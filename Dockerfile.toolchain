@@ -1,0 +1,178 @@
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+# SPDX-FileCopyrightText: 2026 Callan Barrett
+#
+# Builds the reusable Qt 6.7.2 + MiSTer ARM32 toolchain base image.
+# Tag locally as:
+#   zaparoo/qt6-arm32-mister:6.7.2
+#
+# This image is built ONCE (or when Qt version bumps) and reused by
+# Dockerfile.arm32 to keep per-commit builds fast (< 1 minute vs 45 min).
+#
+# Build command (run from repo root):
+#   ./scripts/build-toolchain.sh
+#
+# Qt version pinned here — bump this line when updating Qt:
+ARG QT_VERSION=6.7.2
+
+FROM debian:bookworm-slim AS toolchain-base
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    ninja-build \
+    pkg-config \
+    git \
+    perl \
+    python3 \
+    wget \
+    xz-utils \
+    libfontconfig1-dev \
+    libfreetype-dev \
+    libx11-dev \
+    libx11-xcb-dev \
+    libxext-dev \
+    libxfixes-dev \
+    libxi-dev \
+    libxrender-dev \
+    libxcb1-dev \
+    libxcb-cursor-dev \
+    libxcb-glx0-dev \
+    libxcb-keysyms1-dev \
+    libxcb-image0-dev \
+    libxcb-shm0-dev \
+    libxcb-icccm4-dev \
+    libxcb-sync-dev \
+    libxcb-xfixes0-dev \
+    libxcb-shape0-dev \
+    libxcb-randr0-dev \
+    libxcb-render-util0-dev \
+    libxcb-util-dev \
+    libxcb-xinerama0-dev \
+    libxcb-xkb-dev \
+    libxkbcommon-dev \
+    libxkbcommon-x11-dev \
+    libgl1-mesa-dev \
+    libgles2-mesa-dev \
+    libegl1-mesa-dev \
+    libssl-dev \
+    libdbus-1-dev \
+    libglib2.0-dev \
+    libicu-dev \
+    libpcre2-dev \
+    zlib1g-dev \
+    libjpeg-dev \
+    libpng-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# MiSTer official ARM toolchain (gcc-arm-10.2-2020.11 targeting glibc 2.31)
+RUN wget -q \
+    https://developer.arm.com/-/media/Files/downloads/gnu-a/10.2-2020.11/binrel/gcc-arm-10.2-2020.11-x86_64-arm-none-linux-gnueabihf.tar.xz \
+    && tar xf gcc-arm-10.2-2020.11-x86_64-arm-none-linux-gnueabihf.tar.xz -C /opt \
+    && rm gcc-arm-10.2-2020.11-x86_64-arm-none-linux-gnueabihf.tar.xz
+
+ENV PATH="/opt/gcc-arm-10.2-2020.11-x86_64-arm-none-linux-gnueabihf/bin:${PATH}"
+ENV ARM_SYSROOT="/opt/gcc-arm-10.2-2020.11-x86_64-arm-none-linux-gnueabihf/arm-none-linux-gnueabihf/libc"
+
+WORKDIR /build
+
+ARG QT_VERSION
+RUN git clone --depth 1 --branch v${QT_VERSION} https://github.com/qt/qtbase.git && \
+    git clone --depth 1 --branch v${QT_VERSION} https://github.com/qt/qtshadertools.git && \
+    git clone --depth 1 --branch v${QT_VERSION} https://github.com/qt/qtdeclarative.git
+
+# Stage 1: Qt6 host build (provides native tools: moc, rcc, qmllint, etc.)
+RUN mkdir qtbase-host-build && cd qtbase-host-build && \
+    ../qtbase/configure \
+        -release \
+        -prefix /opt/qt6-host \
+        -nomake examples \
+        -nomake tests \
+        -no-opengl \
+        -no-openssl \
+        -no-dbus \
+        -no-feature-accessibility \
+        -no-feature-printsupport \
+        -no-feature-sql \
+        -qt-zlib \
+        -qt-libpng \
+        -qt-libjpeg \
+        -qt-freetype \
+        -qt-pcre \
+        -qt-harfbuzz \
+    && cmake --build . --parallel $(nproc) \
+    && cmake --install .
+
+RUN mkdir qtshadertools-host-build && cd qtshadertools-host-build && \
+    /opt/qt6-host/bin/qt-configure-module ../qtshadertools \
+    && cmake --build . --parallel $(nproc) \
+    && cmake --install .
+
+RUN mkdir qtdeclarative-host-build && cd qtdeclarative-host-build && \
+    /opt/qt6-host/bin/qt-configure-module ../qtdeclarative \
+    && cmake --build . --parallel $(nproc) \
+    && cmake --install .
+
+# Stage 2: CMake toolchain file for ARM32 cross-compilation
+RUN cat > /build/arm32-toolchain.cmake << 'EOF'
+set(CMAKE_SYSTEM_NAME Linux)
+set(CMAKE_SYSTEM_PROCESSOR arm)
+
+set(CMAKE_C_COMPILER arm-none-linux-gnueabihf-gcc)
+set(CMAKE_CXX_COMPILER arm-none-linux-gnueabihf-g++)
+set(CMAKE_AR arm-none-linux-gnueabihf-ar)
+set(CMAKE_RANLIB arm-none-linux-gnueabihf-ranlib)
+set(CMAKE_STRIP arm-none-linux-gnueabihf-strip)
+
+set(CMAKE_SYSROOT /opt/gcc-arm-10.2-2020.11-x86_64-arm-none-linux-gnueabihf/arm-none-linux-gnueabihf/libc)
+set(CMAKE_FIND_ROOT_PATH ${CMAKE_SYSROOT})
+
+set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
+
+# MiSTer FPGA: Cyclone V SoC — Cortex-A9, NEON, hard-float ABI
+set(CMAKE_C_FLAGS_INIT   "-mcpu=cortex-a9 -mfloat-abi=hard -mtune=cortex-a9 -mfpu=neon")
+set(CMAKE_CXX_FLAGS_INIT "-mcpu=cortex-a9 -mfloat-abi=hard -mtune=cortex-a9 -mfpu=neon")
+EOF
+
+# Stage 3: Qt6 cross-compiled for ARM32 (static, linuxfb, no GPU)
+RUN mkdir qtbase-arm-build && cd qtbase-arm-build && \
+    ../qtbase/configure \
+        -release \
+        -static \
+        -prefix /opt/qt6-arm32 \
+        -qt-host-path /opt/qt6-host \
+        -nomake examples \
+        -nomake tests \
+        -no-opengl \
+        -linuxfb \
+        -no-openssl \
+        -no-dbus \
+        -no-icu \
+        -no-feature-accessibility \
+        -no-feature-printsupport \
+        -no-feature-sql \
+        -no-feature-concurrent \
+        -no-feature-brotli \
+        -qt-zlib \
+        -qt-libpng \
+        -qt-libjpeg \
+        -qt-freetype \
+        -qt-pcre \
+        -qt-harfbuzz \
+        -- -DCMAKE_TOOLCHAIN_FILE=/build/arm32-toolchain.cmake \
+    && cmake --build . --parallel $(nproc) \
+    && cmake --install .
+
+RUN mkdir qtshadertools-arm-build && cd qtshadertools-arm-build && \
+    /opt/qt6-arm32/bin/qt-configure-module ../qtshadertools \
+    && cmake --build . --parallel $(nproc) \
+    && cmake --install .
+
+RUN mkdir qtdeclarative-arm-build && cd qtdeclarative-arm-build && \
+    /opt/qt6-arm32/bin/qt-configure-module ../qtdeclarative \
+    && cmake --build . --parallel $(nproc) \
+    && cmake --install .

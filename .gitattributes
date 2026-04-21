@@ -1,0 +1,37 @@
+# Binary assets — prevent git from messing with them
+*.png    binary
+*.ttf    binary
+*.otf    binary
+*.ico    binary
+*.icns   binary
+*.jpg    binary
+*.jpeg   binary
+*.gif    binary
+*.webp   binary
+
+# Text files — enforce LF line endings everywhere
+*.cpp    text eol=lf
+*.h      text eol=lf
+*.hpp    text eol=lf
+*.qml    text eol=lf
+*.cmake  text eol=lf
+CMakeLists.txt text eol=lf
+*.sh     text eol=lf
+*.py     text eol=lf
+*.md     text eol=lf
+*.txt    text eol=lf
+*.ini    text eol=lf
+*.conf   text eol=lf
+*.yaml   text eol=lf
+*.yml    text eol=lf
+*.json   text eol=lf
+*.xml    text eol=lf
+Dockerfile*  text eol=lf
+.gitignore   text eol=lf
+.gitattributes text eol=lf
+.editorconfig  text eol=lf
+
+# Diff hints
+*.cpp    diff=cpp
+*.h      diff=cpp
+*.hpp    diff=cpp

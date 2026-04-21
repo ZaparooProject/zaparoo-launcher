@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+# SPDX-FileCopyrightText: 2026 Callan Barrett
+#
+# Cross-compiles the zaparoo-launcher application for ARM32 / MiSTer FPGA.
+#
+# Requires the prebuilt toolchain image to exist locally:
+#   zaparoo/qt6-arm32-mister:6.7.2
+#
+# Build the toolchain image first (one-time, ~45 min):
+#   ./scripts/build-toolchain.sh
+#
+# Then build the application (fast, < 1 min):
+#   ./scripts/build-arm32.sh
+
+FROM zaparoo/qt6-arm32-mister:6.7.2 AS app-build
+
+WORKDIR /src
+
+COPY CMakeLists.txt .
+COPY cmake/ cmake/
+COPY src/ src/
+COPY resources/ resources/
+
+RUN mkdir build && cd build && \
+    /opt/qt6-arm32/bin/qt-cmake .. \
+        -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DZAPAROO_BUILD_TESTS=OFF \
+    && ninja
+
+# Output stage — extracts only the binary into the host output directory
+FROM scratch AS export
+COPY --from=app-build /src/build/bin/zaparoo-launcher /zaparoo-launcher

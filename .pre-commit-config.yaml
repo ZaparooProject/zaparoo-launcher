@@ -1,0 +1,43 @@
+---
+repos:
+  # C++ formatting check via clang-format
+  - repo: https://github.com/cpp-linter/cpp-linter-hooks
+    rev: v1.4.0
+    hooks:
+      - id: clang-format
+        args: [--style=file, --version=18]
+        types_or: [c++, c]
+
+  # CMake formatting
+  - repo: https://github.com/cheshirekow/cmake_format
+    rev: v0.6.13
+    hooks:
+      - id: cmake-format
+        args: [--config-files, .cmake-format.yaml]
+
+  # QML formatting — runs qmlformat in-place on changed .qml files
+  - repo: local
+    hooks:
+      - id: qmlformat
+        name: qmlformat
+        entry: qmlformat
+        args: [--inplace]
+        language: system
+        types: [file]
+        files: \.qml$
+        pass_filenames: true
+
+  # Basic file hygiene
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: end-of-file-fixer
+        exclude: \.(png|ttf|ico|icns|jpg)$
+      - id: trailing-whitespace
+        exclude: \.(png|ttf|ico|icns|jpg)$
+      - id: check-yaml
+      - id: check-merge-conflict
+      - id: mixed-line-ending
+        args: [--fix=lf]
+        exclude: \.(png|ttf|ico|icns|jpg)$
+...

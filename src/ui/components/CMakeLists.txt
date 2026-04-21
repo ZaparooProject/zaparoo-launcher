@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+# SPDX-FileCopyrightText: 2026 Callan Barrett
+
+qt_add_library(zaparoo_ui_components STATIC)
+
+qt_add_qml_module(
+    zaparoo_ui_components
+    URI Zaparoo.Ui
+    VERSION 1.0
+    QML_FILES
+        Carousel.qml
+        CrtOverlay.qml
+        FpsCounter.qml
+        MenuBar.qml
+        SelectionDots.qml
+        Starfield.qml
+)
+
+target_link_libraries(
+    zaparoo_ui_components
+    PUBLIC Qt6::Quick
+    PRIVATE Zaparoo::CompileOptions
+)

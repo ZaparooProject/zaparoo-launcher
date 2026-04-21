@@ -1,0 +1,50 @@
+Qt LGPL License Notice
+======================
+
+This software uses the Qt framework, which is licensed under the
+GNU Lesser General Public License version 3 (LGPLv3).
+
+Qt Modules Used
+---------------
+- Qt Core
+- Qt GUI
+- Qt QML
+- Qt Quick
+- Qt Quick Controls 2
+
+License Compliance
+------------------
+In accordance with the LGPLv3:
+
+1. The Qt libraries are dynamically linked to this application.
+2. You may replace the Qt shared libraries with your own modified
+   or different versions of Qt.
+3. The complete source code for Qt is available at:
+   https://code.qt.io/
+4. The full text of the LGPLv3 license is included in this distribution
+   as "LGPLv3.txt".
+
+Qt Copyright Notice
+-------------------
+Copyright (C) 2024 The Qt Company Ltd.
+Contact: https://www.qt.io/licensing/
+
+Qt is available under the following licenses:
+- GNU Lesser General Public License version 3 (LGPLv3)
+- GNU General Public License version 2 (GPLv2)
+- GNU General Public License version 3 (GPLv3)
+- Commercial License
+
+For more information about Qt licensing, visit:
+https://www.qt.io/licensing/
+
+Obtaining Qt Source Code
+------------------------
+The source code for the Qt libraries used in this application can be
+obtained from:
+
+1. Official Qt repositories: https://code.qt.io/
+2. Qt download page: https://www.qt.io/download-open-source
+
+Alternatively, you may request a copy of the Qt source code by contacting
+the distributor of this software.
