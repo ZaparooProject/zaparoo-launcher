@@ -52,3 +52,7 @@ output/
 # Qt Creator local user settings
 *.creator.user
 *.user
+
+# AI agent tooling — local only, not shared
+CLAUDE.md
+.claude/
