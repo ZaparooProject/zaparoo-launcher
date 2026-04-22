@@ -49,14 +49,14 @@ ApplicationWindow {
     property string activeScreen: root.screenHub       // screenHub | screenGames
     property string hubFocus: root.focusCategories     // focusCategories | focusSystems
 
-    // Slow rainbow hue cycle for the retro aesthetic.
-    property real rainbowHue
+    // Drives the hub↔games slide transition. 0 = hub centred; width = games centred.
+    property real screenOffset: root.activeScreen === root.screenGames ? width : 0
 
-    NumberAnimation on rainbowHue {
-        from: 0
-        to: 1
-        duration: 12000
-        loops: Animation.Infinite
+    Behavior on screenOffset {
+        NumberAnimation {
+            duration: 220
+            easing.type: Easing.OutCubic
+        }
     }
 
     // Reset carousel indices when models deliver new data.
@@ -88,6 +88,150 @@ ApplicationWindow {
         color: Theme.bgDeep
     }
 
+    // ── Logo ──────────────────────────────────────────────────────────────────
+
+    Image {
+        anchors.left: parent.left
+        anchors.top: parent.top
+        anchors.leftMargin: Sizing.pctW(2)
+        anchors.topMargin: Sizing.pctH(2)
+        height: Sizing.pctH(7)
+        fillMode: Image.PreserveAspectFit
+        source: "qrc:/qt/qml/Zaparoo/App/resources/images/logo.png"
+    }
+
+    // ── Hub screen ────────────────────────────────────────────────────────────
+
+    Item {
+        id: hubContainer
+        x: -root.screenOffset
+        width: parent.width
+        height: parent.height
+
+        Carousel {
+            id: categoriesCarousel
+
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: parent.width
+            height: Sizing.pctH(20)
+            y: root.hubFocus === root.focusSystems ? Sizing.pctH(12) : Sizing.pctH(35)
+            coverWidth: Sizing.pctH(20)
+            coverHeight: Sizing.pctH(20)
+            coverSpacing: Sizing.pctH(23)
+
+            model: root.categoriesRef
+            delegate: TextTileDelegate {}
+            placeholderCover: ""
+
+            Behavior on y {
+                NumberAnimation {
+                    duration: 250
+                    easing.type: Easing.OutQuad
+                }
+            }
+        }
+
+        Carousel {
+            id: systemsCarousel
+
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: parent.width
+            height: Sizing.pctH(20)
+            y: Sizing.pctH(36)
+            visible: root.hubFocus === root.focusSystems
+            coverWidth: Sizing.pctH(20)
+            coverHeight: Sizing.pctH(20)
+            coverSpacing: Sizing.pctH(23)
+
+            model: root.systemsRef
+            delegate: TextTileDelegate {}
+            placeholderCover: ""
+        }
+
+        Text {
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: systemsCarousel.y + systemsCarousel.height + Sizing.pctH(1)
+            visible: root.hubFocus === root.focusSystems
+            // qmllint disable compiler
+            text: {
+                root.systemsRef.count
+                return root.systemsRef.systemNameAt(systemsCarousel.currentIndex)
+            }
+            // qmllint enable compiler
+            font.family: Theme.fontRetro
+            font.pixelSize: Sizing.fontSize(4)
+            color: Theme.textPrimary
+            renderType: Text.NativeRendering
+        }
+    }
+
+    // ── Games screen ──────────────────────────────────────────────────────────
+
+    Item {
+        id: gamesContainer
+        x: parent.width - root.screenOffset
+        width: parent.width
+        height: parent.height
+
+        Carousel {
+            id: gamesCarousel
+
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: Sizing.pctH(12)
+            width: parent.width
+            height: Sizing.pctH(55)
+            // qmllint disable compiler
+            opacity: root.gamesRef.loading ? 0.5 : 1.0
+            model: root.activeScreen === root.screenGames ? root.gamesRef : null
+            // qmllint enable compiler
+            delegate: CoverDelegate {}
+            placeholderCover: "qrc:/qt/qml/Zaparoo/App/resources/images/placeholder/cover_generic.png"
+
+            onCurrentIndexChanged: {
+                // qmllint disable compiler
+                root.gamesRef.setSelectedIndex(currentIndex)
+                // qmllint enable compiler
+            }
+
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: 100
+                }
+            }
+        }
+
+        Text {
+            anchors.centerIn: gamesCarousel
+            // qmllint disable compiler
+            visible: root.gamesRef.errorMessage !== ""
+            text: root.gamesRef.errorMessage
+            // qmllint enable compiler
+            font.family: Theme.fontRetro
+            font.pixelSize: Sizing.fontSize(3)
+            color: Theme.textDim
+            wrapMode: Text.WordWrap
+            horizontalAlignment: Text.AlignHCenter
+            width: parent.width * 0.7
+            renderType: Text.NativeRendering
+        }
+
+        Text {
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.top: gamesCarousel.bottom
+            anchors.topMargin: Sizing.pctH(1)
+            // qmllint disable compiler
+            text: {
+                root.gamesRef.count
+                return root.gamesRef.nameAt(gamesCarousel.currentIndex)
+            }
+            // qmllint enable compiler
+            font.family: Theme.fontRetro
+            font.pixelSize: Sizing.fontSize(4)
+            color: Theme.textPrimary
+            renderType: Text.NativeRendering
+        }
+    }
+
     // ── FPS counter ───────────────────────────────────────────────────────────
 
     FpsCounter {
@@ -96,171 +240,6 @@ ApplicationWindow {
         anchors.topMargin: Sizing.pctH(1)
         anchors.rightMargin: Sizing.pctW(1)
         z: 200
-    }
-
-    // ── Title ─────────────────────────────────────────────────────────────────
-
-    Text {
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.top: parent.top
-        anchors.topMargin: Sizing.pctH(3)
-        text: "ZAPAROO"
-        font.family: Theme.fontRetro
-        font.pixelSize: Sizing.fontSize(5)
-        color: Qt.hsla(root.rainbowHue, 0.9, 0.65, 1)
-    }
-
-    // ── Categories carousel ───────────────────────────────────────────────────
-
-    Carousel {
-        id: categoriesCarousel
-
-        anchors.horizontalCenter: parent.horizontalCenter
-        width: parent.width
-        height: Sizing.pctH(30)
-        y: root.hubFocus === root.focusSystems ? Sizing.pctH(5) : Sizing.pctH(28)
-        opacity: root.activeScreen === root.screenHub ? 1 : 0
-
-        model: root.categoriesRef
-        delegate: TextTileDelegate {}
-        placeholderCover: ""
-        rainbowHue: root.rainbowHue
-
-        Behavior on y {
-            NumberAnimation {
-                duration: 250
-                easing.type: Easing.OutQuad
-            }
-        }
-        Behavior on opacity {
-            NumberAnimation {
-                duration: 250
-                easing.type: Easing.OutQuad
-            }
-        }
-    }
-
-    // ── Systems carousel ──────────────────────────────────────────────────────
-
-    Carousel {
-        id: systemsCarousel
-
-        anchors.horizontalCenter: parent.horizontalCenter
-        width: parent.width
-        height: Sizing.pctH(30)
-        y: root.hubFocus === root.focusSystems ? Sizing.pctH(40) : Sizing.pctH(62)
-        opacity: root.activeScreen === root.screenHub && root.hubFocus === root.focusSystems ? 1 : 0
-
-        model: root.systemsRef
-        delegate: TextTileDelegate {}
-        placeholderCover: ""
-        rainbowHue: root.rainbowHue
-
-        Behavior on y {
-            NumberAnimation {
-                duration: 250
-                easing.type: Easing.OutQuad
-            }
-        }
-        Behavior on opacity {
-            NumberAnimation {
-                duration: 250
-                easing.type: Easing.OutQuad
-            }
-        }
-    }
-
-    // ── Games carousel ────────────────────────────────────────────────────────
-
-    Carousel {
-        id: gamesCarousel
-
-        anchors.horizontalCenter: parent.horizontalCenter
-        y: Sizing.pctH(12)
-        width: parent.width
-        height: Sizing.pctH(55)
-        // qmllint disable compiler
-        opacity: root.activeScreen === root.screenGames ? (root.gamesRef.loading ? 0.5 : 1.0) : 0
-
-        model: root.gamesRef
-        // qmllint enable compiler
-        delegate: CoverDelegate {}
-        placeholderCover: "qrc:/qt/qml/Zaparoo/App/resources/images/placeholder/cover_generic.png"
-        rainbowHue: root.rainbowHue
-
-        onCurrentIndexChanged: {
-            // qmllint disable compiler
-            root.gamesRef.setSelectedIndex(currentIndex)
-            // qmllint enable compiler
-        }
-
-        Behavior on opacity {
-            NumberAnimation {
-                duration: 200
-                easing.type: Easing.OutQuad
-            }
-        }
-    }
-
-    // ── Games error message ───────────────────────────────────────────────────
-
-    Text {
-        anchors.centerIn: gamesCarousel
-        // qmllint disable compiler
-        opacity: root.activeScreen === root.screenGames && root.gamesRef.errorMessage !== "" ? 1 : 0
-        text: root.gamesRef.errorMessage
-        // qmllint enable compiler
-        font.family: Theme.fontRetro
-        font.pixelSize: Sizing.fontSize(3)
-        color: Theme.textDim
-        wrapMode: Text.WordWrap
-        horizontalAlignment: Text.AlignHCenter
-        width: parent.width * 0.7
-    }
-
-    // ── Context title text ────────────────────────────────────────────────────
-
-    Text {
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.top: gamesCarousel.bottom
-        anchors.topMargin: Sizing.pctH(1)
-        opacity: root.activeScreen === root.screenGames ? 1 : 0
-        // qmllint disable compiler
-        text: {
-            root.gamesRef.count // read count so this binding re-evaluates on model reset
-            return root.gamesRef.nameAt(gamesCarousel.currentIndex)
-        }
-        // qmllint enable compiler
-        font.family: Theme.fontRetro
-        font.pixelSize: Sizing.fontSize(4)
-        color: Theme.textPrimary
-
-        Behavior on opacity {
-            NumberAnimation {
-                duration: 200
-            }
-        }
-    }
-
-    Text {
-        anchors.horizontalCenter: parent.horizontalCenter
-        y: systemsCarousel.y + systemsCarousel.height + Sizing.pctH(1)
-        opacity: root.activeScreen === root.screenHub && root.hubFocus === root.focusSystems ? 1 : 0
-        // qmllint disable compiler
-        text: {
-            root.systemsRef.count // read count so this binding re-evaluates on model reset
-            return root.systemsRef.systemNameAt(systemsCarousel.currentIndex)
-        }
-        // qmllint enable compiler
-        font.family: Theme.fontRetro
-        font.pixelSize: Sizing.fontSize(4)
-        color: Theme.textPrimary
-
-        Behavior on opacity {
-            NumberAnimation {
-                duration: 200
-            }
-        }
     }
 
     // ── Instructions bar ──────────────────────────────────────────────────────
@@ -288,6 +267,7 @@ ApplicationWindow {
             font.family: Theme.fontRetro
             font.pixelSize: Sizing.fontSize(2.5)
             color: Theme.textDim
+            renderType: Text.NativeRendering
         }
     }
 

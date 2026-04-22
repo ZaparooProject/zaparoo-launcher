@@ -12,14 +12,13 @@ Item {
     required property var model
     required property Component delegate
     required property url placeholderCover
-    required property real rainbowHue
 
     property int currentIndex: 0
     readonly property int itemCount: itemRepeater.count
 
-    readonly property int coverWidth: Sizing.pctH(30)
-    readonly property int coverHeight: Sizing.pctH(45)
-    readonly property int coverSpacing: Sizing.pctH(35)
+    property int coverWidth: Sizing.pctH(30)
+    property int coverHeight: Sizing.pctH(45)
+    property int coverSpacing: Sizing.pctH(35)
 
     Repeater {
         id: itemRepeater
@@ -50,16 +49,18 @@ Item {
             x: root.width / 2 - width / 2 + offset * root.coverSpacing
             y: 0
             z: 10 - Math.abs(offset)
-            opacity: isVisible ? (1.0 - Math.abs(offset) * 0.3) : 0
+            opacity: isVisible ? 1.0 : 0
             scale: isSelected ? 1.1 : 0.85
             visible: isVisible
 
             Behavior on x {
+                enabled: coverItem.isVisible
                 NumberAnimation {
                     duration: 150
                 }
             }
             Behavior on scale {
+                enabled: coverItem.isVisible
                 NumberAnimation {
                     duration: 150
                 }
@@ -69,7 +70,6 @@ Item {
                 anchors.fill: parent
                 sourceComponent: root.delegate
                 property bool isSelected: coverItem.isSelected
-                property real rainbowHue: root.rainbowHue
                 property url placeholderCover: root.placeholderCover
                 property string name: coverItem.name
             }

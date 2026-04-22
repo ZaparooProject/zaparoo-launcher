@@ -11,10 +11,7 @@ Item {
     id: root
 
     property int fps: 0
-
-    // Drives frame counting via an always-running NumberAnimation.
     property int _frameCount: 0
-    property real _animValue
 
     Timer {
         interval: 1000
@@ -26,14 +23,10 @@ Item {
         }
     }
 
-    NumberAnimation on _animValue {
-        from: 0
-        to: 1000000
-        duration: 1000000 * (1000 / 60)
-        loops: Animation.Infinite
+    FrameAnimation {
+        running: true
+        onTriggered: root._frameCount++
     }
-
-    on_AnimValueChanged: _frameCount++
 
     Text {
         anchors.top: parent.top
@@ -42,5 +35,6 @@ Item {
         font.family: Theme.fontMono
         font.pixelSize: Sizing.fontSize(2)
         color: root.fps >= 55 ? "#00ff00" : (root.fps >= 30 ? "#ffff00" : "#ff0000")
+        renderType: Text.NativeRendering
     }
 }

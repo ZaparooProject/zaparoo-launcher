@@ -79,7 +79,6 @@ int main(int argc, char* argv[])
     zaparoo::GamesModel::setInstance(&gamesModel);
 
     // Fonts are embedded inside the Zaparoo.App QML module's resource bundle.
-    QFontDatabase::addApplicationFont(":/qt/qml/Zaparoo/App/resources/fonts/DejaVuSans.ttf");
     QFontDatabase::addApplicationFont(":/qt/qml/Zaparoo/App/resources/fonts/PressStart2P.ttf");
 
     // Basic style is mandatory: it is the only style compatible with software

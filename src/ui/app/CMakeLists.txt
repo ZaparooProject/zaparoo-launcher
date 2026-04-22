@@ -8,8 +8,8 @@ qt_add_library(zaparoo_ui_app STATIC)
 # resource system can give them a stable, relative-looking path.
 set(_RESOURCE_ROOT "${CMAKE_SOURCE_DIR}/resources")
 set(_APP_RESOURCES
-    "${_RESOURCE_ROOT}/fonts/DejaVuSans.ttf"
     "${_RESOURCE_ROOT}/fonts/PressStart2P.ttf"
+    "${_RESOURCE_ROOT}/images/logo.png"
     "${_RESOURCE_ROOT}/images/placeholder/cover_generic.png"
 )
 

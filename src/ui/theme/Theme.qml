@@ -9,7 +9,7 @@ import QtQuick
 QtObject {
     // Backgrounds
     readonly property color bgDeep: "#0f0f23"
-    readonly property color bgMid: "#12121f"
+    readonly property color bgMid: "#252550"
     readonly property color bgPanel: "#1a1a35"
     readonly property color bgBar: "#0a0a15"
 
@@ -25,6 +25,9 @@ QtObject {
     readonly property color textMuted: "#666666"
     readonly property color textDim: "#555555"
     readonly property color textLabel: "#888888"
+
+    // Accent — static warm amber used for selection highlights.
+    readonly property color accent: "#FFB347"
 
     // Fonts
     readonly property string fontRetro: "Press Start 2P"

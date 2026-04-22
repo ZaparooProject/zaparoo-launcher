@@ -11,16 +11,15 @@ Item {
 
     // qmllint disable missing-property compiler
     readonly property bool delegateIsSelected: parent.isSelected
-    readonly property real delegateRainbowHue: parent.rainbowHue
     readonly property string delegateName: parent.name
     // qmllint enable missing-property compiler
 
     Rectangle {
         anchors.fill: parent
-        anchors.margins: -Sizing.pctH(0.8)
+        anchors.margins: 0
         color: "transparent"
         border.width: Math.max(1, Sizing.pctH(0.5))
-        border.color: root.delegateIsSelected ? Qt.hsla(root.delegateRainbowHue, 0.9, 0.6, 1) : Theme.borderMid
+        border.color: root.delegateIsSelected ? Theme.accent : Theme.borderMid
     }
 
     Rectangle {
@@ -36,6 +35,7 @@ Item {
             color: root.delegateIsSelected ? Theme.textPrimary : Theme.textDim
             wrapMode: Text.WordWrap
             horizontalAlignment: Text.AlignHCenter
+            renderType: Text.NativeRendering
         }
     }
 }
