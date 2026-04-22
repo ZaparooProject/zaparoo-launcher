@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 # SPDX-FileCopyrightText: 2026 Callan Barrett
 
-qt_add_executable(zaparoo-launcher main.cpp)
+qt_add_executable(launcher main.cpp MiSterRuntime.cpp MiSterRuntime.h)
 
 target_compile_definitions(
-    zaparoo-launcher
+    launcher
     PRIVATE ZAPAROO_VERSION="${CMAKE_PROJECT_VERSION}"
 )
 
@@ -20,6 +20,7 @@ get_target_property(_qt6_core_type Qt6::Core TYPE)
 # Also load the linuxfb platform plugin, whose config lives inside Qt6Gui/ rather
 # than a standalone Qt6QLinuxFbIntegrationPlugin/ directory.
 if(_qt6_core_type STREQUAL "STATIC_LIBRARY")
+    target_compile_definitions(launcher PRIVATE ZAPAROO_MISTER)
     get_filename_component(_qt_prefix "${Qt6_DIR}/../../.." ABSOLUTE)
     file(GLOB _qml_plugin_configs
         "${_qt_prefix}/lib/cmake/Qt6Qml/QmlPlugins/Qt6*Config.cmake"
@@ -41,7 +42,7 @@ if(_qt6_core_type STREQUAL "STATIC_LIBRARY")
 endif()
 
 target_link_libraries(
-    zaparoo-launcher
+    launcher
     PRIVATE
         Zaparoo::CompileOptions
         zaparoo_core
@@ -54,7 +55,7 @@ target_link_libraries(
 # qt_import_qml_plugins must be called AFTER target_link_libraries so that
 # qmlimportscanner can traverse the full dependency graph and find all
 # import statements in the linked QML modules.
-qt_import_qml_plugins(zaparoo-launcher)
+qt_import_qml_plugins(launcher)
 
 # For static builds: link the linuxfb platform plugin and the QtQuick.Controls
 # chain. The _init object files contain Q_IMPORT_PLUGIN which registers each
@@ -62,7 +63,7 @@ qt_import_qml_plugins(zaparoo-launcher)
 # cross-compiled static Qt toolchain that lacks qmlimportscanner.
 if(_qt6_core_type STREQUAL "STATIC_LIBRARY")
     if(TARGET Qt6::QLinuxFbIntegrationPlugin)
-        target_link_libraries(zaparoo-launcher PRIVATE
+        target_link_libraries(launcher PRIVATE
             Qt6::QLinuxFbIntegrationPlugin
             Qt6::QLinuxFbIntegrationPlugin_init
         )
@@ -74,7 +75,7 @@ if(_qt6_core_type STREQUAL "STATIC_LIBRARY")
             qtquicktemplates2plugin
             quickwindow)
         if(TARGET Qt6::${_qml_plugin})
-            target_link_libraries(zaparoo-launcher PRIVATE
+            target_link_libraries(launcher PRIVATE
                 Qt6::${_qml_plugin}
                 Qt6::${_qml_plugin}_init
             )
@@ -83,8 +84,8 @@ if(_qt6_core_type STREQUAL "STATIC_LIBRARY")
 endif()
 
 set_target_properties(
-    zaparoo-launcher PROPERTIES
+    launcher PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )
 
-install(TARGETS zaparoo-launcher RUNTIME DESTINATION bin)
+install(TARGETS launcher RUNTIME DESTINATION bin)

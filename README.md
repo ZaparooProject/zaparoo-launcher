@@ -10,23 +10,23 @@ See [docs/building.md](docs/building.md) for full instructions.
 
 ```bash
 cmake -S . -B build && cmake --build build
-./build/bin/zaparoo-launcher
+./build/bin/launcher
 ```
 
 **MiSTer ARM32 (requires Docker):**
 
 ```bash
 ./scripts/build-arm32.sh
-# output/zaparoo-launcher
+# output/launcher
 ```
 
 ## Running on framebuffer
 
 ```bash
-QT_QPA_PLATFORM=linuxfb QT_QUICK_BACKEND=software ./zaparoo-launcher
+QT_QPA_PLATFORM=linuxfb QT_QUICK_BACKEND=software ./build/bin/launcher
 ```
 
-MiSTer launcher scripts with `vmode` resolution switching are in `packaging/mister/`.
+On MiSTer, the binary sets `vmode` and starts the Zaparoo Core service automatically. Configure resolution via `/media/fat/zaparoo/launcher.toml`.
 
 ## Controls
 

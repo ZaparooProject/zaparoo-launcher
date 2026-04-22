@@ -160,8 +160,8 @@ void ZaparooClient::onDisconnected()
     emit disconnected();
     if (!m_endpoint.isEmpty())
     {
-        qCDebug(zapNet) << "scheduling reconnect in 3s";
-        m_reconnectTimer.start(3000);
+        qCDebug(zapNet) << "scheduling reconnect in 1s";
+        m_reconnectTimer.start(1000);
     }
 }
 

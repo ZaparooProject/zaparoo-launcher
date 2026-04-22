@@ -23,7 +23,7 @@ On Ubuntu/Debian: `sudo apt install qt6-declarative-dev qt6-quick-controls2-dev 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
 cmake --build build
-./build/bin/zaparoo-launcher
+./build/bin/launcher
 ```
 
 For a Release build:
@@ -45,7 +45,7 @@ cmake -S . -B build -DZAPAROO_BUILD_TESTS=OFF
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug \
     -DZAPAROO_ENABLE_ASAN=ON -DZAPAROO_ENABLE_UBSAN=ON
 cmake --build build
-./build/bin/zaparoo-launcher
+./build/bin/launcher
 ```
 
 ### QML linting
@@ -68,7 +68,7 @@ This creates the `zaparoo/qt6-arm32-mister:6.7.2` Docker image locally.
 
 ```bash
 ./scripts/build-arm32.sh
-# Output: output/zaparoo-launcher
+# Output: output/launcher
 ```
 
 If the toolchain image is missing, `build-arm32.sh` rebuilds it automatically.
@@ -76,7 +76,7 @@ If the toolchain image is missing, `build-arm32.sh` rebuilds it automatically.
 ### Verify the ARM binary
 
 ```bash
-file output/zaparoo-launcher
+file output/launcher
 # Should report: ELF 32-bit LSB executable, ARM, EABI5 ...
 ```
 
@@ -85,20 +85,37 @@ file output/zaparoo-launcher
 ```bash
 cmake --build build
 ./packaging/deploy-desktop.sh
-./deploy/zaparoo-launcher/run.sh
+./deploy/launcher/run.sh
 ```
 
 The deploy script bundles Qt shared libraries alongside the binary. Qt
 must be on your PATH (i.e. `qmake6` or `qmake` must be findable).
 
-## Run on framebuffer (MiSTer or headless Linux)
+## Deploy to MiSTer
 
 ```bash
-QT_QPA_PLATFORM=linuxfb QT_QUICK_BACKEND=software ./build/bin/zaparoo-launcher
+./scripts/deploy-mister.sh
 ```
 
-Use the MiSTer launcher scripts in `packaging/mister/` to set the correct
-`vmode` resolution before launching.
+The binary is self-contained on MiSTer: it sets `QT_QPA_PLATFORM=linuxfb` and
+`QT_QUICK_BACKEND=software`, runs `vmode -r W H rgb32` (width/height from
+config, defaulting to 1920×1080), and starts
+`/media/fat/Scripts/zaparoo.sh -service start` automatically. Just run the
+binary — no wrapper script required.
+
+User-editable config lives at `/media/fat/zaparoo/launcher.toml`. Example to override resolution:
+
+```toml
+[video]
+width = 1280
+height = 720
+```
+
+## Run on framebuffer (desktop headless)
+
+```bash
+QT_QPA_PLATFORM=linuxfb QT_QUICK_BACKEND=software ./build/bin/launcher
+```
 
 ## Running tests
 

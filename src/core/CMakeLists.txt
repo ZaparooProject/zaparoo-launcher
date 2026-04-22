@@ -25,7 +25,11 @@ qt_add_qml_module(
     VERSION 1.0
 )
 
-target_include_directories(zaparoo_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_include_directories(
+    zaparoo_core
+    PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}"
+    SYSTEM PRIVATE "${CMAKE_SOURCE_DIR}/third_party" # tomlplusplus v3.4.0
+)
 
 target_link_libraries(
     zaparoo_core

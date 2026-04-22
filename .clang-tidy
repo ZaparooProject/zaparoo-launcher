@@ -6,6 +6,7 @@ Checks: >
   readability-*,
   cppcoreguidelines-*,
   -modernize-use-trailing-return-type,
+  -clang-analyzer-optin.cplusplus.UninitializedObject,
   -readability-magic-numbers,
   -readability-named-parameter,
   -cppcoreguidelines-avoid-magic-numbers,

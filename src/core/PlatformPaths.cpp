@@ -18,17 +18,17 @@ QString PlatformPaths::configFilePath()
 {
     if (isMiSTer())
     {
-        return QStringLiteral("/media/fat/Scripts/zaparoo-launcher/launcher.conf");
+        return QStringLiteral("/media/fat/zaparoo/launcher.toml");
     }
     const QString configDir = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
-    return configDir + QStringLiteral("/launcher.conf");
+    return configDir + QStringLiteral("/launcher.toml");
 }
 
 QString PlatformPaths::cacheDir()
 {
     if (isMiSTer())
     {
-        return QStringLiteral("/media/fat/Scripts/zaparoo-launcher/cache");
+        return QStringLiteral("/media/fat/zaparoo/cache");
     }
     return QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
 }

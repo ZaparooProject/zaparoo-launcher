@@ -90,7 +90,6 @@ class MockServer : public QObject
         emit frameReceived();
     }
 
-  private:
     QWebSocketServer m_server;
     QJsonObject m_reply;
     QJsonObject m_lastFrame;
@@ -302,7 +301,6 @@ class TestZaparooClient : public QObject
         QTRY_COMPARE(spy.count(), 1);
     }
 
-  private:
     MockServer* m_server{nullptr};    // NOLINT(cppcoreguidelines-owning-memory)
     ZaparooClient* m_client{nullptr}; // NOLINT(cppcoreguidelines-owning-memory)
 };

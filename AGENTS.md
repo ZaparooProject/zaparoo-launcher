@@ -42,10 +42,7 @@ lost on kill.
 ```bash
 # Build and run (desktop)
 cmake -S . -B build && cmake --build build
-./build/bin/zaparoo-launcher
-
-# Run on framebuffer
-QT_QPA_PLATFORM=linuxfb QT_QUICK_BACKEND=software ./build/bin/zaparoo-launcher
+./build/bin/launcher
 
 # Tests
 ctest --test-dir build --output-on-failure
@@ -69,10 +66,22 @@ pre-commit run --all-files
 ```
 
 Builds the ARM32 binary, backs up the existing binary on the device to
-`zaparoo-launcher.bak`, kills any running instance, and SCPs the new binary
-over. Reads `MISTER_IP` from a `.env` file in the project root — create it
-with `echo 'MISTER_IP=<ip>' > .env` if it doesn't exist yet. When the user
-asks to deploy, run this script.
+`launcher.bak`, SCPs the new binary over, kills any running `launcher` and
+`MiSTer_Zaparoo` processes, then restarts `MiSTer_Zaparoo`. Reads `MISTER_IP`
+from a `.env` file in the project root — create it with
+`echo 'MISTER_IP=<ip>' > .env` if it doesn't exist yet. When the user asks
+to deploy, run this script.
+
+`/media/fat/MiSTer_Zaparoo` is the pre-existing Zaparoo integration binary
+that ships with MiSTer; it is responsible for launching our `launcher` binary.
+Restarting it picks up the newly deployed binary automatically.
+
+The launcher binary is self-contained: it sets `QT_QPA_PLATFORM=linuxfb` and
+`QT_QUICK_BACKEND=software`, runs `vmode -r W H rgb32` (width/height from
+config), and starts the Zaparoo Core service automatically. Resolution and
+endpoint can be overridden in `/media/fat/zaparoo/launcher.toml`
+(TOML format; create the file manually — see `docs/building.md` for an
+example).
 
 For ARM32 / MiSTer builds and deploy bundle, see @docs/building.md.
 

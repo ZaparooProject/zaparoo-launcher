@@ -10,7 +10,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 BUILD_DIR="${PROJECT_ROOT}/build"
-DEPLOY_DIR="${PROJECT_ROOT}/deploy/zaparoo-launcher"
+DEPLOY_DIR="${PROJECT_ROOT}/deploy/launcher"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -21,7 +21,7 @@ info() { echo -e "${GREEN}[INFO]${NC} $1"; }
 warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 error() { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 
-BINARY="${BUILD_DIR}/src/app/zaparoo-launcher"
+BINARY="${BUILD_DIR}/bin/launcher"
 if [ ! -f "${BINARY}" ]; then
     error "Binary not found at ${BINARY}. Run 'cmake --build build' first."
 fi
@@ -113,6 +113,7 @@ info "Copying licenses..."
 cp "${PROJECT_ROOT}/src/LICENSES/LGPLv3.txt" "${DEPLOY_DIR}/"
 cp "${PROJECT_ROOT}/src/LICENSES/Qt-LGPL-NOTICE.txt" "${DEPLOY_DIR}/"
 cp "${PROJECT_ROOT}/COPYING" "${DEPLOY_DIR}/"
+cp "${PROJECT_ROOT}/third_party/tomlplusplus/LICENSE" "${DEPLOY_DIR}/tomlplusplus-LICENSE.txt"
 
 info "Creating launcher script..."
 cat > "${DEPLOY_DIR}/run.sh" << 'EOF'
@@ -128,7 +129,7 @@ if [ -z "$DISPLAY" ] && [ -z "$WAYLAND_DISPLAY" ]; then
     export QT_QUICK_BACKEND="${QT_QUICK_BACKEND:-software}"
 fi
 
-exec "${SCRIPT_DIR}/zaparoo-launcher" "$@"
+exec "${SCRIPT_DIR}/launcher" "$@"
 EOF
 chmod +x "${DEPLOY_DIR}/run.sh"
 

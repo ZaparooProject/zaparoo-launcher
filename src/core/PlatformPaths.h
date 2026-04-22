@@ -8,7 +8,7 @@ namespace zaparoo
 {
 
 // Returns platform-appropriate paths for config, cache, and deployment.
-// On MiSTer, the binary lives at /media/fat/Scripts/zaparoo-launcher.
+// On MiSTer, paths live under /media/fat/zaparoo/.
 // On desktop, standard XDG / platform paths are used.
 class PlatformPaths
 {

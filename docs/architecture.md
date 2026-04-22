@@ -4,7 +4,11 @@
 
 ```
 src/app/
-  zaparoo-launcher (executable)
+  launcher (executable)
+    ├── MiSterRuntime.cpp/.h
+    │     Pre-Qt setup: sets linuxfb env vars, calls vmode, starts zaparoo.sh.
+    │     Compiled only on ZAPAROO_MISTER (ARM32 static Qt); stubs on desktop.
+    │
     ├── src/core/
     │     zaparoo_core (static lib)
     │     Qt6::Core, Qt6::Qml, Qt6::WebSockets

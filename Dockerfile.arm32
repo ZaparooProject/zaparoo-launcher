@@ -20,6 +20,7 @@ COPY CMakeLists.txt .
 COPY cmake/ cmake/
 COPY src/ src/
 COPY resources/ resources/
+COPY third_party/ third_party/
 
 RUN mkdir build && cd build && \
     /opt/qt6-arm32/bin/qt-cmake .. \
@@ -31,4 +32,4 @@ RUN mkdir build && cd build && \
 
 # Output stage — extracts only the binary into the host output directory
 FROM scratch AS export
-COPY --from=app-build /src/build/bin/zaparoo-launcher /zaparoo-launcher
+COPY --from=app-build /src/build/bin/launcher /launcher

@@ -4,6 +4,7 @@
 #include "BrowseModel.h"
 #include "Config.h"
 #include "Logger.h"
+#include "MiSterRuntime.h"
 #include "ZaparooClient.h"
 
 #include <QFontDatabase>
@@ -19,34 +20,48 @@ Q_IMPORT_QML_PLUGIN(Zaparoo_UiPlugin)
 Q_IMPORT_QML_PLUGIN(Zaparoo_ThemePlugin)
 Q_IMPORT_QML_PLUGIN(Zaparoo_BrowsePlugin)
 
-// Qt's QtQuick.Controls plugin chain is not registered automatically in static
-// builds — each must be explicitly imported here so the factory is reachable
-// at startup (the _init object that would normally do this is not pulled in
-// transitively when using a cross-compiled static Qt without qmlimportscanner).
+// For static Qt builds (MiSTer ARM32): the QtQuick.Controls plugin chain and
+// platform plugins are embedded in the binary and not found on disk, so they
+// must be explicitly imported. On dynamic (desktop) Qt these are loaded
+// automatically and the symbols don't exist as static functions.
+#ifdef QT_STATIC
+#include <QtPlugin>
 Q_IMPORT_QML_PLUGIN(QtQuickControls2Plugin)
 Q_IMPORT_QML_PLUGIN(QtQuickControls2BasicStylePlugin)
 Q_IMPORT_QML_PLUGIN(QtQuickControls2ImplPlugin)
 Q_IMPORT_QML_PLUGIN(QtQuickTemplates2Plugin)
 Q_IMPORT_QML_PLUGIN(QtQuick_WindowPlugin)
-
-// For static Qt builds (MiSTer ARM32), platform plugins are embedded in
-// the binary and must be explicitly imported — they are not found on disk.
-#ifdef QT_STATIC
-#include <QtPlugin>
 Q_IMPORT_PLUGIN(QLinuxFbIntegrationPlugin)
 #endif
 
 int main(int argc, char* argv[])
 {
-    QGuiApplication app(argc, argv);
+    // These static setters must come before loadConfig() so that
+    // QStandardPaths::AppConfigLocation resolves the correct org/app name
+    // on desktop (otherwise it falls back to the binary filename).
     QGuiApplication::setApplicationName("Zaparoo Launcher");
     QGuiApplication::setApplicationVersion(QStringLiteral(ZAPAROO_VERSION));
     QGuiApplication::setOrganizationName("Zaparoo");
     QGuiApplication::setOrganizationDomain("zaparoo.org");
 
+    // Logger and config load before QGuiApplication so that MiSTer pre-Qt
+    // setup (env vars, vmode) can read the config. Neither Logger::install()
+    // nor loadConfig() requires a QCoreApplication instance.
     zaparoo::Logger::install();
-
     const zaparoo::Config config = zaparoo::loadConfig();
+
+    // On MiSTer: sets QT_QPA_PLATFORM/QT_QUICK_BACKEND and calls vmode.
+    // Must run before QGuiApplication so Qt reads the env vars on init.
+    // No-op on desktop.
+    zaparoo::mister::applyPreQtSetup(config);
+
+    // Start the Zaparoo Core service early so it has time to initialise
+    // while Qt is loading. ZaparooClient will reconnect once it's up.
+    // No-op on desktop.
+    zaparoo::mister::ensureCoreServiceRunning();
+
+    QGuiApplication app(argc, argv);
+
     zaparoo::ZaparooClient client;
     zaparoo::BrowseModel browseModel(&client);
     zaparoo::BrowseModel::setInstance(&browseModel);
@@ -61,6 +76,8 @@ int main(int argc, char* argv[])
 
     QQmlApplicationEngine engine;
 #ifndef ZAPAROO_DEV_BUILD
+    // Full-screen for all release builds — MiSTer requires it and desktop
+    // release builds should behave the same way.
     engine.setInitialProperties({{"fullScreen", true}});
 #endif
     engine.loadFromModule("Zaparoo.App", "Main");

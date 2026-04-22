@@ -20,8 +20,9 @@ class SmokeSetup : public QObject
   public slots:
     void applicationAvailable()
     {
-        m_client = new zaparoo::ZaparooClient(this);
-        m_model = new zaparoo::BrowseModel(m_client, this);
+        m_client = new zaparoo::ZaparooClient(this); // NOLINT(cppcoreguidelines-owning-memory)
+        m_model =
+            new zaparoo::BrowseModel(m_client, this); // NOLINT(cppcoreguidelines-owning-memory)
         zaparoo::BrowseModel::setInstance(m_model);
     }
 

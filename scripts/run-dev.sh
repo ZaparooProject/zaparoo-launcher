@@ -19,4 +19,4 @@ cmake -S "${PROJECT_ROOT}" -B "${BUILD_DIR}" \
 
 cmake --build "${BUILD_DIR}"
 
-exec "${BUILD_DIR}/bin/zaparoo-launcher"
+exec "${BUILD_DIR}/bin/launcher"
