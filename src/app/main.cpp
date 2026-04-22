@@ -2,9 +2,13 @@
 // SPDX-FileCopyrightText: 2026 Callan Barrett
 
 #include "BrowseModel.h"
+#include "CategoriesModel.h"
 #include "Config.h"
+#include "GamesModel.h"
 #include "Logger.h"
 #include "MiSterRuntime.h"
+#include "SystemsCatalog.h"
+#include "SystemsModel.h"
 #include "ZaparooClient.h"
 
 #include <QFontDatabase>
@@ -66,6 +70,13 @@ int main(int argc, char* argv[])
     zaparoo::ZaparooClient client;
     zaparoo::BrowseModel browseModel(&client);
     zaparoo::BrowseModel::setInstance(&browseModel);
+    zaparoo::SystemsCatalog systemsCatalog(&client);
+    zaparoo::CategoriesModel categoriesModel(&systemsCatalog);
+    zaparoo::CategoriesModel::setInstance(&categoriesModel);
+    zaparoo::SystemsModel systemsModel(&systemsCatalog);
+    zaparoo::SystemsModel::setInstance(&systemsModel);
+    zaparoo::GamesModel gamesModel(&client);
+    zaparoo::GamesModel::setInstance(&gamesModel);
 
     // Fonts are embedded inside the Zaparoo.App QML module's resource bundle.
     QFontDatabase::addApplicationFont(":/qt/qml/Zaparoo/App/resources/fonts/DejaVuSans.ttf");

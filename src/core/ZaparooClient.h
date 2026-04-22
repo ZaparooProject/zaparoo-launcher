@@ -27,6 +27,7 @@ struct JsonRpcError
 using MediaSearchCallback = std::function<void(const MediaSearchResult&, const JsonRpcError&)>;
 using MediaBrowseCallback = std::function<void(const MediaBrowseResult&, const JsonRpcError&)>;
 using RunCallback = std::function<void(const RunResult&, const JsonRpcError&)>;
+using SystemsCallback = std::function<void(const SystemsResult&, const JsonRpcError&)>;
 
 // Asynchronous client for the Zaparoo Core JSON-RPC 2.0 WebSocket API.
 // Call connectToCore() to open the connection; use mediaSearch()/mediaBrowse()
@@ -49,6 +50,7 @@ class ZaparooClient : public QObject
     QString mediaSearch(const MediaSearchParams& params, MediaSearchCallback callback);
     QString mediaBrowse(const MediaBrowseParams& params, MediaBrowseCallback callback);
     QString run(const RunParams& params, RunCallback callback);
+    QString systems(const SystemsParams& params, SystemsCallback callback);
 
   signals:
     void connected();

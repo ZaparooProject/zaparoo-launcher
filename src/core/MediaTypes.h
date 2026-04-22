@@ -84,4 +84,13 @@ struct RunResult
 {
 };
 
+struct SystemsParams
+{
+};
+
+struct SystemsResult
+{
+    QVector<SystemInfo> systems;
+};
+
 } // namespace zaparoo

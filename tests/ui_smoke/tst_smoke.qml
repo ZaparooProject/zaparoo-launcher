@@ -4,7 +4,6 @@
 import QtQuick
 import QtTest
 import Zaparoo.App
-import Zaparoo.Browse as Browse
 
 TestCase {
     name: "UiSmoke"
@@ -22,16 +21,7 @@ TestCase {
     }
 
     function test_initial_state() {
-        verify(!mainWindow.inMenu, "Should start in carousel mode, not menu mode")
-        compare(mainWindow.menuIndex, 0)
-        verify(!mainWindow.crtEnabled, "CRT should start off")
+        compare(mainWindow.activeScreen, "hub")
+        compare(mainWindow.hubFocus, "categories")
     }
-
-    // qmllint disable compiler
-    function test_browse_model_initial_state() {
-        compare(Browse.BrowseModel.rowCount(), 0)
-        compare(Browse.BrowseModel.currentPath, "")
-        verify(!Browse.BrowseModel.canGoBack)
-    }
-    // qmllint enable compiler
 }

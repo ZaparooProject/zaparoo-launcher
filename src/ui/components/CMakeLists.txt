@@ -9,13 +9,9 @@ qt_add_qml_module(
     VERSION 1.0
     QML_FILES
         Carousel.qml
-        CrtOverlay.qml
+        CoverDelegate.qml
         FpsCounter.qml
-        MenuBar.qml
-        SelectionDots.qml
-        Starfield.qml
-    IMPORTS
-        Zaparoo.Browse
+        TextTileDelegate.qml
 )
 
 target_link_libraries(

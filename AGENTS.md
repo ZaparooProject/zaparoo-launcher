@@ -120,9 +120,9 @@ written the code:
 | Directory | URI | Contents |
 |---|---|---|
 | `src/ui/theme/` | `Zaparoo.Theme` | `Theme`, `Sizing` singletons |
-| `src/ui/components/` | `Zaparoo.Ui` | `Carousel`, `Starfield`, `FpsCounter`, `MenuBar`, `SelectionDots`, `CrtOverlay` |
+| `src/ui/components/` | `Zaparoo.Ui` | `Carousel`, `CoverDelegate`, `TextTileDelegate`, `FpsCounter` |
 | `src/ui/app/` | `Zaparoo.App` | `Main.qml` + embedded fonts and images |
-| `src/core/` | `Zaparoo.Browse` | `BrowseModel` singleton (QML) + `Config`, `Logger`, `PlatformPaths`, `ZaparooClient` (C++) |
+| `src/core/` | `Zaparoo.Browse` | `CategoriesModel`, `SystemsModel`, `GamesModel`, `BrowseModel` (dormant) singletons + `SystemsCatalog`, `Config`, `Logger`, `PlatformPaths`, `ZaparooClient` (C++) |
 
 Import QML modules as `import Zaparoo.Theme`, `import Zaparoo.Ui`, etc.
 Resources are embedded at `qrc:/qt/qml/Zaparoo/App/resources/...`.

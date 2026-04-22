@@ -4,14 +4,13 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import Zaparoo.Theme
-import Zaparoo.Browse as Browse
 
-// Horizontal cover-art carousel.
-// Displays up to visibleCovers items centred on currentIndex.
+// Horizontal carousel. Displays up to visibleCovers items centred on currentIndex.
 Item {
     id: root
 
-    required property Browse.BrowseModel browseModel
+    required property var model
+    required property Component delegate
     required property url placeholderCover
     required property real rainbowHue
 
@@ -25,12 +24,13 @@ Item {
     Repeater {
         id: itemRepeater
 
-        model: root.browseModel
+        model: root.model
 
         Item {
             id: coverItem
 
             required property int index
+            required property string name
 
             property int offset: {
                 if (root.itemCount === 0)
@@ -65,28 +65,13 @@ Item {
                 }
             }
 
-            Rectangle {
+            Loader {
                 anchors.fill: parent
-                anchors.margins: -Sizing.pctH(0.8)
-                color: "transparent"
-                border.width: Math.max(1, Sizing.pctH(0.5))
-                border.color: coverItem.isSelected
-                    ? Qt.hsla(root.rainbowHue, 0.9, 0.6, 1)
-                    : Theme.borderMid
-            }
-
-            Rectangle {
-                anchors.fill: parent
-                color: Theme.bgMid
-
-                Image {
-                    anchors.fill: parent
-                    anchors.margins: 1
-                    source: root.placeholderCover
-                    fillMode: Image.PreserveAspectFit
-                    smooth: false
-                    cache: true
-                }
+                sourceComponent: root.delegate
+                property bool isSelected: coverItem.isSelected
+                property real rainbowHue: root.rainbowHue
+                property url placeholderCover: root.placeholderCover
+                property string name: coverItem.name
             }
         }
     }

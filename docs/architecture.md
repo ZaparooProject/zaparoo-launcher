@@ -12,13 +12,13 @@ src/app/
     ├── src/core/
     │     zaparoo_core (static lib)
     │     Qt6::Core, Qt6::Qml, Qt6::WebSockets
-    │     Exposes Zaparoo.Browse QML module (BrowseModel singleton)
+    │     Exposes Zaparoo.Browse QML module (four singletons; BrowseModel is dormant)
     │
     └── src/ui/app/  [Zaparoo.App QML module]
           Main.qml
           ├── src/ui/components/  [Zaparoo.Ui QML module]
-          │     Carousel.qml, Starfield.qml, FpsCounter.qml,
-          │     MenuBar.qml, SelectionDots.qml, CrtOverlay.qml
+          │     Carousel.qml, CoverDelegate.qml, TextTileDelegate.qml,
+          │     FpsCounter.qml
           │
           └── src/ui/theme/  [Zaparoo.Theme QML module]
                 Sizing.qml  — pctH/pctW/fontSize singletons
@@ -66,12 +66,42 @@ License texts live in `src/LICENSES/`.
 
 ```
 ZaparooClient (WebSocket JSON-RPC 2.0)
-    ↓  mediaBrowse() / run() callbacks
-BrowseModel (QAbstractListModel + QML_SINGLETON, Zaparoo.Browse)
-    ↓  model roles + Q_INVOKABLE methods
-Carousel.qml / Main.qml
+    │
+    ├── systems() callback
+    │     SystemsCatalog (internal C++, not a singleton)
+    │         ├── CategoriesModel (QML_SINGLETON, Zaparoo.Browse)
+    │         │       ↓ category name list
+    │         │   categoriesCarousel in Main.qml
+    │         │
+    │         └── SystemsModel (QML_SINGLETON, Zaparoo.Browse)
+    │                 ↓ systems filtered by current category
+    │             systemsCarousel in Main.qml
+    │
+    ├── media.search() callback
+    │     GamesModel (QML_SINGLETON, Zaparoo.Browse)
+    │         ↓ game list for current system (up to 100)
+    │     gamesCarousel in Main.qml
+    │
+    └── run() callback
+          (game launch, no model — direct invokable on GamesModel)
 ```
 
-`BrowseModel` is a `QML_SINGLETON` registered via `QML_ELEMENT`. The
-singleton instance must be set via `BrowseModel::setInstance()` before the
-QML engine is created. See `src/app/main.cpp` for the wiring.
+All four singletons (`CategoriesModel`, `SystemsModel`, `GamesModel`, and the
+dormant `BrowseModel`) must be set via their `setInstance()` methods before the
+`QQmlApplicationEngine` is created. See `src/app/main.cpp` for the wiring.
+
+### Navigation state (Main.qml)
+
+```
+activeScreen: "hub" | "games"
+hubFocus:     "categories" | "systems"
+```
+
+- **hub + categories**: categoriesCarousel centred; Left/Right cycle categories;
+  Enter calls `SystemsModel.setCategory()` and shifts hubFocus to "systems";
+  Escape quits.
+- **hub + systems**: categoriesCarousel swoops to top; systemsCarousel fades in
+  below; Enter calls `GamesModel.setSystem()` and sets activeScreen to "games";
+  Escape returns to categories.
+- **games**: gamesCarousel visible; Enter calls `GamesModel.launchAt()`;
+  Escape returns to hub (hubFocus preserved).

@@ -11,10 +11,18 @@ import Zaparoo.Browse as Browse
 ApplicationWindow {
     id: root
 
-    // Local reference to the singleton — typed property for QML tooling.
+    // Typed local references to singletons — required for property access in tooling.
     // qmllint disable compiler
-    readonly property Browse.BrowseModel browseRef: Browse.BrowseModel
+    readonly property Browse.CategoriesModel categoriesRef: Browse.CategoriesModel
+    readonly property Browse.SystemsModel systemsRef: Browse.SystemsModel
+    readonly property Browse.GamesModel gamesRef: Browse.GamesModel
     // qmllint enable compiler
+
+    // Screen/focus state constants — use these instead of bare string literals.
+    readonly property string screenHub: "hub"
+    readonly property string screenGames: "games"
+    readonly property string focusCategories: "categories"
+    readonly property string focusSystems: "systems"
 
     property bool fullScreen: false
 
@@ -24,7 +32,6 @@ ApplicationWindow {
     visibility: fullScreen ? Window.FullScreen : Window.Windowed
     title: "Zaparoo Launcher"
 
-    // Keep Sizing singleton informed of the current resolution.
     onWidthChanged: {
         Sizing.screenWidth = width
         Sizing.screenHeight = height
@@ -38,9 +45,9 @@ ApplicationWindow {
         Sizing.screenHeight = height
     }
 
-    property bool inMenu: false
-    property int menuIndex: 0
-    property bool crtEnabled: false
+    // Screen state.
+    property string activeScreen: root.screenHub       // screenHub | screenGames
+    property string hubFocus: root.focusCategories     // focusCategories | focusSystems
 
     // Slow rainbow hue cycle for the retro aesthetic.
     property real rainbowHue
@@ -52,12 +59,27 @@ ApplicationWindow {
         loops: Animation.Infinite
     }
 
-    // Reset carousel to index 0 when root.browseRef loads a new folder.
+    // Reset carousel indices when models deliver new data.
     Connections {
-        target: root.browseRef
-        function onModelReset(): void { carousel.currentIndex = 0 }
-        function onIndexRestored(newIndex: int): void { carousel.currentIndex = newIndex }
+        target: root.categoriesRef
+        function onModelReset(): void {
+            categoriesCarousel.currentIndex = 0
+        }
     }
+    Connections {
+        target: root.systemsRef
+        function onModelReset(): void {
+            systemsCarousel.currentIndex = 0
+        }
+    }
+    // qmllint disable compiler
+    Connections {
+        target: root.gamesRef
+        function onModelReset(): void {
+            gamesCarousel.currentIndex = 0
+        }
+    }
+    // qmllint enable compiler
 
     // ── Background ────────────────────────────────────────────────────────────
 
@@ -66,18 +88,13 @@ ApplicationWindow {
         color: Theme.bgDeep
     }
 
-    Starfield {
-        anchors.fill: parent
-        z: 0
-    }
-
     // ── FPS counter ───────────────────────────────────────────────────────────
 
     FpsCounter {
         anchors.top: parent.top
         anchors.right: parent.right
-        anchors.topMargin: Sizing.pctH(8)
-        anchors.rightMargin: Sizing.pctW(8)
+        anchors.topMargin: Sizing.pctH(1)
+        anchors.rightMargin: Sizing.pctW(1)
         z: 200
     }
 
@@ -93,46 +110,130 @@ ApplicationWindow {
         color: Qt.hsla(root.rainbowHue, 0.9, 0.65, 1)
     }
 
-    // ── Carousel ──────────────────────────────────────────────────────────────
+    // ── Categories carousel ───────────────────────────────────────────────────
 
-    // qmllint disable compiler
     Carousel {
-        id: carousel
+        id: categoriesCarousel
 
         anchors.horizontalCenter: parent.horizontalCenter
-        anchors.top: parent.top
-        anchors.topMargin: Sizing.pctH(12)
         width: parent.width
-        height: Sizing.pctH(55)
-        opacity: root.inMenu ? 0.3 : (root.browseRef.loading ? 0.5 : 1.0)
+        height: Sizing.pctH(30)
+        y: root.hubFocus === root.focusSystems ? Sizing.pctH(5) : Sizing.pctH(28)
+        opacity: root.activeScreen === root.screenHub ? 1 : 0
 
-        browseModel: root.browseRef
-        placeholderCover: "qrc:/qt/qml/Zaparoo/App/resources/images/placeholder/cover_generic.png"
+        model: root.categoriesRef
+        delegate: TextTileDelegate {}
+        placeholderCover: ""
         rainbowHue: root.rainbowHue
 
-        onCurrentIndexChanged: root.browseRef.setSelectedIndex(currentIndex)
-
+        Behavior on y {
+            NumberAnimation {
+                duration: 250
+                easing.type: Easing.OutQuad
+            }
+        }
         Behavior on opacity {
             NumberAnimation {
-                duration: 150
+                duration: 250
+                easing.type: Easing.OutQuad
             }
         }
     }
-    // qmllint enable compiler
 
-    // ── Game title ────────────────────────────────────────────────────────────
+    // ── Systems carousel ──────────────────────────────────────────────────────
+
+    Carousel {
+        id: systemsCarousel
+
+        anchors.horizontalCenter: parent.horizontalCenter
+        width: parent.width
+        height: Sizing.pctH(30)
+        y: root.hubFocus === root.focusSystems ? Sizing.pctH(40) : Sizing.pctH(62)
+        opacity: root.activeScreen === root.screenHub && root.hubFocus === root.focusSystems ? 1 : 0
+
+        model: root.systemsRef
+        delegate: TextTileDelegate {}
+        placeholderCover: ""
+        rainbowHue: root.rainbowHue
+
+        Behavior on y {
+            NumberAnimation {
+                duration: 250
+                easing.type: Easing.OutQuad
+            }
+        }
+        Behavior on opacity {
+            NumberAnimation {
+                duration: 250
+                easing.type: Easing.OutQuad
+            }
+        }
+    }
+
+    // ── Games carousel ────────────────────────────────────────────────────────
+
+    Carousel {
+        id: gamesCarousel
+
+        anchors.horizontalCenter: parent.horizontalCenter
+        y: Sizing.pctH(12)
+        width: parent.width
+        height: Sizing.pctH(55)
+        // qmllint disable compiler
+        opacity: root.activeScreen === root.screenGames ? (root.gamesRef.loading ? 0.5 : 1.0) : 0
+
+        model: root.gamesRef
+        // qmllint enable compiler
+        delegate: CoverDelegate {}
+        placeholderCover: "qrc:/qt/qml/Zaparoo/App/resources/images/placeholder/cover_generic.png"
+        rainbowHue: root.rainbowHue
+
+        onCurrentIndexChanged: {
+            // qmllint disable compiler
+            root.gamesRef.setSelectedIndex(currentIndex)
+            // qmllint enable compiler
+        }
+
+        Behavior on opacity {
+            NumberAnimation {
+                duration: 200
+                easing.type: Easing.OutQuad
+            }
+        }
+    }
+
+    // ── Games error message ───────────────────────────────────────────────────
+
+    Text {
+        anchors.centerIn: gamesCarousel
+        // qmllint disable compiler
+        opacity: root.activeScreen === root.screenGames && root.gamesRef.errorMessage !== "" ? 1 : 0
+        text: root.gamesRef.errorMessage
+        // qmllint enable compiler
+        font.family: Theme.fontRetro
+        font.pixelSize: Sizing.fontSize(3)
+        color: Theme.textDim
+        wrapMode: Text.WordWrap
+        horizontalAlignment: Text.AlignHCenter
+        width: parent.width * 0.7
+    }
+
+    // ── Context title text ────────────────────────────────────────────────────
 
     Text {
         anchors.horizontalCenter: parent.horizontalCenter
-        anchors.top: carousel.bottom
+        anchors.top: gamesCarousel.bottom
         anchors.topMargin: Sizing.pctH(1)
+        opacity: root.activeScreen === root.screenGames ? 1 : 0
         // qmllint disable compiler
-        text: { root.browseRef.count; return root.browseRef.nameAt(carousel.currentIndex) }
+        text: {
+            root.gamesRef.count // read count so this binding re-evaluates on model reset
+            return root.gamesRef.nameAt(gamesCarousel.currentIndex)
+        }
         // qmllint enable compiler
         font.family: Theme.fontRetro
         font.pixelSize: Sizing.fontSize(4)
         color: Theme.textPrimary
-        opacity: root.inMenu ? 0.3 : 1.0
 
         Behavior on opacity {
             NumberAnimation {
@@ -141,49 +242,25 @@ ApplicationWindow {
         }
     }
 
-    // ── Selection dots ────────────────────────────────────────────────────────
-
-    SelectionDots {
+    Text {
         anchors.horizontalCenter: parent.horizontalCenter
-        anchors.top: carousel.bottom
-        anchors.topMargin: Sizing.pctH(8)
+        y: systemsCarousel.y + systemsCarousel.height + Sizing.pctH(1)
+        opacity: root.activeScreen === root.screenHub && root.hubFocus === root.focusSystems ? 1 : 0
         // qmllint disable compiler
-        count: root.browseRef.count
+        text: {
+            root.systemsRef.count // read count so this binding re-evaluates on model reset
+            return root.systemsRef.systemNameAt(systemsCarousel.currentIndex)
+        }
         // qmllint enable compiler
-        currentIndex: carousel.currentIndex
-        rainbowHue: root.rainbowHue
-        opacity: root.inMenu ? 0.3 : 1.0
+        font.family: Theme.fontRetro
+        font.pixelSize: Sizing.fontSize(4)
+        color: Theme.textPrimary
 
         Behavior on opacity {
             NumberAnimation {
                 duration: 200
             }
         }
-    }
-
-    // ── Separator ─────────────────────────────────────────────────────────────
-
-    Rectangle {
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottom: menuBar.top
-        anchors.bottomMargin: Sizing.pctH(1)
-        width: Sizing.pctW(60)
-        height: 1
-        color: Theme.borderFaint
-    }
-
-    // ── Menu bar ──────────────────────────────────────────────────────────────
-
-    MenuBar {
-        id: menuBar
-
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottom: instructionsBar.top
-        anchors.bottomMargin: Sizing.pctH(1)
-        inMenu: root.inMenu
-        menuIndex: root.menuIndex
-        rainbowHue: root.rainbowHue
-        menuItems: ["PLAY", root.crtEnabled ? "CRT:ON" : "CRT:OFF", "EXIT"]
     }
 
     // ── Instructions bar ──────────────────────────────────────────────────────
@@ -201,29 +278,17 @@ ApplicationWindow {
 
         Text {
             anchors.centerIn: parent
-            // qmllint disable compiler
             text: {
-                root.browseRef.count
-                const action = root.browseRef.isFolderAt(carousel.currentIndex) ? "OPEN" : "PLAY"
-                if (root.inMenu)
-                    return "[<>] SEL  [OK] GO  [^] BACK"
-                return root.browseRef.canGoBack
-                    ? "[<>] BROWSE  [OK] " + action + "  [ESC] BACK  [v] MENU"
-                    : "[<>] BROWSE  [OK] " + action + "  [v] MENU"
+                if (root.activeScreen === root.screenGames)
+                    return "[<>] GAME  [OK] PLAY  [ESC] BACK"
+                if (root.hubFocus === root.focusSystems)
+                    return "[<>] SYSTEM  [OK] GAMES  [ESC] BACK"
+                return "[<>] CATEGORY  [OK] SELECT  [ESC] QUIT"
             }
-            // qmllint enable compiler
             font.family: Theme.fontRetro
             font.pixelSize: Sizing.fontSize(2.5)
             color: Theme.textDim
         }
-    }
-
-    // ── CRT overlay ───────────────────────────────────────────────────────────
-
-    CrtOverlay {
-        anchors.fill: parent
-        visible: root.crtEnabled
-        z: 100
     }
 
     // ── Keyboard input ────────────────────────────────────────────────────────
@@ -232,47 +297,45 @@ ApplicationWindow {
         focus: true
 
         // qmllint disable compiler
+        function navigateCarousel(carousel, delta) {
+            if (carousel.itemCount > 0)
+                carousel.currentIndex = (carousel.currentIndex + delta + carousel.itemCount) % carousel.itemCount
+        }
+
         Keys.onPressed: function (event) {
-            if (root.inMenu) {
+            if (root.activeScreen === root.screenGames) {
                 if (event.key === Qt.Key_Left) {
-                    root.menuIndex = (root.menuIndex - 1 + menuBar.menuItems.length) % menuBar.menuItems.length
+                    navigateCarousel(gamesCarousel, -1)
                 } else if (event.key === Qt.Key_Right) {
-                    root.menuIndex = (root.menuIndex + 1) % menuBar.menuItems.length
-                } else if (event.key === Qt.Key_Up) {
-                    root.inMenu = false
+                    navigateCarousel(gamesCarousel, 1)
                 } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                    if (root.menuIndex === 0) {
-                        root.browseRef.launchAt(carousel.currentIndex)
-                    } else if (root.menuIndex === 1) {
-                        root.crtEnabled = !root.crtEnabled
-                    } else if (root.menuIndex === 2) {
-                        Qt.quit()
-                    }
-                } else if (event.key === Qt.Key_Escape) {
-                    root.inMenu = false
+                    root.gamesRef.launchAt(gamesCarousel.currentIndex)
+                } else if (event.key === Qt.Key_Escape || event.key === Qt.Key_Backspace) {
+                    root.activeScreen = root.screenHub
+                }
+            } else if (root.hubFocus === root.focusSystems) {
+                if (event.key === Qt.Key_Left) {
+                    navigateCarousel(systemsCarousel, -1)
+                } else if (event.key === Qt.Key_Right) {
+                    navigateCarousel(systemsCarousel, 1)
+                } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                    root.gamesRef.setSystem(root.systemsRef.systemIdAt(systemsCarousel.currentIndex))
+                    gamesCarousel.currentIndex = 0
+                    root.activeScreen = root.screenGames
+                } else if (event.key === Qt.Key_Escape || event.key === Qt.Key_Backspace) {
+                    root.hubFocus = root.focusCategories
                 }
             } else {
                 if (event.key === Qt.Key_Left) {
-                    if (carousel.itemCount > 0)
-                        carousel.currentIndex = (carousel.currentIndex - 1 + carousel.itemCount) % carousel.itemCount
+                    navigateCarousel(categoriesCarousel, -1)
                 } else if (event.key === Qt.Key_Right) {
-                    if (carousel.itemCount > 0)
-                        carousel.currentIndex = (carousel.currentIndex + 1) % carousel.itemCount
-                } else if (event.key === Qt.Key_Down) {
-                    root.inMenu = true
-                    root.menuIndex = 0
+                    navigateCarousel(categoriesCarousel, 1)
                 } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                    if (root.browseRef.isFolderAt(carousel.currentIndex)) {
-                        root.browseRef.enter(carousel.currentIndex)
-                    } else {
-                        root.browseRef.launchAt(carousel.currentIndex)
-                    }
+                    systemsCarousel.currentIndex = 0
+                    root.systemsRef.setCategory(root.categoriesRef.categoryAt(categoriesCarousel.currentIndex))
+                    root.hubFocus = root.focusSystems
                 } else if (event.key === Qt.Key_Escape || event.key === Qt.Key_Backspace) {
-                    if (root.browseRef.canGoBack) {
-                        root.browseRef.goBack()
-                    } else {
-                        Qt.quit()
-                    }
+                    Qt.quit()
                 }
             }
         }

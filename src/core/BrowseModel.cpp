@@ -29,7 +29,6 @@ void BrowseModel::setInstance(BrowseModel* instance)
 BrowseModel::BrowseModel(ZaparooClient* client, QObject* parent)
     : QAbstractListModel(parent), m_client(client)
 {
-    connect(m_client, &ZaparooClient::connected, this, &BrowseModel::refresh);
 }
 
 int BrowseModel::rowCount(const QModelIndex& parent) const

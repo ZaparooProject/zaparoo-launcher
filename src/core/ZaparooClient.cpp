@@ -61,6 +61,16 @@ MediaSearchResult parseSearchResult(const QJsonObject& result)
     return out;
 }
 
+SystemsResult parseSystemsResult(const QJsonObject& result)
+{
+    SystemsResult out;
+    for (const auto& val : result["systems"].toArray())
+    {
+        out.systems.append(parseSystemInfo(val.toObject()));
+    }
+    return out;
+}
+
 BrowseEntry parseBrowseEntry(const QJsonObject& obj)
 {
     BrowseEntry entry;
@@ -341,6 +351,21 @@ QString ZaparooClient::run(const RunParams& params, RunCallback callback)
     return sendRequest("run", jsonParams,
                        [cb = std::move(callback)](const QJsonValue&, const JsonRpcError& error)
                        { cb(RunResult{}, error); });
+}
+
+QString ZaparooClient::systems(const SystemsParams& /*params*/, SystemsCallback callback)
+{
+    return sendRequest(
+        "systems", QJsonObject{},
+        [cb = std::move(callback)](const QJsonValue& result, const JsonRpcError& error)
+        {
+            if (error.isError)
+            {
+                cb(SystemsResult{}, error);
+                return;
+            }
+            cb(parseSystemsResult(result.toObject()), JsonRpcError{});
+        });
 }
 
 } // namespace zaparoo

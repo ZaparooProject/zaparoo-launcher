@@ -8,13 +8,21 @@ target_sources(
     PRIVATE
         BrowseModel.cpp
         BrowseModel.h
+        CategoriesModel.cpp
+        CategoriesModel.h
         Config.cpp
         Config.h
+        GamesModel.cpp
+        GamesModel.h
         Logger.cpp
         Logger.h
         MediaTypes.h
         PlatformPaths.cpp
         PlatformPaths.h
+        SystemsCatalog.cpp
+        SystemsCatalog.h
+        SystemsModel.cpp
+        SystemsModel.h
         ZaparooClient.cpp
         ZaparooClient.h
 )

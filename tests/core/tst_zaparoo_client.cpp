@@ -2,100 +2,15 @@
 // SPDX-FileCopyrightText: 2026 Callan Barrett
 
 #include "MediaTypes.h"
+#include "MockServer.h"
 #include "ZaparooClient.h"
 
 #include <QJsonArray>
-#include <QJsonDocument>
 #include <QJsonObject>
 #include <QSignalSpy>
 #include <QTest>
-#include <QWebSocket>
-#include <QWebSocketServer>
 
 using namespace zaparoo;
-
-// Local WebSocket server that records incoming frames and can reply on demand.
-class MockServer : public QObject
-{
-    Q_OBJECT
-
-  public:
-    explicit MockServer(QObject* parent = nullptr)
-        : QObject(parent), m_server("mock", QWebSocketServer::NonSecureMode, this)
-    {
-        if (!m_server.listen(QHostAddress::LocalHost, 0))
-        {
-            qFatal("MockServer: listen failed");
-        }
-        connect(&m_server, &QWebSocketServer::newConnection, this, &MockServer::onNewConnection);
-    }
-
-    [[nodiscard]] quint16 port() const
-    {
-        return m_server.serverPort();
-    }
-    [[nodiscard]] bool hasClient() const
-    {
-        return m_peer != nullptr;
-    }
-    [[nodiscard]] QJsonObject lastFrame() const
-    {
-        return m_lastFrame;
-    }
-
-    void setReply(const QJsonObject& reply)
-    {
-        m_reply = reply;
-    }
-
-    void sendToClient(const QJsonObject& frame)
-    {
-        if (m_peer != nullptr)
-        {
-            m_peer->sendTextMessage(
-                QString::fromUtf8(QJsonDocument(frame).toJson(QJsonDocument::Compact)));
-        }
-    }
-
-    void sendRawToClient(const QString& text)
-    {
-        if (m_peer != nullptr)
-        {
-            m_peer->sendTextMessage(text);
-        }
-    }
-
-  signals:
-    void frameReceived();
-    void clientConnected();
-
-  private slots:
-    void onNewConnection()
-    {
-        m_peer = m_server.nextPendingConnection();
-        connect(m_peer, &QWebSocket::textMessageReceived, this, &MockServer::onMessage);
-        emit clientConnected();
-    }
-
-    void onMessage(const QString& msg)
-    {
-        m_lastFrame = QJsonDocument::fromJson(msg.toUtf8()).object();
-        if (!m_reply.isEmpty())
-        {
-            QJsonObject reply = m_reply;
-            reply["id"] = m_lastFrame["id"];
-            m_reply = {};
-            sendToClient(reply);
-        }
-        emit frameReceived();
-    }
-
-  private:
-    QWebSocketServer m_server;
-    QJsonObject m_reply;
-    QJsonObject m_lastFrame;
-    QWebSocket* m_peer{nullptr};
-};
 
 class TestZaparooClient : public QObject
 {
@@ -282,6 +197,57 @@ class TestZaparooClient : public QObject
         QCOMPARE(p["text"].toString(), "@SNES/Mario.sfc");
     }
 
+    void testSystemsRequestFormat() // NOLINT(readability-function-cognitive-complexity)
+    {
+        QSignalSpy spy(m_server, &MockServer::frameReceived);
+        m_client->systems({}, [](const SystemsResult&, const JsonRpcError&) {});
+        QTRY_COMPARE(spy.count(), 1);
+
+        const QJsonObject frame = m_server->lastFrame();
+        QCOMPARE(frame["jsonrpc"].toString(), "2.0");
+        QCOMPARE(frame["method"].toString(), "systems");
+        QVERIFY(!frame["id"].toString().isEmpty());
+    }
+
+    void testSystemsResponseParsing() // NOLINT(readability-function-cognitive-complexity)
+    {
+        QJsonObject reply;
+        reply["jsonrpc"] = "2.0";
+        reply["result"] = QJsonObject{{"systems", QJsonArray{
+                                                      QJsonObject{{"id", "GameboyColor"},
+                                                                  {"name", "Gameboy Color"},
+                                                                  {"category", "Handheld"},
+                                                                  {"releaseDate", "1998-10-21"},
+                                                                  {"manufacturer", "Nintendo"}},
+                                                      QJsonObject{{"id", "SNES"},
+                                                                  {"name", "Super Nintendo"},
+                                                                  {"category", "Console"},
+                                                                  {"releaseDate", "1990-11-21"},
+                                                                  {"manufacturer", "Nintendo"}},
+                                                  }}};
+        m_server->setReply(reply);
+
+        SystemsResult result;
+        JsonRpcError error;
+        bool done = false;
+        m_client->systems({},
+                          [&](const SystemsResult& r, const JsonRpcError& e)
+                          {
+                              result = r;
+                              error = e;
+                              done = true;
+                          });
+
+        QTRY_VERIFY(done);
+        QVERIFY(!error.isError);
+        QCOMPARE(result.systems.size(), 2);
+        QCOMPARE(result.systems[0].id, "GameboyColor");
+        QCOMPARE(result.systems[0].name, "Gameboy Color");
+        QCOMPARE(result.systems[0].category, "Handheld");
+        QCOMPARE(result.systems[1].id, "SNES");
+        QCOMPARE(result.systems[1].category, "Console");
+    }
+
     void testMalformedFramesIgnoredGracefully() // NOLINT(readability-function-cognitive-complexity)
     {
         // Send a JSON array instead of an object — should be ignored, no crash.
@@ -302,7 +268,7 @@ class TestZaparooClient : public QObject
         QTRY_COMPARE(spy.count(), 1);
     }
 
-  private:
+  private:                            // NOLINT(readability-redundant-access-specifiers)
     MockServer* m_server{nullptr};    // NOLINT(cppcoreguidelines-owning-memory)
     ZaparooClient* m_client{nullptr}; // NOLINT(cppcoreguidelines-owning-memory)
 };

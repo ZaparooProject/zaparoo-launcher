@@ -2,87 +2,15 @@
 // SPDX-FileCopyrightText: 2026 Callan Barrett
 
 #include "BrowseModel.h"
+#include "MockServer.h"
 #include "ZaparooClient.h"
 
 #include <QJsonArray>
-#include <QJsonDocument>
 #include <QJsonObject>
 #include <QSignalSpy>
 #include <QTest>
-#include <QWebSocket>
-#include <QWebSocketServer>
 
 using namespace zaparoo;
-
-// Reuse the same MockServer pattern as tst_zaparoo_client.cpp.
-class MockServer : public QObject
-{
-    Q_OBJECT
-
-  public:
-    explicit MockServer(QObject* parent = nullptr)
-        : QObject(parent), m_server("mock", QWebSocketServer::NonSecureMode, this)
-    {
-        if (!m_server.listen(QHostAddress::LocalHost, 0))
-        {
-            qFatal("MockServer: listen failed");
-        }
-        connect(&m_server, &QWebSocketServer::newConnection, this, &MockServer::onNewConnection);
-    }
-
-    [[nodiscard]] quint16 port() const
-    {
-        return m_server.serverPort();
-    }
-    [[nodiscard]] bool hasClient() const
-    {
-        return m_peer != nullptr;
-    }
-
-    void setReply(const QJsonObject& reply)
-    {
-        m_reply = reply;
-    }
-
-    void sendToClient(const QJsonObject& frame)
-    {
-        if (m_peer != nullptr)
-        {
-            m_peer->sendTextMessage(
-                QString::fromUtf8(QJsonDocument(frame).toJson(QJsonDocument::Compact)));
-        }
-    }
-
-  signals:
-    void frameReceived(QJsonObject);
-    void clientConnected();
-
-  private slots:
-    void onNewConnection()
-    {
-        m_peer = m_server.nextPendingConnection();
-        connect(m_peer, &QWebSocket::textMessageReceived, this, &MockServer::onMessage);
-        emit clientConnected();
-    }
-
-    void onMessage(const QString& msg)
-    {
-        const QJsonObject frame = QJsonDocument::fromJson(msg.toUtf8()).object();
-        if (!m_reply.isEmpty())
-        {
-            QJsonObject reply = m_reply;
-            reply["id"] = frame["id"];
-            m_reply = {};
-            sendToClient(reply);
-        }
-        emit frameReceived(frame);
-    }
-
-  private:
-    QWebSocketServer m_server;
-    QJsonObject m_reply;
-    QWebSocket* m_peer{nullptr};
-};
 
 // Build a minimal successful browse response.
 static QJsonObject makeBrowseReply(const QJsonArray& entries)
@@ -365,7 +293,7 @@ class TestBrowseModel : public QObject
         QTest::qWait(50);      // nothing sent to server
     }
 
-  private:
+  private:                            // NOLINT(readability-redundant-access-specifiers)
     MockServer* m_server{nullptr};    // NOLINT(cppcoreguidelines-owning-memory)
     ZaparooClient* m_client{nullptr}; // NOLINT(cppcoreguidelines-owning-memory)
     BrowseModel* m_model{nullptr};    // NOLINT(cppcoreguidelines-owning-memory)
