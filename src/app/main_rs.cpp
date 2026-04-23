@@ -5,15 +5,17 @@
 // zaparoo_launcher_rs staticlib; Qt plugin wiring is handled here so that
 // Qt's CMake (qt_import_qml_plugins) can emit the correct link flags.
 
-#include <QFile>
 #include <QFontDatabase>
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQuickStyle>
 #include <QtQml/qqmlextensionplugin.h>
+#include <cstddef>
+#include <cstdint>
 
 extern "C" int zaparoo_rust_init();
 extern "C" void zaparoo_rust_post_qt_start();
+extern "C" void zaparoo_log_qt(uint8_t level, const char* msg, size_t len);
 
 // Pull Zaparoo QML plugin symbols into the final binary so the linker does
 // not strip their static-initializer registration functions.
@@ -36,47 +38,17 @@ Q_IMPORT_QML_PLUGIN(QtQuick_WindowPlugin)
 Q_IMPORT_PLUGIN(QLinuxFbIntegrationPlugin)
 #endif
 
-// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
-static QFile qtLog;
-
+// Forward all Qt log messages to the Rust tracing registry (same sinks as
+// Rust-side log output: stderr + launcher.log). Installed after
+// zaparoo_rust_init() so the tracing subscriber is already alive.
 static void qtMessageHandler(QtMsgType type, const QMessageLogContext& /*ctx*/, const QString& msg)
 {
-    const char* prefix = nullptr;
-    switch (type)
-    {
-    case QtDebugMsg:
-        prefix = "D";
-        break;
-    case QtInfoMsg:
-        prefix = "I";
-        break;
-    case QtWarningMsg:
-        prefix = "W";
-        break;
-    case QtCriticalMsg:
-        prefix = "E";
-        break;
-    case QtFatalMsg:
-        prefix = "F";
-        break;
-    }
-    if (prefix == nullptr)
-    {
-        return;
-    }
-    if (qtLog.isOpen())
-    {
-        qtLog.write(QByteArray(prefix) + " " + msg.toLocal8Bit() + "\n");
-        qtLog.flush();
-    }
+    const QByteArray utf8 = msg.toUtf8();
+    zaparoo_log_qt(static_cast<uint8_t>(type), utf8.constData(), static_cast<size_t>(utf8.size()));
 }
 
 int main(int argc, char* argv[])
 {
-    qtLog.setFileName("/tmp/zaparoo/qt.log");
-    (void)qtLog.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
-    qInstallMessageHandler(qtMessageHandler);
-
     QGuiApplication::setApplicationName("Zaparoo Launcher");
     QGuiApplication::setApplicationVersion("0.1.0");
     QGuiApplication::setOrganizationName("Zaparoo");
@@ -86,6 +58,10 @@ int main(int argc, char* argv[])
     {
         return EXIT_FAILURE;
     }
+
+    // Install after zaparoo_rust_init() so tracing is live before any Qt
+    // messages are emitted.
+    qInstallMessageHandler(qtMessageHandler);
 
     QGuiApplication app(argc, argv);
     QFontDatabase::addApplicationFont(":/qt/qml/Zaparoo/App/resources/fonts/PressStart2P.ttf");

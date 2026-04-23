@@ -4,6 +4,23 @@
 mod mister_runtime;
 mod models;
 
+/// Called from the Qt message handler in main.cpp. `level` is QtMsgType
+/// cast to u8. `msg_ptr`/`msg_len` are a UTF-8 slice owned by the caller.
+/// Routes Qt log output through the tracing registry so it lands in the
+/// same stderr + file sinks as Rust log messages.
+#[no_mangle]
+pub extern "C" fn zaparoo_log_qt(level: u8, msg_ptr: *const u8, msg_len: usize) {
+    let msg = unsafe { std::str::from_utf8_unchecked(std::slice::from_raw_parts(msg_ptr, msg_len)) };
+    match level {
+        0 /* QtDebugMsg    */ => tracing::debug!(target: "qt", "{}", msg),
+        4 /* QtInfoMsg     */ => tracing::info!(target: "qt", "{}", msg),
+        1 /* QtWarningMsg  */ => tracing::warn!(target: "qt", "{}", msg),
+        2 /* QtCriticalMsg */ => tracing::error!(target: "qt", "{}", msg),
+        3 /* QtFatalMsg    */ => tracing::error!(target: "qt", "FATAL: {}", msg),
+        _ => tracing::info!(target: "qt", "{}", msg),
+    }
+}
+
 use std::ffi::c_int;
 use std::sync::Arc;
 use zaparoo_core::{client::Client, config::load_config, logger::install, platform_paths::config_file_path, systems_catalog};

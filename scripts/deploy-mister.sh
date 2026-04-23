@@ -48,6 +48,6 @@ echo "Deployed ${BINARY} → root@${MISTER_IP}:${REMOTE_PATH}"
 ssh "root@${MISTER_IP}" "
     killall launcher 2>/dev/null && echo 'Killed running launcher' || true
     killall MiSTer_Zaparoo 2>/dev/null && echo 'Killed running MiSTer_Zaparoo' || true
-    rm -f /tmp/zaparoo/launcher.log /tmp/zaparoo/qt.log
+    rm -f /tmp/zaparoo/launcher.log
     nohup /media/fat/MiSTer_Zaparoo >/dev/null 2>&1 &
 "
