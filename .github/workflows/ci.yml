@@ -101,7 +101,7 @@ jobs:
         run: ctest --preset desktop-debug
       - name: Upload launcher binary
         if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: launcher-debug-${{ github.run_id }}
           path: build/bin/launcher
@@ -155,7 +155,7 @@ jobs:
           file output/launcher
           file output/launcher | grep -q 'ARM' || (echo "Not an ARM binary" && exit 1)
       - name: Upload launcher binary
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: launcher-arm32
           path: output/launcher
