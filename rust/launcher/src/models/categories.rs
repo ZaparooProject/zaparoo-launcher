@@ -40,6 +40,9 @@ pub mod ffi {
         #[qinvokable]
         fn category_at(self: &CategoriesModel, index: i32) -> QString;
 
+        #[qinvokable]
+        fn index_for_category(self: &CategoriesModel, name: &QString) -> i32;
+
         #[inherit]
         #[cxx_name = "beginResetModel"]
         fn begin_reset_model(self: Pin<&mut CategoriesModel>);
@@ -127,5 +130,16 @@ impl ffi::CategoriesModel {
             return QString::default();
         }
         QString::from(self.categories[index as usize].as_str())
+    }
+
+    fn index_for_category(&self, name: &QString) -> i32 {
+        let needle = name.to_string();
+        if needle.is_empty() {
+            return -1;
+        }
+        self.categories
+            .iter()
+            .position(|c| c == &needle)
+            .map_or(-1, |i| i as i32)
     }
 }

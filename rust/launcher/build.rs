@@ -27,6 +27,9 @@ fn main() {
                 "src/models/systems.rs",
                 "src/models/games.rs",
                 "src/models/browse.rs",
+                "src/models/app_state.rs",
+                "src/models/hub_state.rs",
+                "src/models/games_state.rs",
             ],
             qml_files: &[],
             ..Default::default()

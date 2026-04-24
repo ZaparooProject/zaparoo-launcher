@@ -16,24 +16,29 @@
     reason = "process-local init invariants: any violation is a wiring bug and must be fatal"
 )]
 
+pub mod app_state;
 pub mod browse;
 pub mod categories;
 pub mod games;
+pub mod games_state;
+pub mod hub_state;
 pub mod systems;
 
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 use tokio::runtime::Runtime;
 use tokio::sync::watch;
-use zaparoo_core::{client::Client, systems_catalog::CatalogData};
+use zaparoo_core::{client::Client, persist::PersistedState, systems_catalog::CatalogData};
 
 static RUNTIME: OnceLock<Arc<Runtime>> = OnceLock::new();
 static CLIENT: OnceLock<Arc<Client>> = OnceLock::new();
 static CATALOG_TX: OnceLock<watch::Sender<Option<CatalogData>>> = OnceLock::new();
+static PERSIST_STATE: OnceLock<Arc<Mutex<PersistedState>>> = OnceLock::new();
 
 pub fn init_globals(
     runtime: Arc<Runtime>,
     client: Arc<Client>,
     catalog_tx: watch::Sender<Option<CatalogData>>,
+    persist_state: Arc<Mutex<PersistedState>>,
 ) {
     RUNTIME
         .set(runtime)
@@ -44,6 +49,9 @@ pub fn init_globals(
     CATALOG_TX
         .set(catalog_tx)
         .unwrap_or_else(|_| panic!("CATALOG_TX already initialized"));
+    PERSIST_STATE
+        .set(persist_state)
+        .unwrap_or_else(|_| panic!("PERSIST_STATE already initialized"));
 }
 
 pub fn global_runtime() -> Arc<Runtime> {
@@ -59,4 +67,11 @@ pub fn subscribe_catalog() -> watch::Receiver<Option<CatalogData>> {
         .get()
         .expect("CATALOG_TX not initialized")
         .subscribe()
+}
+
+pub fn persist_state() -> Arc<Mutex<PersistedState>> {
+    PERSIST_STATE
+        .get()
+        .expect("PERSIST_STATE not initialized")
+        .clone()
 }

@@ -28,6 +28,24 @@ pub fn log_file_path() -> PathBuf {
     }
 }
 
+pub fn state_file_path() -> PathBuf {
+    // ZAPAROO_STATE_FILE lets tests (and ad-hoc runs) redirect state
+    // persistence away from the real user path. Checked first so the
+    // override applies on every platform.
+    if let Ok(custom) = std::env::var("ZAPAROO_STATE_FILE") {
+        if !custom.is_empty() {
+            return PathBuf::from(custom);
+        }
+    }
+    if runtime::current().is_mister() {
+        PathBuf::from("/tmp/zaparoo/state.toml")
+    } else {
+        let mut path = config_file_path();
+        path.set_file_name("state.toml");
+        path
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(
@@ -37,7 +55,7 @@ mod tests {
         reason = "tests should fail-fast on unexpected errors"
     )]
 
-    use super::{config_file_path, log_file_path};
+    use super::{config_file_path, log_file_path, state_file_path};
     use crate::runtime;
 
     #[test]
@@ -53,6 +71,12 @@ mod tests {
             log.file_name().and_then(|n| n.to_str()),
             Some("launcher.log")
         );
+
+        let state = state_file_path();
+        assert_eq!(
+            state.file_name().and_then(|n| n.to_str()),
+            Some("state.toml")
+        );
     }
 
     #[test]
@@ -65,6 +89,7 @@ mod tests {
                 Some("/media/fat/zaparoo/launcher.toml")
             );
             assert_eq!(log_file_path().to_str(), Some("/tmp/zaparoo/launcher.log"));
+            assert_eq!(state_file_path().to_str(), Some("/tmp/zaparoo/state.toml"));
         } else {
             let cfg = config_file_path();
             assert!(
@@ -76,6 +101,25 @@ mod tests {
                 log.ends_with("zaparoo/logs/launcher.log"),
                 "log path did not end with zaparoo/logs/launcher.log: {log:?}"
             );
+            let state = state_file_path();
+            assert!(
+                state.ends_with("zaparoo/state.toml"),
+                "state path did not end with zaparoo/state.toml: {state:?}"
+            );
         }
+    }
+
+    #[test]
+    fn state_file_sits_next_to_config_file_on_desktop() {
+        if runtime::current().is_mister() {
+            return;
+        }
+        let cfg = config_file_path();
+        let state = state_file_path();
+        assert_eq!(
+            cfg.parent(),
+            state.parent(),
+            "state.toml must be a sibling of launcher.toml: cfg={cfg:?} state={state:?}"
+        );
     }
 }

@@ -9,15 +9,15 @@ import Zaparoo.Ui
 import Zaparoo.Theme
 import Zaparoo.Browse as Browse
 
+// cxx-qt 0.7 doesn't emit FINAL markers in plugin.qmltypes, so qmllint
+// flags every call on a Zaparoo.Browse singleton as "can be shadowed".
+// Nearly every statement in this file touches one, so silence the whole
+// category here rather than sprinkling block pragmas. Remove after the
+// cxx-qt 0.8 upgrade (which fixes the qmltypes emission).
+// qmllint disable compiler
+
 ApplicationWindow {
     id: root
-
-    // Typed local references to singletons — required for property access in tooling.
-    // qmllint disable compiler
-    readonly property Browse.CategoriesModel categoriesRef: Browse.CategoriesModel
-    readonly property Browse.SystemsModel systemsRef: Browse.SystemsModel
-    readonly property Browse.GamesModel gamesRef: Browse.GamesModel
-    // qmllint enable compiler
 
     // Screen/focus state constants — use these instead of bare string literals.
     readonly property string screenHub: "hub"
@@ -44,6 +44,22 @@ ApplicationWindow {
     Component.onCompleted: {
         Sizing.screenWidth = width
         Sizing.screenHeight = height
+        // Restore screen/focus synchronously before first paint. The parent
+        // process on MiSTer kills the launcher without notice, so we resume
+        // exactly where we left off. Selection restore happens asynchronously
+        // in the modelReset handlers below as catalog data arrives.
+        const savedScreen = Browse.AppState.active_screen
+        if (savedScreen === root.screenGames || savedScreen === root.screenHub)
+            root.activeScreen = savedScreen
+        const savedFocus = Browse.HubState.focus
+        if (savedFocus === root.focusCategories || savedFocus === root.focusSystems)
+            root.hubFocus = savedFocus
+        // If Core responded before Main.qml finished loading, CategoriesModel
+        // has already emitted modelReset and the Connections below missed it.
+        // Kick the restore chain manually; the set_category cascade re-fires
+        // SystemsModel.modelReset (now wired) which cascades into GamesModel.
+        if (Browse.CategoriesModel.count > 0)
+            root.restoreFromCategoriesReset()
     }
 
     // Screen state.
@@ -60,27 +76,58 @@ ApplicationWindow {
         }
     }
 
-    // Reset carousel indices when models deliver new data.
+    // Seed carousel indices from persisted state when models deliver new data.
+    // A miss (category renamed, ROM deleted) falls back to index 0 and leaves
+    // the saved identifier untouched on disk — so the user's intent survives
+    // a transient catalog gap. State writes only happen in handleKey (user
+    // navigation); these programmatic seeds are inert with respect to state.
+    //
+    // Always cascade into set_category (even on a miss or first-launch empty
+    // HubState.category): SystemsModel is the only way to drive the next
+    // onModelReset handler, and a games-screen restore depends on that chain
+    // firing so GamesModel.set_system runs.
+    function restoreFromCategoriesReset(): void {
+        const savedCategory = Browse.HubState.category
+        const idx = savedCategory === "" ? -1 : Browse.CategoriesModel.index_for_category(savedCategory)
+        const chosenIndex = idx >= 0 ? idx : 0
+        const chosenCategory = idx >= 0 ? savedCategory : Browse.CategoriesModel.category_at(chosenIndex)
+        categoriesCarousel.currentIndex = chosenIndex
+        Browse.SystemsModel.set_category(chosenCategory)
+    }
+
     Connections {
-        target: root.categoriesRef
+        target: Browse.CategoriesModel
         function onModelReset(): void {
-            categoriesCarousel.currentIndex = 0
+            root.restoreFromCategoriesReset()
         }
     }
     Connections {
-        target: root.systemsRef
+        target: Browse.SystemsModel
+        // On a games-screen restore, GamesState.system_id is authoritative;
+        // fall back to HubState.system_id only if it's empty (edge case: user
+        // pressed Enter on an empty systems carousel and we flipped the
+        // screen without ever committing a system). On a hub restore,
+        // HubState.system_id is authoritative — don't peek at GamesState, or
+        // we'd override the user's hub position with a stale games target
+        // from a prior escape-back-to-hub.
         function onModelReset(): void {
-            systemsCarousel.currentIndex = 0
+            const savedSystem = root.activeScreen === root.screenGames
+                ? (Browse.GamesState.system_id !== "" ? Browse.GamesState.system_id : Browse.HubState.system_id)
+                : Browse.HubState.system_id
+            const idx = savedSystem === "" ? -1 : Browse.SystemsModel.index_for_system_id(savedSystem)
+            systemsCarousel.currentIndex = idx >= 0 ? idx : 0
+            if (idx >= 0)
+                Browse.GamesModel.set_system(savedSystem)
         }
     }
-    // qmllint disable compiler
     Connections {
-        target: root.gamesRef
+        target: Browse.GamesModel
         function onModelReset(): void {
-            gamesCarousel.currentIndex = 0
+            const savedPath = Browse.GamesState.game_path
+            const idx = savedPath === "" ? -1 : Browse.GamesModel.index_for_game_path(savedPath)
+            gamesCarousel.currentIndex = idx >= 0 ? idx : 0
         }
     }
-    // qmllint enable compiler
 
     // ── Background ────────────────────────────────────────────────────────────
 
@@ -120,7 +167,7 @@ ApplicationWindow {
             coverHeight: Sizing.pctH(20)
             coverSpacing: Sizing.pctH(23)
 
-            model: root.categoriesRef
+            model: Browse.CategoriesModel
             delegate: TextTileDelegate {}
             placeholderCover: ""
 
@@ -144,7 +191,7 @@ ApplicationWindow {
             coverHeight: Sizing.pctH(20)
             coverSpacing: Sizing.pctH(23)
 
-            model: root.systemsRef
+            model: Browse.SystemsModel
             delegate: TextTileDelegate {}
             placeholderCover: ""
         }
@@ -153,12 +200,10 @@ ApplicationWindow {
             anchors.horizontalCenter: parent.horizontalCenter
             y: systemsCarousel.y + systemsCarousel.height + Sizing.pctH(1)
             visible: root.hubFocus === root.focusSystems
-            // qmllint disable compiler
             text: {
-                root.systemsRef.count
-                return root.systemsRef.system_name_at(systemsCarousel.currentIndex)
+                Browse.SystemsModel.count
+                return Browse.SystemsModel.system_name_at(systemsCarousel.currentIndex)
             }
-            // qmllint enable compiler
             font.family: Theme.fontRetro
             font.pixelSize: Sizing.fontSize(4)
             color: Theme.textPrimary
@@ -181,18 +226,10 @@ ApplicationWindow {
             y: Sizing.pctH(12)
             width: parent.width
             height: Sizing.pctH(55)
-            // qmllint disable compiler
-            opacity: root.gamesRef.loading ? 0.5 : 1.0
-            model: root.activeScreen === root.screenGames ? root.gamesRef : null
-            // qmllint enable compiler
+            opacity: Browse.GamesModel.loading ? 0.5 : 1.0
+            model: root.activeScreen === root.screenGames ? Browse.GamesModel : null
             delegate: CoverDelegate {}
             placeholderCover: "qrc:/qt/qml/Zaparoo/App/resources/images/placeholder/cover_generic.png"
-
-            onCurrentIndexChanged: {
-                // qmllint disable compiler
-                root.gamesRef.set_selected_index(currentIndex)
-                // qmllint enable compiler
-            }
 
             Behavior on opacity {
                 NumberAnimation {
@@ -203,10 +240,8 @@ ApplicationWindow {
 
         Text {
             anchors.centerIn: gamesCarousel
-            // qmllint disable compiler
-            visible: (root.gamesRef.errorMessage ?? "") !== ""
-            text: root.gamesRef.errorMessage ?? ""
-            // qmllint enable compiler
+            visible: (Browse.GamesModel.error_message ?? "") !== ""
+            text: Browse.GamesModel.error_message ?? ""
             font.family: Theme.fontRetro
             font.pixelSize: Sizing.fontSize(3)
             color: Theme.textDim
@@ -220,12 +255,10 @@ ApplicationWindow {
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: gamesCarousel.bottom
             anchors.topMargin: Sizing.pctH(1)
-            // qmllint disable compiler
             text: {
-                root.gamesRef.count
-                return root.gamesRef.name_at(gamesCarousel.currentIndex)
+                Browse.GamesModel.count
+                return Browse.GamesModel.name_at(gamesCarousel.currentIndex)
             }
-            // qmllint enable compiler
             font.family: Theme.fontRetro
             font.pixelSize: Sizing.fontSize(4)
             color: Theme.textPrimary
@@ -279,51 +312,83 @@ ApplicationWindow {
         Keys.onPressed: event => root.handleKey(event.key)
     }
 
-    // qmllint disable compiler
-    function navigateCarousel(carousel, delta) {
-        if (carousel.itemCount > 0)
-            carousel.currentIndex = (carousel.currentIndex + delta + carousel.itemCount) % carousel.itemCount
+    // Returns true if the carousel actually moved. Callers use this to gate
+    // persistence writes — navigating an empty carousel must not overwrite
+    // saved state with "" (the `_at(-1)` or `_at(0)` fallback on an empty
+    // model).
+    function navigateCarousel(carousel, delta): bool {
+        if (carousel.itemCount <= 0)
+            return false
+        carousel.currentIndex = (carousel.currentIndex + delta + carousel.itemCount) % carousel.itemCount
+        return true
     }
 
     // Navigation key router. Called by the focus Item's Keys.onPressed and
-    // directly from tests (offscreen key routing is unreliable). Kept as a
-    // pure function of root state + the three carousel ids.
+    // directly from tests (offscreen key routing is unreliable). Every
+    // user-initiated selection change writes through to the persisted state
+    // singletons *here* — the carousels themselves don't persist on index
+    // change, so programmatic seeds during restore leave disk state intact.
     function handleKey(key) {
         if (root.activeScreen === root.screenGames) {
             if (key === Qt.Key_Left) {
-                navigateCarousel(gamesCarousel, -1)
+                if (navigateCarousel(gamesCarousel, -1))
+                    Browse.GamesState.game_path = Browse.GamesModel.path_at(gamesCarousel.currentIndex)
             } else if (key === Qt.Key_Right) {
-                navigateCarousel(gamesCarousel, 1)
+                if (navigateCarousel(gamesCarousel, 1))
+                    Browse.GamesState.game_path = Browse.GamesModel.path_at(gamesCarousel.currentIndex)
             } else if (key === Qt.Key_Return || key === Qt.Key_Enter) {
-                root.gamesRef.launch_at(gamesCarousel.currentIndex)
+                if (gamesCarousel.itemCount > 0) {
+                    // Persist before handing control away. Left/Right already
+                    // writes game_path on every move, but the user may press
+                    // Enter on the first highlighted game without navigating,
+                    // leaving game_path stale from a prior system. Writing
+                    // here makes the commit explicit so a kill during launch
+                    // resumes on the correct game.
+                    Browse.GamesState.game_path = Browse.GamesModel.path_at(gamesCarousel.currentIndex)
+                    Browse.GamesModel.launch_at(gamesCarousel.currentIndex)
+                }
             } else if (key === Qt.Key_Escape || key === Qt.Key_Backspace) {
                 root.activeScreen = root.screenHub
+                Browse.AppState.active_screen = root.screenHub
             }
         } else if (root.hubFocus === root.focusSystems) {
             if (key === Qt.Key_Left) {
-                navigateCarousel(systemsCarousel, -1)
+                if (navigateCarousel(systemsCarousel, -1))
+                    Browse.HubState.system_id = Browse.SystemsModel.system_id_at(systemsCarousel.currentIndex)
             } else if (key === Qt.Key_Right) {
-                navigateCarousel(systemsCarousel, 1)
+                if (navigateCarousel(systemsCarousel, 1))
+                    Browse.HubState.system_id = Browse.SystemsModel.system_id_at(systemsCarousel.currentIndex)
             } else if (key === Qt.Key_Return || key === Qt.Key_Enter) {
-                root.gamesRef.set_system(root.systemsRef.system_id_at(systemsCarousel.currentIndex))
-                gamesCarousel.currentIndex = 0
+                if (systemsCarousel.itemCount > 0) {
+                    const chosen = Browse.SystemsModel.system_id_at(systemsCarousel.currentIndex)
+                    Browse.GamesModel.set_system(chosen)
+                    Browse.HubState.system_id = chosen
+                    Browse.GamesState.system_id = chosen
+                }
                 root.activeScreen = root.screenGames
+                Browse.AppState.active_screen = root.screenGames
             } else if (key === Qt.Key_Escape || key === Qt.Key_Backspace) {
                 root.hubFocus = root.focusCategories
+                Browse.HubState.focus = root.focusCategories
             }
         } else {
             if (key === Qt.Key_Left) {
-                navigateCarousel(categoriesCarousel, -1)
+                if (navigateCarousel(categoriesCarousel, -1))
+                    Browse.HubState.category = Browse.CategoriesModel.category_at(categoriesCarousel.currentIndex)
             } else if (key === Qt.Key_Right) {
-                navigateCarousel(categoriesCarousel, 1)
+                if (navigateCarousel(categoriesCarousel, 1))
+                    Browse.HubState.category = Browse.CategoriesModel.category_at(categoriesCarousel.currentIndex)
             } else if (key === Qt.Key_Return || key === Qt.Key_Enter) {
-                systemsCarousel.currentIndex = 0
-                root.systemsRef.set_category(root.categoriesRef.category_at(categoriesCarousel.currentIndex))
+                if (categoriesCarousel.itemCount > 0) {
+                    const chosen = Browse.CategoriesModel.category_at(categoriesCarousel.currentIndex)
+                    Browse.SystemsModel.set_category(chosen)
+                    Browse.HubState.category = chosen
+                }
                 root.hubFocus = root.focusSystems
+                Browse.HubState.focus = root.focusSystems
             } else if (key === Qt.Key_Escape || key === Qt.Key_Backspace) {
                 Qt.quit()
             }
         }
     }
-    // qmllint enable compiler
 }

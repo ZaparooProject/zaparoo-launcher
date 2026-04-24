@@ -32,9 +32,9 @@ pub unsafe extern "C" fn zaparoo_log_qt(level: u8, msg_ptr: *const u8, msg_len: 
 }
 
 use std::ffi::c_int;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use zaparoo_core::{
-    client::Client, config::load_config, logger::install, platform,
+    client::Client, config::load_config, logger::install, persist, platform,
     platform_paths::config_file_path, systems_catalog,
 };
 
@@ -70,8 +70,12 @@ pub extern "C" fn zaparoo_rust_init() -> c_int {
     platform::spawn_fetcher(client.clone(), &runtime);
     let catalog_tx = systems_catalog::spawn(client.clone(), &runtime);
 
+    // Load persisted UI state up front so per-screen singletons can seed
+    // their properties from a consistent snapshot during Initialize.
+    let persist_state = Arc::new(Mutex::new(persist::load()));
+
     // init_globals stores Arcs — runtime keeps running after this fn returns.
-    models::init_globals(runtime, client, catalog_tx);
+    models::init_globals(runtime, client, catalog_tx, persist_state);
 
     0
 }
