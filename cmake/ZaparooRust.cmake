@@ -51,7 +51,7 @@ corrosion_set_env_vars(zaparoo_launcher_rs
     "QMAKE=${_rs_qmake}"
 )
 if(_rs_qt6_core_type STREQUAL "STATIC_LIBRARY")
-    corrosion_set_env_vars(zaparoo_launcher_rs "ZAPAROO_MISTER=1")
+    corrosion_set_env_vars(zaparoo_launcher_rs "ZAPAROO_RUNTIME=mister")
 endif()
 if(ZAPAROO_DEV)
     corrosion_set_env_vars(zaparoo_launcher_rs "ZAPAROO_DEV_BUILD=1")

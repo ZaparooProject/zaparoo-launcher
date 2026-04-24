@@ -6,5 +6,7 @@ pub mod client;
 pub mod config;
 pub mod logger;
 pub mod media_types;
+pub mod platform;
 pub mod platform_paths;
+pub mod runtime;
 pub mod systems_catalog;

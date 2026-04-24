@@ -8,7 +8,7 @@ use zaparoo_core::config::Config;
 /// `vmode -r W H rgb32`. Must be called before `QGuiApplication`. No-op on
 /// non-MiSTer builds.
 pub fn apply_pre_qt_setup(config: &Config) {
-    #[cfg(mister)]
+    #[cfg(zaparoo_runtime = "mister")]
     {
         use tracing::warn;
         std::env::set_var("QT_QPA_PLATFORM", "linuxfb");
@@ -36,13 +36,13 @@ pub fn apply_pre_qt_setup(config: &Config) {
             Ok(_) => {}
         }
     }
-    #[cfg(not(mister))]
+    #[cfg(not(zaparoo_runtime = "mister"))]
     let _ = config;
 }
 
 /// Fire-and-forget `zaparoo.sh -service start`. No-op on non-MiSTer builds.
 pub fn ensure_core_service_running() {
-    #[cfg(mister)]
+    #[cfg(zaparoo_runtime = "mister")]
     {
         use tracing::warn;
         if let Err(e) = std::process::Command::new("/media/fat/Scripts/zaparoo.sh")

@@ -34,8 +34,8 @@ pub unsafe extern "C" fn zaparoo_log_qt(level: u8, msg_ptr: *const u8, msg_len: 
 use std::ffi::c_int;
 use std::sync::Arc;
 use zaparoo_core::{
-    client::Client, config::load_config, logger::install, platform_paths::config_file_path,
-    systems_catalog,
+    client::Client, config::load_config, logger::install, platform,
+    platform_paths::config_file_path, systems_catalog,
 };
 
 /// Called by the C++ main before `QGuiApplication` is constructed.
@@ -67,6 +67,7 @@ pub extern "C" fn zaparoo_rust_init() -> c_int {
     mister_runtime::apply_pre_qt_setup(&config);
 
     let client = Client::new(config.core_endpoint.clone(), &runtime);
+    platform::spawn_fetcher(client.clone(), &runtime);
     let catalog_tx = systems_catalog::spawn(client.clone(), &runtime);
 
     // init_globals stores Arcs — runtime keeps running after this fn returns.

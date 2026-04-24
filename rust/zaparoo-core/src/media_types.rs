@@ -86,6 +86,14 @@ pub struct SystemsResult {
     pub systems: Vec<SystemInfo>,
 }
 
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct VersionResult {
+    #[serde(default)]
+    pub version: String,
+    #[serde(default)]
+    pub platform: String,
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(

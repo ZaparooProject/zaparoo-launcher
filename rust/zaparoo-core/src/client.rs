@@ -8,7 +8,7 @@
 
 use crate::media_types::{
     MediaBrowseParams, MediaBrowseResult, MediaSearchParams, MediaSearchResult, RunParams,
-    RunResult, SystemsParams, SystemsResult,
+    RunResult, SystemsParams, SystemsResult, VersionResult,
 };
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
@@ -231,6 +231,15 @@ impl Client {
             text: String,
         }
         let val = self.call("run", &P { text: params.text }).await?;
+        serde_json::from_value(val).map_err(|e| ClientError {
+            message: e.to_string(),
+        })
+    }
+
+    pub async fn version(&self) -> Result<VersionResult, ClientError> {
+        #[derive(Serialize)]
+        struct P {}
+        let val = self.call("version", &P {}).await?;
         serde_json::from_value(val).map_err(|e| ClientError {
             message: e.to_string(),
         })

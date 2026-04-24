@@ -28,7 +28,9 @@ src/app/main.cpp
     │           systems_catalog.rs — derives categories + systems from server data
     │           config.rs          — TOML config (launcher.toml)
     │           logger.rs          — tracing-subscriber: stderr + JSONL file sinks
-    │           platform_paths.rs  — log/config paths per platform
+    │           runtime.rs         — Runtime enum: what device the launcher runs on
+    │           platform.rs        — Platform enum: what Zaparoo Core is running on
+    │           platform_paths.rs  — log/config paths routed through runtime
     │           media_types.rs     — file-extension → media-type lookup
     │
     └── src/ui/app/  [Zaparoo.App QML module]
@@ -71,6 +73,39 @@ No `qrc:/` strings anywhere else.
 - **Dynamic Qt on desktop, static Qt on MiSTer.** `BUILD_SHARED_LIBS=ON`
   is the default (LGPL compliance for distribution). The ARM32 Docker
   build passes `-DBUILD_SHARED_LIBS=OFF` via the Qt CMake toolchain.
+
+## Runtime vs Platform
+
+Two orthogonal facts the launcher reasons about. Keep them separate —
+gating the wrong one reintroduces bugs the split was designed to prevent.
+
+| Concept | Source of truth | Question answered |
+|---|---|---|
+| **Runtime** | `zaparoo_core::runtime::current()` (filesystem-cached) | What device is the **launcher binary** running on? |
+| **Platform** | `zaparoo_core::platform::subscribe()` (from `version` RPC) | What OS/device is **Zaparoo Core** running on? |
+
+`Runtime == Mister` does **not** imply `Platform == Mister`. The launcher
+can run on a desktop while talking to Core on a MiSTer on the network,
+or vice-versa.
+
+### When to use which
+
+- **Runtime gate** — "this code path behaves differently depending on
+  the launcher's host device." Read `runtime::current()`. Prefer runtime
+  gating for behaviour.
+- **Build-time cfg `#[cfg(zaparoo_runtime = "mister")]`** — reserve for
+  code that genuinely should not compile into desktop binaries (system
+  calls, MiSTer-only dependencies). Currently only `mister_runtime.rs`
+  uses this. Set by `ZAPAROO_RUNTIME=mister` in `cmake/ZaparooRust.cmake`
+  for static-Qt (ARM32) builds.
+- **Platform gate** — "this feature depends on what Core supports."
+  Subscribe to `platform::subscribe()`; treat `None` as "unknown — don't
+  enable platform-specific features until the first `version` RPC
+  completes." Never gate on `Platform` from C++/QML directly; route the
+  decision through Rust and expose a QML property.
+
+**Never gate runtime behaviour on `Platform`, never gate Core
+assumptions on `Runtime`.** They are independent.
 
 ## LGPL compliance
 

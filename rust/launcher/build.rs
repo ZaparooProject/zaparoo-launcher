@@ -33,13 +33,19 @@ fn main() {
         })
         .build();
 
-    println!("cargo:rerun-if-env-changed=ZAPAROO_MISTER");
+    println!("cargo:rerun-if-env-changed=ZAPAROO_RUNTIME");
     println!("cargo:rerun-if-env-changed=ZAPAROO_DEV_BUILD");
 
-    println!("cargo:rustc-check-cfg=cfg(mister)");
+    println!("cargo:rustc-check-cfg=cfg(zaparoo_runtime, values(\"mister\"))");
     println!("cargo:rustc-check-cfg=cfg(dev_build)");
-    if std::env::var("ZAPAROO_MISTER").is_ok() {
-        println!("cargo:rustc-cfg=mister");
+    if let Ok(rt) = std::env::var("ZAPAROO_RUNTIME") {
+        if rt == "mister" {
+            println!("cargo:rustc-cfg=zaparoo_runtime=\"mister\"");
+        } else {
+            println!(
+                "cargo:warning=ignoring unknown ZAPAROO_RUNTIME value: {rt:?} (expected \"mister\")"
+            );
+        }
     }
     if std::env::var("ZAPAROO_DEV_BUILD").is_ok() {
         println!("cargo:rustc-cfg=dev_build");

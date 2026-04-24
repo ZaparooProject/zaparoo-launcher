@@ -204,8 +204,8 @@ ApplicationWindow {
         Text {
             anchors.centerIn: gamesCarousel
             // qmllint disable compiler
-            visible: root.gamesRef.errorMessage !== ""
-            text: root.gamesRef.errorMessage
+            visible: (root.gamesRef.errorMessage ?? "") !== ""
+            text: root.gamesRef.errorMessage ?? ""
             // qmllint enable compiler
             font.family: Theme.fontRetro
             font.pixelSize: Sizing.fontSize(3)
