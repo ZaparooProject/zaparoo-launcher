@@ -103,7 +103,7 @@ mod tests {
         reason = "tests should fail-fast on unexpected errors"
     )]
 
-    use super::{BrowseEntry, MediaSearchResult, SystemsResult};
+    use super::{BrowseEntry, MediaSearchResult, SystemsResult, VersionResult};
 
     #[test]
     fn is_folder_accepts_both_spellings() {
@@ -174,5 +174,20 @@ mod tests {
         let json = r#"{"results":[]}"#;
         let result: MediaSearchResult = serde_json::from_str(json).expect("parse");
         assert!(!result.has_next_page);
+    }
+
+    #[test]
+    fn version_result_parses_populated_payload() {
+        let json = r#"{"version":"1.2.3","platform":"mister"}"#;
+        let result: VersionResult = serde_json::from_str(json).expect("parse");
+        assert_eq!(result.version, "1.2.3");
+        assert_eq!(result.platform, "mister");
+    }
+
+    #[test]
+    fn version_result_missing_fields_default_to_empty() {
+        let result: VersionResult = serde_json::from_str("{}").expect("parse");
+        assert_eq!(result.version, "");
+        assert_eq!(result.platform, "");
     }
 }

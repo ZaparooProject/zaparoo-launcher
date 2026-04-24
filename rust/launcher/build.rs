@@ -39,7 +39,7 @@ fn main() {
     println!("cargo:rustc-check-cfg=cfg(zaparoo_runtime, values(\"mister\"))");
     println!("cargo:rustc-check-cfg=cfg(dev_build)");
     if let Ok(rt) = std::env::var("ZAPAROO_RUNTIME") {
-        if rt == "mister" {
+        if rt.trim().eq_ignore_ascii_case("mister") {
             println!("cargo:rustc-cfg=zaparoo_runtime=\"mister\"");
         } else {
             println!(

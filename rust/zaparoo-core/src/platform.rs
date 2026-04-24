@@ -11,7 +11,7 @@
 use crate::client::Client;
 use crate::media_types::VersionResult;
 use std::sync::{Arc, OnceLock};
-use tokio::sync::watch;
+use tokio::sync::{broadcast, watch};
 use tracing::{info, warn};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -97,7 +97,10 @@ pub fn spawn_fetcher(client: Arc<Client>, runtime: &Arc<tokio::runtime::Runtime>
                     Err(e) => warn!("version RPC failed: {}", e.message),
                 },
                 Ok(false) => {}
-                Err(_) => break,
+                Err(broadcast::error::RecvError::Lagged(n)) => {
+                    warn!("connected channel lagged by {n}, continuing");
+                }
+                Err(broadcast::error::RecvError::Closed) => break,
             }
         }
     });
