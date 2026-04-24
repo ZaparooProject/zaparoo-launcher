@@ -14,7 +14,13 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 OUTPUT_DIR="${PROJECT_ROOT}/output"
-TOOLCHAIN_VERSION="$(cat "${PROJECT_ROOT}/toolchain/VERSION")"
+VERSION_FILE="${PROJECT_ROOT}/toolchain/VERSION"
+if [ ! -f "${VERSION_FILE}" ]; then
+    echo "Error: toolchain version file not found at ${VERSION_FILE}" >&2
+    echo "       (PROJECT_ROOT=${PROJECT_ROOT})" >&2
+    exit 1
+fi
+TOOLCHAIN_VERSION="$(cat "${VERSION_FILE}")"
 # CI sets TOOLCHAIN_IMAGE to a GHCR tag; local dev defaults to the image
 # produced by build-toolchain.sh, whose tag derives from toolchain/VERSION.
 TOOLCHAIN_IMAGE="${TOOLCHAIN_IMAGE:-zaparoo/qt6-arm32-mister:${TOOLCHAIN_VERSION}}"

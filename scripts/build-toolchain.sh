@@ -13,7 +13,13 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-TOOLCHAIN_VERSION="$(cat "${PROJECT_ROOT}/toolchain/VERSION")"
+VERSION_FILE="${PROJECT_ROOT}/toolchain/VERSION"
+if [ ! -f "${VERSION_FILE}" ]; then
+    echo "Error: toolchain version file not found at ${VERSION_FILE}" >&2
+    echo "       (PROJECT_ROOT=${PROJECT_ROOT})" >&2
+    exit 1
+fi
+TOOLCHAIN_VERSION="$(cat "${VERSION_FILE}")"
 IMAGE_TAG="zaparoo/qt6-arm32-mister:${TOOLCHAIN_VERSION}"
 
 echo "=== Building Qt 6.7.2 ARM32 toolchain image (${TOOLCHAIN_VERSION}) ==="
