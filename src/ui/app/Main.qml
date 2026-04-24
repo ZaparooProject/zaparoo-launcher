@@ -337,8 +337,16 @@ ApplicationWindow {
                 if (navigateCarousel(gamesCarousel, 1))
                     Browse.GamesState.game_path = Browse.GamesModel.path_at(gamesCarousel.currentIndex)
             } else if (key === Qt.Key_Return || key === Qt.Key_Enter) {
-                if (gamesCarousel.itemCount > 0)
+                if (gamesCarousel.itemCount > 0) {
+                    // Persist before handing control away. Left/Right already
+                    // writes game_path on every move, but the user may press
+                    // Enter on the first highlighted game without navigating,
+                    // leaving game_path stale from a prior system. Writing
+                    // here makes the commit explicit so a kill during launch
+                    // resumes on the correct game.
+                    Browse.GamesState.game_path = Browse.GamesModel.path_at(gamesCarousel.currentIndex)
                     Browse.GamesModel.launch_at(gamesCarousel.currentIndex)
+                }
             } else if (key === Qt.Key_Escape || key === Qt.Key_Backspace) {
                 root.activeScreen = root.screenHub
                 Browse.AppState.active_screen = root.screenHub

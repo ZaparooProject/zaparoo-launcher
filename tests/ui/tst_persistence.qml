@@ -108,4 +108,12 @@ TestCase {
         compare(Browse.HubState.system_id, "persistence-probe-system",
                 "Enter on an empty systems carousel must not overwrite HubState.system_id")
     }
+
+    function test_enter_on_empty_games_preserves_games_state(): void {
+        Browse.GamesState.game_path = "persistence-probe-path"
+        main.activeScreen = main.screenGames
+        main.handleKey(Qt.Key_Return)
+        compare(Browse.GamesState.game_path, "persistence-probe-path",
+                "Enter on an empty games carousel must not overwrite GamesState.game_path")
+    }
 }
