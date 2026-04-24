@@ -1,6 +1,7 @@
 #!/bin/bash
+# Zaparoo Launcher
+# Copyright (c) 2026 The Zaparoo Project Contributors.
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-# SPDX-FileCopyrightText: 2026 Callan Barrett
 #
 # Builds the ARM32 binary and deploys it to a MiSTer FPGA over SSH/SCP.
 # Reads MISTER_IP from a .env file in the project root.

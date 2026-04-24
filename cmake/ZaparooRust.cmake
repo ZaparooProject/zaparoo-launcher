@@ -1,5 +1,6 @@
+# Zaparoo Launcher
+# Copyright (c) 2026 The Zaparoo Project Contributors.
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-# SPDX-FileCopyrightText: 2026 Callan Barrett
 #
 # Rust/Cargo integration via Corrosion. Builds zaparoo_launcher_rs as a
 # staticlib and links it into a thin C++ executable (launcher) so that Qt's

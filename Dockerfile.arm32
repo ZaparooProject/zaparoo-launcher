@@ -1,18 +1,25 @@
+# Zaparoo Launcher
+# Copyright (c) 2026 The Zaparoo Project Contributors.
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-# SPDX-FileCopyrightText: 2026 Callan Barrett
 #
 # Cross-compiles the zaparoo-launcher application for ARM32 / MiSTer FPGA.
 #
-# Requires the prebuilt toolchain image to exist locally:
-#   zaparoo/qt6-arm32-mister:6.7.2
+# Requires the prebuilt toolchain image to exist locally — the tag is
+# derived from toolchain/VERSION (e.g. zaparoo/qt6-arm32-mister:6.7.2-1).
 #
 # Build the toolchain image first (one-time, ~45 min):
 #   ./scripts/build-toolchain.sh
 #
 # Then build the application (fast, < 1 min):
 #   ./scripts/build-arm32.sh
+#
+# scripts/build-arm32.sh passes TOOLCHAIN_IMAGE as a build-arg; this default
+# is only a safety net for someone invoking `docker build` directly, and
+# intentionally matches no real tag so the build fails loudly rather than
+# using a stale image.
 
-FROM zaparoo/qt6-arm32-mister:6.7.2 AS app-build
+ARG TOOLCHAIN_IMAGE=zaparoo/qt6-arm32-mister:unset
+FROM ${TOOLCHAIN_IMAGE} AS app-build
 
 # cxx-qt's build script resolves Qt paths via qmake, which returns
 # sysroot-prefixed paths (e.g. {sysroot}/opt/qt6-arm32/...). Symlink Qt

@@ -1,5 +1,6 @@
+// Zaparoo Launcher
+// Copyright (c) 2026 The Zaparoo Project Contributors.
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-// SPDX-FileCopyrightText: 2026 Callan Barrett
 
 use cxx_qt::{CxxQtType, Threading};
 use cxx_qt_lib::{QByteArray, QHash, QHashPair_i32_QByteArray, QModelIndex, QString, QVariant};

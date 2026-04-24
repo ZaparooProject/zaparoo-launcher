@@ -1,5 +1,6 @@
+// Zaparoo Launcher
+// Copyright (c) 2026 The Zaparoo Project Contributors.
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-// SPDX-FileCopyrightText: 2026 Callan Barrett
 //
 // Globals set by main() before the QML engine is created. Each QML singleton
 // model reads from these in its Default::default() implementation so it can

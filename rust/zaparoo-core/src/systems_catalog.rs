@@ -1,5 +1,6 @@
+// Zaparoo Launcher
+// Copyright (c) 2026 The Zaparoo Project Contributors.
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-// SPDX-FileCopyrightText: 2026 Callan Barrett
 //
 // Fetches the systems list once on every connection event and broadcasts
 // a parsed CatalogData to subscribers (the QObject models).

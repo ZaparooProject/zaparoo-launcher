@@ -1,6 +1,7 @@
 #!/bin/bash
+# Zaparoo Launcher
+# Copyright (c) 2026 The Zaparoo Project Contributors.
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-# SPDX-FileCopyrightText: 2026 Callan Barrett
 #
 # Bundle Qt shared libraries for LGPL-compliant desktop distribution.
 # Run from the project root after a successful cmake --build.
@@ -112,6 +113,8 @@ done
 info "Copying licenses..."
 cp "${PROJECT_ROOT}/src/LICENSES/LGPLv3.txt" "${DEPLOY_DIR}/"
 cp "${PROJECT_ROOT}/src/LICENSES/Qt-LGPL-NOTICE.txt" "${DEPLOY_DIR}/"
+cp "${PROJECT_ROOT}/src/LICENSES/OFL.txt" "${DEPLOY_DIR}/"
+cp "${PROJECT_ROOT}/src/LICENSES/PressStart2P-ATTRIBUTION.txt" "${DEPLOY_DIR}/"
 cp "${PROJECT_ROOT}/COPYING" "${DEPLOY_DIR}/"
 
 info "Creating launcher script..."

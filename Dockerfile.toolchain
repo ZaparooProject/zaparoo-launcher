@@ -1,9 +1,12 @@
+# syntax=docker/dockerfile:1.6
+# Zaparoo Launcher
+# Copyright (c) 2026 The Zaparoo Project Contributors.
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-# SPDX-FileCopyrightText: 2026 Callan Barrett
 #
-# Builds the reusable Qt 6.7.2 + MiSTer ARM32 toolchain base image.
-# Tag locally as:
-#   zaparoo/qt6-arm32-mister:6.7.2
+# Builds the reusable Qt + MiSTer ARM32 toolchain base image. Qt upstream
+# version is pinned via the QT_VERSION arg below; the image tag is supplied
+# by scripts/build-toolchain.sh, which reads it from toolchain/VERSION so CI
+# and local dev agree on the tag.
 #
 # This image is built ONCE (or when Qt version bumps) and reused by
 # Dockerfile.arm32 to keep per-commit builds fast (< 1 minute vs 45 min).
