@@ -1,5 +1,6 @@
+# Zaparoo Launcher
+# Copyright (c) 2026 The Zaparoo Project Contributors.
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-# SPDX-FileCopyrightText: 2026 Callan Barrett
 
 [workspace]
 members = ["launcher", "zaparoo-core"]
@@ -10,7 +11,7 @@ version      = "0.1.0"
 edition      = "2021"
 rust-version = "1.90"
 license      = "LicenseRef-PolyForm-Noncommercial-1.0.0"
-authors      = ["Callan Barrett"]
+authors      = ["The Zaparoo Project Contributors"]
 
 [workspace.dependencies]
 cxx             = "1"

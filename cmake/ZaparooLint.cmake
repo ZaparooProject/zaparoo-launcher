@@ -1,5 +1,6 @@
+# Zaparoo Launcher
+# Copyright (c) 2026 The Zaparoo Project Contributors.
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-# SPDX-FileCopyrightText: 2026 Callan Barrett
 #
 # Developer lint targets. Include this AFTER all add_subdirectory() calls so
 # that the Qt-generated all_qmllint target already exists.
@@ -18,6 +19,17 @@ file(
     "${CMAKE_SOURCE_DIR}/src/*.h"
     "${CMAKE_SOURCE_DIR}/tests/*.cpp"
     "${CMAKE_SOURCE_DIR}/tests/*.h"
+)
+
+# Translation units only. run-clang-tidy treats its positional args as regex
+# filters against compile_commands.json, which never contains headers — so
+# passing headers here produces unmatched filter strings. Headers still get
+# analysed, just indirectly via the TUs that #include them.
+file(
+    GLOB_RECURSE _ZAPAROO_CXX_TIDY_SOURCES
+    CONFIGURE_DEPENDS
+    "${CMAKE_SOURCE_DIR}/src/*.cpp"
+    "${CMAKE_SOURCE_DIR}/tests/*.cpp"
 )
 
 # ── clang-format check ────────────────────────────────────────────────────────
@@ -48,9 +60,13 @@ find_program(RUN_CLANG_TIDY_EXE NAMES run-clang-tidy run-clang-tidy.py)
 find_program(CLANG_TIDY_EXE NAMES clang-tidy)
 
 if(RUN_CLANG_TIDY_EXE)
+    # Pass first-party sources as positional args rather than `-source-filter`
+    # so we work with the older run-clang-tidy shipped in Ubuntu (noble has
+    # clang-tidy 18 but its run-clang-tidy rejects `-source-filter`, which
+    # only stabilized across distros in clang 19+).
     add_custom_target(
         tidy
-        COMMAND ${RUN_CLANG_TIDY_EXE} -p "${CMAKE_BINARY_DIR}" -source-filter "${CMAKE_SOURCE_DIR}/src/.*"
+        COMMAND ${RUN_CLANG_TIDY_EXE} -p "${CMAKE_BINARY_DIR}" ${_ZAPAROO_CXX_TIDY_SOURCES}
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
         COMMENT "clang-tidy: static analysis (parallel via run-clang-tidy)"
         VERBATIM
@@ -58,7 +74,7 @@ if(RUN_CLANG_TIDY_EXE)
 elseif(CLANG_TIDY_EXE)
     add_custom_target(
         tidy
-        COMMAND ${CLANG_TIDY_EXE} -p "${CMAKE_BINARY_DIR}" ${_ZAPAROO_CXX_SOURCES}
+        COMMAND ${CLANG_TIDY_EXE} -p "${CMAKE_BINARY_DIR}" ${_ZAPAROO_CXX_TIDY_SOURCES}
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
         COMMENT "clang-tidy: static analysis"
         VERBATIM

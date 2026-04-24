@@ -1,5 +1,6 @@
+// Zaparoo Launcher
+// Copyright (c) 2026 The Zaparoo Project Contributors.
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-// SPDX-FileCopyrightText: 2026 Callan Barrett
 //
 // Thin C++ entry point for the Rust launcher. Domain logic lives in the
 // zaparoo_launcher_rs staticlib; Qt plugin wiring is handled here so that

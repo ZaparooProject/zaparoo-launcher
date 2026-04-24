@@ -1,6 +1,7 @@
 #!/bin/bash
+# Zaparoo Launcher
+# Copyright (c) 2026 The Zaparoo Project Contributors.
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-# SPDX-FileCopyrightText: 2026 Callan Barrett
 #
 # Build and run a desktop dev build (ZAPAROO_DEV=ON).
 # Uses build-dev/ to avoid clobbering the regular build/.

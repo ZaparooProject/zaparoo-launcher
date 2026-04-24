@@ -1,5 +1,6 @@
+# Zaparoo Launcher
+# Copyright (c) 2026 The Zaparoo Project Contributors.
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-# SPDX-FileCopyrightText: 2026 Callan Barrett
 
 name: CI
 
@@ -17,7 +18,13 @@ permissions:
   contents: read
 
 env:
-  QT_VERSION: "6.7.2"
+  # 6.10.x LTS — earlier versions' CMake machinery emits `--alias-cycle=error`
+  # (and similar `=error` levels) to qmllint, but the `error` level was only
+  # added to qmllint in 6.10. 6.7.2 and 6.8.3 qmllint both reject it with
+  # "Invalid logging level 'error'". The ARM32 static build still pins
+  # Qt 6.7.2 (built from source in its own toolchain image); this env is
+  # only for desktop CI via aqtinstall.
+  QT_VERSION: "6.10.3"
 
 jobs:
   rust-lint:
@@ -27,7 +34,17 @@ jobs:
       run:
         working-directory: rust
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Install mold
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mold
+      - name: Install Qt ${{ env.QT_VERSION }}
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          modules: qtshadertools
+          cache: true
       - uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # master
         with:
           toolchain: stable
@@ -35,6 +52,10 @@ jobs:
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
           workspaces: rust
+          # QT_VERSION contributes to cache key — cxx-qt-lib's build.rs bakes
+          # Qt library paths and linker flags into target/, so stale cache
+          # from a different Qt version leaves dangling `-l` refs.
+          env-vars: "CARGO CC CFLAGS CXX CMAKE RUST QT"
       - uses: taiki-e/install-action@74e87cbfa15a59692b158178d8905a61bf6fca95 # v2
         with:
           tool: cargo-deny
@@ -52,17 +73,24 @@ jobs:
       run:
         working-directory: rust
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Install mold
         run: |
           sudo apt-get update
           sudo apt-get install -y mold
+      - name: Install Qt ${{ env.QT_VERSION }}
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          modules: qtshadertools
+          cache: true
       - uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # master
         with:
           toolchain: stable
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
           workspaces: rust
+          env-vars: "CARGO CC CFLAGS CXX CMAKE RUST QT"
       - uses: taiki-e/install-action@74e87cbfa15a59692b158178d8905a61bf6fca95 # v2
         with:
           tool: cargo-nextest
@@ -73,7 +101,7 @@ jobs:
     name: Desktop build + ctest
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Install system deps
         run: |
           sudo apt-get update
@@ -85,7 +113,7 @@ jobs:
         uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
         with:
           version: ${{ env.QT_VERSION }}
-          modules: qtdeclarative qtshadertools qtquickcontrols2
+          modules: qtshadertools
           cache: true
       - uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # master
         with:
@@ -93,6 +121,7 @@ jobs:
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
           workspaces: rust
+          env-vars: "CARGO CC CFLAGS CXX CMAKE RUST QT"
       - name: Configure
         run: cmake --preset desktop-debug
       - name: Build
@@ -101,7 +130,7 @@ jobs:
         run: ctest --preset desktop-debug
       - name: Upload launcher binary
         if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: launcher-debug-${{ github.run_id }}
           path: build/bin/launcher
@@ -112,7 +141,7 @@ jobs:
     name: C++ / QML lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Install system deps
         run: |
           sudo apt-get update
@@ -124,7 +153,7 @@ jobs:
         uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
         with:
           version: ${{ env.QT_VERSION }}
-          modules: qtdeclarative qtshadertools qtquickcontrols2
+          modules: qtshadertools
           cache: true
       - uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # master
         with:
@@ -132,6 +161,7 @@ jobs:
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
           workspaces: rust
+          env-vars: "CARGO CC CFLAGS CXX CMAKE RUST QT"
       - name: Configure (required for compile_commands.json)
         run: cmake --preset desktop-debug
       - name: Build (autogen + moc outputs needed by clang-tidy)
@@ -139,23 +169,45 @@ jobs:
       - name: Lint (clang-format + clang-tidy + qmllint)
         run: cmake --build build --target lint
 
+  ensure-toolchain:
+    name: Ensure ARM32 toolchain image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/toolchain-build.yml
+    permissions:
+      contents: read
+      packages: write
+
   arm32-build:
     name: ARM32 cross-build (MiSTer)
     runs-on: ubuntu-latest
-    # Expensive toolchain bootstrap; only run on push to main.
-    # TODO: publish the toolchain image to GHCR so CI can pull it instead of
-    # rebuilding the ~45min toolchain layer on every run.
+    needs: [ensure-toolchain]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: read
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Set lowercase repository owner
+        run: |
+          echo "OWNER_LC=${OWNER,,}" >> "$GITHUB_ENV"
+        env:
+          OWNER: ${{ github.repository_owner }}
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build ARM32 launcher
+        env:
+          TOOLCHAIN_IMAGE: ghcr.io/${{ env.OWNER_LC }}/qt6-arm32-mister:${{ needs.ensure-toolchain.outputs.version }}
         run: ./scripts/build-arm32.sh
       - name: Verify ARM ELF
         run: |
           file output/launcher
           file output/launcher | grep -q 'ARM' || (echo "Not an ARM binary" && exit 1)
       - name: Upload launcher binary
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: launcher-arm32
           path: output/launcher

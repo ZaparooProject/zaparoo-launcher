@@ -8,7 +8,7 @@
 - CMake 3.22+
 - C++17 compiler (GCC 10+, Clang 12+, MSVC 2019+)
 - Rust stable toolchain (`rustup install stable`)
-- Ninja (required — pinned by `CMakePresets.json`)
+- Ninja (required; pinned by `CMakePresets.json`)
 - mold (used as linker on x86_64 Linux; pinned by `rust/.cargo/config.toml`)
 
 On Fedora/RHEL: `sudo dnf install qt6-qtdeclarative-devel qt6-qtquickcontrols2-devel cmake ninja-build mold`
@@ -19,7 +19,7 @@ Install Rust via rustup: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup
 ### MiSTer ARM32 cross-build
 
 - Docker (any recent version)
-- x86_64 host (no emulation needed — pure cross-compilation)
+- x86_64 host (no emulation needed, pure cross-compilation)
 - ~8 GB disk space for the toolchain image
 
 The toolchain Docker image ships a cross-compiler-aware `rust/.cargo/config.toml`
@@ -110,7 +110,7 @@ The binary is self-contained on MiSTer: it sets `QT_QPA_PLATFORM=linuxfb` and
 `QT_QUICK_BACKEND=software`, runs `vmode -r W H rgb32` (width/height from
 config, defaulting to 1920×1080), and starts
 `/media/fat/Scripts/zaparoo.sh -service start` automatically. Just run the
-binary — no wrapper script required.
+binary; no wrapper script required.
 
 User-editable config lives at `/media/fat/zaparoo/launcher.toml`. Example:
 
@@ -150,7 +150,7 @@ cmake --build build --target lint
 ```
 
 This runs clang-format (check only), clang-tidy, and qmllint in one shot.
-`compile_commands.json` is always generated in `build/` — no extra cmake flag needed.
+`compile_commands.json` is always generated in `build/`, so no extra cmake flag is needed.
 
 ### Individual lint targets
 

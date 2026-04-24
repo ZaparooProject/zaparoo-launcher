@@ -1,6 +1,8 @@
+// Zaparoo Launcher
+// Copyright (c) 2026 The Zaparoo Project Contributors.
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-// SPDX-FileCopyrightText: 2026 Callan Barrett
 
+#include <QQuickStyle>
 #include <QtQml/qqmlextensionplugin.h>
 #include <QtQuickTest/quicktest.h>
 
@@ -23,6 +25,12 @@ class UiSetup : public QObject
     // NOLINTNEXTLINE(readability-convert-member-functions-to-static) — Qt slot, must be a member
     void applicationAvailable()
     {
+        // Match the real launcher's style selection. Also forces the test
+        // binary to reference QQuickStyle, which keeps libQt6QuickControls2
+        // on the link line under GNU ld --as-needed (cxx-qt-lib's
+        // quickcontrols feature inside zaparoo_launcher_rs is the sole
+        // other consumer and appears later on the command line).
+        QQuickStyle::setStyle("Basic");
         zaparoo_rust_init();
     }
 };

@@ -1,9 +1,12 @@
+# syntax=docker/dockerfile:1.6
+# Zaparoo Launcher
+# Copyright (c) 2026 The Zaparoo Project Contributors.
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-# SPDX-FileCopyrightText: 2026 Callan Barrett
 #
-# Builds the reusable Qt 6.7.2 + MiSTer ARM32 toolchain base image.
-# Tag locally as:
-#   zaparoo/qt6-arm32-mister:6.7.2
+# Builds the reusable Qt + MiSTer ARM32 toolchain base image. Qt upstream
+# version is pinned via the QT_VERSION arg below; the image tag is supplied
+# by scripts/build-toolchain.sh, which reads it from toolchain/VERSION so CI
+# and local dev agree on the tag.
 #
 # This image is built ONCE (or when Qt version bumps) and reused by
 # Dockerfile.arm32 to keep per-commit builds fast (< 1 minute vs 45 min).
@@ -120,8 +123,10 @@ RUN mkdir qtwebsockets-host-build && cd qtwebsockets-host-build && \
     && cmake --build . --parallel $(nproc) \
     && cmake --install .
 
-# Stage 2: CMake toolchain file for ARM32 cross-compilation
-RUN cat > /build/arm32-toolchain.cmake << 'EOF'
+# Stage 2: CMake toolchain file for ARM32 cross-compilation.
+# Single-quoted heredoc tag so ${CMAKE_SYSROOT} reaches the file literally
+# rather than being expanded by the Dockerfile frontend.
+COPY <<'EOF' /build/arm32-toolchain.cmake
 set(CMAKE_SYSTEM_NAME Linux)
 set(CMAKE_SYSTEM_PROCESSOR arm)
 
@@ -139,7 +144,7 @@ set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
 
-# MiSTer FPGA: Cyclone V SoC — Cortex-A9, NEON, hard-float ABI
+# MiSTer FPGA: Cyclone V SoC, Cortex-A9, NEON, hard-float ABI.
 set(CMAKE_C_FLAGS_INIT   "-mcpu=cortex-a9 -mfloat-abi=hard -mtune=cortex-a9 -mfpu=neon")
 set(CMAKE_CXX_FLAGS_INIT "-mcpu=cortex-a9 -mfloat-abi=hard -mtune=cortex-a9 -mfpu=neon")
 EOF

@@ -1,5 +1,6 @@
+# Zaparoo Launcher
+# Copyright (c) 2026 The Zaparoo Project Contributors.
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-# SPDX-FileCopyrightText: 2026 Callan Barrett
 
 [graph]
 targets = [
@@ -17,20 +18,40 @@ allow = [
     "MIT",
     "Apache-2.0",
     "BSD-2-Clause",
-    "BSD-3-Clause",
-    "ISC",
     "Zlib",
     "Unicode-3.0",
-    "Unicode-DFS-2016",
-    "MPL-2.0",
     "LicenseRef-PolyForm-Noncommercial-1.0.0",
 ]
 confidence-threshold = 0.93
 
 [bans]
-multiple-versions    = "warn"
+multiple-versions    = "deny"
 wildcards            = "deny"
 allow-wildcard-paths = true  # Workspace path deps have no version pin; this is fine.
+
+# Known transitive duplicates we can't resolve without forking upstream.
+# Entries are version-pinned so a future additional duplicate (e.g. a third
+# thiserror) trips the check rather than being silently swallowed.
+# Audit this list whenever cxx-qt, tungstenite, or tracing-appender are bumped.
+skip = [
+    # cxx-qt-build pulls codespan-reporting 0.11 directly; its cxx-gen dep pulls 0.13.
+    { crate = "codespan-reporting@0.11.1" },
+    { crate = "codespan-reporting@0.13.1" },
+    # codespan-reporting 0.11 → unicode-width 0.1; codespan-reporting 0.13 → 0.2.
+    { crate = "unicode-width@0.1.14" },
+    { crate = "unicode-width@0.2.2" },
+    # tungstenite/rand hold getrandom 0.2; tempfile+uuid moved to 0.4.
+    # (getrandom 0.3 is also in the lockfile via cc/jobserver build-deps but
+    # cargo-deny's target-filtered graph doesn't surface it, so skipping it
+    # here would warn as unmatched.)
+    { crate = "getrandom@0.2.17" },
+    { crate = "getrandom@0.4.2" },
+    # tracing-appender is on thiserror 2; cxx-qt + tungstenite still on 1.
+    { crate = "thiserror@1.0.69" },
+    { crate = "thiserror@2.0.18" },
+    { crate = "thiserror-impl@1.0.69" },
+    { crate = "thiserror-impl@2.0.18" },
+]
 
 [sources]
 unknown-registry = "deny"

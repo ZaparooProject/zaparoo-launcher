@@ -16,12 +16,20 @@ License Compliance
 ------------------
 In accordance with the LGPLv3:
 
-1. The Qt libraries are dynamically linked to this application.
-2. You may replace the Qt shared libraries with your own modified
-   or different versions of Qt.
-3. The complete source code for Qt is available at:
+1. Linking:
+   - On desktop builds, the Qt libraries are dynamically linked. You may
+     replace the shipped Qt shared libraries with your own modified or
+     different versions of Qt.
+   - On MiSTer ARM32 builds, Qt is statically linked (the target has no
+     practical shared-library story). To re-link this application against
+     a modified Qt, the Minimal Corresponding Source — that is, the
+     application's compiled object files — is available on request at
+     legal@zaparoo.org, per LGPLv3 §4(d)(1).
+
+2. The complete source code for Qt is available at:
    https://code.qt.io/
-4. The full text of the LGPLv3 license is included in this distribution
+
+3. The full text of the LGPLv3 license is included in this distribution
    as "LGPLv3.txt".
 
 Qt Copyright Notice
@@ -47,4 +55,4 @@ obtained from:
 2. Qt download page: https://www.qt.io/download-open-source
 
 Alternatively, you may request a copy of the Qt source code by contacting
-the distributor of this software.
+legal@zaparoo.org.
