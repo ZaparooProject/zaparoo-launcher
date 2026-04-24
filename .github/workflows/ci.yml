@@ -25,6 +25,12 @@ env:
   # Qt 6.7.2 (built from source in its own toolchain image); this env is
   # only for desktop CI via aqtinstall.
   QT_VERSION: "6.10.3"
+  # CI doesn't reuse incremental metadata across runs — it only bloats the
+  # cached `target/` and slows the Swatinem post-cache upload.
+  CARGO_INCREMENTAL: 0
+  # Strip debug info from test binaries to keep `target/` small for caching.
+  CARGO_PROFILE_TEST_DEBUG: 0
+  CARGO_TERM_COLOR: always
 
 jobs:
   rust-lint:
@@ -98,47 +104,10 @@ jobs:
         run: cargo nextest run --workspace
 
   desktop-build:
-    name: Desktop build + ctest
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Install system deps
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            cmake ninja-build mold \
-            libgl1-mesa-dev libxkbcommon-dev libxcb-xkb-dev \
-            libvulkan-dev
-      - name: Install Qt ${{ env.QT_VERSION }}
-        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
-        with:
-          version: ${{ env.QT_VERSION }}
-          modules: qtshadertools
-          cache: true
-      - uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # master
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
-        with:
-          workspaces: rust
-          env-vars: "CARGO CC CFLAGS CXX CMAKE RUST QT"
-      - name: Configure
-        run: cmake --preset desktop-debug
-      - name: Build
-        run: cmake --build --preset desktop-debug
-      - name: Test
-        run: ctest --preset desktop-debug
-      - name: Upload launcher binary
-        if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: launcher-debug-${{ github.run_id }}
-          path: build/bin/launcher
-          if-no-files-found: warn
-          retention-days: 7
-
-  cpp-lint:
-    name: C++ / QML lint
+    # Folds the old `cpp-lint` job in: clang-tidy needs compile_commands.json
+    # and the autogen/moc outputs that the desktop build already produces, so
+    # running lint as the final step of the same job avoids building twice.
+    name: Desktop build + ctest + lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -162,12 +131,22 @@ jobs:
         with:
           workspaces: rust
           env-vars: "CARGO CC CFLAGS CXX CMAKE RUST QT"
-      - name: Configure (required for compile_commands.json)
+      - name: Configure
         run: cmake --preset desktop-debug
-      - name: Build (autogen + moc outputs needed by clang-tidy)
+      - name: Build
         run: cmake --build --preset desktop-debug
+      - name: Test
+        run: ctest --preset desktop-debug
       - name: Lint (clang-format + clang-tidy + qmllint)
         run: cmake --build build --target lint
+      - name: Upload launcher binary
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: launcher-debug-${{ github.run_id }}
+          path: build/bin/launcher
+          if-no-files-found: warn
+          retention-days: 7
 
   ensure-toolchain:
     name: Ensure ARM32 toolchain image
