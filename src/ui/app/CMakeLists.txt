@@ -23,7 +23,9 @@ qt_add_qml_module(
     zaparoo_ui_app
     URI Zaparoo.App
     VERSION 1.0
-    QML_FILES Main.qml
+    QML_FILES
+        Main.qml
+        MainLayout.qml
     RESOURCES ${_APP_RESOURCES}
     IMPORTS
         Zaparoo.Ui

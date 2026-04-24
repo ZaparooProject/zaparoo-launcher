@@ -51,6 +51,9 @@ lint: lint-cpp lint-rust
 lint-cpp: build
     cmake --build build --target lint
 
+lint-qml: build
+    cmake --build build --target all_qmllint
+
 lint-rust:
     cd rust && cargo fmt --all --check
     cd rust && cargo clippy --workspace --all-targets -- -D warnings
