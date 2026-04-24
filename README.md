@@ -1,6 +1,6 @@
 # Zaparoo Launcher
 
-A Qt/QML game launcher frontend for [Zaparoo Core](https://zaparoo.org), designed to run on MiSTer FPGA (Linux framebuffer, no GPU) and desktop systems. Built with Qt 6.7+, software rendering, and a retro carousel UI that scales from 240p CRT to 1080p.
+A game launcher frontend for [Zaparoo Core](https://zaparoo.org).
 
 ## Building
 
@@ -32,18 +32,15 @@ This repository contains Zaparoo trademarks which are explicitly licensed to the
 
 Copyright 2026 The Zaparoo Project Contributors.
 Source available under the [PolyForm Noncommercial License 1.0.0](COPYING).
-Non-commercial use only.
-
-For commercial licensing, contact
-[legal@zaparoo.org](mailto:legal@zaparoo.org) to discuss terms.
+Non-commercial use only. For commercial licensing, contact [legal@zaparoo.org](mailto:legal@zaparoo.org) to discuss terms.
 
 Third-party components:
 
-- **Qt framework** — LGPLv3. Dynamically linked on desktop builds; statically
+- **Qt framework**: LGPLv3. Dynamically linked on desktop builds; statically
   linked on MiSTer ARM32. Object files for re-linking against a modified Qt
   are available on request at
   [legal@zaparoo.org](mailto:legal@zaparoo.org).
   See [`src/LICENSES/`](src/LICENSES/).
-- **Press Start 2P** font — SIL Open Font License 1.1, © 2012 The Press Start 2P
+- **Press Start 2P** font: SIL Open Font License 1.1, © 2012 The Press Start 2P
   Project Authors. See [`src/LICENSES/OFL.txt`](src/LICENSES/OFL.txt) and
   [`src/LICENSES/PressStart2P-ATTRIBUTION.txt`](src/LICENSES/PressStart2P-ATTRIBUTION.txt).
