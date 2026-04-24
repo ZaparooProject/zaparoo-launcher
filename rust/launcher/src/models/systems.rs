@@ -75,6 +75,9 @@ pub mod ffi {
         #[qinvokable]
         fn system_name_at(self: &SystemsModel, index: i32) -> QString;
 
+        #[qinvokable]
+        fn index_for_system_id(self: &SystemsModel, id: &QString) -> i32;
+
         #[inherit]
         #[cxx_name = "beginResetModel"]
         fn begin_reset_model(self: Pin<&mut SystemsModel>);
@@ -214,5 +217,16 @@ impl ffi::SystemsModel {
             return QString::default();
         }
         QString::from(self.systems[index as usize].name.as_str())
+    }
+
+    fn index_for_system_id(&self, id: &QString) -> i32 {
+        let needle = id.to_string();
+        if needle.is_empty() {
+            return -1;
+        }
+        self.systems
+            .iter()
+            .position(|s| s.id == needle)
+            .map_or(-1, |i| i as i32)
     }
 }

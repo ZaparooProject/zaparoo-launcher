@@ -107,6 +107,17 @@ target_link_libraries(launcher
         Qt6::QuickControls2
 )
 
+# Dummy CMake target satisfying qmlimportscanner's lookup for the cxx-qt
+# plugin. build/qml/Zaparoo/Browse/qmldir declares `optional plugin
+# Zaparoo_Browse`, and qt_import_qml_plugins() warns when that name has
+# no matching CMake target. The real plugin code is baked into
+# zaparoo_launcher_rs (already linked above); the INTERFACE target here
+# is a no-op link-wise but silences the "plugin will not be linked"
+# warning. Defined at global scope so tests/ui sees it too.
+if(NOT TARGET Zaparoo_Browse)
+    add_library(Zaparoo_Browse INTERFACE)
+endif()
+
 # Critical: documented Qt static-plugin machinery. Runs qmlimportscanner,
 # traverses the QML module dependency graph, and emits correct
 # Q_IMPORT_QML_PLUGIN calls + --whole-archive link lines for every Qt
@@ -140,4 +151,20 @@ endif()
 
 set_target_properties(launcher PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+)
+
+# ── cxx-qt QML module sync for tooling ───────────────────────────────────────
+# cxx-qt writes qmldir + plugin.qmltypes under cargo's OUT_DIR, which qmllint
+# does not search. Copy them into ${QT_QML_OUTPUT_DIRECTORY}/<module>/ so
+# qmllint's -I path resolves types (Browse.QAppState, Browse.GamesModel, …)
+# exposed by the Rust staticlib. The cmake script globs at build time because
+# Corrosion's hash-segmented path is not known at configure time.
+add_custom_target(zaparoo_cxxqt_qml_sync
+    COMMAND ${CMAKE_COMMAND}
+        -DCARGO_DIR=${CMAKE_BINARY_DIR}/cargo
+        -DDEST_QML_DIR=${CMAKE_BINARY_DIR}/qml
+        -P ${CMAKE_SOURCE_DIR}/cmake/SyncCxxqtQmlModules.cmake
+    DEPENDS cargo-build_zaparoo_launcher_rs
+    COMMENT "Syncing cxx-qt QML module manifests into ${CMAKE_BINARY_DIR}/qml"
+    VERBATIM
 )

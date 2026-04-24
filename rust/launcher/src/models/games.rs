@@ -77,6 +77,12 @@ pub mod ffi {
         fn name_at(self: &GamesModel, index: i32) -> QString;
 
         #[qinvokable]
+        fn path_at(self: &GamesModel, index: i32) -> QString;
+
+        #[qinvokable]
+        fn index_for_game_path(self: &GamesModel, path: &QString) -> i32;
+
+        #[qinvokable]
         fn set_selected_index(self: Pin<&mut GamesModel>, index: i32);
 
         #[inherit]
@@ -209,6 +215,24 @@ impl ffi::GamesModel {
             return QString::default();
         }
         QString::from(self.items[index as usize].name.as_str())
+    }
+
+    fn path_at(&self, index: i32) -> QString {
+        if index < 0 || index >= self.count {
+            return QString::default();
+        }
+        QString::from(self.items[index as usize].path.as_str())
+    }
+
+    fn index_for_game_path(&self, path: &QString) -> i32 {
+        let needle = path.to_string();
+        if needle.is_empty() {
+            return -1;
+        }
+        self.items
+            .iter()
+            .position(|item| item.path == needle)
+            .map_or(-1, |i| i as i32)
     }
 
     fn set_selected_index(mut self: Pin<&mut Self>, index: i32) {
