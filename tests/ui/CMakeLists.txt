@@ -12,6 +12,7 @@ qt_add_qml_module(
         tst_smoke.qml
         tst_navigation.qml
         tst_sizing.qml
+        tst_persistence.qml
     IMPORTS
         Zaparoo.App
         Zaparoo.Browse
