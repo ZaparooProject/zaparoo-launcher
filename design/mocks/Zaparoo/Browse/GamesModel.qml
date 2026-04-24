@@ -13,6 +13,8 @@ ListModel {
 
     property bool loading: false
     property string error_message: ""
+    property bool has_next_page: false
+    property string current_system_id: ""
 
     function set_system(_system_id: string): void {}
     function launch_at(_index: int): void {}

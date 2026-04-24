@@ -13,7 +13,7 @@ launcher binary — it's a designer-only sidecar.
 2. **Build the launcher once** from the repo root so the generated
    QML modules exist:
 
-   ```
+   ```sh
    just build
    ```
 
@@ -23,7 +23,7 @@ launcher binary — it's a designer-only sidecar.
    under `design/mocks/`.
 3. **Open the project** in Qt Design Studio:
 
-   ```
+   ```text
    design/launcher.qmlproject
    ```
 
@@ -66,14 +66,17 @@ Allowed:
 If an effect is essential, talk to an engineer first — there's often a
 flat `Rectangle` / `Image` combo that gets you 80% of the way.
 
-## Sizing — never hardcode pixels
+## Sizing — never hardcode pixels or element counts
 
 The launcher scales from 240p (CRT) to 1080p. Use the helpers exposed
-as the `Sizing` singleton (import `Zaparoo.Theme`):
+as the `Sizing` singleton (import `Zaparoo.Theme`) — never hardcode
+pixel values or element counts:
 
 - `Sizing.pctH(n)` — `n` percent of screen height.
 - `Sizing.pctW(n)` — `n` percent of screen width.
 - `Sizing.fontSize(n)` — percent-of-height font size, floored at 8 px.
+- `Sizing.visibleCovers` — element count for carousels and similar
+  repeaters; drops at very low resolutions to avoid crowding.
 
 At the designer canvas of 1280×720, `Sizing.pctH(10)` previews as 72 px.
 
