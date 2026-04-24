@@ -77,16 +77,22 @@ ApplicationWindow {
     }
 
     // Seed carousel indices from persisted state when models deliver new data.
-    // A miss (system removed, ROM deleted) falls back to index 0 and leaves
+    // A miss (category renamed, ROM deleted) falls back to index 0 and leaves
     // the saved identifier untouched on disk — so the user's intent survives
     // a transient catalog gap. State writes only happen in handleKey (user
     // navigation); these programmatic seeds are inert with respect to state.
+    //
+    // Always cascade into set_category (even on a miss or first-launch empty
+    // HubState.category): SystemsModel is the only way to drive the next
+    // onModelReset handler, and a games-screen restore depends on that chain
+    // firing so GamesModel.set_system runs.
     function restoreFromCategoriesReset(): void {
         const savedCategory = Browse.HubState.category
         const idx = savedCategory === "" ? -1 : Browse.CategoriesModel.index_for_category(savedCategory)
-        categoriesCarousel.currentIndex = idx >= 0 ? idx : 0
-        if (savedCategory !== "")
-            Browse.SystemsModel.set_category(savedCategory)
+        const chosenIndex = idx >= 0 ? idx : 0
+        const chosenCategory = idx >= 0 ? savedCategory : Browse.CategoriesModel.category_at(chosenIndex)
+        categoriesCarousel.currentIndex = chosenIndex
+        Browse.SystemsModel.set_category(chosenCategory)
     }
 
     Connections {
@@ -97,12 +103,16 @@ ApplicationWindow {
     }
     Connections {
         target: Browse.SystemsModel
-        // On a games-screen restore, the saved system lives in GamesState —
-        // the hub's own system_id may be stale or unset. Fall back to
-        // HubState otherwise (resume into hub, or first launch).
+        // On a games-screen restore, GamesState.system_id is authoritative;
+        // fall back to HubState.system_id only if it's empty (edge case: user
+        // pressed Enter on an empty systems carousel and we flipped the
+        // screen without ever committing a system). On a hub restore,
+        // HubState.system_id is authoritative — don't peek at GamesState, or
+        // we'd override the user's hub position with a stale games target
+        // from a prior escape-back-to-hub.
         function onModelReset(): void {
             const savedSystem = root.activeScreen === root.screenGames
-                ? Browse.GamesState.system_id
+                ? (Browse.GamesState.system_id !== "" ? Browse.GamesState.system_id : Browse.HubState.system_id)
                 : Browse.HubState.system_id
             const idx = savedSystem === "" ? -1 : Browse.SystemsModel.index_for_system_id(savedSystem)
             systemsCarousel.currentIndex = idx >= 0 ? idx : 0
@@ -344,6 +354,7 @@ ApplicationWindow {
                 if (systemsCarousel.itemCount > 0) {
                     const chosen = Browse.SystemsModel.system_id_at(systemsCarousel.currentIndex)
                     Browse.GamesModel.set_system(chosen)
+                    Browse.HubState.system_id = chosen
                     Browse.GamesState.system_id = chosen
                 }
                 root.activeScreen = root.screenGames
@@ -360,8 +371,11 @@ ApplicationWindow {
                 if (navigateCarousel(categoriesCarousel, 1))
                     Browse.HubState.category = Browse.CategoriesModel.category_at(categoriesCarousel.currentIndex)
             } else if (key === Qt.Key_Return || key === Qt.Key_Enter) {
-                if (categoriesCarousel.itemCount > 0)
-                    Browse.SystemsModel.set_category(Browse.CategoriesModel.category_at(categoriesCarousel.currentIndex))
+                if (categoriesCarousel.itemCount > 0) {
+                    const chosen = Browse.CategoriesModel.category_at(categoriesCarousel.currentIndex)
+                    Browse.SystemsModel.set_category(chosen)
+                    Browse.HubState.category = chosen
+                }
                 root.hubFocus = root.focusSystems
                 Browse.HubState.focus = root.focusSystems
             } else if (key === Qt.Key_Escape || key === Qt.Key_Backspace) {

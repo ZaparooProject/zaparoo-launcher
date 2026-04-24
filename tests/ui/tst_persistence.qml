@@ -88,4 +88,24 @@ TestCase {
         compare(Browse.AppState.active_screen, main.screenGames,
                 "Enter must flip active_screen even on an empty carousel")
     }
+
+    // Enter commits the highlighted selection into HubState so first-launch
+    // users who never press Left/Right still get a restorable identifier on
+    // disk. The write is guarded by itemCount > 0 — on an empty carousel
+    // (this harness) the guard must skip the write, leaving prior state
+    // intact.
+    function test_enter_on_empty_categories_preserves_hub_state(): void {
+        Browse.HubState.category = "persistence-probe-category"
+        main.handleKey(Qt.Key_Return)
+        compare(Browse.HubState.category, "persistence-probe-category",
+                "Enter on an empty categories carousel must not overwrite HubState.category")
+    }
+
+    function test_enter_on_empty_systems_preserves_hub_state(): void {
+        Browse.HubState.system_id = "persistence-probe-system"
+        main.hubFocus = main.focusSystems
+        main.handleKey(Qt.Key_Return)
+        compare(Browse.HubState.system_id, "persistence-probe-system",
+                "Enter on an empty systems carousel must not overwrite HubState.system_id")
+    }
 }
