@@ -6,148 +6,65 @@ rendering) and desktop Linux (x86_64, windowed). The hard rendering
 constraint shapes every visual decision. See @docs/architecture.md for the
 module graph and @docs/building.md for the full build matrix.
 
-## Hard Constraints
+## Constraints
 
-**Software rendering only.** MiSTer has no GPU. Never use: shaders,
-`LinearGradient`, `RadialGradient`, `DropShadow`, `Glow`, `OpacityMask`,
-`MultiEffect`, `Qt5Compat.GraphicalEffects`. Stick to `Rectangle`, `Image`,
-`Text`, `Repeater`, `NumberAnimation`, `ColorAnimation`. The "Basic"
-`QQuickStyle` is mandatory for the same reason.
+### NEVER
 
-**Resolution-agnostic layout.** The UI runs from 240p (CRT) to 1080p. Use
-`Sizing.pctH()`, `Sizing.pctW()`, `Sizing.fontSize()` for all dimensions.
-Scale element counts with resolution (e.g. `Sizing.visibleCovers`). Never
-hardcode pixel values.
+- Use shaders, `LinearGradient`, `RadialGradient`, `DropShadow`, `Glow`,
+  `OpacityMask`, `MultiEffect`, `Qt5Compat.GraphicalEffects`, or any other
+  GPU-dependent QML type. MiSTer renders in software on a framebuffer.
+  Stick to `Rectangle`, `Image`, `Text`, `Repeater`, `NumberAnimation`,
+  `ColorAnimation`. "Basic" `QQuickStyle` is mandatory.
+- Hardcode pixel values. The UI runs 240p (CRT) → 1080p; use
+  `Sizing.pctH()`, `Sizing.pctW()`, `Sizing.fontSize()`, and
+  `Sizing.visibleCovers` for every dimension and element count.
+- Add Qt5 compatibility code or `#if QT_VERSION` guards. Qt 6.7+ only.
+- Change `BUILD_SHARED_LIBS` — `ON` on desktop is required for LGPL
+  compliance; `OFF` on ARM32/MiSTer is set by the Docker toolchain.
+- Hold in-memory-only application state. MiSTer's launcher script kills
+  and relaunches the binary freely; every piece of user-visible state
+  (selected game, carousel position, menu state, settings) must be
+  serializable to disk and restored before the first frame paints.
+- Leave a lint warning or failing test unresolved.
+- `cd rust/` or invoke raw cmake/cargo. Drive every workflow from the
+  repo root via `just`.
 
-**Qt 6.7+ only.** No Qt5 compatibility code. No `#if QT_VERSION` guards.
+### ASK
 
-**Dynamic Qt on desktop; static on MiSTer.** `BUILD_SHARED_LIBS ON` is the
-default and required for LGPL compliance on desktop. The ARM32 Docker build
-uses static Qt — do not change this.
+- Before adding or changing a `Client` method in
+  `rust/zaparoo-core/src/client.rs` — cross-check
+  https://zaparoo.org/docs/core/api/ first. Method names, param shapes,
+  and return types must match upstream.
 
-**Watch the FPS counter.** `src/ui/components/FpsCounter.qml` shows a live
-FPS readout (green ≥55, yellow ≥30, red <30). When changing visuals, verify
-it stays green at 720p+ and doesn't fall red at 240p.
+### ALWAYS
 
-**State is always serializable; the app is effectively stateless across runs.**
-MiSTer launcher scripts kill and relaunch the binary freely. Design all
-application state (selected game, carousel position, menu state, settings) so
-it can be persisted to disk at any time and fully restored on the next launch.
-On startup, load persisted state before the first frame paints — the relaunch
-must feel instant to the user. Never hold in-memory-only state that would be
-lost on kill.
+- After editing any C++, Rust, or QML file: run `just lint` (zero
+  warnings is the bar) and `just test` if the change can affect runtime
+  behaviour.
+- Watch `src/ui/components/FpsCounter.qml` when changing visuals —
+  it must stay green (≥55) at 720p+ and not fall red (<30) at 240p.
 
 ## Commands
 
-Common workflows are wrapped in `justfile` recipes — run `just --list` for the
-full menu. Prefer `just X` over raw cmake/cargo invocations.
+Run `just --list` for the full menu. The `justfile` is the source of
+truth — `.cargo/config.toml` and `CMakePresets.json` are tuned to it.
 
-```bash
-# Build and run (desktop)
-just build        # cmake configure + build
-just run          # build + launch desktop binary
+    just build | run                   desktop cmake + run
+    just test | test-qml | test-rust   ctest + cargo nextest
+    just lint | lint-cpp | lint-rust   clang-format/tidy + qmllint +
+                                       rustfmt + clippy + cargo-deny
+    just fmt                           pre-commit + cargo fmt
+    just arm32 | deploy-mister         cross-build + SCP to MiSTer
 
-# Tests
-just test         # ctest + cargo nextest
-just test-qml     # QML smoke tests only
-just test-rust    # Rust unit tests only
+## Deploy to MiSTer
 
-# Linters (clang-format + clang-tidy + qmllint + rustfmt + clippy + cargo-deny)
-just lint
-just lint-cpp     # C++/QML only
-just lint-rust    # Rust only
-
-# Auto-format (pre-commit for C++/QML, cargo fmt for Rust)
-just fmt
-
-# ARM32 cross-build and deploy
-just arm32
-just deploy-mister
-```
-
-The raw commands still work; `just` just wraps them. Equivalents:
-
-```bash
-cmake -S . -B build && cmake --build build         # just build
-ctest --test-dir build --output-on-failure         # just test-qml
-cmake --build build --target lint                  # just lint-cpp
-cd rust && cargo clippy --workspace --all-targets -- -D warnings  # part of just lint-rust
-```
-
-# Deploy to MiSTer
-
-```bash
-./scripts/deploy-mister.sh
-```
-
-Builds the ARM32 binary, backs up the existing binary on the device to
-`launcher.bak`, SCPs the new binary over, kills any running `launcher` and
-`MiSTer_Zaparoo` processes, then restarts `MiSTer_Zaparoo`. Reads `MISTER_IP`
-from a `.env` file in the project root — create it with
-`echo 'MISTER_IP=<ip>' > .env` if it doesn't exist yet. When the user asks
-to deploy, run this script.
-
-`/media/fat/MiSTer_Zaparoo` is the pre-existing Zaparoo integration binary
-that ships with MiSTer; it is responsible for launching our `launcher` binary.
-Restarting it picks up the newly deployed binary automatically.
-
-The launcher binary is self-contained: it sets `QT_QPA_PLATFORM=linuxfb` and
-`QT_QUICK_BACKEND=software`, runs `vmode -r W H rgb32` (width/height from
-config), and starts the Zaparoo Core service automatically. Resolution and
-endpoint can be overridden in `/media/fat/zaparoo/launcher.toml`
-(TOML format; create the file manually — see `docs/building.md` for an
-example).
-
-For ARM32 / MiSTer builds and deploy bundle, see @docs/building.md.
-
-## IMPORTANT: Repo Policy
-
-After editing any C++, Rust, or QML file, ALWAYS run:
-1. `just lint` — zero warnings is the bar (covers clang-tidy, qmllint,
-   rustfmt, clippy, and cargo-deny).
-2. `just test` — if the change can affect runtime behaviour.
-
-Never leave a lint warning or failing test unresolved.
-
-## QML Gotchas
-
-These pitfalls come up repeatedly; qmllint only catches them after you've
-written the code:
-
-- **Typed properties, not `var`.** Use `list<string>`, `list<url>`, `int`,
-  `real` — `var` produces `QVariant` warnings and blocks AOT compilation.
-- **`Repeater` delegates need `pragma ComponentBehavior: Bound`** at the top
-  of the file. Add `required property int index` to the delegate, plus
-  `required property string modelData` when the model is a list.
-- **Nested delegate children** that reference the delegate's properties must
-  qualify: give the delegate an `id` and use `id.modelData`, not bare
-  `modelData`.
-- **Singleton QML types** need both `pragma Singleton` in the `.qml` file
-  and `set_source_files_properties(Foo.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)`
-  in CMake, or qmllint will warn "not declared as singleton in qmldir".
-- **Function type annotations required.** Add `: ParamType` parameters and
-  `: ReturnType` return types to all functions in singleton `.qml` files.
-- **`NumberAnimation on propName`** conflicts with `property T propName: value`.
-  Drop the `: value` initialiser — the animation takes over immediately.
-
-## cxx-qt Bridge Gotchas
-
-When writing Rust QML models via cxx-qt 0.7:
-
-- **`cxx = "1"` must be a direct dependency.** The `#[cxx_qt::bridge]` macro
-  expands to `#[cxx::bridge]`. Rust resolves proc-macro attributes in the
-  calling crate's scope, so `cxx` must appear in that crate's `[dependencies]`
-  — being a transitive dep through `cxx-qt` is not sufficient.
-- **`#[qproperty(T, snake_case_name)]` auto-converts to camelCase** on the Qt
-  and QML side. `#[qproperty(bool, has_next_page)]` → accessible as
-  `hasNextPage` in QML.
-- **User-defined `#[qinvokable]` methods are exposed with their Rust name**
-  (snake_case). QML calls them as `model.set_system(id)` etc. Add
-  `#[cxx_name = "..."]` only when you need camelCase (e.g. to match a Qt
-  base-class virtual like `rowCount`, `roleNames`, `beginResetModel`).
-- **cxx-qt plugin class name** for a `Zaparoo.Browse` module is
-  `Zaparoo_Browse_plugin` (not `Zaparoo_BrowsePlugin`). Use
-  `Q_IMPORT_QML_PLUGIN(Zaparoo_Browse_plugin)` in the C++ entry point.
+`./scripts/deploy-mister.sh` — reads `MISTER_IP` from a `.env` in the
+project root (create with `echo 'MISTER_IP=<ip>' > .env`). Non-obvious
+context: `/media/fat/MiSTer_Zaparoo` is a pre-existing integration binary
+shipped with MiSTer that is responsible for launching our `launcher`; the
+deploy script restarts it, which picks up the newly-SCP'd binary
+automatically. User-editable resolution and endpoint overrides live at
+`/media/fat/zaparoo/launcher.toml` (example in @docs/building.md).
 
 ## Module Map
 
@@ -157,46 +74,29 @@ When writing Rust QML models via cxx-qt 0.7:
 | `src/ui/components/` | `Zaparoo.Ui` | `Carousel`, `CoverDelegate`, `TextTileDelegate`, `FpsCounter` |
 | `src/ui/app/` | `Zaparoo.App` | `Main.qml` + embedded fonts and images |
 | `rust/launcher/src/models/` | `Zaparoo.Browse` | `CategoriesModel`, `SystemsModel`, `GamesModel`, `BrowseModel` (dormant) — Rust QML singletons via cxx-qt |
-| `rust/zaparoo-core/` | — | `client`, `config`, `logger`, `systems_catalog`, `media_types`, `platform_paths` (Rust, no Qt dependency) |
+| `rust/zaparoo-core/` | — | `client`, `config`, `logger`, `systems_catalog`, `media_types`, `platform_paths` (no Qt dependency) |
 
 Import QML modules as `import Zaparoo.Theme`, `import Zaparoo.Ui`, etc.
 Resources are embedded at `qrc:/qt/qml/Zaparoo/App/resources/...`.
-`compile_commands.json` is always generated in `build/`; no extra CMake flag needed.
+`compile_commands.json` is generated in `build/` unconditionally.
 
 ## Logging
 
-Use `tracing::info!`, `tracing::debug!`, `tracing::warn!`, `tracing::error!`
-in Rust code:
+Use `tracing::{info,debug,warn,error}!` in Rust. Two sinks write
+simultaneously: stderr (RFC-3339 human-readable) and JSONL file at
+`platform_paths::log_file_path()` — `/tmp/zaparoo/launcher.log` on MiSTer,
+`~/.local/share/zaparoo/logs/launcher.log` on desktop. Qt messages route
+through `zaparoo_log_qt` (`rust/launcher/src/lib.rs`) with `target="qt"`,
+so Qt warnings land in the same file.
 
-```rust
-tracing::info!("catalog loaded: {} systems", count);
-tracing::debug!(target: "qt", "message from Qt layer");
-tracing::warn!("vmode exited with {:?}", code);
-```
-
-The logger writes two sinks simultaneously:
-- **stderr**: human-readable RFC-3339 timestamp + level + message
-- **file**: JSONL at `platform_paths::log_file_path()`. MiSTer:
-  `/tmp/zaparoo/launcher.log`. Desktop:
-  `~/.local/share/zaparoo/logs/launcher.log`.
-
-Qt messages are forwarded through the same tracing registry via the
-`zaparoo_log_qt` extern in `rust/launcher/src/lib.rs`, so Qt warnings
-appear in `launcher.log` with `target="qt"`.
-
-Debug-level output is filtered out by default. Enable it two ways:
-- **Config**: set `[logging] debug = true` in `launcher.toml`.
-- **Env var**: `ZAPAROO_DEBUG=1 ./launcher` (takes effect before config loads).
-
-## Zaparoo Core API
-
-Full API reference: https://zaparoo.org/docs/core/api/
-
-Before adding or modifying any `Client` method in `rust/zaparoo-core/src/client.rs`,
-check the upstream docs to verify method names, param shapes, and return types.
+Debug level is filtered out by default. Enable with `[logging] debug =
+true` in `launcher.toml`, or `ZAPAROO_DEBUG=1` env var (takes effect
+before config loads, useful for debugging startup).
 
 ## Further Reading
 
-- @docs/architecture.md — module graph, data-flow plan, LGPL notes
-- @docs/building.md — full build matrix (ARM32 toolchain, deploy bundle, sanitizers)
+- @docs/architecture.md — module graph, data-flow, LGPL notes
+- @docs/building.md — full build matrix, ARM32 toolchain, sanitizers, deploy bundle
+- @docs/qml-gotchas.md — QML pitfalls qmllint only catches post-hoc (read when writing QML)
+- @docs/cxx-qt-bridge.md — cxx-qt 0.7 bridge gotchas (read when editing Rust QML models)
 - `src/LICENSES/` — Qt LGPL notices

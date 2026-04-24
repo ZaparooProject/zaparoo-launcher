@@ -74,8 +74,8 @@ No `qrc:/` strings anywhere else.
 
 ## LGPL compliance
 
-Qt is used under LGPLv3. The desktop binary links Qt dynamically — end
-users may replace the bundled Qt libraries. The MiSTer ARM32 binary is
+Qt is used under LGPLv3. The desktop binary links Qt dynamically, so end
+users can replace the bundled Qt libraries. The MiSTer ARM32 binary is
 statically linked; object files are available on request per LGPL §4(d)(1).
 License texts live in `src/LICENSES/`.
 
