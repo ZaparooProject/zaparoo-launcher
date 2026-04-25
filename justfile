@@ -31,6 +31,13 @@ run: build
 run-dev: build-dev
     ./build-dev/bin/launcher
 
+# Run a local mock Zaparoo Core (ws://127.0.0.1:27497/api/v0.1).
+# Deliberately offset from the real Core's 7497 so dev never collides
+# with a running Core. `just run-dev` automatically points the launcher
+# here via ZAPAROO_CORE_ENDPOINT. See docs/quickstart.md.
+mock-core:
+    cd rust && cargo run --bin mock-core
+
 # --- test ---
 test: build
     ctest --preset desktop-debug

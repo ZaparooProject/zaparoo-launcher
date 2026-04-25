@@ -1,5 +1,5 @@
 // Zaparoo Launcher
-// Copyright (c) 2026 The Zaparoo Project Contributors.
+// Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 
 import QtQuick
@@ -7,13 +7,12 @@ import QtQuick.Window
 import QtQuick.Controls
 import Zaparoo.Ui
 import Zaparoo.Theme
+import Zaparoo.Screens
 import Zaparoo.Browse as Browse
 
 // cxx-qt 0.7 doesn't emit FINAL markers in plugin.qmltypes, so qmllint
 // flags every call on a Zaparoo.Browse singleton as "can be shadowed".
-// Nearly every binding in this form touches one, so silence the whole
-// category here. Remove after the cxx-qt 0.8 upgrade (which fixes the
-// qmltypes emission).
+// Remove after the cxx-qt 0.8 upgrade.
 // qmllint disable compiler
 
 // Visual tree. Edit this file in Qt Design Studio; the state machine
@@ -24,18 +23,19 @@ import Zaparoo.Browse as Browse
 ApplicationWindow {
     id: root
 
-    // Screen/focus state constants — referenced by bindings below and
-    // by Main.qml. Declared here so the layout's own bindings resolve
-    // without depending on the wrapper.
-    readonly property string screenHub: "hub"
-    readonly property string screenGames: "games"
-    readonly property string focusCategories: "categories"
-    readonly property string focusSystems: "systems"
+    // Screen/focus constants re-exported from the manager + HubScreen so
+    // tests and Main.qml can reference them without importing both.
+    readonly property string screenHub: ScreenManager.screenHub
+    readonly property string screenGames: ScreenManager.screenGames
+    readonly property string focusCategories: hubScreen.focusCategories
+    readonly property string focusSystems: hubScreen.focusSystems
 
-    // Runtime state the wrapper mutates; the layout binds against them.
+    // Runtime state. `activeScreen` mirrors ScreenManager's property
+    // (two-way synced below so direct assignment from tests still
+    // works). `hubFocus` aliases HubScreen's internal focus.
     property bool fullScreen: false
-    property string activeScreen: root.screenHub
-    property string hubFocus: root.focusCategories
+    property string activeScreen: ScreenManager.activeScreen
+    property alias hubFocus: hubScreen.section
 
     // Drives the hub↔games slide transition. 0 = hub centred; width = games centred.
     property real screenOffset: root.activeScreen === root.screenGames ? root.width : 0
@@ -47,18 +47,38 @@ ApplicationWindow {
     height: 720
     visible: true
     visibility: root.fullScreen ? Window.FullScreen : Window.Windowed
-    title: "Zaparoo Launcher"
+    title: qsTr("Zaparoo Launcher")
 
-    // Aliases so the Main.qml wrapper can drive the carousels (ids
-    // declared inside this file aren't visible from the extending file).
-    property alias categoriesCarousel: categoriesCarousel
-    property alias systemsCarousel: systemsCarousel
-    property alias gamesCarousel: gamesCarousel
+    // Aliases so Main.qml (and existing tests) can drive the carousels
+    // without reaching through nested component ids.
+    property alias categoriesCarousel: hubScreen.categoriesCarousel
+    property alias systemsCarousel: hubScreen.systemsCarousel
+    property alias gamesCarousel: gamesScreen.gamesCarousel
+
+    // Screen/manager plumbing exposed for Main.qml's orchestration.
+    property alias hubScreen: hubScreen
+    property alias gamesScreen: gamesScreen
 
     Behavior on screenOffset {
         NumberAnimation {
             duration: 220
             easing.type: Easing.OutCubic
+        }
+    }
+
+    // Two-way sync between root.activeScreen and ScreenManager.activeScreen.
+    // Binding-breaking assignments (tests setting root.activeScreen = "games")
+    // still propagate to ScreenManager; ScreenManager changes (from the
+    // screens) still update root.activeScreen.
+    onActiveScreenChanged: {
+        if (ScreenManager.activeScreen !== root.activeScreen)
+            ScreenManager.activeScreen = root.activeScreen
+    }
+    Connections {
+        target: ScreenManager
+        function onActiveScreenChanged(): void {
+            if (root.activeScreen !== ScreenManager.activeScreen)
+                root.activeScreen = ScreenManager.activeScreen
         }
     }
 
@@ -81,125 +101,21 @@ ApplicationWindow {
         source: "qrc:/qt/qml/Zaparoo/App/resources/images/logo.png"
     }
 
-    // ── Hub screen ────────────────────────────────────────────────────────────
+    // ── Screen containers ─────────────────────────────────────────────────────
 
-    Item {
-        id: hubContainer
+    HubScreen {
+        id: hubScreen
         x: -root.screenOffset
         width: parent.width
         height: parent.height
-
-        Carousel {
-            id: categoriesCarousel
-
-            anchors.horizontalCenter: parent.horizontalCenter
-            width: parent.width
-            height: Sizing.pctH(20)
-            y: root.hubFocus === root.focusSystems ? Sizing.pctH(12) : Sizing.pctH(35)
-            coverWidth: Sizing.pctH(20)
-            coverHeight: Sizing.pctH(20)
-            coverSpacing: Sizing.pctH(23)
-
-            model: Browse.CategoriesModel
-            delegate: TextTileDelegate {}
-            placeholderCover: ""
-
-            Behavior on y {
-                NumberAnimation {
-                    duration: 250
-                    easing.type: Easing.OutQuad
-                }
-            }
-        }
-
-        Carousel {
-            id: systemsCarousel
-
-            anchors.horizontalCenter: parent.horizontalCenter
-            width: parent.width
-            height: Sizing.pctH(20)
-            y: Sizing.pctH(36)
-            visible: root.hubFocus === root.focusSystems
-            coverWidth: Sizing.pctH(20)
-            coverHeight: Sizing.pctH(20)
-            coverSpacing: Sizing.pctH(23)
-
-            model: Browse.SystemsModel
-            delegate: TextTileDelegate {}
-            placeholderCover: ""
-        }
-
-        Text {
-            anchors.horizontalCenter: parent.horizontalCenter
-            y: systemsCarousel.y + systemsCarousel.height + Sizing.pctH(1)
-            visible: root.hubFocus === root.focusSystems
-            // Reading Browse.SystemsModel.count registers the binding for
-            // model resets; the comparison is always true so the result
-            // is the system name at the current carousel index.
-            text: Browse.SystemsModel.count >= 0
-                  ? Browse.SystemsModel.system_name_at(systemsCarousel.currentIndex)
-                  : ""
-            font.family: Theme.fontRetro
-            font.pixelSize: Sizing.fontSize(4)
-            color: Theme.textPrimary
-            renderType: Text.NativeRendering
-        }
     }
 
-    // ── Games screen ──────────────────────────────────────────────────────────
-
-    Item {
-        id: gamesContainer
+    GamesScreen {
+        id: gamesScreen
         x: parent.width - root.screenOffset
         width: parent.width
         height: parent.height
-
-        Carousel {
-            id: gamesCarousel
-
-            anchors.horizontalCenter: parent.horizontalCenter
-            y: Sizing.pctH(12)
-            width: parent.width
-            height: Sizing.pctH(55)
-            opacity: Browse.GamesModel.loading ? 0.5 : 1.0
-            model: root.activeScreen === root.screenGames ? Browse.GamesModel : null
-            delegate: CoverDelegate {}
-            placeholderCover: "qrc:/qt/qml/Zaparoo/App/resources/images/placeholder/cover_generic.png"
-
-            Behavior on opacity {
-                NumberAnimation {
-                    duration: 100
-                }
-            }
-        }
-
-        Text {
-            anchors.centerIn: gamesCarousel
-            visible: (Browse.GamesModel.error_message ?? "") !== ""
-            text: Browse.GamesModel.error_message ?? ""
-            font.family: Theme.fontRetro
-            font.pixelSize: Sizing.fontSize(3)
-            color: Theme.textDim
-            wrapMode: Text.WordWrap
-            horizontalAlignment: Text.AlignHCenter
-            width: parent.width * 0.7
-            renderType: Text.NativeRendering
-        }
-
-        Text {
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.top: gamesCarousel.bottom
-            anchors.topMargin: Sizing.pctH(1)
-            // See _selectedSystemName note above — reading count here
-            // registers the binding for model-reset updates.
-            text: Browse.GamesModel.count >= 0
-                  ? Browse.GamesModel.name_at(gamesCarousel.currentIndex)
-                  : ""
-            font.family: Theme.fontRetro
-            font.pixelSize: Sizing.fontSize(4)
-            color: Theme.textPrimary
-            renderType: Text.NativeRendering
-        }
+        active: root.activeScreen === root.screenGames
     }
 
     // ── FPS counter ───────────────────────────────────────────────────────────
@@ -210,6 +126,53 @@ ApplicationWindow {
         anchors.topMargin: Sizing.pctH(1)
         anchors.rightMargin: Sizing.pctW(1)
         z: 200
+    }
+
+    // ── Connection status strip ───────────────────────────────────────────────
+    //
+    // Shown only when Core is unreachable or the catalog failed to load;
+    // otherwise the strip is hidden and takes no space. Connection state
+    // constants mirror rust/launcher/src/models/app_status.rs:
+    //   0 DISCONNECTED · 1 CONNECTING · 2 READY · 3 ERROR.
+
+    Rectangle {
+        id: statusStrip
+
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: instructionsBar.top
+        height: visible ? Sizing.pctH(4) : 0
+        visible: Browse.AppStatus.connection_state !== 2
+        color: Theme.bgBar
+        border.width: 1
+        // White border on ERROR draws the eye to the strip; the muted
+        // border on CONNECTING/DISCONNECTED keeps it informational.
+        border.color: Browse.AppStatus.connection_state === 3
+                      ? Theme.textPrimary
+                      : Theme.borderSubtle
+        z: 150
+
+        Text {
+            anchors.centerIn: parent
+            // `%1` placeholder keeps translators in charge of word order —
+            // some languages won't lead with "Core error". `last_error`
+            // is untranslated (it's the Rust-side error string) on purpose.
+            text: {
+                const state = Browse.AppStatus.connection_state;
+                if (state === 3) {
+                    const msg = Browse.AppStatus.last_error ?? "";
+                    return msg !== ""
+                        ? qsTr("Core error: %1").arg(msg)
+                        : qsTr("Core error");
+                }
+                if (state === 1) return qsTr("Connecting to Zaparoo Core…");
+                return qsTr("Disconnected from Zaparoo Core");
+            }
+            font.family: Theme.fontRetro
+            font.pixelSize: Sizing.fontSize(2.5)
+            color: Theme.textPrimary
+            renderType: Text.NativeRendering
+        }
     }
 
     // ── Instructions bar ──────────────────────────────────────────────────────
@@ -228,10 +191,10 @@ ApplicationWindow {
         Text {
             anchors.centerIn: parent
             text: root.activeScreen === root.screenGames
-                  ? "[<>] GAME  [OK] PLAY  [ESC] BACK"
+                  ? qsTr("[<>] GAME  [OK] PLAY  [ESC] BACK")
                   : (root.hubFocus === root.focusSystems
-                     ? "[<>] SYSTEM  [OK] GAMES  [ESC] BACK"
-                     : "[<>] CATEGORY  [OK] SELECT  [ESC] QUIT")
+                     ? qsTr("[<>] SYSTEM  [OK] GAMES  [ESC] BACK")
+                     : qsTr("[<>] CATEGORY  [OK] SELECT  [ESC] QUIT"))
             font.family: Theme.fontRetro
             font.pixelSize: Sizing.fontSize(2.5)
             color: Theme.textDim

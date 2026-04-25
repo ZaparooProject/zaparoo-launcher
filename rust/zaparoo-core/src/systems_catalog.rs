@@ -1,11 +1,11 @@
 // Zaparoo Launcher
-// Copyright (c) 2026 The Zaparoo Project Contributors.
+// Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //
-// Fetches the systems list once on every connection event and broadcasts
+// Fetches the systems list once on every connection event and publishes
 // a parsed CatalogData to subscribers (the QObject models).
 
-use crate::client::Client;
+use crate::client::{Client, ConnectionState};
 use crate::media_types::{SystemInfo, SystemsParams};
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -16,6 +16,23 @@ use tracing::{info, warn};
 pub struct CatalogData {
     pub systems: Vec<SystemInfo>,
     pub categories: Vec<String>,
+}
+
+/// Lifecycle of the catalog fetch, published alongside `CatalogData` so the
+/// UI can distinguish "waiting for Core" from "Core returned an error."
+#[derive(Debug, Clone, Default)]
+pub enum CatalogStatus {
+    #[default]
+    Idle,
+    Loading,
+    Ready,
+    Errored(String),
+}
+
+#[derive(Debug)]
+pub struct CatalogChannels {
+    pub data: watch::Sender<Option<CatalogData>>,
+    pub status: watch::Sender<CatalogStatus>,
 }
 
 impl CatalogData {
@@ -53,49 +70,54 @@ fn derive_categories(systems: &[SystemInfo]) -> Vec<String> {
     cats
 }
 
-pub fn spawn(
-    client: Arc<Client>,
-    runtime: &Arc<tokio::runtime::Runtime>,
-) -> watch::Sender<Option<CatalogData>> {
-    let (catalog_tx, _) = watch::channel(None::<CatalogData>);
-    let tx = catalog_tx.clone();
-    // Subscribe before spawning: broadcast receivers miss messages sent before
-    // subscription, so if the core is already up the "connected = true" event
-    // would arrive before the async task even starts. Subscribing here on the
-    // main thread guarantees we capture it.
-    let mut connected_rx = client.connected.subscribe();
+pub fn spawn(client: Arc<Client>, runtime: &Arc<tokio::runtime::Runtime>) -> CatalogChannels {
+    let (data_tx, _) = watch::channel(None::<CatalogData>);
+    let (status_tx, _) = watch::channel(CatalogStatus::Idle);
+    let data = data_tx.clone();
+    let status = status_tx.clone();
+    let mut connection_rx = client.connection.subscribe();
 
     runtime.spawn(async move {
+        // Seed from the watch's current value so we react if Core is
+        // already Connected at subscription time, then loop on changes.
+        let mut state = connection_rx.borrow_and_update().clone();
         loop {
-            match connected_rx.recv().await {
-                Ok(true) => {
-                    let seq_client = client.clone();
-                    match seq_client.systems(SystemsParams {}).await {
-                        Ok(result) => {
-                            let mut systems = result.systems;
-                            systems
-                                .sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-                            let categories = derive_categories(&systems);
-                            info!(
-                                "catalog loaded: {} systems, {} categories",
-                                systems.len(),
-                                categories.len()
-                            );
-                            tx.send_replace(Some(CatalogData {
-                                systems,
-                                categories,
-                            }));
-                        }
-                        Err(e) => warn!("systems RPC failed: {}", e.message),
+            if matches!(state, ConnectionState::Connected) {
+                status.send_replace(CatalogStatus::Loading);
+                let seq_client = client.clone();
+                match seq_client.systems(SystemsParams {}).await {
+                    Ok(result) => {
+                        let mut systems = result.systems;
+                        systems.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+                        let categories = derive_categories(&systems);
+                        info!(
+                            "catalog loaded: {} systems, {} categories",
+                            systems.len(),
+                            categories.len()
+                        );
+                        data.send_replace(Some(CatalogData {
+                            systems,
+                            categories,
+                        }));
+                        status.send_replace(CatalogStatus::Ready);
+                    }
+                    Err(e) => {
+                        warn!("systems RPC failed: {}", e.message);
+                        status.send_replace(CatalogStatus::Errored(e.message));
                     }
                 }
-                Ok(false) => {}
-                Err(_) => break,
             }
+            if connection_rx.changed().await.is_err() {
+                break;
+            }
+            state = connection_rx.borrow_and_update().clone();
         }
     });
 
-    catalog_tx
+    CatalogChannels {
+        data: data_tx,
+        status: status_tx,
+    }
 }
 
 #[cfg(test)]
@@ -199,7 +221,7 @@ mod tests {
             sys("mame", "MAME", "arcade"),
             sys("odd", "Odd One", ""),
         ];
-        // Match the sort applied by spawn() before broadcasting.
+        // Match the sort applied by spawn() before publishing.
         systems.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
         let categories = derive_categories(&systems);
         insta::assert_debug_snapshot!(CatalogData {

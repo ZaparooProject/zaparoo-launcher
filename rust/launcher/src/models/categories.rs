@@ -1,5 +1,5 @@
 // Zaparoo Launcher
-// Copyright (c) 2026 The Zaparoo Project Contributors.
+// Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 
 use cxx_qt::{CxxQtType, Initialize, Threading};
@@ -12,6 +12,7 @@ const NAME_ROLE: i32 = 256 + 1; // Qt::UserRole + 1
 pub struct CategoriesModelRust {
     categories: Vec<String>,
     count: i32,
+    error_message: QString,
 }
 
 #[cxx_qt::bridge]
@@ -35,6 +36,7 @@ pub mod ffi {
         #[qml_element]
         #[qml_singleton]
         #[qproperty(i32, count)]
+        #[qproperty(QString, error_message)]
         type CategoriesModel = super::CategoriesModelRust;
 
         #[qinvokable]
@@ -65,9 +67,11 @@ pub mod ffi {
 
 impl Initialize for ffi::CategoriesModel {
     fn initialize(mut self: Pin<&mut Self>) {
-        use crate::models::{global_runtime, subscribe_catalog};
+        use crate::models::{global_runtime, subscribe_catalog, subscribe_catalog_status};
+        use zaparoo_core::systems_catalog::CatalogStatus;
 
         let mut catalog_rx = subscribe_catalog();
+        let mut status_rx = subscribe_catalog_status();
 
         // Apply whatever the catalog task has already loaded (handles the common
         // case where the connection is fast enough to complete before Qt starts).
@@ -81,6 +85,7 @@ impl Initialize for ffi::CategoriesModel {
         }
 
         let qt_thread = self.qt_thread();
+        let qt_thread_status = qt_thread.clone();
         global_runtime().spawn(async move {
             while catalog_rx.changed().await.is_ok() {
                 if let Some(data) = catalog_rx.borrow_and_update().clone() {
@@ -92,6 +97,24 @@ impl Initialize for ffi::CategoriesModel {
                         model.as_mut().end_reset_model();
                         model.as_mut().count_changed();
                     });
+                }
+            }
+        });
+
+        global_runtime().spawn(async move {
+            loop {
+                let err = match &*status_rx.borrow_and_update() {
+                    CatalogStatus::Errored(msg) => msg.clone(),
+                    _ => String::new(),
+                };
+                let qstr = QString::from(err.as_str());
+                let _ = qt_thread_status.queue(move |mut model| {
+                    if model.error_message != qstr {
+                        model.as_mut().set_error_message(qstr);
+                    }
+                });
+                if status_rx.changed().await.is_err() {
+                    break;
                 }
             }
         });

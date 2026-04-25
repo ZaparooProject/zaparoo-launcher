@@ -1,5 +1,5 @@
 # Zaparoo Launcher
-# Copyright (c) 2026 The Zaparoo Project Contributors.
+# Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 #
 # Developer lint targets. Include this AFTER all add_subdirectory() calls so
@@ -105,6 +105,7 @@ if(TARGET all_qmllint)
         foreach(_qmllint_target IN ITEMS
                 zaparoo_ui_app_qmllint
                 zaparoo_ui_components_qmllint
+                zaparoo_ui_screens_qmllint
                 zaparoo_ui_theme_qmllint
                 tst_ui_qmllint)
             if(TARGET ${_qmllint_target})

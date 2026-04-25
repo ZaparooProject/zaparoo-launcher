@@ -1,10 +1,11 @@
 // Zaparoo Launcher
-// Copyright (c) 2026 The Zaparoo Project Contributors.
+// Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 
 import QtQuick
 import QtQuick.Window
 import Zaparoo.Theme
+import Zaparoo.Screens
 import Zaparoo.Browse as Browse
 
 // cxx-qt 0.7 doesn't emit FINAL markers in plugin.qmltypes, so qmllint
@@ -13,8 +14,11 @@ import Zaparoo.Browse as Browse
 // qmllint disable compiler
 
 // Runtime wrapper around MainLayout. The visual tree lives in
-// MainLayout.qml (editable by designers in Qt Design Studio); this
-// file carries the state machine, key input, and persistence.
+// MainLayout.qml (editable by designers in Qt Design Studio) and the
+// individual screens in Zaparoo.Screens; this file is a thin router
+// that translates raw Qt key events into actions, dispatches them to
+// the active screen (or topmost modal), and persists user-visible
+// navigation state across kills.
 MainLayout {
     id: root
 
@@ -47,32 +51,23 @@ MainLayout {
         // Kick the restore chain manually; the set_category cascade re-fires
         // SystemsModel.modelReset (now wired) which cascades into GamesModel.
         if (Browse.CategoriesModel.count > 0)
-            root.restoreFromCategoriesReset()
+            root.hubScreen.restoreFromCategoriesReset()
     }
 
     // Seed carousel indices from persisted state when models deliver new data.
     // A miss (category renamed, ROM deleted) falls back to index 0 and leaves
     // the saved identifier untouched on disk — so the user's intent survives
-    // a transient catalog gap. State writes only happen in handleKey (user
-    // navigation); these programmatic seeds are inert with respect to state.
+    // a transient catalog gap. State writes only happen in each screen's
+    // handleAction (user navigation); these programmatic seeds are inert.
     //
     // Always cascade into set_category (even on a miss or first-launch empty
     // HubState.category): SystemsModel is the only way to drive the next
     // onModelReset handler, and a games-screen restore depends on that chain
     // firing so GamesModel.set_system runs.
-    function restoreFromCategoriesReset(): void {
-        const savedCategory = Browse.HubState.category
-        const idx = savedCategory === "" ? -1 : Browse.CategoriesModel.index_for_category(savedCategory)
-        const chosenIndex = idx >= 0 ? idx : 0
-        const chosenCategory = idx >= 0 ? savedCategory : Browse.CategoriesModel.category_at(chosenIndex)
-        root.categoriesCarousel.currentIndex = chosenIndex
-        Browse.SystemsModel.set_category(chosenCategory)
-    }
-
     Connections {
         target: Browse.CategoriesModel
         function onModelReset(): void {
-            root.restoreFromCategoriesReset()
+            root.hubScreen.restoreFromCategoriesReset()
         }
     }
     Connections {
@@ -103,84 +98,61 @@ MainLayout {
         }
     }
 
-    // Returns true if the carousel actually moved. Callers use this to gate
-    // persistence writes — navigating an empty carousel must not overwrite
-    // saved state with "" (the `_at(-1)` or `_at(0)` fallback on an empty
-    // model).
-    function navigateCarousel(carousel, delta): bool {
-        if (carousel.itemCount <= 0)
-            return false
-        carousel.currentIndex = (carousel.currentIndex + delta + carousel.itemCount) % carousel.itemCount
-        return true
+    // Cross-screen transitions: each screen signals its intent and this
+    // router writes persistence + flips ScreenManager. Keeps the screens
+    // themselves ignorant of AppState so they can be reused in test
+    // harnesses that don't wire the full persistence layer.
+    Connections {
+        target: root.hubScreen
+        function onRequestGamesScreen(): void {
+            ScreenManager.activeScreen = root.screenGames
+            Browse.AppState.active_screen = root.screenGames
+        }
+        function onRequestQuit(): void {
+            Qt.quit()
+        }
+    }
+    Connections {
+        target: root.gamesScreen
+        function onRequestHubScreen(): void {
+            ScreenManager.activeScreen = root.screenHub
+            Browse.AppState.active_screen = root.screenHub
+        }
+    }
+    // Persist hub section flips (categories ↔ systems) — those don't
+    // trigger a cross-screen signal, but the section change is user
+    // intent we want on disk.
+    Connections {
+        target: root.hubScreen
+        function onSectionChanged(): void {
+            Browse.HubState.focus = root.hubScreen.section
+        }
     }
 
-    // Navigation key router. Called by the focus Item's Keys.onPressed and
-    // directly from tests (offscreen key routing is unreliable). Every
-    // user-initiated selection change writes through to the persisted state
-    // singletons *here* — the carousels themselves don't persist on index
-    // change, so programmatic seeds during restore leave disk state intact.
-    function handleKey(key) {
-        if (root.activeScreen === root.screenGames) {
-            if (key === Qt.Key_Left) {
-                if (navigateCarousel(root.gamesCarousel, -1))
-                    Browse.GamesState.game_path = Browse.GamesModel.path_at(root.gamesCarousel.currentIndex)
-            } else if (key === Qt.Key_Right) {
-                if (navigateCarousel(root.gamesCarousel, 1))
-                    Browse.GamesState.game_path = Browse.GamesModel.path_at(root.gamesCarousel.currentIndex)
-            } else if (key === Qt.Key_Return || key === Qt.Key_Enter) {
-                if (root.gamesCarousel.itemCount > 0) {
-                    // Persist before handing control away. Left/Right already
-                    // writes game_path on every move, but the user may press
-                    // Enter on the first highlighted game without navigating,
-                    // leaving game_path stale from a prior system. Writing
-                    // here makes the commit explicit so a kill during launch
-                    // resumes on the correct game.
-                    Browse.GamesState.game_path = Browse.GamesModel.path_at(root.gamesCarousel.currentIndex)
-                    Browse.GamesModel.launch_at(root.gamesCarousel.currentIndex)
-                }
-            } else if (key === Qt.Key_Escape || key === Qt.Key_Backspace) {
-                root.activeScreen = root.screenHub
-                Browse.AppState.active_screen = root.screenHub
-            }
-        } else if (root.hubFocus === root.focusSystems) {
-            if (key === Qt.Key_Left) {
-                if (navigateCarousel(root.systemsCarousel, -1))
-                    Browse.HubState.system_id = Browse.SystemsModel.system_id_at(root.systemsCarousel.currentIndex)
-            } else if (key === Qt.Key_Right) {
-                if (navigateCarousel(root.systemsCarousel, 1))
-                    Browse.HubState.system_id = Browse.SystemsModel.system_id_at(root.systemsCarousel.currentIndex)
-            } else if (key === Qt.Key_Return || key === Qt.Key_Enter) {
-                if (root.systemsCarousel.itemCount > 0) {
-                    const chosen = Browse.SystemsModel.system_id_at(root.systemsCarousel.currentIndex)
-                    Browse.GamesModel.set_system(chosen)
-                    Browse.HubState.system_id = chosen
-                    Browse.GamesState.system_id = chosen
-                }
-                root.activeScreen = root.screenGames
-                Browse.AppState.active_screen = root.screenGames
-            } else if (key === Qt.Key_Escape || key === Qt.Key_Backspace) {
-                root.hubFocus = root.focusCategories
-                Browse.HubState.focus = root.focusCategories
-            }
-        } else {
-            if (key === Qt.Key_Left) {
-                if (navigateCarousel(root.categoriesCarousel, -1))
-                    Browse.HubState.category = Browse.CategoriesModel.category_at(root.categoriesCarousel.currentIndex)
-            } else if (key === Qt.Key_Right) {
-                if (navigateCarousel(root.categoriesCarousel, 1))
-                    Browse.HubState.category = Browse.CategoriesModel.category_at(root.categoriesCarousel.currentIndex)
-            } else if (key === Qt.Key_Return || key === Qt.Key_Enter) {
-                if (root.categoriesCarousel.itemCount > 0) {
-                    const chosen = Browse.CategoriesModel.category_at(root.categoriesCarousel.currentIndex)
-                    Browse.SystemsModel.set_category(chosen)
-                    Browse.HubState.category = chosen
-                }
-                root.hubFocus = root.focusSystems
-                Browse.HubState.focus = root.focusSystems
-            } else if (key === Qt.Key_Escape || key === Qt.Key_Backspace) {
-                Qt.quit()
-            }
+    // Action router. Called from handleKey (which translates Qt key
+    // codes via Browse.Input.action_for_key) and directly from tests.
+    // Dispatches to the top modal if any, otherwise the active screen.
+    function handleAction(action: string): void {
+        if (ScreenManager.hasModal) {
+            // Modal overlays are a forward-looking extension; no modal
+            // components exist yet, so just swallow input while one is
+            // on the stack rather than leak it to the root screen.
+            return
         }
+        if (root.activeScreen === root.screenGames) {
+            root.gamesScreen.handleAction(action)
+        } else {
+            root.hubScreen.handleAction(action)
+        }
+    }
+
+    // Thin boundary shim kept for back-compat with tst_navigation.qml.
+    // Delegates to handleAction so the state machine has a single entry
+    // point regardless of input source.
+    function handleKey(key): void {
+        const action = Browse.Input.action_for_key(key)
+        if (action !== "")
+            root.handleAction(action)
     }
 
     Item {

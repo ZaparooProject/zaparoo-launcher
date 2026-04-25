@@ -1,5 +1,5 @@
 // Zaparoo Launcher
-// Copyright (c) 2026 The Zaparoo Project Contributors.
+// Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 
 use cxx_qt::{CxxQtType, Threading};
@@ -168,7 +168,8 @@ impl ffi::GamesModel {
                 model.as_mut().set_loading(false);
                 match result {
                     Ok(r) => {
-                        if r.has_next_page {
+                        let has_next = r.has_next_page();
+                        if has_next {
                             warn!("games list for {sid} has >100 results; only first page shown");
                         }
                         let count = r.results.len() as i32;
@@ -177,7 +178,7 @@ impl ffi::GamesModel {
                         model.as_mut().rust_mut().count = count;
                         model.as_mut().end_reset_model();
                         model.as_mut().count_changed();
-                        model.as_mut().set_has_next_page(r.has_next_page);
+                        model.as_mut().set_has_next_page(has_next);
                     }
                     Err(e) => {
                         model

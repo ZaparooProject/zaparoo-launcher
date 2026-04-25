@@ -1,6 +1,6 @@
 #!/bin/bash
 # Zaparoo Launcher
-# Copyright (c) 2026 The Zaparoo Project Contributors.
+# Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 #
 # Builds the ARM32 binary and deploys it to a MiSTer FPGA over SSH/SCP.

@@ -1,5 +1,5 @@
 // Zaparoo Launcher
-// Copyright (c) 2026 The Zaparoo Project Contributors.
+// Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 
 #![allow(
@@ -27,6 +27,7 @@ pub struct SystemsModelRust {
     systems: Vec<SystemInfo>,
     count: i32,
     current_category: QString,
+    error_message: QString,
     // Shared catalog owned by the background task; model reads it on setCategory
     catalog: Arc<RwLock<Option<CatalogData>>>,
 }
@@ -37,6 +38,7 @@ impl Default for SystemsModelRust {
             systems: Vec::new(),
             count: 0,
             current_category: QString::default(),
+            error_message: QString::default(),
             catalog: Arc::new(RwLock::new(None)),
         }
     }
@@ -64,6 +66,7 @@ pub mod ffi {
         #[qml_singleton]
         #[qproperty(i32, count)]
         #[qproperty(QString, current_category)]
+        #[qproperty(QString, error_message)]
         type SystemsModel = super::SystemsModelRust;
 
         #[qinvokable]
@@ -99,11 +102,14 @@ pub mod ffi {
 
 impl Initialize for ffi::SystemsModel {
     fn initialize(self: Pin<&mut Self>) {
-        use crate::models::{global_runtime, subscribe_catalog};
+        use crate::models::{global_runtime, subscribe_catalog, subscribe_catalog_status};
+        use zaparoo_core::systems_catalog::CatalogStatus;
 
         let catalog_arc = self.rust().catalog.clone();
         let qt_thread = self.qt_thread();
+        let qt_thread_status = qt_thread.clone();
         let mut catalog_rx = subscribe_catalog();
+        let mut status_rx = subscribe_catalog_status();
 
         // Seed catalog arc with whatever has already loaded.
         if let Some(data) = catalog_rx.borrow_and_update().clone() {
@@ -142,6 +148,24 @@ impl Initialize for ffi::SystemsModel {
                         model.as_mut().count_changed();
                     }
                 });
+            }
+        });
+
+        global_runtime().spawn(async move {
+            loop {
+                let err = match &*status_rx.borrow_and_update() {
+                    CatalogStatus::Errored(msg) => msg.clone(),
+                    _ => String::new(),
+                };
+                let qstr = QString::from(err.as_str());
+                let _ = qt_thread_status.queue(move |mut model| {
+                    if model.error_message != qstr {
+                        model.as_mut().set_error_message(qstr);
+                    }
+                });
+                if status_rx.changed().await.is_err() {
+                    break;
+                }
             }
         });
     }

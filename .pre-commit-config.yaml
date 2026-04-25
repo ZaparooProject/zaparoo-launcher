@@ -27,6 +27,18 @@ repos:
         files: \.qml$
         pass_filenames: true
 
+  # Rust formatting — runs cargo fmt across the whole workspace when any
+  # .rs file changes. pass_filenames is false because cargo fmt picks up
+  # the workspace targets from rust/Cargo.toml directly.
+  - repo: local
+    hooks:
+      - id: cargo-fmt
+        name: cargo fmt
+        entry: cargo fmt --manifest-path rust/Cargo.toml --all
+        language: system
+        types: [rust]
+        pass_filenames: false
+
   # Basic file hygiene
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.6.0

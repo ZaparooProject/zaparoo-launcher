@@ -92,7 +92,7 @@ or vice-versa.
 
 - **Runtime gate** — "this code path behaves differently depending on
   the launcher's host device." Read `runtime::current()`. Prefer runtime
-  gating for behaviour.
+  gating for behavior.
 - **Build-time cfg `#[cfg(zaparoo_runtime = "mister")]`** — reserve for
   code that genuinely should not compile into desktop binaries (system
   calls, MiSTer-only dependencies). Currently only `mister_runtime.rs`
@@ -104,7 +104,7 @@ or vice-versa.
   completes." Never gate on `Platform` from C++/QML directly; route the
   decision through Rust and expose a QML property.
 
-**Never gate runtime behaviour on `Platform`, never gate Core
+**Never gate runtime behavior on `Platform`, never gate Core
 assumptions on `Runtime`.** They are independent.
 
 ## LGPL compliance
@@ -159,7 +159,7 @@ activeScreen: "hub" | "games"
 hubFocus:     "categories" | "systems"
 ```
 
-- **hub + categories**: categoriesCarousel centred; Left/Right cycle categories;
+- **hub + categories**: categoriesCarousel centered; Left/Right cycle categories;
   Enter calls `SystemsModel.set_category()` and shifts hubFocus to "systems";
   Escape quits.
 - **hub + systems**: categoriesCarousel swoops to top; systemsCarousel fades in

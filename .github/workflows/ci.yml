@@ -1,5 +1,5 @@
 # Zaparoo Launcher
-# Copyright (c) 2026 The Zaparoo Project Contributors.
+# Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 
 name: CI
@@ -159,8 +159,12 @@ jobs:
   arm32-build:
     name: ARM32 cross-build (MiSTer)
     runs-on: ubuntu-latest
+    # ensure-toolchain only runs on push-to-main (it needs packages:write).
+    # On PRs it is skipped, so arm32-build allows either outcome. The tag
+    # is read from toolchain/VERSION either way, so PRs pull whatever image
+    # main has already pushed.
     needs: [ensure-toolchain]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: ${{ needs.ensure-toolchain.result == 'success' || needs.ensure-toolchain.result == 'skipped' }}
     permissions:
       contents: read
       packages: read
@@ -171,6 +175,12 @@ jobs:
           echo "OWNER_LC=${OWNER,,}" >> "$GITHUB_ENV"
         env:
           OWNER: ${{ github.repository_owner }}
+      - name: Resolve toolchain version
+        id: toolchain
+        run: |
+          VERSION=$(tr -d '[:space:]' < toolchain/VERSION)
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Using toolchain image tag: ${VERSION}"
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4
         with:
@@ -179,7 +189,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build ARM32 launcher
         env:
-          TOOLCHAIN_IMAGE: ghcr.io/${{ env.OWNER_LC }}/qt6-arm32-mister:${{ needs.ensure-toolchain.outputs.version }}
+          TOOLCHAIN_IMAGE: ghcr.io/${{ env.OWNER_LC }}/qt6-arm32-mister:${{ steps.toolchain.outputs.version }}
         run: ./scripts/build-arm32.sh
       - name: Verify ARM ELF
         run: |

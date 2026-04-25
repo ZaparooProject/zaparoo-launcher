@@ -1,0 +1,108 @@
+# Zaparoo Launcher Contributor License Agreement
+
+**Version:** 1.0 · effective 2026-04-25
+
+Thank you for your interest in contributing to Zaparoo Launcher.
+
+This Contributor License Agreement ("CLA") records the rights you grant
+to **Wizzo Pty Ltd** (the "Company") when you contribute code,
+documentation, translations, or other material to this project. You
+sign it once, on your first contribution, and it covers every
+contribution you make afterwards.
+
+## Why we ask for this
+
+Zaparoo Launcher is published under the PolyForm Noncommercial License
+1.0.0. The Company separately grants commercial licences to partners
+who want to use the software commercially. For the Company to be able
+to grant those commercial licences without having to renegotiate with
+every past contributor, each contributor gives the Company broad
+licensing rights to their contribution.
+
+**You keep the copyright on your own work.** This is a licence, not a
+transfer.
+
+## 1. Definitions
+
+- **"Contribution"** means any code, documentation, translation, asset,
+  configuration, or other material you submit to the project in any
+  form (pull request, patch, issue comment containing code, etc.).
+- **"You"** means the individual signing this CLA. If you are
+  contributing on behalf of an employer, "You" means both you and
+  your employer, and you confirm you have authority to sign on their
+  behalf.
+
+## 2. You keep your rights
+
+You retain the copyright to your Contribution. Nothing in this CLA
+prevents you from using your Contribution yourself, licensing it to
+anyone else, or including it in other projects.
+
+## 3. Copyright licence to the Company
+
+You grant Wizzo Pty Ltd a perpetual, worldwide, non-exclusive,
+royalty-free, irrevocable copyright licence to use your Contribution
+in any way, including:
+
+- reproducing, modifying, distributing, performing, and displaying it;
+- preparing derivative works from it;
+- combining it with other material; and
+- **sublicensing** any or all of these rights to third parties, on any
+  terms the Company chooses (including commercial terms).
+
+## 4. Patent licence to the Company
+
+You grant Wizzo Pty Ltd a perpetual, worldwide, non-exclusive,
+royalty-free, irrevocable patent licence — with the right to
+sublicense — to make, have made, use, sell, offer to sell, import, and
+otherwise transfer your Contribution and any combination of your
+Contribution with the project. This patent licence covers only those
+patent claims you own or control that are necessarily infringed by your
+Contribution or by that combination.
+
+## 5. Moral rights
+
+To the extent the law allows, you consent to the Company and its
+sublicensees using your Contribution without personally attributing it
+to you, and you agree not to bring any moral-rights claim against the
+Company or its sublicensees about how your Contribution is used or
+modified.
+
+## 6. You have the right to grant this
+
+You confirm that:
+
+- Your Contribution is your own original work, or you have permission
+  from the copyright holder (for example, your employer) to submit it
+  under this CLA.
+- You have identified any third-party code, licences, or patents that
+  are included in or required by your Contribution, either in your pull
+  request description or in the relevant commit message.
+- Submitting your Contribution does not breach any agreement you have
+  with anyone else.
+
+## 7. No warranty, no obligation
+
+You provide your Contribution "as is", without any warranty. Signing
+this CLA does not obligate you or the Company to maintain, support, or
+distribute anything.
+
+## 8. Public release
+
+Your Contribution will be released to the public under the same licence
+as the rest of the project (currently PolyForm Noncommercial 1.0.0).
+The Company may also sublicense it to specific partners under different
+terms, as permitted by sections 3 and 4 above.
+
+## Signing
+
+To sign this CLA, post the following comment on your first pull request
+to this repository:
+
+> I have read the CLA Document and I hereby sign the CLA
+
+The CLA Assistant Lite bot will record your signature in
+`.github/contributors/signatures.json`. You only need to sign once;
+future pull requests will be recognised automatically.
+
+Questions? Email [legal@zaparoo.org](mailto:legal@zaparoo.org).

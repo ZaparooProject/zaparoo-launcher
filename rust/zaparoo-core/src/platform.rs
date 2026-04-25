@@ -1,5 +1,5 @@
 // Zaparoo Launcher
-// Copyright (c) 2026 The Zaparoo Project Contributors.
+// Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //
 // Platform: what is the connected Zaparoo Core server running on?
@@ -8,10 +8,10 @@
 // of `runtime` (which describes the launcher binary's host).
 // See docs/architecture.md for the gating rules.
 
-use crate::client::Client;
+use crate::client::{Client, ConnectionState};
 use crate::media_types::VersionResult;
 use std::sync::{Arc, OnceLock};
-use tokio::sync::{broadcast, watch};
+use tokio::sync::watch;
 use tracing::{info, warn};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -84,24 +84,24 @@ fn publish(p: Platform) {
 /// prior value (or `None`). `systems` and other catalog fetches continue
 /// regardless.
 pub fn spawn_fetcher(client: Arc<Client>, runtime: &Arc<tokio::runtime::Runtime>) {
-    let mut connected_rx = client.connected.subscribe();
+    let mut connection_rx = client.connection.subscribe();
     runtime.spawn(async move {
+        let mut state = connection_rx.borrow_and_update().clone();
         loop {
-            match connected_rx.recv().await {
-                Ok(true) => match client.version().await {
+            if matches!(state, ConnectionState::Connected) {
+                match client.version().await {
                     Ok(VersionResult { version, platform }) => {
                         let parsed = Platform::from_api_string(&platform);
                         info!("core version: {version} platform: {parsed}");
                         publish(parsed);
                     }
                     Err(e) => warn!("version RPC failed: {}", e.message),
-                },
-                Ok(false) => {}
-                Err(broadcast::error::RecvError::Lagged(n)) => {
-                    warn!("connected channel lagged by {n}, continuing");
                 }
-                Err(broadcast::error::RecvError::Closed) => break,
             }
+            if connection_rx.changed().await.is_err() {
+                break;
+            }
+            state = connection_rx.borrow_and_update().clone();
         }
     });
 }

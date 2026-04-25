@@ -30,7 +30,7 @@ This repository contains Zaparoo trademarks which are explicitly licensed to the
 
 ## License
 
-Copyright 2026 The Zaparoo Project Contributors.
+Copyright 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 Source available under the [PolyForm Noncommercial License 1.0.0](COPYING).
 Non-commercial use only. For commercial licensing, contact [legal@zaparoo.org](mailto:legal@zaparoo.org) to discuss terms.
 

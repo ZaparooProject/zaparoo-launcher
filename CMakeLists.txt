@@ -1,5 +1,5 @@
 # Zaparoo Launcher
-# Copyright (c) 2026 The Zaparoo Project Contributors.
+# Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 
 cmake_minimum_required(VERSION 3.22)
@@ -33,7 +33,7 @@ include(ZaparooQmlModule)
 # Always emit compile_commands.json so clangd and clang-tidy work without extra flags.
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-find_package(Qt6 6.7 REQUIRED COMPONENTS Quick QuickControls2 Qml)
+find_package(Qt6 6.7 REQUIRED COMPONENTS Quick QuickControls2 Qml LinguistTools)
 
 if(ZAPAROO_BUILD_TESTS)
     find_package(Qt6 6.7 REQUIRED COMPONENTS QuickTest Test)
@@ -49,6 +49,7 @@ set(QML_IMPORT_PATH "${QT_QML_OUTPUT_DIRECTORY}" CACHE PATH "Extra QML import pa
 
 add_subdirectory(src/ui/theme)
 add_subdirectory(src/ui/components)
+add_subdirectory(src/ui/screens)
 add_subdirectory(src/ui/app)
 
 # All Zaparoo QML CMake targets must exist before ZaparooRust is included.

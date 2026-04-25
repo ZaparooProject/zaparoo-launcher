@@ -1,5 +1,5 @@
 # Zaparoo Launcher
-# Copyright (c) 2026 The Zaparoo Project Contributors.
+# Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 #
 # Rust/Cargo integration via Corrosion. Builds zaparoo_launcher_rs as a
@@ -151,6 +151,23 @@ endif()
 
 set_target_properties(launcher PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+)
+
+# ── Translations ─────────────────────────────────────────────────────────────
+# lrelease compiles .ts → .qm and qt_add_translations embeds them into the
+# launcher binary under qrc:/i18n/ (the default RESOURCE_PREFIX). main.cpp
+# loads the locale-matching .qm with `QTranslator::load(locale, "launcher",
+# "_", ":/i18n")` before the QML engine runs.
+#
+# IMMEDIATE_CALL runs source collection inline instead of deferring to the
+# end of the top-level directory scope. Without it, qt_add_translations
+# defers until CMake finalises PROJECT_SOURCE_DIR and the generated resource
+# targets land after link-time, producing missing-dependency errors on
+# parallel builds (Corrosion-provided staticlibs are visited out of order).
+qt_add_translations(launcher
+    TS_FILES "${CMAKE_SOURCE_DIR}/src/ui/translations/launcher_en.ts"
+    RESOURCE_PREFIX "/i18n"
+    IMMEDIATE_CALL
 )
 
 # ── cxx-qt QML module sync for tooling ───────────────────────────────────────

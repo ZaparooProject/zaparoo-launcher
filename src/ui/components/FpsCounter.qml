@@ -1,5 +1,5 @@
 // Zaparoo Launcher
-// Copyright (c) 2026 The Zaparoo Project Contributors.
+// Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 
 import QtQuick
@@ -32,7 +32,9 @@ Item {
     Text {
         anchors.top: parent.top
         anchors.right: parent.right
-        text: root.fps + " FPS"
+        // `%1 FPS` stays one string so translators can reorder ("FPS %1")
+        // without splitting the label from the number.
+        text: qsTr("%1 FPS").arg(root.fps)
         font.family: Theme.fontMono
         font.pixelSize: Sizing.fontSize(2)
         color: root.fps >= 55 ? "#00ff00" : (root.fps >= 30 ? "#ffff00" : "#ff0000")

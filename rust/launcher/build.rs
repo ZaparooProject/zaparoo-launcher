@@ -1,5 +1,5 @@
 // Zaparoo Launcher
-// Copyright (c) 2026 The Zaparoo Project Contributors.
+// Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 
 use cxx_qt_build::{CxxQtBuilder, QmlModule};
@@ -28,8 +28,10 @@ fn main() {
                 "src/models/games.rs",
                 "src/models/browse.rs",
                 "src/models/app_state.rs",
+                "src/models/app_status.rs",
                 "src/models/hub_state.rs",
                 "src/models/games_state.rs",
+                "src/models/input.rs",
             ],
             qml_files: &[],
             ..Default::default()

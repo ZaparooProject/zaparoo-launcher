@@ -22,4 +22,4 @@ catches *after* the code is written, so it's cheaper to avoid them up front.
   `: ReturnType` return types to all functions in singleton `.qml` files.
 
 - **`NumberAnimation on propName`** conflicts with `property T propName: value`.
-  Drop the `: value` initialiser; the animation takes over immediately.
+  Drop the `: value` initializer; the animation takes over immediately.

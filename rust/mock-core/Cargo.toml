@@ -1,0 +1,29 @@
+# Zaparoo Launcher
+# Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+
+[package]
+name         = "mock-core"
+description  = "Mock Zaparoo Core WebSocket server for local launcher development."
+version      = { workspace = true }
+edition      = { workspace = true }
+rust-version = { workspace = true }
+license      = { workspace = true }
+authors      = { workspace = true }
+publish      = false
+
+[[bin]]
+name = "mock-core"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+tokio              = { workspace = true, features = ["rt-multi-thread", "macros", "net", "sync", "time", "io-util", "signal"] }
+tokio-tungstenite  = { workspace = true }
+serde              = { workspace = true }
+serde_json         = { workspace = true }
+tracing            = { workspace = true }
+tracing-subscriber = { workspace = true }
+futures-util       = { workspace = true }
