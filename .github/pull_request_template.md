@@ -1,20 +1,20 @@
-<!-- Thanks for sending a pull request! Fill this out before requesting review. -->
+<!-- Thanks for the pull request. Please fill this out before requesting review. -->
 
 ## Summary
 
-<!-- What does this PR change, and why? One or two sentences is usually enough. -->
+<!-- What changed, and why? One or two sentences is usually enough. -->
 
 ## Motivation
 
-<!-- Link to the issue being fixed or the discussion this came out of. Delete this section if neither applies. -->
+<!-- Link the issue or discussion that led to this. Delete this section if it does not apply. -->
 
 ## Screenshots / recordings
 
-<!-- Required for any visual change. Include the FPS counter reading at 720p and, if possible, 240p. -->
+<!-- Required for visual changes. Include the FPS counter at 720p and, if possible, 240p. -->
 
 ## Test plan
 
-<!-- How did you verify this works? Bullet list of manual steps or automated tests. -->
+<!-- How did you verify this? Manual steps and automated tests are both fine. -->
 
 ## Checklist
 

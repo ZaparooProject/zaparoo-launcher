@@ -1,8 +1,7 @@
 # Translations
 
-Zaparoo Launcher routes every user-visible string through Qt's
-`QTranslator` so non-English builds can ship without code changes.
-Three pieces hold the pipeline together:
+Zaparoo Launcher sends every user-visible string through Qt's `QTranslator`.
+Non-English builds should not need code changes. The pipeline has three parts:
 
 1. `qsTr()` in QML and `tr()` in C++ at every user-visible call site.
 2. `src/ui/translations/launcher_<tag>.ts` as the canonical catalog
@@ -11,8 +10,8 @@ Three pieces hold the pipeline together:
    `lrelease` at build time and bundles the resulting `.qm` files
    under `qrc:/i18n/` inside the launcher binary.
 
-At runtime, `src/app/main.cpp` installs a `QTranslator` before the QML
-engine loads and picks the `.qm` that matches the configured locale.
+At runtime, `src/app/main.cpp` installs a `QTranslator` before the QML engine
+loads, then picks the `.qm` file for the configured locale.
 
 ## Locale resolution
 
@@ -21,17 +20,16 @@ engine loads and picks the `.qm` that matches the configured locale.
 | `[general] language = "ja_JP"` in `launcher.toml` | 1: explicit override |
 | `[general] language = "auto"` or unset | 2: `QLocale::system()` |
 
-The Rust config loader (`rust/zaparoo-core/src/config.rs`) normalizes
-`"auto"` (case-insensitive) to an empty string, which `main.cpp`
-treats as the signal to call `QLocale::system()`. Anything else passes
-straight through to `QLocale(tag)`; Qt does its own tag validation.
+The Rust config loader (`rust/zaparoo-core/src/config.rs`) normalizes `"auto"`
+(case-insensitive) to an empty string. `main.cpp` treats that as the signal to
+call `QLocale::system()`. Anything else passes through to `QLocale(tag)` and Qt
+handles tag validation.
 
-The config-to-C++ handoff goes through FFI:
-`zaparoo_rust_language_code()` returns a `'static` NUL-terminated
-UTF-8 pointer cached in `LANGUAGE_CODE: OnceLock<CString>`. The main
-thread reads it once before constructing the QML engine. There is no
-reload path, so changing the locale requires a relaunch (the same
-cost as any other `launcher.toml` edit).
+The config-to-C++ handoff goes through FFI. `zaparoo_rust_language_code()`
+returns a `'static` NUL-terminated UTF-8 pointer cached in
+`LANGUAGE_CODE: OnceLock<CString>`. The main thread reads it once before
+constructing the QML engine. There is no reload path; changing the locale takes
+a relaunch, like any other `launcher.toml` edit.
 
 ## Writing translatable strings
 
@@ -48,13 +46,12 @@ text: qsTr("Core error: %1").arg(Browse.AppStatus.last_error)
 text: qsTr("Core error:") + " " + Browse.AppStatus.last_error
 ```
 
-Rule of thumb: one sentence, one `qsTr()`. Use `%1`/`%2` placeholders
-for runtime values so translators control word order around them.
+Rule of thumb: one sentence, one `qsTr()`. Use `%1` and `%2` placeholders for
+runtime values so translators can control word order.
 
-Strings that never face a human (enum tags, filesystem paths, QRC
-URLs, internal error codes routed to `tracing::error!`, QML type
-names) do **not** need wrapping. When in doubt: if it could appear in
-a screenshot, wrap it.
+Strings that never face a user do **not** need wrapping: enum tags, filesystem
+paths, QRC URLs, internal error codes routed to `tracing::error!`, QML type
+names, and similar. If it could appear in a screenshot, wrap it.
 
 ## Adding a new locale
 
@@ -67,12 +64,12 @@ a screenshot, wrap it.
 
         lupdate-qt6 src/ -ts src/ui/translations/launcher_de.ts
 
-   `lupdate` is idempotent. Re-running it reconciles new and removed
+   `lupdate` is idempotent. Re-running it adds new strings and marks removed
    strings without clobbering existing translations.
 
 3. Fill in each `<translation>` element in the `.ts` file. An empty
-   `<translation>` with `type="unfinished"` means "use the source
-   string"; Qt Linguist highlights these in the editor UI.
+   `<translation>` with `type="unfinished"` falls back to the source string;
+   Qt Linguist highlights these in the editor UI.
 
 4. Add the file path to the `TS_FILES` list in
    `cmake/ZaparooRust.cmake`'s `qt_add_translations(launcher ...)`
@@ -90,11 +87,10 @@ After adding or changing any `qsTr()` call, re-run `lupdate-qt6`:
 
     lupdate-qt6 src/ -ts src/ui/translations/launcher_en.ts
 
-Review the diff: new strings appear with empty `<translation>`
-elements, changed strings are flagged `type="unfinished"`, and removed
-strings are marked `type="obsolete"`. Commit the `.ts` changes
-alongside the QML or C++ edit that triggered them so translators have
-a clean incremental diff.
+Review the diff. New strings appear with empty `<translation>` elements,
+changed strings are flagged `type="unfinished"`, and removed strings are marked
+`type="obsolete"`. Commit the `.ts` changes with the QML or C++ edit that
+triggered them so translators get a clean incremental diff.
 
 ## Build-time mechanics
 
@@ -109,7 +105,7 @@ qt_add_translations(launcher
 )
 ```
 
-What happens:
+The build does this:
 
 - `lrelease` runs per `.ts` to produce `<name>.qm` in the build tree.
 - The `.qm` files are packed into a Qt resource bound to the
@@ -120,11 +116,10 @@ What happens:
   the default build, so every `just build` refreshes the compiled
   catalogs.
 
-`IMMEDIATE_CALL` runs the source-target collection inline. Without
-it, Qt defers collection to the end of the top-level
-`PROJECT_SOURCE_DIR` scope, which races Corrosion's late-bound Rust
-staticlib targets on parallel builds and produces missing-dependency
-errors.
+`IMMEDIATE_CALL` runs source-target collection inline. Without it, Qt defers
+collection to the end of the top-level `PROJECT_SOURCE_DIR` scope. That races
+Corrosion's late-bound Rust staticlib targets on parallel builds and can
+produce missing-dependency errors.
 
 ## Runtime loading
 
@@ -139,11 +134,10 @@ if (translator.load(locale, "launcher", "_", ":/i18n")) {
 }
 ```
 
-`QTranslator::load` walks Qt's usual fallback chain: an exact `ja_JP`
-match first, then `ja`, then the base name. A missing `.qm` is logged
-at info level, not as an error, because English-only builds ship
-exactly one catalog (a passthrough `launcher_en.qm`) and any other
-locale just falls through to the source strings.
+`QTranslator::load` uses Qt's normal fallback chain: exact `ja_JP` match, then
+`ja`, then the base name. A missing `.qm` is logged at info level, not error
+level. English-only builds ship one passthrough catalog (`launcher_en.qm`), and
+other locales fall through to the source strings.
 
 ## Requirements
 

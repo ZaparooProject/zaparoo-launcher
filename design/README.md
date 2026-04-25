@@ -1,15 +1,15 @@
 # Zaparoo Launcher — Designer Guide
 
-This directory lets a UX designer open the launcher UI visually in
-**Qt Design Studio**. Nothing under `design/` is compiled into the
-launcher binary — it's a designer-only sidecar.
+This directory lets a UX designer open the launcher UI in **Qt Design Studio**.
+Nothing under `design/` is compiled into the launcher binary; it exists only
+for design-time previews.
 
-## Setup (one-time)
+## Setup
 
-1. **Install Qt Design Studio.** Free, GPLv3. Fastest path: install
-   via the Qt online installer (<https://www.qt.io/download-qt-installer>)
-   and tick *Qt Design Studio*. Linux package managers sometimes ship
-   it as `qt-design-studio`.
+1. **Install Qt Design Studio.** It is free and GPLv3. The simplest route is
+   the Qt online installer (<https://www.qt.io/download-qt-installer>); select
+   *Qt Design Studio*. Some Linux package managers ship it as
+   `qt-design-studio`.
 2. **Build the launcher once** from the repo root so the generated
    QML modules exist:
 
@@ -17,43 +17,41 @@ launcher binary — it's a designer-only sidecar.
    just build
    ```
 
-   This populates `build/qml/Zaparoo/{App,Ui,Theme}/` with the real
-   QML files. Design Studio reads them directly from there. The
-   `Zaparoo.Browse` module — backed by Rust — is replaced by mocks
-   under `design/mocks/`.
+   This populates `build/qml/Zaparoo/{App,Ui,Theme}/` with the real QML files.
+   Design Studio reads them from there. The Rust-backed `Zaparoo.Browse` module
+   is replaced by mocks under `design/mocks/`.
 3. **Open the project** in Qt Design Studio:
 
    ```text
    design/launcher.qmlproject
    ```
 
-   The 2D view should render `MainPreview.qml` at 1280×720 with a
-   populated categories/systems carousel drawn from the mock
-   singletons. If carousels look empty, double-check step 2.
+   The 2D view should render `MainPreview.qml` at 1280×720 with populated
+   categories and systems carousels from the mock singletons. If the carousels
+   are empty, rebuild the launcher and reopen the project.
 
-## Editable vs. off-limits files
+## Editable files
 
 | Path                            | Touch?                                                     |
 | ------------------------------- | ---------------------------------------------------------- |
-| `src/ui/theme/Theme.qml`        | Yes — colour & font constants.                             |
+| `src/ui/theme/Theme.qml`        | Yes — colour and font constants.                           |
 | `src/ui/theme/Sizing.qml`       | Logic tweaks only; ask first.                              |
 | `src/ui/components/*.qml`       | Yes — delegates, carousel, FPS counter.                    |
 | `src/ui/app/MainLayout.qml`     | Yes — screen layout, backgrounds, anchors.                 |
-| `src/ui/app/Main.qml`           | **No.** Engineer-owned state machine. Flag changes.        |
+| `src/ui/app/Main.qml`           | **No.** Engineer-owned state machine. Ask before editing.  |
 | `design/mocks/**`               | No. Design-time stubs; edit only if engineering asks.      |
 | `design/previews/MainPreview.qml` | Change preview canvas here; don't add real UI.           |
 
-## Hard constraints — software rendering only
+## Software rendering only
 
-The launcher runs on MiSTer FPGA, which has **no GPU**. Anything that
-needs a shader or effect crashes or renders as a grey box. Stick to
-this palette:
+The launcher runs on MiSTer FPGA, which has **no GPU**. Anything shader-backed
+can crash or render as a grey box. Stay within this set:
 
 Allowed:
 `Rectangle`, `Image`, `Text`, `Repeater`, `Item`, `NumberAnimation`,
 `ColorAnimation`, `Behavior`.
 
-**Banned** — do not drag these from the Design Studio Components panel:
+**Do not use these from the Design Studio Components panel:**
 
 - `LinearGradient`, `RadialGradient`, `ConicalGradient`
 - `DropShadow`, `Glow`, `InnerShadow`
@@ -63,14 +61,14 @@ Allowed:
   `Regular Polygon`, `Star`, `Svg Path Item`
 - Any shader‑backed effect
 
-If an effect is essential, talk to an engineer first — there's often a
-flat `Rectangle` / `Image` combo that gets you 80% of the way.
+If an effect seems necessary, talk to an engineer first. A flat `Rectangle` or
+`Image` version is usually the safer MiSTer-friendly option.
 
-## Sizing — never hardcode pixels or element counts
+## Sizing
 
-The launcher scales from 240p (CRT) to 1080p. Use the helpers exposed
-as the `Sizing` singleton (import `Zaparoo.Theme`) — never hardcode
-pixel values or element counts:
+The launcher scales from 240p CRT output to 1080p. Use the helpers on the
+`Sizing` singleton (`import Zaparoo.Theme`). Do not hardcode pixel values or
+element counts:
 
 - `Sizing.pctH(n)` — `n` percent of screen height.
 - `Sizing.pctW(n)` — `n` percent of screen width.
@@ -78,7 +76,7 @@ pixel values or element counts:
 - `Sizing.visibleCovers` — element count for carousels and similar
   repeaters; drops at very low resolutions to avoid crowding.
 
-At the designer canvas of 1280×720, `Sizing.pctH(10)` previews as 72 px.
+On the 1280×720 designer canvas, `Sizing.pctH(10)` previews as 72 px.
 
 ## Handing work back
 
@@ -87,20 +85,20 @@ At the designer canvas of 1280×720, `Sizing.pctH(10)` previews as 72 px.
 3. Do not edit `CMakeLists.txt`, `.cpp`, `.rs`, or anything under
    `rust/` — those are engineering concerns.
 
-## If the Design tab stays greyed out in Qt *Creator*
+## If Qt Creator's Design tab is greyed out
 
-That's expected. Qt Creator 6+ ships its QML visual designer disabled
-because it was superseded by Qt Design Studio. Open the project in
-**Design Studio**, not Creator.
+That is expected. Qt Creator 6+ ships with its QML visual designer disabled
+because Qt Design Studio replaced it. Open this project in **Design Studio**,
+not Creator.
 
 ## Troubleshooting
 
-- **Red error banners on `Zaparoo.Browse.*`** — `build/qml/` is
-  missing or stale. Rerun `just build`.
-- **Red error banners on `Zaparoo.Ui` / `Zaparoo.Theme`** — same
-  cause; `just build` populates those too.
-- **Carousel is empty** — the mock ListModels seed four entries; if
-  all carousels are empty, `mocks/` isn't being resolved. Check that
-  `importPaths` in `launcher.qmlproject` still lists `mocks` first.
-- **"Cannot find type XYZ"** — probably a Qt Quick Studio Component.
-  Don't use them; see the banned list above.
+- **Red error banners on `Zaparoo.Browse.*`** — `build/qml/` is missing or
+  stale. Rerun `just build`.
+- **Red error banners on `Zaparoo.Ui` / `Zaparoo.Theme`** — same cause;
+  `just build` populates those too.
+- **Carousel is empty** — the mock ListModels seed four entries. If every
+  carousel is empty, `mocks/` is not being resolved. Check that `importPaths`
+  in `launcher.qmlproject` still lists `mocks` first.
+- **"Cannot find type XYZ"** — probably a Qt Quick Studio Component. Do not
+  use it; see the banned list above.

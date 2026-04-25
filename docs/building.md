@@ -1,10 +1,10 @@
 # Building
 
-Day-to-day builds, lints, and tests are wrapped in
+Day-to-day builds, lints, and tests go through the
 [`justfile`](../justfile). `just --list` shows the full menu.
-`CMakePresets.json` and `rust/.cargo/config.toml` are tuned to the
-recipes; if you find yourself reaching for raw `cmake` or `cargo`,
-something is probably off.
+`CMakePresets.json` and `rust/.cargo/config.toml` are written for those
+recipes. If you need raw `cmake` or `cargo`, double-check that the justfile does
+not already cover the job.
 
 ## Requirements
 
@@ -47,11 +47,10 @@ If `just` isn't packaged for your distro, install it the same way:
 - x86_64 host (no emulation needed; pure cross-compilation)
 - ~8 GB disk space for the toolchain image
 
-The toolchain Docker image ships a cross-compiler-aware
-`rust/.cargo/config.toml` that sets the linker
-(`arm-linux-gnueabihf-gcc`), target
-(`armv7-unknown-linux-gnueabihf`), and `mold` on desktop for faster
-links. No manual cargo config is needed.
+The toolchain Docker image provides the ARM build environment. Cargo still gets
+its target and linker settings from `rust/.cargo/config.toml`; the desktop
+`mold` linker setting lives there too. You should not need to edit Cargo config
+by hand.
 
 ## Desktop builds
 
@@ -63,10 +62,10 @@ just build-san       # ASan + UBSan
 just run             # build then ./build/bin/launcher
 ```
 
-The first build pulls and compiles Rust + Qt dependencies. Incremental
-builds after that are fast.
+The first build pulls and compiles the Rust and Qt dependencies. Incremental
+builds are much faster after that.
 
-To skip tests for faster iteration, configure with
+For a faster local build without tests, configure with
 `-DZAPAROO_BUILD_TESTS=OFF`:
 
 ```bash
@@ -76,25 +75,24 @@ cmake --build --preset desktop-debug
 
 ## MiSTer ARM32 cross-build
 
-First time (builds Qt 6.7.2 from source, ~45 min):
+First run, building Qt from source (~45 min):
 
 ```bash
 ./scripts/build-toolchain.sh
 ```
 
-This creates the `zaparoo/qt6-arm32-mister:6.7.2` Docker image
-locally.
+This creates the local `zaparoo/qt6-arm32-mister:<version>` Docker image. The
+tag comes from `toolchain/VERSION`.
 
-Subsequent builds (under a minute):
+Later builds usually take under a minute:
 
 ```bash
 just arm32           # output/launcher
 ```
 
-If the toolchain image is missing, `build-arm32.sh` rebuilds it
-automatically.
+If the toolchain image is missing, `build-arm32.sh` rebuilds it.
 
-Verify the ARM binary:
+Check the ARM binary:
 
 ```bash
 file output/launcher
@@ -120,9 +118,9 @@ just lint-rust       # rustfmt check + clippy + cargo-deny
 just fmt             # auto-apply: pre-commit + cargo fmt
 ```
 
-`just lint` is the zero-warnings gate before opening a PR.
-`compile_commands.json` is generated unconditionally in `build/`, so
-clang-tidy and qmllint always have what they need.
+`just lint` is the zero-warnings gate before a PR. `compile_commands.json` is
+always generated in `build/`, so clang-tidy and qmllint have the project
+metadata they need.
 
 ## Deploy desktop bundle
 
@@ -132,8 +130,8 @@ just build
 ./deploy/launcher/run.sh
 ```
 
-The deploy script bundles Qt shared libraries alongside the binary.
-Qt must be on your PATH (`qmake6` or `qmake` must be findable).
+The deploy script copies Qt shared libraries next to the binary. Qt must be on
+your PATH (`qmake6` or `qmake` must be findable).
 
 ## Deploy to MiSTer
 
@@ -141,11 +139,10 @@ Qt must be on your PATH (`qmake6` or `qmake` must be findable).
 just deploy-mister
 ```
 
-The binary is self-contained on MiSTer: it sets
-`QT_QPA_PLATFORM=linuxfb` and `QT_QUICK_BACKEND=software`, runs `vmode
--r W H rgb32` (width and height from config, defaulting to
-1920×1080), and starts `/media/fat/Scripts/zaparoo.sh -service start`
-automatically. No wrapper script required.
+The MiSTer binary is self-contained. It sets `QT_QPA_PLATFORM=linuxfb` and
+`QT_QUICK_BACKEND=software`, runs `vmode -r W H rgb32` using the configured
+width and height (default `1920×1080`), and starts
+`/media/fat/Scripts/zaparoo.sh -service start`. No wrapper script is needed.
 
 User-editable config lives at `/media/fat/zaparoo/launcher.toml`.
 Example:
@@ -161,7 +158,7 @@ debug = true
 
 ## Run on framebuffer (desktop headless)
 
-Useful for reproducing MiSTer rendering paths on a desktop:
+Use this to reproduce the MiSTer rendering path on a desktop:
 
 ```bash
 QT_QPA_PLATFORM=linuxfb QT_QUICK_BACKEND=software ./build/bin/launcher
@@ -169,8 +166,8 @@ QT_QPA_PLATFORM=linuxfb QT_QUICK_BACKEND=software ./build/bin/launcher
 
 ## Underlying mechanics
 
-Reach for these only when debugging the build itself or running
-something not in the justfile.
+Use these only when debugging the build itself or doing something the justfile
+does not cover.
 
 `just build` resolves to:
 
@@ -179,9 +176,9 @@ cmake --preset desktop-debug
 cmake --build --preset desktop-debug
 ```
 
-`just lint-cpp` resolves to `cmake --build build --target lint`,
-which runs clang-format (check only), clang-tidy, and qmllint in one
-shot. Individual targets:
+`just lint-cpp` resolves to `cmake --build build --target lint`. That runs
+clang-format (check only), clang-tidy, and qmllint together. The individual
+targets are:
 
 ```bash
 cmake --build build --target format-check   # clang-format dry-run
@@ -190,9 +187,8 @@ cmake --build build --target all_qmllint    # QML linting
 ```
 
 `just test` resolves to `ctest --preset desktop-debug` plus
-`cargo nextest run --workspace` (run from inside `rust/` because
-nextest needs a workspace path; that's what the justfile does for
-you). Plain ctest works too:
+`cargo nextest run --workspace`. Nextest needs the Rust workspace path, so the
+justfile runs that command from `rust/`. Plain ctest works too:
 
 ```bash
 ctest --test-dir build --output-on-failure

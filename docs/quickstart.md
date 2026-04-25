@@ -2,20 +2,21 @@
 
 ## 1. Install prerequisites
 
-One-time setup. Skip any you already have.
+Install the pieces you do not already have.
 
 ### Linux
 
 **Fedora / RHEL:**
 ```bash
 sudo dnf install qt6-qtdeclarative-devel qt6-qtquickcontrols2-devel \
-    cmake ninja-build mold clang-tools-extra just
+    qt6-qttools-devel cmake ninja-build mold clang-tools-extra just
 ```
 
 **Ubuntu / Debian:**
 ```bash
 sudo apt install qt6-declarative-dev qt6-quick-controls2-dev \
-    cmake ninja-build mold clang-tidy clang-format just
+    qt6-tools-dev qt6-l10n-tools cmake ninja-build mold \
+    clang-tidy clang-format just
 ```
 
 (If `just` isn't packaged for your distro, install it with
@@ -30,9 +31,9 @@ cargo install --locked cargo-nextest cargo-deny
 
 ### macOS / Windows
 
-macOS is best-effort and not covered in CI. See
-[`docs/building.md`](building.md) for Homebrew package names. Windows
-is not tested; use WSL2.
+macOS is best-effort and not covered in CI. Qt package names change often
+enough that Linux is the supported path unless you are prepared to debug local
+setup. Windows is not tested; use WSL2.
 
 ## 2. Clone and build
 
@@ -42,8 +43,8 @@ cd zaparoo-launcher
 just build
 ```
 
-The first build pulls and compiles Rust + Qt dependencies. After that
-incremental builds are fast.
+The first build pulls and compiles the Rust and Qt dependencies. Incremental
+builds are much faster after that.
 
 ## 3. Start the mock Core
 
@@ -59,21 +60,18 @@ You should see:
 mock-core listening on ws://127.0.0.1:27497/api/v0.1
 ```
 
-The mock serves three categories (Consoles, Handhelds, Arcade), ten
-systems, and fifty games. That's enough to drive every launcher
-screen end to end.
+The mock serves three categories (Consoles, Handhelds, Arcade), ten systems,
+and fifty games. That is enough data to exercise every launcher screen.
 
-`27497` is deliberately offset from the real Core's `7497` so a
-real Core (or other Core test instance) running on the same machine
-never clashes with the mock. The launcher's production default is
-still `7497`; `just run-dev` overrides that to the mock port via the
-`ZAPAROO_CORE_ENDPOINT` environment variable, and `just run` (the
-release-style runner) reads `~/.config/zaparoo/launcher.toml` as
-normal.
+`27497` is offset from the real Core's `7497` so a real Core, or another Core
+test instance, can run on the same machine without colliding with the mock. The
+launcher still defaults to `7497` in production. `just run-dev` points it at
+the mock through `ZAPAROO_CORE_ENDPOINT`; `just run` reads
+`~/.config/zaparoo/launcher.toml` as usual.
 
-### Picking a different port
+### Pick a different port
 
-If something else binds `27497` already, override at start:
+If something already uses `27497`, override it at startup:
 
 ```bash
 MOCK_CORE_ADDR=127.0.0.1:9000 just mock-core
@@ -90,11 +88,11 @@ In a second terminal:
 just run-dev
 ```
 
-(`run-dev` is windowed and auto-points at the mock; `just run` is the
-production-style runner that respects `~/.config/zaparoo/launcher.toml`
-and starts fullscreen.)
+`run-dev` is windowed and points at the mock. `just run` is the
+production-style runner: it respects `~/.config/zaparoo/launcher.toml` and
+starts fullscreen.
 
-## 5. What success looks like
+## 5. Check the result
 
 - The launcher window opens.
 - A **categories** carousel fills with "Arcade", "Consoles",
@@ -103,15 +101,15 @@ and starts fullscreen.)
   category.
 - Pressing Enter on a system opens the **games** carousel (five
   entries per system).
-- Pressing Enter on a game fires a `run` RPC to the mock. The mock
-  logs it with the selected game's zap script, but the launcher keeps
-  running because there's nothing actually to launch.
+- Pressing Enter on a game sends a `run` RPC to the mock. The mock logs the
+  selected game's zap script, but the launcher keeps running because nothing is
+  actually launched.
 - Escape backs out; Escape on the top level quits.
 
-The FPS counter in the corner should stay green (≥ 55). If it goes
-red, flag it; that's a regression.
+The FPS counter in the corner should stay green (≥ 55). Red means the UI fell
+below 30 FPS and needs investigation.
 
-## 6. Running tests and lints
+## 6. Run tests and lints
 
 Before you open a pull request:
 

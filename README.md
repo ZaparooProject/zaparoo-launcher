@@ -1,14 +1,15 @@
 # Zaparoo Launcher
 
-A game launcher frontend for [Zaparoo Core](https://zaparoo.org).
+Zaparoo Launcher is the game launcher frontend for
+[Zaparoo Core](https://zaparoo.org).
 
-## Building
+## Build
 
-See [docs/building.md](docs/building.md) for full instructions, including
-first-run system dependencies.
+Start with [docs/building.md](docs/building.md). It covers the packages you
+need on a fresh machine and the MiSTer cross-build path.
 
-Common tasks are wrapped in a [`justfile`](justfile); run `just --list` for the
-full menu.
+Most commands go through the [`justfile`](justfile). Run `just --list` if you
+need the full menu.
 
 ```bash
 just build && just run    # desktop
@@ -17,8 +18,7 @@ just test                 # ctest + cargo nextest
 just lint                 # clang-format, clang-tidy, qmllint, rustfmt, clippy, cargo-deny
 ```
 
-`just test` and `just lint` require `cargo-nextest` and `cargo-deny`. Install
-them once with:
+`just test` and `just lint` need `cargo-nextest` and `cargo-deny`:
 
 ```bash
 cargo install --locked cargo-nextest cargo-deny
@@ -26,13 +26,17 @@ cargo install --locked cargo-nextest cargo-deny
 
 ## Trademarks
 
-This repository contains Zaparoo trademarks which are explicitly licensed to the project in this location by the trademark owner. These trademarks must be removed from the project or replaced if you intend to redistribute or adapt the project in any form. See the Zaparoo [Terms of Use](https://zaparoo.org/terms/) for further details.
+This repository includes Zaparoo trademarks used here with permission from the
+trademark owner. If you redistribute or adapt the project, remove or replace
+those marks first. See the Zaparoo [Terms of Use](https://zaparoo.org/terms/)
+for the details.
 
 ## License
 
 Copyright 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 Source available under the [PolyForm Noncommercial License 1.0.0](COPYING).
-Non-commercial use only. For commercial licensing, contact [legal@zaparoo.org](mailto:legal@zaparoo.org) to discuss terms.
+Non-commercial use only. For commercial licensing, contact
+[legal@zaparoo.org](mailto:legal@zaparoo.org).
 
 Third-party components:
 

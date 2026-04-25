@@ -1,68 +1,62 @@
 # Contributing to Zaparoo Launcher
 
-Thanks for your interest. This doc covers the practical bits: signing
-the CLA, getting a dev environment running, and what we expect before
-you open a pull request.
+Thanks for taking the time to contribute. This guide covers the parts that
+matter before a pull request: the CLA, local setup, and the checks we expect
+you to run.
 
 ## Contributor License Agreement
 
-Every contributor signs a one-time [CLA](.github/CLA.md). It grants
-**Wizzo Pty Ltd** (the legal entity behind the project) a broad license
-to use and sublicense your contribution. You keep the copyright; this
-is a license, not a transfer. The CLA exists so the company can grant
-commercial licenses to friendly partners without renegotiating with
-every past contributor each time.
+Every contributor signs the [CLA](.github/CLA.md) once. It gives
+**Wizzo Pty Ltd** (the legal entity behind the project) the license it needs
+to use and sublicense your contribution. You keep your copyright; this is not a
+copyright transfer. The CLA lets the company offer commercial licenses to
+friendly partners without renegotiating every past contribution.
 
-To sign, open your first pull request and post this exact comment on
-it:
+To sign, open your first pull request and post this exact comment:
 
 > I have read the CLA Document and I hereby sign the CLA
 
-The CLA Assistant Lite bot records your signature in
-`.github/contributors/signatures.json`. You only need to sign once;
-future PRs are recognized automatically.
+CLA Assistant Lite records your signature in
+`.github/contributors/signatures.json`. After that, future PRs are recognized
+automatically.
 
 ## Development setup
 
-See [`docs/quickstart.md`](docs/quickstart.md) for the fastest path
-from a fresh clone to a running launcher. You do not need MiSTer
-hardware: the repo ships a mock Zaparoo Core you can run locally with
-`just mock-core`.
+Use [`docs/quickstart.md`](docs/quickstart.md) to get from a fresh clone to a
+running launcher. You do not need MiSTer hardware. The repo includes a mock
+Zaparoo Core you can start with `just mock-core`.
 
-For full build details (MiSTer ARM32 cross-build, sanitizer builds,
-deployment), see [`docs/building.md`](docs/building.md).
+For the MiSTer ARM32 cross-build, sanitizer builds, and deployment, see
+[`docs/building.md`](docs/building.md).
 
 ### Supported host platforms
 
-- **Linux (x86_64)** is the primary development target and fully
-  supported.
-- **macOS** is best-effort. It should work, but CI does not cover it.
-  Report breakage; patches welcome.
-- **Windows** is not tested or actively supported. Use WSL2.
+- **Linux (x86_64)** is the main development target.
+- **macOS** is best-effort. It should work, but CI does not cover it. Report
+  breakage; patches welcome.
+- **Windows** is not tested or actively supported. Use WSL2 instead.
 
 ## Before you open a pull request
 
-Run these locally. CI runs the same checks and will block merge if
-they fail.
+Run these locally. CI runs the same checks and blocks merge when they fail.
 
 ```bash
 just lint    # clang-format, clang-tidy, qmllint, rustfmt, clippy, cargo-deny
 just test    # ctest + cargo nextest
 ```
 
-Zero lint warnings is the bar. If a rule is wrong for your change,
-don't disable it; raise it in the PR and we'll discuss.
+Zero lint warnings is the bar. If a rule is wrong for the change you are
+making, do not disable it quietly; call it out in the PR.
 
 ## Pull request conventions
 
-The [PR template](.github/pull_request_template.md) prompts for
-everything we want to see. The two things worth calling out up front:
+The [PR template](.github/pull_request_template.md) asks for the details we
+need. Two points matter most:
 
-- **Explain the why, not just the what.** The diff already shows the
-  what.
-- **Screenshots or recordings for visual changes**, with the FPS
-  counter reading at 720p and, ideally, 240p. It must stay green
-  (≥55) at 720p+ and not go red (<30) at 240p.
+- **Explain why the change exists.** The diff already shows what changed.
+- **Include screenshots or recordings for visual changes**, with the FPS
+  counter visible at 720p and, if possible, 240p. It must stay green (≥55) at
+  720p+ and not go red (<30) at 240p.
 
 ### Commit messages
 
@@ -75,21 +69,21 @@ We use [Conventional Commits](https://www.conventionalcommits.org/):
 - `test:` for adding or updating tests
 - `chore:` for build, tooling, deps, or other housekeeping
 
-Scopes are optional but encouraged when they sharpen the summary:
+Scopes are optional. Use one when it makes the summary clearer:
 `feat(ui): add settings screen`, `fix(rust): handle empty catalog`.
 
 ### Branch naming
 
-`feat/<short-description>`, `fix/<short-description>`,
-`docs/<short-description>`, etc. Keep it readable; hyphens not
+Use `feat/<short-description>`, `fix/<short-description>`,
+`docs/<short-description>`, etc. Keep it readable; use hyphens, not
 underscores.
 
 ## Main branch is protected
 
-`main` accepts changes only via pull request. Every PR needs:
+`main` only accepts changes through pull requests. Every PR needs:
 
-1. All CI jobs green (`rust-lint`, `rust-test`, `desktop-build`,
-   `arm32-build`, and the CLA check).
+1. All CI jobs green: Rust lint, Rust tests, desktop build + ctest + lint,
+   ARM32 cross-build, and the CLA check.
 2. A CLA signature recorded for the PR author.
 3. At least one approving review from a maintainer other than the PR
    author.
@@ -99,15 +93,15 @@ Force-pushing and direct pushes to `main` are blocked.
 
 ## Bugs and feature requests
 
-Open a GitHub issue. For bugs, include repro steps, expected vs actual
-behavior, whether it reproduces on desktop and/or MiSTer, and a log
-excerpt (`~/.local/share/zaparoo/logs/launcher.log` on desktop;
-`/tmp/zaparoo/launcher.log` on MiSTer). For features, say what you
-want and why; if you plan to implement it yourself, say so and we'll
-align on scope first.
+Open a GitHub issue. For bugs, include repro steps, expected behavior, actual
+behavior, whether it reproduces on desktop and/or MiSTer, and a log excerpt
+(`~/.local/share/zaparoo/logs/launcher.log` on desktop;
+`/tmp/zaparoo/launcher.log` on MiSTer). For feature requests, say what you want
+and why. If you plan to implement it, say that too so we can agree on scope
+first.
 
 ## Questions?
 
-- Architecture or design questions: open a GitHub Discussion (or
-  issue) so the answer is searchable for the next person.
+- Architecture or design questions: open a GitHub Discussion or issue so the
+  answer is searchable later.
 - CLA or licensing: [legal@zaparoo.org](mailto:legal@zaparoo.org).
