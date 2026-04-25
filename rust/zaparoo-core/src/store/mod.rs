@@ -488,6 +488,23 @@ mod tests {
         }
     }
 
+    /// Mutation whose `invalidates` targets one specific id rather than
+    /// the whole kind. Used to drive the discriminating-match path.
+    struct SpecificInvalidatingMutation;
+    impl Mutation for SpecificInvalidatingMutation {
+        type Args = ();
+        type Output = ();
+        fn run(
+            _client: Arc<Client>,
+            _args: Self::Args,
+        ) -> BoxFuture<'static, Result<Self::Output, ClientError>> {
+            Box::pin(async { Ok(()) })
+        }
+        fn invalidates(_args: &Self::Args, _result: &Self::Output) -> Vec<Tag> {
+            vec![Tag::specific("Dummy", "id1")]
+        }
+    }
+
     #[test]
     fn run_mutation_refetches_entry_with_matching_provides() {
         let store = test_store();
@@ -551,6 +568,86 @@ mod tests {
         });
 
         assert_eq!(counter.load(AtomicOrdering::SeqCst), 0);
+    }
+
+    #[test]
+    fn run_mutation_refetches_every_matching_entry_at_once() {
+        // Per-entry matching is unit-tested above; this asserts the
+        // dispatch loop in `Store::invalidate` invokes *every* matching
+        // entry's `refetch` closure (across endpoints) for a single
+        // mutation, and leaves non-matching entries alone. The closure
+        // is the test fixture's counter bump, not the real
+        // `RemoteResource::refetch` notify pulse — covered separately.
+        let store = test_store();
+
+        let key_match_any = CacheKey::new::<DummyEndpoint>(&"alpha".to_string());
+        let key_match_specific = CacheKey::new::<OtherEndpoint>(&"alpha".to_string());
+        let key_unrelated = CacheKey::new::<DummyEndpoint>(&"beta".to_string());
+
+        let counter_match_any =
+            install_entry_with_provides(&store, key_match_any, vec![Tag::any("Dummy")]);
+        let counter_match_specific = install_entry_with_provides(
+            &store,
+            key_match_specific,
+            vec![Tag::specific("Dummy", "id1")],
+        );
+        let counter_unrelated =
+            install_entry_with_provides(&store, key_unrelated, vec![Tag::any("Other")]);
+
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("build runtime");
+        runtime.block_on(async {
+            store
+                .run_mutation::<InvalidatingMutation>(())
+                .await
+                .expect("mutation runs");
+        });
+
+        // `InvalidatingMutation::invalidates` returns `Tag::any("Dummy")`,
+        // which matches both `Tag::any("Dummy")` and
+        // `Tag::specific("Dummy", _)` via the wildcard rule in
+        // `tags_match`.
+        assert_eq!(counter_match_any.load(AtomicOrdering::SeqCst), 1);
+        assert_eq!(counter_match_specific.load(AtomicOrdering::SeqCst), 1);
+        assert_eq!(counter_unrelated.load(AtomicOrdering::SeqCst), 0);
+    }
+
+    #[test]
+    fn specific_mutation_refetches_only_same_id_and_any_of_kind() {
+        // Companion to `run_mutation_refetches_every_matching_entry_at_once`:
+        // exercises the discriminating-match side of `tags_match` through
+        // the dispatch loop. A `Tag::specific("Dummy","id1")` mutation
+        // should hit the same-id entry and any `Tag::any("Dummy")` entry,
+        // but skip a sibling `Tag::specific("Dummy","id2")` entry.
+        let store = test_store();
+
+        let key_same_id = CacheKey::new::<DummyEndpoint>(&"id1".to_string());
+        let key_other_id = CacheKey::new::<DummyEndpoint>(&"id2".to_string());
+        let key_any_of_kind = CacheKey::new::<OtherEndpoint>(&"alpha".to_string());
+
+        let counter_same_id =
+            install_entry_with_provides(&store, key_same_id, vec![Tag::specific("Dummy", "id1")]);
+        let counter_other_id =
+            install_entry_with_provides(&store, key_other_id, vec![Tag::specific("Dummy", "id2")]);
+        let counter_any_of_kind =
+            install_entry_with_provides(&store, key_any_of_kind, vec![Tag::any("Dummy")]);
+
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("build runtime");
+        runtime.block_on(async {
+            store
+                .run_mutation::<SpecificInvalidatingMutation>(())
+                .await
+                .expect("mutation runs");
+        });
+
+        assert_eq!(counter_same_id.load(AtomicOrdering::SeqCst), 1);
+        assert_eq!(counter_any_of_kind.load(AtomicOrdering::SeqCst), 1);
+        assert_eq!(counter_other_id.load(AtomicOrdering::SeqCst), 0);
     }
 
     #[test]
