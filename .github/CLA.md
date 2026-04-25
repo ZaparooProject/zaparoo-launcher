@@ -60,7 +60,14 @@ Contribution with the project. This patent licence covers only those
 patent claims you own or control that are necessarily infringed by your
 Contribution or by that combination.
 
-## 5. Moral rights
+## 5. No trademark licence
+
+Nothing in sections 3 or 4 grants you, or anyone the Company sublicenses
+to, any rights to use the Company's or the Zaparoo Project's names,
+logos, or trademarks. Trademark use is handled separately and is outside
+the scope of this CLA.
+
+## 6. Moral rights
 
 To the extent the law allows, you consent to the Company and its
 sublicensees using your Contribution without personally attributing it
@@ -68,7 +75,7 @@ to you, and you agree not to bring any moral-rights claim against the
 Company or its sublicensees about how your Contribution is used or
 modified.
 
-## 6. You have the right to grant this
+## 7. You have the right to grant this
 
 You confirm that:
 
@@ -81,13 +88,13 @@ You confirm that:
 - Submitting your Contribution does not breach any agreement you have
   with anyone else.
 
-## 7. No warranty, no obligation
+## 8. No warranty, no obligation
 
 You provide your Contribution "as is", without any warranty. Signing
 this CLA does not obligate you or the Company to maintain, support, or
 distribute anything.
 
-## 8. Public release
+## 9. Public release
 
 Your Contribution will be released to the public under the same licence
 as the rest of the project (currently PolyForm Noncommercial 1.0.0).

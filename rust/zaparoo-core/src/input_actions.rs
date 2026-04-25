@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //
-// Normalised UI action catalogue and the defaulted key-bindings that map
+// Normalized UI action catalog and the defaulted key-bindings that map
 // raw Qt key codes onto those actions. Screens handle actions, not keys,
 // so gamepad / NFC reader sources can slot in beside the keyboard without
 // touching the UI tree. Inspired by RetroArch's RetroPad abstraction.
@@ -73,7 +73,7 @@ pub fn default_bindings() -> HashMap<String, Vec<String>> {
 /// ([`Qt::Key`] code → action). When two actions bind the same key the
 /// alphabetically-later action wins — a deterministic, hand-authored
 /// collision policy. We sort the entries before walking them because
-/// `HashMap` iteration order is randomised per process, which would
+/// `HashMap` iteration order is randomized per process, which would
 /// otherwise let two runs disagree on which action owns a contested key.
 #[must_use]
 pub fn invert<S>(bindings: &HashMap<String, Vec<String>, S>) -> HashMap<i32, String>
@@ -106,20 +106,17 @@ mod tests {
     use super::{actions, default_bindings, invert, qt_key_code};
 
     #[test]
-    fn defaults_cover_every_navigable_action() {
+    fn every_default_binding_is_non_empty() {
+        // Iterating the whole map (rather than a hard-coded subset)
+        // catches future drift: any action added to default_bindings()
+        // must come with at least one key, or this test fails.
         let b = default_bindings();
-        for action in [
-            actions::LEFT,
-            actions::RIGHT,
-            actions::UP,
-            actions::DOWN,
-            actions::ACCEPT,
-            actions::CANCEL,
-        ] {
-            assert!(
-                b.get(action).is_some_and(|v| !v.is_empty()),
-                "missing default binding for {action}"
-            );
+        assert!(
+            !b.is_empty(),
+            "default_bindings() must define at least one action"
+        );
+        for (action, keys) in &b {
+            assert!(!keys.is_empty(), "missing default binding for {action}");
         }
     }
 

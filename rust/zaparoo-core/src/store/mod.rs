@@ -113,7 +113,7 @@ impl Store {
             }
             // Same NAME but a different `Output` type — programmer
             // error (two endpoints sharing a NAME). Fall through and
-            // overwrite so behaviour is deterministic, but surface
+            // overwrite so behavior is deterministic, but surface
             // the misuse loudly in dev and at least log it in release
             // so it doesn't go unnoticed.
             tracing::error!(
@@ -425,7 +425,7 @@ mod tests {
         assert!(!tags_match(&Tag::any("X"), &Tag::specific("Y", "a")));
     }
 
-    // run_mutation / invalidate end-to-end behaviour. These bypass
+    // run_mutation / invalidate end-to-end behavior. These bypass
     // `Store::subscribe`'s connection-driven resource lifecycle by
     // populating cache entries directly, so the tests stay deterministic
     // regardless of the `Client`'s reconnect task.
