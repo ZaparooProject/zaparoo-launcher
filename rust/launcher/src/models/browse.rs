@@ -3,10 +3,12 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //
 // Minimal BrowseModel stub — dormant, kept to satisfy the Zaparoo.Browse QML
-// module registration. Full implementation deferred to a future phase.
+// module registration. Full implementation deferred to a future phase. The
+// `enter` / `go_back` / `launch_at` / etc. methods are intentionally absent
+// from the QML surface so a stray call fails at `qmllint` time instead of
+// silently no-opping at runtime.
 
 use cxx_qt_lib::{QByteArray, QHash, QHashPair_i32_QByteArray, QModelIndex, QString, QVariant};
-use std::pin::Pin;
 
 #[derive(Default)]
 pub struct BrowseModelRust {
@@ -44,27 +46,6 @@ pub mod ffi {
         #[qproperty(QString, error_message)]
         type BrowseModel = super::BrowseModelRust;
 
-        #[qinvokable]
-        fn enter(self: Pin<&mut BrowseModel>, index: i32);
-
-        #[qinvokable]
-        fn go_back(self: Pin<&mut BrowseModel>);
-
-        #[qinvokable]
-        fn refresh(self: Pin<&mut BrowseModel>);
-
-        #[qinvokable]
-        fn launch_at(self: Pin<&mut BrowseModel>, index: i32);
-
-        #[qinvokable]
-        fn set_selected_index(self: Pin<&mut BrowseModel>, index: i32);
-
-        #[qinvokable]
-        fn name_at(self: &BrowseModel, index: i32) -> QString;
-
-        #[qinvokable]
-        fn is_folder_at(self: &BrowseModel, index: i32) -> bool;
-
         #[cxx_name = "rowCount"]
         fn row_count(self: &BrowseModel, parent: &QModelIndex) -> i32;
         fn data(self: &BrowseModel, index: &QModelIndex, role: i32) -> QVariant;
@@ -94,19 +75,5 @@ impl ffi::BrowseModel {
         h.insert(256 + 4, QByteArray::from("fileCount"));
         h.insert(256 + 5, QByteArray::from("isFolder"));
         h
-    }
-
-    fn enter(self: Pin<&mut Self>, _index: i32) {}
-    fn go_back(self: Pin<&mut Self>) {}
-    fn refresh(self: Pin<&mut Self>) {}
-    fn launch_at(self: Pin<&mut Self>, _index: i32) {}
-    fn set_selected_index(self: Pin<&mut Self>, _index: i32) {}
-
-    fn name_at(&self, _index: i32) -> QString {
-        QString::default()
-    }
-
-    fn is_folder_at(&self, _index: i32) -> bool {
-        false
     }
 }

@@ -36,6 +36,7 @@ pub mod systems;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, OnceLock};
 use tokio::runtime::Runtime;
+use tracing::error;
 use zaparoo_core::{persist::PersistedState, store::Store};
 
 static RUNTIME: OnceLock<Arc<Runtime>> = OnceLock::new();
@@ -83,4 +84,27 @@ pub fn persist_state() -> Arc<Mutex<PersistedState>> {
         .get()
         .expect("PERSIST_STATE not initialized")
         .clone()
+}
+
+/// Read the persisted state under a closure. Centralises the
+/// lock + log + panic-on-poison chain so the 5+ persist call sites
+/// can't drift in their error message or skip the log breadcrumb.
+pub fn with_persist_read<R>(f: impl FnOnce(&PersistedState) -> R) -> R {
+    let shared = persist_state();
+    let guard = shared
+        .lock()
+        .inspect_err(|e| error!("persist mutex poisoned: {e}"))
+        .expect("persist mutex poisoned");
+    f(&guard)
+}
+
+/// Mutate the persisted state under a closure. Same poisoning
+/// contract as `with_persist_read`.
+pub fn with_persist_mut<R>(f: impl FnOnce(&mut PersistedState) -> R) -> R {
+    let shared = persist_state();
+    let mut guard = shared
+        .lock()
+        .inspect_err(|e| error!("persist mutex poisoned: {e}"))
+        .expect("persist mutex poisoned");
+    f(&mut guard)
 }

@@ -2,15 +2,9 @@
 // Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 
-#![allow(
-    clippy::unwrap_used,
-    reason = "RwLock poisoning signals another thread panicked with the lock held; state is unrecoverable"
-)]
-
 use cxx_qt::CxxQtType;
 use cxx_qt_lib::{QByteArray, QHash, QHashPair_i32_QByteArray, QModelIndex, QString, QVariant};
 use std::pin::Pin;
-use std::sync::{Arc, RwLock};
 use zaparoo_core::endpoints::catalog::CatalogEndpoint;
 use zaparoo_core::remote_resource::ResourceStatus;
 use zaparoo_core::systems_catalog::CatalogData;
@@ -25,25 +19,18 @@ pub struct SystemInfo {
     pub category: String,
 }
 
+#[derive(Default)]
 pub struct SystemsModelRust {
     systems: Vec<SystemInfo>,
     count: i32,
     current_category: QString,
     error_message: QString,
-    // Shared catalog owned by the background task; model reads it on setCategory
-    catalog: Arc<RwLock<Option<CatalogData>>>,
-}
-
-impl Default for SystemsModelRust {
-    fn default() -> Self {
-        Self {
-            systems: Vec::new(),
-            count: 0,
-            current_category: QString::default(),
-            error_message: QString::default(),
-            catalog: Arc::new(RwLock::new(None)),
-        }
-    }
+    // Last-known-good catalog. Updated by `apply_state` on every
+    // `Ready`; never cleared on `Loading`/`Errored`. Lets
+    // `set_category` keep populating rows during a transient refetch
+    // instead of wiping the carousel until the catalog returns to
+    // `Ready`.
+    last_ready: Option<CatalogData>,
 }
 
 #[cxx_qt::bridge]
@@ -121,33 +108,35 @@ fn project(status: &ResourceStatus<CatalogData>) -> (Option<CatalogData>, String
     }
 }
 
+/// Filter `catalog`'s systems to the named category and re-shape them
+/// into the local row type. Returns empty when `catalog` is `None` so
+/// `set_category` and `apply_state` share one filter+map definition.
+fn rows_for_category(catalog: Option<&CatalogData>, cat: &str) -> Vec<SystemInfo> {
+    catalog.map_or_else(Vec::new, |c| {
+        c.systems_by_category(cat)
+            .into_iter()
+            .map(|s| SystemInfo {
+                id: s.id,
+                name: s.name,
+                category: s.category,
+            })
+            .collect()
+    })
+}
+
 fn apply_state(mut model: Pin<&mut ffi::SystemsModel>, (data, err): (Option<CatalogData>, String)) {
     if let Some(data) = data {
-        // Rebuild visible rows directly from `data` — if the user has
-        // already picked a category — *before* moving it into the
-        // shared catalog cache, so we don't have to re-acquire the
-        // read lock to look at what we just wrote.
         let cat = model.rust().current_category.to_string();
         if !cat.is_empty() {
-            let systems = data.systems_by_category(&cat);
-            let count = systems.len() as i32;
-            let rows: Vec<SystemInfo> = systems
-                .into_iter()
-                .map(|s| SystemInfo {
-                    id: s.id,
-                    name: s.name,
-                    category: s.category,
-                })
-                .collect();
+            let rows = rows_for_category(Some(&data), &cat);
+            let count = rows.len() as i32;
             model.as_mut().begin_reset_model();
             model.as_mut().rust_mut().systems = rows;
             model.as_mut().rust_mut().count = count;
             model.as_mut().end_reset_model();
             model.as_mut().count_changed();
         }
-        // Refresh the shared catalog cache that `set_category` reads
-        // so subsequent category switches see the latest data.
-        *model.rust().catalog.write().unwrap() = Some(data);
+        model.as_mut().rust_mut().last_ready = Some(data);
     }
     let qerr = QString::from(err.as_str());
     if model.error_message != qerr {
@@ -187,23 +176,12 @@ impl ffi::SystemsModel {
 
     fn set_category(mut self: Pin<&mut Self>, category: QString) {
         let cat = category.to_string();
-        let systems = self
-            .rust()
-            .catalog
-            .read()
-            .unwrap()
-            .as_ref()
-            .map(|c| c.systems_by_category(&cat))
-            .unwrap_or_default();
-        let count = systems.len() as i32;
-        let rows: Vec<SystemInfo> = systems
-            .into_iter()
-            .map(|s| SystemInfo {
-                id: s.id,
-                name: s.name,
-                category: s.category,
-            })
-            .collect();
+        // Read from `last_ready` rather than the live `ResourceStatus`
+        // so a transient `Loading` (a refetch in flight) doesn't wipe
+        // the carousel between the user's category change and the
+        // refetch completing.
+        let rows = rows_for_category(self.rust().last_ready.as_ref(), &cat);
+        let count = rows.len() as i32;
         self.as_mut().begin_reset_model();
         self.as_mut().rust_mut().systems = rows;
         self.as_mut().rust_mut().count = count;
@@ -236,5 +214,108 @@ impl ffi::SystemsModel {
             .iter()
             .position(|s| s.id == needle)
             .map_or(-1, |i| i as i32)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(
+        clippy::expect_used,
+        clippy::unwrap_used,
+        clippy::panic,
+        reason = "tests should fail-fast on unexpected errors"
+    )]
+
+    use super::{project, rows_for_category};
+    use zaparoo_core::media_types::SystemInfo as MediaSystemInfo;
+    use zaparoo_core::remote_resource::ResourceStatus;
+    use zaparoo_core::systems_catalog::CatalogData;
+
+    fn sys(id: &str, name: &str, category: &str) -> MediaSystemInfo {
+        MediaSystemInfo {
+            id: id.into(),
+            name: name.into(),
+            category: category.into(),
+        }
+    }
+
+    fn catalog_with(systems: Vec<MediaSystemInfo>) -> CatalogData {
+        CatalogData {
+            systems,
+            categories: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn idle_projects_to_no_data_no_error() {
+        let (data, err) = project(&ResourceStatus::Idle);
+        assert!(data.is_none());
+        assert!(err.is_empty());
+    }
+
+    #[test]
+    fn loading_projects_to_no_data_no_error() {
+        let (data, err) = project(&ResourceStatus::Loading);
+        assert!(data.is_none());
+        assert!(err.is_empty());
+    }
+
+    #[test]
+    fn ready_projects_data_and_no_error() {
+        let catalog = catalog_with(vec![sys("smb", "SMB", "Consoles")]);
+        let (data, err) = project(&ResourceStatus::Ready(catalog));
+        assert!(data.is_some());
+        assert!(err.is_empty());
+        assert_eq!(data.unwrap().systems.len(), 1);
+    }
+
+    #[test]
+    fn errored_projects_message_and_no_data() {
+        let status: ResourceStatus<CatalogData> = ResourceStatus::Errored {
+            message: "boom".into(),
+            retrying: false,
+        };
+        let (data, err) = project(&status);
+        assert!(data.is_none());
+        assert_eq!(err, "boom");
+    }
+
+    #[test]
+    fn errored_with_retrying_still_propagates_message() {
+        let status: ResourceStatus<CatalogData> = ResourceStatus::Errored {
+            message: "reconnecting".into(),
+            retrying: true,
+        };
+        let (data, err) = project(&status);
+        assert!(data.is_none());
+        assert_eq!(err, "reconnecting");
+    }
+
+    #[test]
+    fn rows_for_category_none_returns_empty() {
+        let rows = rows_for_category(None, "Arcade");
+        assert!(rows.is_empty());
+    }
+
+    #[test]
+    fn rows_for_category_filters_and_reshapes() {
+        let catalog = catalog_with(vec![
+            sys("smb", "Super Mario Bros", "Consoles"),
+            sys("snk", "SNK Heroes", "Arcade"),
+            sys("zelda", "Zelda", "Consoles"),
+        ]);
+        let rows = rows_for_category(Some(&catalog), "Consoles");
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].id, "smb");
+        assert_eq!(rows[0].name, "Super Mario Bros");
+        assert_eq!(rows[0].category, "Consoles");
+        assert_eq!(rows[1].id, "zelda");
+    }
+
+    #[test]
+    fn rows_for_category_unknown_returns_empty() {
+        let catalog = catalog_with(vec![sys("smb", "SMB", "Consoles")]);
+        let rows = rows_for_category(Some(&catalog), "DoesNotExist");
+        assert!(rows.is_empty());
     }
 }

@@ -7,6 +7,7 @@
 // highlighted game path. Schema version is checked independently
 // from other screens on load (see `zaparoo_core::persist`).
 
+use crate::models::{with_persist_mut, with_persist_read};
 use cxx_qt::{CxxQtType, Initialize};
 use cxx_qt_lib::QString;
 use std::pin::Pin;
@@ -46,11 +47,7 @@ pub mod ffi {
 
 impl Initialize for ffi::GamesState {
     fn initialize(mut self: Pin<&mut Self>) {
-        let shared = crate::models::persist_state();
-        let snapshot: GamesState = {
-            let guard = shared.lock().expect("persist mutex poisoned");
-            guard.games.clone()
-        };
+        let snapshot: GamesState = with_persist_read(|s| s.games.clone());
         self.as_mut().rust_mut().system_id = QString::from(snapshot.system_id.as_str());
         self.as_mut().rust_mut().game_path = QString::from(snapshot.game_path.as_str());
     }
@@ -79,11 +76,9 @@ impl ffi::GamesState {
 }
 
 fn persist_games<F: FnOnce(&mut GamesState)>(mutator: F) {
-    let shared = crate::models::persist_state();
-    let snapshot = {
-        let mut guard = shared.lock().expect("persist mutex poisoned");
-        mutator(&mut guard.games);
-        guard.clone()
-    };
+    let snapshot = with_persist_mut(|s| {
+        mutator(&mut s.games);
+        s.clone()
+    });
     persist::save(&snapshot);
 }
