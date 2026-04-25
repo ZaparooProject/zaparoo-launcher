@@ -7,6 +7,7 @@
 // lives in its own singleton (`Browse.HubState`, `Browse.GamesState`)
 // so a screen can evolve its schema without touching the others.
 
+use crate::models::{with_persist_mut, with_persist_read};
 use cxx_qt::{CxxQtType, Initialize};
 use cxx_qt_lib::QString;
 use std::pin::Pin;
@@ -41,11 +42,7 @@ pub mod ffi {
 
 impl Initialize for ffi::AppState {
     fn initialize(mut self: Pin<&mut Self>) {
-        let shared = crate::models::persist_state();
-        let snapshot = {
-            let guard = shared.lock().expect("persist mutex poisoned");
-            guard.active_screen.clone()
-        };
+        let snapshot = with_persist_read(|s| s.active_screen.clone());
         self.as_mut().rust_mut().active_screen = QString::from(snapshot.as_str());
         // No *_changed emits here: QML bindings haven't attached yet
         // during Initialize, and Main.qml reads the property directly
@@ -66,11 +63,9 @@ impl ffi::AppState {
 }
 
 fn persist_active_screen(value: String) {
-    let shared = crate::models::persist_state();
-    let snapshot = {
-        let mut guard = shared.lock().expect("persist mutex poisoned");
-        guard.active_screen = value;
-        guard.clone()
-    };
+    let snapshot = with_persist_mut(|s| {
+        s.active_screen = value;
+        s.clone()
+    });
     persist::save(&snapshot);
 }

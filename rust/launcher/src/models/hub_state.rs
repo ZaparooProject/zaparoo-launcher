@@ -7,6 +7,7 @@
 // the user last left the hub. Schema version is checked independently
 // from other screens on load (see `zaparoo_core::persist`).
 
+use crate::models::{with_persist_mut, with_persist_read};
 use cxx_qt::{CxxQtType, Initialize};
 use cxx_qt_lib::QString;
 use std::pin::Pin;
@@ -51,11 +52,7 @@ pub mod ffi {
 
 impl Initialize for ffi::HubState {
     fn initialize(mut self: Pin<&mut Self>) {
-        let shared = crate::models::persist_state();
-        let snapshot: HubState = {
-            let guard = shared.lock().expect("persist mutex poisoned");
-            guard.hub.clone()
-        };
+        let snapshot: HubState = with_persist_read(|s| s.hub.clone());
         self.as_mut().rust_mut().focus = QString::from(snapshot.focus.as_str());
         self.as_mut().rust_mut().category = QString::from(snapshot.category.as_str());
         self.as_mut().rust_mut().system_id = QString::from(snapshot.system_id.as_str());
@@ -95,11 +92,9 @@ impl ffi::HubState {
 }
 
 fn persist_hub<F: FnOnce(&mut HubState)>(mutator: F) {
-    let shared = crate::models::persist_state();
-    let snapshot = {
-        let mut guard = shared.lock().expect("persist mutex poisoned");
-        mutator(&mut guard.hub);
-        guard.clone()
-    };
+    let snapshot = with_persist_mut(|s| {
+        mutator(&mut s.hub);
+        s.clone()
+    });
     persist::save(&snapshot);
 }
