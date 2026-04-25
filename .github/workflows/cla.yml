@@ -89,5 +89,25 @@ jobs:
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add .github/contributors/signatures.json
             git commit -m "chore(cla): stamp version $cla_version on new signatures"
-            git push origin HEAD:main
+            # Bounded retry: another merge may land on main between
+            # checkout and push. Rebase + retry instead of failing the
+            # job; the stamp is idempotent so a future signing event
+            # catches strays if all attempts lose the race.
+            pushed=0
+            for _ in 1 2 3; do
+              git fetch origin main
+              if ! git rebase origin/main; then
+                git rebase --abort
+                sleep 5
+                continue
+              fi
+              if git push origin HEAD:main; then
+                pushed=1
+                break
+              fi
+              sleep 5
+            done
+            if [ "$pushed" -eq 0 ]; then
+              echo "::warning::version-stamp push lost three races; retry on next CLA event"
+            fi
           fi

@@ -70,15 +70,20 @@ pub fn default_bindings() -> HashMap<String, Vec<String>> {
 }
 
 /// Inverts the bindings (action → keys) into the runtime lookup shape
-/// ([`Qt::Key`] code → action). Later bindings for the same key win — a
-/// sane collision policy for a small hand-authored table.
+/// ([`Qt::Key`] code → action). When two actions bind the same key the
+/// alphabetically-later action wins — a deterministic, hand-authored
+/// collision policy. We sort the entries before walking them because
+/// `HashMap` iteration order is randomised per process, which would
+/// otherwise let two runs disagree on which action owns a contested key.
 #[must_use]
 pub fn invert<S>(bindings: &HashMap<String, Vec<String>, S>) -> HashMap<i32, String>
 where
     S: std::hash::BuildHasher,
 {
     let mut out: HashMap<i32, String> = HashMap::new();
-    for (action, keys) in bindings {
+    let mut ordered: Vec<(&String, &Vec<String>)> = bindings.iter().collect();
+    ordered.sort_unstable_by(|(a, _), (b, _)| a.cmp(b));
+    for (action, keys) in ordered {
         for name in keys {
             if let Some(code) = qt_key_code(name) {
                 out.insert(code, action.clone());
@@ -132,6 +137,22 @@ mod tests {
         assert_eq!(
             map.get(&qt_key_code("Escape").unwrap()).map(String::as_str),
             Some(actions::CANCEL),
+        );
+    }
+
+    #[test]
+    fn collision_resolution_is_deterministic_alphabetical_winner() {
+        // Two actions bind "Return" — `accept` (alphabetically earlier)
+        // and `zzz_late` (alphabetically later). With sorted iteration
+        // the later-walked entry overwrites, so `zzz_late` must always
+        // win regardless of process-local hash seed.
+        let mut b = std::collections::HashMap::new();
+        b.insert(actions::ACCEPT.into(), vec!["Return".into()]);
+        b.insert("zzz_late".to_string(), vec!["Return".into()]);
+        let map = invert(&b);
+        assert_eq!(
+            map.get(&qt_key_code("Return").unwrap()).map(String::as_str),
+            Some("zzz_late"),
         );
     }
 

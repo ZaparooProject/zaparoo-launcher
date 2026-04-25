@@ -95,11 +95,14 @@ impl<T: Clone + Send + Sync + 'static> RemoteResource<T> {
     /// `Connected` (and, while still Connected, on retry after error
     /// with capped exponential backoff).
     ///
-    /// The returned `RemoteResource` owns the watch channel; dropping it
-    /// drops all subscribers' senders but the spawned task keeps running
-    /// until the connection watch is closed (i.e. the `Client` is
-    /// dropped). Callers wanting to cancel an in-flight fetch should
-    /// drop the `Client` or a wrapping `Arc<Client>`.
+    /// Lifecycle: dropping the returned `RemoteResource` cancels the
+    /// spawned task and any in-flight fetch (the held `_cancel_tx`
+    /// fires its receiver inside the `tokio::select!`). The task also
+    /// exits when the connection watch is closed — i.e. when the
+    /// `Client` is dropped — so callers don't have to manage either
+    /// lifetime end explicitly. Both shutdown paths are exercised by
+    /// `dropping_resource_cancels_spawned_task` and the surrounding
+    /// tests.
     pub fn driven_by<F, Fut>(client: Arc<Client>, runtime: &Arc<Runtime>, fetch: F) -> Self
     where
         F: Fn(Arc<Client>) -> Fut + Send + Sync + 'static,

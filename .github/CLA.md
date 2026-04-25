@@ -8,7 +8,7 @@ This Contributor License Agreement ("CLA") records the rights you grant
 to **Wizzo Pty Ltd** (the "Company") when you contribute code,
 documentation, translations, or other material to this project. You
 sign it once, on your first contribution, and it covers every
-contribution you make afterwards.
+contribution you make afterward.
 
 ## Why we ask for this
 

@@ -127,6 +127,15 @@ impl Store {
                 E::NAME
             );
         }
+        // Cache entries live for the lifetime of the `Store` (which is
+        // the lifetime of the launcher process). No reclamation path:
+        // total cardinality is bounded by `endpoints × distinct args` —
+        // a handful of endpoints times a few dozen system IDs in the
+        // worst case — and each entry holds one `tokio::sync::watch`
+        // plus one watcher task, both cheap. The `Client` and `Runtime`
+        // outlive every entry by construction. Add eviction (most
+        // likely `Arc::strong_count`-driven on the per-entry watcher's
+        // drop branch) only if RAM growth shows up in the field.
         let runtime = self.runtime.clone();
         let args_for_fetch = args.clone();
         let resource = Arc::new(RemoteResource::driven_by(

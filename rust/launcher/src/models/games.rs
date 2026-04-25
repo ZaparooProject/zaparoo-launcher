@@ -148,10 +148,22 @@ impl ffi::GamesModel {
 
         // User-visible reset happens synchronously so QML sees fresh
         // state immediately, before the resource has even spun up.
+        // Crucially, drop the prior system's rows here too — otherwise
+        // the carousel keeps painting (and accepting input on) games
+        // from the system the user just navigated away from until the
+        // new system's fetch resolves.
         self.as_mut().set_current_system_id(system_id);
         self.as_mut().set_loading(true);
         self.as_mut().set_error_message(QString::default());
         self.as_mut().set_has_next_page(false);
+        if !self.items.is_empty() {
+            self.as_mut().begin_reset_model();
+            self.as_mut().rust_mut().items.clear();
+            self.as_mut().rust_mut().count = 0;
+            self.as_mut().rust_mut().selected_index = -1;
+            self.as_mut().end_reset_model();
+            self.as_mut().count_changed();
+        }
 
         // Abort the old watcher so it stops enqueuing further callbacks.
         // Any callback already on the Qt event loop is still pending —

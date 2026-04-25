@@ -1,5 +1,6 @@
 /.github/CLA.md @ZaparooProject/admins
 /.github/CODEOWNERS @ZaparooProject/admins
 /.github/contributors/ @ZaparooProject/admins
+/.github/workflows/cla.yml @ZaparooProject/admins
 /COPYING @ZaparooProject/admins
 /src/LICENSES/ @ZaparooProject/admins

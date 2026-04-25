@@ -113,7 +113,7 @@ mod tests {
     }
 
     #[test]
-    fn derive_categories_synthesises_other_for_empty() {
+    fn derive_categories_synthesizes_other_for_empty() {
         let systems = vec![sys("a", "A", ""), sys("b", "B", "Consoles")];
         assert_eq!(derive_categories(&systems), vec!["Consoles", "Other"]);
     }

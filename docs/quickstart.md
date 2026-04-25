@@ -37,7 +37,7 @@ is not tested; use WSL2.
 ## 2. Clone and build
 
 ```bash
-git clone git@github.com:ZaparooProject/zaparoo-launcher.git
+git clone https://github.com/ZaparooProject/zaparoo-launcher.git
 cd zaparoo-launcher
 just build
 ```
@@ -55,7 +55,7 @@ just mock-core
 
 You should see:
 
-```
+```text
 mock-core listening on ws://127.0.0.1:27497/api/v0.1
 ```
 
