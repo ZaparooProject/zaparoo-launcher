@@ -20,3 +20,41 @@ Read this when writing Rust QML models via cxx-qt 0.7 in
 - **cxx-qt plugin class name** for a `Zaparoo.Browse` module is
   `Zaparoo_Browse_plugin` (not `Zaparoo_BrowsePlugin`). Use
   `Q_IMPORT_QML_PLUGIN(Zaparoo_Browse_plugin)` in the C++ entry point.
+
+- **Bind QML singletons to data through `bind_to_endpoint!`.** QML
+  singletons are constructed *after* `init_globals` runs, which is
+  *after* the WebSocket task has very likely already advanced past
+  `Idle`/`Disconnected`. If you only spawn an async watcher inside
+  `initialize()`, the QObject's `Default::default()` placeholder values
+  are visible to the first frame.
+
+  The macro at `rust/launcher/src/bind.rs` emits the entire
+  `cxx_qt::Initialize` impl: it subscribes the singleton to the
+  store-cached `RemoteResource<E::Output>` for the chosen endpoint,
+  reads the current `ResourceStatus` *synchronously* before returning,
+  and only then spawns the qt_thread watcher for subsequent updates.
+  The seed bug is closed structurally — there is no place left to
+  forget it.
+
+  ```rust
+  // models/app_status.rs — full bridge for the AppStatus banner.
+  crate::bind_to_endpoint! {
+      for ffi::AppStatus,
+      endpoint = CatalogEndpoint,
+      args = (),
+      select = project,       // fn(&ResourceStatus<CatalogData>) -> Projected
+      apply  = apply_state,   // fn(Pin<&mut Self>, Projected)
+  }
+  ```
+
+  `select` and `apply` are free functions (not closures) so they're
+  `Copy` and reusable across the sync seed and the async loop. For
+  per-arg endpoints (e.g. `MediaSearchEndpoint`, keyed by system id),
+  drive `Store::subscribe` directly from a `#[qinvokable]` and abort
+  the previous watcher's `JoinHandle` before installing the new one
+  (see `models/games.rs`).
+
+  Use `tokio::sync::watch` for any state a `RemoteResource` exposes;
+  `tokio::sync::broadcast` drops messages sent before a receiver
+  subscribes and so loses the seed value entirely (see the CLAUDE.md
+  "broadcast vs watch" note).

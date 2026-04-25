@@ -1,6 +1,7 @@
 ---
-source: zaparoo-core/src/systems_catalog.rs
-expression: "CatalogData { systems, categories }"
+source: zaparoo-core/src/endpoints/catalog.rs
+assertion_line: 130
+expression: shape_catalog(systems)
 ---
 CatalogData {
     systems: [

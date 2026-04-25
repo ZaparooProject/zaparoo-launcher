@@ -4,10 +4,14 @@
 //
 // Async WebSocket JSON-RPC 2.0 client. Mirrors ZaparooClient.{cpp,h}.
 // Runs on a tokio runtime; auto-reconnects with exponential backoff
-// (1→2→4→8→16s, capped at 30s). After RETRY_ERROR_THRESHOLD consecutive
-// connect failures the client publishes ConnectionState::Error so the UI
-// can surface "Core unreachable" instead of a transient "Disconnected"
-// banner. Public methods are async and safe to call from any tokio task.
+// (1→2→4→8→16s, capped at 30s).
+//
+// `ConnectionState` is an explicit state machine published via `watch`
+// (see the variant docs below for transitions). The outbound channel is
+// session-scoped — every successful connect installs a fresh
+// `mpsc<String>` so RPCs queued while the link is down can't replay
+// against the next session, and `call()` fails fast with `not connected`
+// instead of disappearing into a queue.
 
 use crate::media_types::{
     MediaBrowseParams, MediaBrowseResult, MediaSearchParams, MediaSearchResult, RunParams,
@@ -19,16 +23,16 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tokio::sync::{oneshot, watch};
+use tokio::sync::{mpsc, oneshot, watch};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 /// Consecutive connect failures after which the client advertises
-/// `ConnectionState::Error` to subscribers. The outer loop keeps retrying
-/// past this point — the threshold exists so the UI can escalate a
-/// transient drop into a "Core unreachable" banner rather than cycling
-/// endlessly through "Connecting…".
+/// `ConnectionState::Unreachable` to subscribers. The outer loop keeps
+/// retrying past this point — the threshold exists so the UI can
+/// escalate a transient drop into a "Core unreachable" banner rather
+/// than cycling endlessly through "Reconnecting…".
 const RETRY_ERROR_THRESHOLD: u32 = 10;
 
 /// Ceiling on reconnect backoff. Chosen so a laptop waking from sleep
@@ -38,24 +42,59 @@ const MAX_BACKOFF_SECS: u64 = 30;
 /// Rolling state of the WebSocket link, published via `watch` so late
 /// subscribers (QML singletons whose `initialize()` runs after the QML
 /// engine boots, post-connect) read the current value rather than
-/// silently missing transitions. UI code derives its connection banner
-/// from this plus the catalog RPC status; other tasks (catalog,
-/// platform) trigger work on `Connected`.
+/// silently missing transitions.
+///
+/// State machine:
+///
+/// ```text
+///                        ┌──────── (success) ──────────┐
+///                        ↓                              │
+///       Disconnected ──→ Connecting ──→ Connected      │
+///                          ↑                │           │
+///                          │     (drop) ────┘           │
+///                          │                            │
+///        (recover) ←───────┴──── Reconnecting ──────────┘
+///                                      │
+///                                      │ (failures ≥ RETRY_ERROR_THRESHOLD)
+///                                      ↓
+///                                Unreachable(last_err)
+///                                      │
+///                                      └─ (eventual success → Connected;
+///                                          stays Unreachable until then)
+/// ```
+///
+/// Invariants the connect loop preserves:
+/// - `Connecting` is published exactly once, on the first attempt before
+///   any successful connect.
+/// - After a successful connect that drops, the next published state is
+///   `Reconnecting`, not `Connecting`. UI code can rely on `Connecting`
+///   meaning "first-ever attempt" and `Reconnecting` meaning "lost a
+///   live link."
+/// - Once `Unreachable(msg)` is published, the loop keeps retrying
+///   internally but does not republish `Reconnecting`. Recovery is
+///   signalled by a single transition to `Connected`.
+/// - `Disconnected` is the initial state only — the loop never returns
+///   to it after the first attempt begins.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ConnectionState {
-    /// No active ws link — either never connected yet or briefly
-    /// between retry attempts.
+    /// No connect attempt has been made yet. Initial value before the
+    /// connect loop's first iteration.
     Disconnected,
-    /// `connect_async` in flight. Published at the head of every retry
-    /// loop so the UI can show a "connecting" hint even before the first
-    /// connect succeeds.
+    /// First-ever `connect_async` in flight. Replaced by `Connected` on
+    /// success or `Unreachable` after `RETRY_ERROR_THRESHOLD` consecutive
+    /// failures; UI code may treat this as "boot-time wait."
     Connecting,
     /// ws link up and service loop running.
     Connected,
-    /// Consecutive connect failures exceeded `RETRY_ERROR_THRESHOLD`.
-    /// Inner string is the last connect error. The task keeps retrying;
-    /// recovery is signalled by a later `Connected`.
-    Error(String),
+    /// Lost a previously-live link and the loop is retrying. Distinct
+    /// from `Connecting` so UI can show "lost connection, retrying"
+    /// without flickering "connecting…" every backoff cycle.
+    Reconnecting,
+    /// Threshold of consecutive connect failures hit. The inner string
+    /// is the most recent connect error. Sticky: subsequent retries do
+    /// not republish `Connecting` or `Reconnecting`; only a successful
+    /// connect (→ `Connected`) clears it.
+    Unreachable(String),
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -93,40 +132,131 @@ impl std::error::Error for ClientError {}
 
 type PendingMap = Arc<Mutex<HashMap<String, oneshot::Sender<Result<Value, ClientError>>>>>;
 
+/// Session-scoped outbound sender. `None` means no live ws session, so
+/// `call()` fails fast with `not connected` instead of queueing into a
+/// channel that might be drained against a later session.
+type OutboundSlot = Arc<Mutex<Option<mpsc::UnboundedSender<String>>>>;
+
+/// Bookkeeping for the connection state machine. Extracted from the
+/// connect loop so the transition rules can be unit-tested without
+/// driving real WebSocket I/O.
+#[derive(Debug, Default)]
+struct ConnectionFsm {
+    /// Consecutive connect failures since the last successful handshake.
+    /// Resets on `on_connected`.
+    failures: u32,
+    /// Set on the first `Connected` and never cleared. Drives
+    /// `Connecting` (first-ever attempt) vs `Reconnecting` (post-drop).
+    ever_connected: bool,
+    /// Latches the moment `Unreachable` is published so subsequent retry
+    /// attempts stay silent until a successful connect clears it. Without
+    /// this, the loop would clobber `Unreachable` with `Reconnecting` on
+    /// every backoff cycle.
+    unreachable_published: bool,
+}
+
+impl ConnectionFsm {
+    /// Returns the state to publish before the next connect attempt, or
+    /// `None` if no transition is needed (already at the right state, or
+    /// `Unreachable` has latched).
+    fn before_attempt(&self, current: &ConnectionState) -> Option<ConnectionState> {
+        if self.unreachable_published {
+            return None;
+        }
+        let trying = if self.ever_connected {
+            ConnectionState::Reconnecting
+        } else {
+            ConnectionState::Connecting
+        };
+        if *current == trying {
+            None
+        } else {
+            Some(trying)
+        }
+    }
+
+    /// Records a successful connect and returns the state to publish.
+    /// Always `Connected`; the loop should always publish this so a
+    /// recovery from `Unreachable` produces a visible transition.
+    fn on_connected(&mut self) -> ConnectionState {
+        self.failures = 0;
+        self.ever_connected = true;
+        self.unreachable_published = false;
+        ConnectionState::Connected
+    }
+
+    /// Records a failed connect attempt and returns the state to publish,
+    /// or `None` if the failure shouldn't change the published state
+    /// (below threshold, or already `Unreachable`).
+    fn on_attempt_failed(&mut self, err: String) -> Option<ConnectionState> {
+        self.failures = self.failures.saturating_add(1);
+        if self.failures >= RETRY_ERROR_THRESHOLD && !self.unreachable_published {
+            self.unreachable_published = true;
+            Some(ConnectionState::Unreachable(err))
+        } else {
+            None
+        }
+    }
+
+    fn current_failures(&self) -> u32 {
+        self.failures
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Client {
-    tx: tokio::sync::mpsc::UnboundedSender<String>,
+    tx: OutboundSlot,
     pending: PendingMap,
     pub connection: Arc<watch::Sender<ConnectionState>>,
 }
 
 impl Client {
     pub fn new(endpoint: String, runtime: &Arc<tokio::runtime::Runtime>) -> Arc<Self> {
-        let (msg_tx, mut msg_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
         let (connection_tx, _) = watch::channel(ConnectionState::Disconnected);
         let pending: PendingMap = Arc::new(Mutex::new(HashMap::new()));
         let pending_clone = pending.clone();
         let connection_arc = Arc::new(connection_tx);
         let connection_clone = connection_arc.clone();
+        let tx_slot: OutboundSlot = Arc::new(Mutex::new(None));
+        let tx_slot_clone = tx_slot.clone();
 
         let client = Arc::new(Self {
-            tx: msg_tx,
+            tx: tx_slot,
             pending,
             connection: connection_arc,
         });
 
         runtime.spawn(async move {
-            // Consecutive connect failures since the last successful
-            // handshake. Drives `backoff_delay` and the error-surfacing
-            // threshold; reset on `Ok`.
-            let mut failures: u32 = 0;
+            let mut fsm = ConnectionFsm::default();
+
             loop {
-                connection_clone.send_replace(ConnectionState::Connecting);
+                // Bind the borrow to a local so it's dropped before
+                // `send_replace` — temporaries in the scrutinee of an
+                // `if let` outlive the body, so inlining the borrow
+                // here would hold a read lock across `send_replace`'s
+                // write lock and deadlock the connection task.
+                let next = {
+                    let current = connection_clone.borrow();
+                    fsm.before_attempt(&current)
+                };
+                if let Some(next) = next {
+                    connection_clone.send_replace(next);
+                }
+
                 match connect_async(&endpoint).await {
                     Ok((ws_stream, _)) => {
-                        failures = 0;
                         info!("connected to core at {endpoint}");
-                        connection_clone.send_replace(ConnectionState::Connected);
+
+                        // Fresh outbound channel per session — see the
+                        // OutboundSlot doc comment for why this isn't
+                        // shared across reconnects.
+                        let (msg_tx, mut msg_rx) = mpsc::unbounded_channel::<String>();
+                        #[allow(clippy::unwrap_used, reason = "mutex poisoning is unrecoverable")]
+                        {
+                            *tx_slot_clone.lock().unwrap() = Some(msg_tx);
+                        }
+                        connection_clone.send_replace(fsm.on_connected());
+
                         let (mut write, mut read) = ws_stream.split();
 
                         loop {
@@ -139,7 +269,7 @@ impl Client {
                                                 break;
                                             }
                                         }
-                                        None => return, // Client dropped
+                                        None => return, // Outbound channel dropped — only happens on shutdown.
                                     }
                                 }
                                 msg = read.next() => {
@@ -174,8 +304,15 @@ impl Client {
                             }
                         }
 
-                        connection_clone.send_replace(ConnectionState::Disconnected);
-                        // Fail all pending requests
+                        // Tear down the session: drop the outbound sender
+                        // (msg_rx is dropped at scope-exit, taking any
+                        // queued-but-unsent messages with it) and fail
+                        // every pending RPC. The next iteration publishes
+                        // `Reconnecting` automatically.
+                        #[allow(clippy::unwrap_used, reason = "mutex poisoning is unrecoverable")]
+                        {
+                            *tx_slot_clone.lock().unwrap() = None;
+                        }
                         #[allow(clippy::unwrap_used, reason = "mutex poisoning is unrecoverable")]
                         let drained: Vec<_> = pending_clone.lock().unwrap().drain().collect();
                         for (_, tx) in drained {
@@ -183,17 +320,16 @@ impl Client {
                         }
                     }
                     Err(e) => {
-                        failures = failures.saturating_add(1);
-                        let state = if failures >= RETRY_ERROR_THRESHOLD {
-                            ConnectionState::Error(e.to_string())
-                        } else {
-                            ConnectionState::Disconnected
-                        };
-                        connection_clone.send_replace(state);
-                        debug!("ws connect failed (attempt {failures}): {e}");
+                        if let Some(next) = fsm.on_attempt_failed(e.to_string()) {
+                            connection_clone.send_replace(next);
+                        }
+                        debug!(
+                            "ws connect failed (attempt {}): {e}",
+                            fsm.current_failures()
+                        );
                     }
                 }
-                tokio::time::sleep(backoff_delay(failures)).await;
+                tokio::time::sleep(backoff_delay(fsm.current_failures())).await;
             }
         });
 
@@ -212,15 +348,33 @@ impl Client {
             message: e.to_string(),
         })?;
 
+        // Snapshot the current session's sender. If `None`, no live link —
+        // fail immediately rather than queueing into a channel that will
+        // be dropped at the next disconnect or, worse, drained by the
+        // wrong session.
+        #[allow(clippy::unwrap_used, reason = "mutex poisoning is unrecoverable")]
+        let sender = self.tx.lock().unwrap().clone().ok_or_else(|| ClientError {
+            message: "not connected".into(),
+        })?;
+
         let (resp_tx, resp_rx) = oneshot::channel();
         #[allow(clippy::unwrap_used, reason = "mutex poisoning is unrecoverable")]
         {
-            self.pending.lock().unwrap().insert(id, resp_tx);
+            self.pending.lock().unwrap().insert(id.clone(), resp_tx);
         }
 
-        self.tx.send(text).map_err(|_| ClientError {
-            message: "not connected".into(),
-        })?;
+        if sender.send(text).is_err() {
+            // Receiver was dropped between the snapshot and the send —
+            // session ended in flight. Clean up the pending entry so it
+            // doesn't leak.
+            #[allow(clippy::unwrap_used, reason = "mutex poisoning is unrecoverable")]
+            {
+                self.pending.lock().unwrap().remove(&id);
+            }
+            return Err(ClientError {
+                message: "not connected".into(),
+            });
+        }
 
         resp_rx.await.map_err(|_| ClientError {
             message: "channel closed".into(),
@@ -276,13 +430,11 @@ impl Client {
     }
 
     pub async fn run(&self, params: RunParams) -> Result<(), ClientError> {
-        #[derive(Serialize)]
-        struct P {
-            text: String,
-        }
-        // Upstream returns null on success; the launcher has no use for
-        // the result body either way, so swallow it.
-        self.call("run", &P { text: params.text }).await?;
+        // `RunParams` already derives `Serialize`; forwarding it as-is
+        // means new optional fields the upstream API gains (`type`,
+        // `uid`, `data`, `unsafe`) flow through with no client edits.
+        // Upstream returns null on success; swallow it.
+        self.call("run", &params).await?;
         Ok(())
     }
 
@@ -303,7 +455,10 @@ impl Client {
 /// the delay until the cap.
 ///
 /// Sequence: 0→1, 1→1, 2→2, 3→4, 4→8, 5→16, 6→30, 7+→30 (seconds).
-fn backoff_delay(failures: u32) -> Duration {
+///
+/// `pub(crate)` so `remote_resource` can reuse the same curve for
+/// in-session RPC retry without duplicating the math.
+pub(crate) fn backoff_delay(failures: u32) -> Duration {
     let exp = failures.saturating_sub(1).min(5);
     let secs = 1u64 << exp;
     Duration::from_secs(secs.min(MAX_BACKOFF_SECS))
@@ -326,6 +481,118 @@ mod tests {
         assert_eq!(
             backoff_delay(u32::MAX),
             Duration::from_secs(MAX_BACKOFF_SECS)
+        );
+    }
+
+    /// Replays a scripted sequence of connect outcomes through
+    /// `ConnectionFsm` and returns the distinct sequence of states
+    /// published to the watch — i.e. the public-visible transitions.
+    /// `outcomes` is `Ok(())` for a successful connect or `Err(msg)` for
+    /// a failed connect attempt.
+    fn replay(outcomes: &[Result<(), &str>]) -> Vec<ConnectionState> {
+        let mut fsm = ConnectionFsm::default();
+        let mut current = ConnectionState::Disconnected;
+        let mut log = Vec::new();
+        for outcome in outcomes {
+            if let Some(next) = fsm.before_attempt(&current) {
+                current = next.clone();
+                log.push(next);
+            }
+            match outcome {
+                Ok(()) => {
+                    let next = fsm.on_connected();
+                    current = next.clone();
+                    log.push(next);
+                }
+                Err(e) => {
+                    if let Some(next) = fsm.on_attempt_failed((*e).to_string()) {
+                        current = next.clone();
+                        log.push(next);
+                    }
+                }
+            }
+        }
+        log
+    }
+
+    #[test]
+    fn first_ever_attempt_publishes_connecting_then_connected() {
+        assert_eq!(
+            replay(&[Ok(())]),
+            vec![ConnectionState::Connecting, ConnectionState::Connected],
+        );
+    }
+
+    #[test]
+    fn drop_after_connected_transitions_through_reconnecting_not_connecting() {
+        let log = replay(&[Ok(()), Err("dropped"), Ok(())]);
+        assert_eq!(
+            log,
+            vec![
+                ConnectionState::Connecting,
+                ConnectionState::Connected,
+                // The failed second attempt does not republish; the
+                // pre-attempt of the third attempt publishes Reconnecting.
+                ConnectionState::Reconnecting,
+                ConnectionState::Connected,
+            ],
+        );
+    }
+
+    #[test]
+    fn unreachable_is_sticky_until_recovery() {
+        // Ten failed first-attempts, then a successful one. Unreachable
+        // is published exactly once, and recovery clears it.
+        let mut script: Vec<Result<(), &str>> = (0..RETRY_ERROR_THRESHOLD)
+            .map(|_| Err("conn refused"))
+            .collect();
+        script.push(Ok(()));
+        let log = replay(&script);
+        assert_eq!(
+            log,
+            vec![
+                ConnectionState::Connecting,
+                ConnectionState::Unreachable("conn refused".into()),
+                ConnectionState::Connected,
+            ],
+        );
+    }
+
+    #[test]
+    fn unreachable_does_not_republish_reconnecting_during_extended_outage() {
+        // 20 failures (twice the threshold). Unreachable should appear
+        // exactly once; no Reconnecting/Connecting flapping in between.
+        let script: Vec<Result<(), &str>> = (0..20).map(|_| Err("conn refused")).collect();
+        let log = replay(&script);
+        assert_eq!(
+            log,
+            vec![
+                ConnectionState::Connecting,
+                ConnectionState::Unreachable("conn refused".into()),
+            ],
+        );
+    }
+
+    #[test]
+    fn second_unreachable_window_after_recovery_publishes_again() {
+        // Drop after Connected, fail past threshold a second time. The
+        // second Unreachable goes out because the recovery cleared the
+        // latch.
+        let mut script: Vec<Result<(), &str>> = vec![Ok(()), Err("first drop")];
+        for _ in 0..RETRY_ERROR_THRESHOLD {
+            script.push(Err("flaky"));
+        }
+        script.push(Ok(()));
+        let log = replay(&script);
+        assert_eq!(
+            log,
+            vec![
+                ConnectionState::Connecting,
+                ConnectionState::Connected,
+                ConnectionState::Reconnecting,
+                ConnectionState::Unreachable("flaky".into()),
+                ConnectionState::Connected,
+            ],
         );
     }
 }

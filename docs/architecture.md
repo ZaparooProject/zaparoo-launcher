@@ -11,27 +11,35 @@ src/app/main.cpp
     ├── rust/launcher/  [zaparoo_launcher_rs staticlib]
     │     ├── src/lib.rs
     │     │     zaparoo_rust_init()      — tokio runtime, logger, WebSocket client,
-    │     │                               systems catalog, watch channel
+    │     │                               Store, model globals
     │     │     zaparoo_rust_post_qt_start() — post-engine hooks
     │     │     zaparoo_log_qt()         — Qt message handler sink → tracing registry
+    │     │
+    │     ├── src/bind.rs
+    │     │     `bind_to_endpoint!` macro — emits the cxx_qt::Initialize
+    │     │     impl for QML singletons (sync seed + qt_thread watcher).
     │     │
     │     ├── src/mister_runtime.rs
     │     │     Pre-Qt setup on ARM32: vmode resolution switch, zaparoo.sh start.
     │     │     Compiled on all platforms; MiSTer-specific calls are gated by cfg.
     │     │
     │     ├── src/models/  [Zaparoo.Browse QML module via cxx-qt 0.7]
-    │     │     BrowseModel, CategoriesModel, SystemsModel, GamesModel
-    │     │     All four are QML singletons registered via build.rs QmlModule.
+    │     │     AppStatus, CategoriesModel, SystemsModel, GamesModel
+    │     │     (BrowseModel and per-screen state singletons).
+    │     │     All registered via build.rs QmlModule.
     │     │
     │     └── rust/zaparoo-core/  [non-Qt Rust crate]
-    │           client.rs          — WebSocket JSON-RPC 2.0 (tokio-tungstenite)
-    │           systems_catalog.rs — derives categories + systems from server data
-    │           config.rs          — TOML config (launcher.toml)
-    │           logger.rs          — tracing-subscriber: stderr + JSONL file sinks
-    │           runtime.rs         — Runtime enum: what device the launcher runs on
-    │           platform.rs        — Platform enum: what Zaparoo Core is running on
-    │           platform_paths.rs  — log/config paths routed through runtime
-    │           media_types.rs     — file-extension → media-type lookup
+    │           client.rs           — WebSocket JSON-RPC 2.0 (tokio-tungstenite)
+    │           remote_resource.rs  — RemoteResource<T>/ResourceStatus<T>
+    │           store/              — Endpoint, Mutation, Tag, Store cache
+    │           endpoints/          — CatalogEndpoint, MediaSearchEndpoint, RunMutation
+    │           systems_catalog.rs  — CatalogData payload + by-category filter
+    │           config.rs           — TOML config (launcher.toml)
+    │           logger.rs           — tracing-subscriber: stderr + JSONL file sinks
+    │           runtime.rs          — Runtime enum: what device the launcher runs on
+    │           platform.rs         — Platform enum: what Zaparoo Core is running on
+    │           platform_paths.rs   — log/config paths routed through runtime
+    │           media_types.rs      — file-extension → media-type lookup
     │
     └── src/ui/app/  [Zaparoo.App QML module]
           Main.qml
@@ -116,36 +124,50 @@ License texts live in `src/LICENSES/`.
 
 ## Rust → QML data flow
 
+The data layer is RTK-Query-shaped: a single `Store` owns the
+`Client`, hands out shared `RemoteResource<T>`s keyed by
+`(endpoint NAME, args hash)`, and routes mutations through to the
+same client. QML singletons subscribe by binding to an `Endpoint`;
+the macro at `rust/launcher/src/bind.rs` emits the entire bridge
+(sync seed + qt_thread watcher + property apply).
+
 ```
 zaparoo_rust_init()
     │
     ├── logger::install()          — tracing-subscriber (stderr + JSONL file)
     ├── Config::load()             — launcher.toml
     ├── tokio::Runtime::new()      — multi-thread executor
-    │
-    ├── tokio::sync::watch channel
-    │     Sender<CatalogSnapshot>  — written by WebSocket task
-    │     Receiver<CatalogSnapshot>— cloned into each QML singleton
-    │
-    └── WebSocket client task (tokio)
+    ├── Client::new(endpoint)      — WebSocket JSON-RPC, auto-reconnects
+    └── Store::new(client, runtime)
           │
-          ├── systems() → SystemsCatalog::from_systems()
-          │     → watch channel send(snapshot)
-          │         ├── CategoriesModel::on_catalog_changed()
-          │         │       ↓ category name list
-          │         │   categoriesCarousel in Main.qml
-          │         │
-          │         └── SystemsModel::on_catalog_changed()
-          │                 ↓ systems filtered by current category
-          │             systemsCarousel in Main.qml
+          │   subscribe::<E>(args) → Arc<RemoteResource<E::Output>>
+          │     ─ keyed cache: identical args reuse the same Arc
+          │     ─ per-entry watcher updates `provides` on each Ready
           │
-          ├── media.search() → GamesModel::on_search_result()
-          │         ↓ game list for current system (up to 100)
-          │     gamesCarousel in Main.qml
+          │   run_mutation::<M>(args) → invalidates matching tags,
+          │     each refetch pulses Notify on its RemoteResource
           │
-          └── run() invoked via GamesModel::launch_at()
-                    (game launch — no model update)
+          ├── CatalogEndpoint           Args = ()        provides: any("Catalog")
+          │     └── bound by AppStatus, CategoriesModel, SystemsModel
+          │           via `bind_to_endpoint!`
+          │
+          ├── MediaSearchEndpoint       Args = SystemId  provides: specific("MediaSearch", id)
+          │     └── GamesModel::set_system subscribes per-system; the
+          │         store keys cache entries by id so re-selecting a
+          │         system reuses its cached resource without re-fetching
+          │
+          └── RunMutation               Args = RunParams  invalidates: ()
+                └── GamesModel::launch_at → store.run_mutation::<RunMutation>
+                      Today no tags are invalidated; future
+                      NowPlayingEndpoint can opt in by adding its tag.
 ```
+
+`RemoteResource<T>` collapses the connection FSM and per-fetch state
+into a single `ResourceStatus<T>`: `Idle`, `Loading`, `Ready(T)`,
+`Errored { message, retrying }`. Every binding seeds itself
+synchronously from the *current* status before spawning the watcher,
+which closes the MiSTer "screen never updates if Core connects before
+QML loads" race.
 
 Qt message handler (`qInstallMessageHandler`) forwards all Qt log output
 to `zaparoo_log_qt()` in the Rust staticlib, which routes it through the

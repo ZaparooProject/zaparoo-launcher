@@ -2,6 +2,8 @@
 // Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 
+#[macro_use]
+mod bind;
 mod mister_runtime;
 mod models;
 
@@ -35,7 +37,7 @@ use std::ffi::{c_char, c_int, CString};
 use std::sync::{Arc, Mutex, OnceLock};
 use zaparoo_core::{
     client::Client, config::load_config, logger::install, persist, platform,
-    platform_paths::config_file_path, systems_catalog,
+    platform_paths::config_file_path, store::Store,
 };
 
 /// Resolved language override, cached after [`zaparoo_rust_init`] so the
@@ -88,7 +90,8 @@ fn install_panic_hook() {
 
 /// Called by the C++ main before `QGuiApplication` is constructed.
 /// Sets up logging, tokio runtime, `MiSTer` pre-Qt env/vmode, WebSocket
-/// client, `SystemsCatalog`, and model globals. Returns 0 on success.
+/// client, `Store` (which owns the endpoint cache), and model globals.
+/// Returns 0 on success.
 #[no_mangle]
 pub extern "C" fn zaparoo_rust_init() -> c_int {
     let config_path = config_file_path();
@@ -127,21 +130,17 @@ pub extern "C" fn zaparoo_rust_init() -> c_int {
 
     let client = Client::new(config.core_endpoint.clone(), &runtime);
     platform::spawn_fetcher(client.clone(), &runtime);
-    let channels = systems_catalog::spawn(client.clone(), &runtime);
+    let store = Store::new(client.clone(), runtime.clone());
 
     // Load persisted UI state up front so per-screen singletons can seed
     // their properties from a consistent snapshot during Initialize.
     let persist_state = Arc::new(Mutex::new(persist::load()));
 
     // init_globals stores Arcs — runtime keeps running after this fn returns.
-    models::init_globals(
-        runtime,
-        client,
-        channels.data,
-        channels.status,
-        persist_state,
-        config.key_to_action.clone(),
-    );
+    // The `Client` is owned by the `Store` (and the platform fetcher
+    // task), so `init_globals` no longer takes it directly; singletons
+    // reach the client through `global_store()`.
+    models::init_globals(runtime, store, persist_state, config.key_to_action.clone());
 
     0
 }

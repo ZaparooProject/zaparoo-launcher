@@ -5,21 +5,21 @@
 // `Browse.AppStatus` — ephemeral connection / catalog health, exposed
 // to QML so the UI can render a status strip when Core is unreachable
 // or the initial catalog fetch failed. State is not persisted: it is
-// recomputed from the live client and catalog channels on every start.
+// derived from a single `ResourceStatus<CatalogData>` watch which
+// already merges the link state and the fetch state (see
+// `RemoteResource` for the dispatch table).
 //
 // `connection_state` constants:
-//   0 DISCONNECTED — no active ws link and not currently attempting one
-//   1 CONNECTING   — ws handshake in flight, or ws up with catalog RPC
-//                    pending (same user-facing meaning: "waiting on Core")
-//   2 READY        — ws up and catalog loaded; UI has data
-//   3 ERROR        — catalog RPC errored, or ws reconnect exceeded the
-//                    client's retry threshold (see client::ConnectionState)
+//   0 DISCONNECTED — resource Idle (link not attempted yet)
+//   1 CONNECTING   — resource Loading (handshake or RPC in flight)
+//   2 READY        — resource Ready (catalog loaded)
+//   3 ERROR        — resource Errored (link unreachable or RPC failed)
 
-use cxx_qt::{Initialize, Threading};
 use cxx_qt_lib::QString;
 use std::pin::Pin;
-use zaparoo_core::client::ConnectionState;
-use zaparoo_core::systems_catalog::CatalogStatus;
+use zaparoo_core::endpoints::catalog::CatalogEndpoint;
+use zaparoo_core::remote_resource::ResourceStatus;
+use zaparoo_core::systems_catalog::CatalogData;
 
 pub const DISCONNECTED: i32 = 0;
 pub const CONNECTING: i32 = 1;
@@ -61,79 +61,37 @@ pub mod ffi {
     impl cxx_qt::Initialize for AppStatus {}
 }
 
-impl Initialize for ffi::AppStatus {
-    fn initialize(self: Pin<&mut Self>) {
-        use crate::models::{global_client, global_runtime, subscribe_catalog_status};
+crate::bind_to_endpoint! {
+    for ffi::AppStatus,
+    endpoint = CatalogEndpoint,
+    args = (),
+    select = project,
+    apply = apply_state,
+}
 
-        let qt_thread = self.qt_thread();
-        let client = global_client();
-        let mut connection_rx = client.connection.subscribe();
-        let mut status_rx = subscribe_catalog_status();
-
-        global_runtime().spawn(async move {
-            // Seed both halves from the watches' current values so a late
-            // subscriber (this `initialize()` runs after the QML engine
-            // boots, which is after the WebSocket task has likely already
-            // transitioned through Connecting → Connected) sees the real
-            // current state instead of sitting on a hardcoded default.
-            let mut connection = connection_rx.borrow_and_update().clone();
-            let mut status = status_rx.borrow_and_update().clone();
-            push(&qt_thread, &connection, &status);
-
-            loop {
-                tokio::select! {
-                    result = connection_rx.changed() => match result {
-                        Ok(()) => {
-                            connection = connection_rx.borrow_and_update().clone();
-                            push(&qt_thread, &connection, &status);
-                        }
-                        Err(_) => break,
-                    },
-                    result = status_rx.changed() => match result {
-                        Ok(()) => {
-                            status = status_rx.borrow_and_update().clone();
-                            push(&qt_thread, &connection, &status);
-                        }
-                        Err(_) => break,
-                    }
-                }
-            }
-        });
+/// Map `ResourceStatus<CatalogData>` onto the four banner states the QML
+/// side knows about. The error message is whatever the resource layer
+/// surfaced — link error (`Unreachable`) or RPC error (`Errored` while
+/// the link is still up). The UI treats them the same.
+fn project(status: &ResourceStatus<CatalogData>) -> (i32, String) {
+    match status {
+        ResourceStatus::Idle => (DISCONNECTED, String::new()),
+        ResourceStatus::Loading => (CONNECTING, String::new()),
+        ResourceStatus::Ready(_) => (READY, String::new()),
+        ResourceStatus::Errored { message, .. } => (ERROR, message.clone()),
     }
 }
 
-fn push(
-    qt_thread: &cxx_qt::CxxQtThread<ffi::AppStatus>,
-    connection: &ConnectionState,
-    status: &CatalogStatus,
-) {
-    let (state, err) = derive(connection, status);
-    let _ = qt_thread.queue(move |mut model| {
-        if model.connection_state != state {
-            model.as_mut().set_connection_state(state);
-        }
-        let new_err = QString::from(err.as_str());
-        if model.last_error != new_err {
-            model.as_mut().set_last_error(new_err);
-        }
-    });
-}
-
-/// Merge the two sources of truth (ws link + catalog RPC) into the
-/// single `connection_state` + `last_error` pair that QML consumes.
-///
-/// Precedence: a catalog error outranks a link error outranks a link
-/// transition. A successful link with no catalog yet shows CONNECTING
-/// so the UI doesn't flicker READY between ws-up and catalog-loaded.
-fn derive(connection: &ConnectionState, status: &CatalogStatus) -> (i32, String) {
-    match (connection, status) {
-        (_, CatalogStatus::Errored(msg)) | (ConnectionState::Error(msg), _) => (ERROR, msg.clone()),
-        (ConnectionState::Disconnected, _) => (DISCONNECTED, String::new()),
-        (ConnectionState::Connecting, _) => (CONNECTING, String::new()),
-        (ConnectionState::Connected, CatalogStatus::Idle | CatalogStatus::Loading) => {
-            (CONNECTING, String::new())
-        }
-        (ConnectionState::Connected, CatalogStatus::Ready) => (READY, String::new()),
+/// Apply a freshly-derived `(state, err)` to the model, suppressing
+/// `QProperty` setters whose value hasn't changed so QML doesn't see
+/// spurious `Changed` signals on every reconnect.
+fn apply_state(mut model: Pin<&mut ffi::AppStatus>, (state, err): (i32, String)) {
+    if model.connection_state != state {
+        model.as_mut().set_connection_state(state);
+    }
+    let qerr = QString::from(err.as_str());
+    if model.last_error != qerr {
+        model.as_mut().set_last_error(qerr);
     }
 }
 
@@ -141,48 +99,51 @@ fn derive(connection: &ConnectionState, status: &CatalogStatus) -> (i32, String)
 mod tests {
     use super::*;
 
-    #[test]
-    fn errored_catalog_outranks_connected_link() {
-        let (state, err) = derive(
-            &ConnectionState::Connected,
-            &CatalogStatus::Errored("rpc kaboom".into()),
-        );
-        assert_eq!(state, ERROR);
-        assert_eq!(err, "rpc kaboom");
+    fn empty_catalog() -> CatalogData {
+        CatalogData {
+            systems: Vec::new(),
+            categories: Vec::new(),
+        }
     }
 
     #[test]
-    fn link_error_surfaces_after_retries_exhausted() {
-        let (state, err) = derive(
-            &ConnectionState::Error("connection refused".into()),
-            &CatalogStatus::Idle,
-        );
-        assert_eq!(state, ERROR);
-        assert_eq!(err, "connection refused");
+    fn idle_maps_to_disconnected() {
+        let (state, err) = project(&ResourceStatus::Idle);
+        assert_eq!(state, DISCONNECTED);
+        assert_eq!(err, "");
     }
 
     #[test]
-    fn connecting_link_maps_to_connecting_banner() {
-        let (state, err) = derive(&ConnectionState::Connecting, &CatalogStatus::Idle);
+    fn loading_maps_to_connecting() {
+        let (state, err) = project(&ResourceStatus::Loading);
         assert_eq!(state, CONNECTING);
         assert_eq!(err, "");
     }
 
     #[test]
-    fn connected_but_catalog_loading_stays_connecting() {
-        let (state, _) = derive(&ConnectionState::Connected, &CatalogStatus::Loading);
-        assert_eq!(state, CONNECTING);
-    }
-
-    #[test]
-    fn ready_requires_both_connected_and_catalog_ready() {
-        let (state, _) = derive(&ConnectionState::Connected, &CatalogStatus::Ready);
+    fn ready_maps_to_ready_with_no_error() {
+        let (state, err) = project(&ResourceStatus::Ready(empty_catalog()));
         assert_eq!(state, READY);
+        assert_eq!(err, "");
     }
 
     #[test]
-    fn disconnected_link_overrides_stale_catalog_state() {
-        let (state, _) = derive(&ConnectionState::Disconnected, &CatalogStatus::Ready);
-        assert_eq!(state, DISCONNECTED);
+    fn errored_with_retrying_surfaces_message() {
+        let (state, err) = project(&ResourceStatus::Errored {
+            message: "rpc kaboom".into(),
+            retrying: true,
+        });
+        assert_eq!(state, ERROR);
+        assert_eq!(err, "rpc kaboom");
+    }
+
+    #[test]
+    fn errored_without_retrying_surfaces_message() {
+        let (state, err) = project(&ResourceStatus::Errored {
+            message: "connection refused".into(),
+            retrying: false,
+        });
+        assert_eq!(state, ERROR);
+        assert_eq!(err, "connection refused");
     }
 }

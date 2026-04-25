@@ -2,9 +2,12 @@
 // Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 
-use cxx_qt::{CxxQtType, Initialize, Threading};
+use cxx_qt::CxxQtType;
 use cxx_qt_lib::{QByteArray, QHash, QHashPair_i32_QByteArray, QModelIndex, QString, QVariant};
 use std::pin::Pin;
+use zaparoo_core::endpoints::catalog::CatalogEndpoint;
+use zaparoo_core::remote_resource::ResourceStatus;
+use zaparoo_core::systems_catalog::CatalogData;
 
 const NAME_ROLE: i32 = 256 + 1; // Qt::UserRole + 1
 
@@ -65,59 +68,40 @@ pub mod ffi {
     impl cxx_qt::Initialize for CategoriesModel {}
 }
 
-impl Initialize for ffi::CategoriesModel {
-    fn initialize(mut self: Pin<&mut Self>) {
-        use crate::models::{global_runtime, subscribe_catalog, subscribe_catalog_status};
-        use zaparoo_core::systems_catalog::CatalogStatus;
+crate::bind_to_endpoint! {
+    for ffi::CategoriesModel,
+    endpoint = CatalogEndpoint,
+    args = (),
+    select = project,
+    apply = apply_state,
+}
 
-        let mut catalog_rx = subscribe_catalog();
-        let mut status_rx = subscribe_catalog_status();
+/// Pull the two pieces this model cares about out of the unified
+/// `ResourceStatus`: the category list (only present on `Ready`) and the
+/// surfaced error message (empty unless `Errored`).
+fn project(status: &ResourceStatus<CatalogData>) -> (Option<Vec<String>>, String) {
+    match status {
+        ResourceStatus::Ready(data) => (Some(data.categories.clone()), String::new()),
+        ResourceStatus::Errored { message, .. } => (None, message.clone()),
+        ResourceStatus::Idle | ResourceStatus::Loading => (None, String::new()),
+    }
+}
 
-        // Apply whatever the catalog task has already loaded (handles the common
-        // case where the connection is fast enough to complete before Qt starts).
-        if let Some(data) = catalog_rx.borrow_and_update().clone() {
-            let count = data.categories.len() as i32;
-            self.as_mut().begin_reset_model();
-            self.as_mut().rust_mut().categories = data.categories;
-            self.as_mut().rust_mut().count = count;
-            self.as_mut().end_reset_model();
-            self.as_mut().count_changed();
-        }
-
-        let qt_thread = self.qt_thread();
-        let qt_thread_status = qt_thread.clone();
-        global_runtime().spawn(async move {
-            while catalog_rx.changed().await.is_ok() {
-                if let Some(data) = catalog_rx.borrow_and_update().clone() {
-                    let count = data.categories.len() as i32;
-                    let _ = qt_thread.queue(move |mut model| {
-                        model.as_mut().begin_reset_model();
-                        model.as_mut().rust_mut().categories = data.categories;
-                        model.as_mut().rust_mut().count = count;
-                        model.as_mut().end_reset_model();
-                        model.as_mut().count_changed();
-                    });
-                }
-            }
-        });
-
-        global_runtime().spawn(async move {
-            loop {
-                let err = match &*status_rx.borrow_and_update() {
-                    CatalogStatus::Errored(msg) => msg.clone(),
-                    _ => String::new(),
-                };
-                let qstr = QString::from(err.as_str());
-                let _ = qt_thread_status.queue(move |mut model| {
-                    if model.error_message != qstr {
-                        model.as_mut().set_error_message(qstr);
-                    }
-                });
-                if status_rx.changed().await.is_err() {
-                    break;
-                }
-            }
-        });
+fn apply_state(
+    mut model: Pin<&mut ffi::CategoriesModel>,
+    (categories, err): (Option<Vec<String>>, String),
+) {
+    if let Some(categories) = categories {
+        let count = categories.len() as i32;
+        model.as_mut().begin_reset_model();
+        model.as_mut().rust_mut().categories = categories;
+        model.as_mut().rust_mut().count = count;
+        model.as_mut().end_reset_model();
+        model.as_mut().count_changed();
+    }
+    let qerr = QString::from(err.as_str());
+    if model.error_message != qerr {
+        model.as_mut().set_error_message(qerr);
     }
 }
 

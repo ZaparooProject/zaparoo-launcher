@@ -61,6 +61,7 @@ output/
 # AI agent tooling — local only, not shared
 CLAUDE.md
 .claude/
+.opencode/
 
 # Cargo build cache
 rust/target/

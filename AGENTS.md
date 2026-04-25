@@ -44,6 +44,15 @@ module graph and @docs/building.md for the full build matrix.
   retains the latest value, and subscribers seed via `borrow()` then
   await `changed()`. Reserve `broadcast` for fan-out of *events*
   where missing the early ones is acceptable.
+- Inline a `watch::Sender::borrow()` (or any read-borrow) in the
+  scrutinee of an `if let` / `match` / `while let` whose body then
+  calls `send_replace`/`send`/any write on the same channel.
+  Temporaries in the scrutinee live until the end of the body, so
+  the read lock outlives the entire block and deadlocks the write.
+  Bind the borrow to a local in an inner scope first:
+  `let next = { let cur = tx.borrow(); fsm.step(&cur) };` then
+  match on `next`. Same gotcha applies to any `RwLock`-backed
+  read guard held across a write call.
 
 ### ASK
 
