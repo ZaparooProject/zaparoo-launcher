@@ -154,7 +154,7 @@ mod tests {
     }
 
     #[test]
-    fn unknown_key_names_are_silently_skipped_not_panicked() {
+    fn unknown_key_names_log_warning_and_are_skipped() {
         let mut b = default_bindings();
         b.insert("fictional".into(), vec!["NotAKey".into()]);
         // invert logs a warning and keeps going; the result holds no entry

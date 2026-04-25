@@ -13,13 +13,13 @@ contribution you make afterward.
 ## Why we ask for this
 
 Zaparoo Launcher is published under the PolyForm Noncommercial License
-1.0.0. The Company separately grants commercial licences to partners
+1.0.0. The Company separately grants commercial licenses to partners
 who want to use the software commercially. For the Company to be able
-to grant those commercial licences without having to renegotiate with
+to grant those commercial licenses without having to renegotiate with
 every past contributor, each contributor gives the Company broad
 licensing rights to their contribution.
 
-**You keep the copyright on your own work.** This is a licence, not a
+**You keep the copyright on your own work.** This is a license, not a
 transfer.
 
 ## 1. Definitions
@@ -38,10 +38,10 @@ You retain the copyright to your Contribution. Nothing in this CLA
 prevents you from using your Contribution yourself, licensing it to
 anyone else, or including it in other projects.
 
-## 3. Copyright licence to the Company
+## 3. Copyright license to the Company
 
 You grant Wizzo Pty Ltd a perpetual, worldwide, non-exclusive,
-royalty-free, irrevocable copyright licence to use your Contribution
+royalty-free, irrevocable copyright license to use your Contribution
 in any way, including:
 
 - reproducing, modifying, distributing, performing, and displaying it;
@@ -50,17 +50,17 @@ in any way, including:
 - **sublicensing** any or all of these rights to third parties, on any
   terms the Company chooses (including commercial terms).
 
-## 4. Patent licence to the Company
+## 4. Patent license to the Company
 
 You grant Wizzo Pty Ltd a perpetual, worldwide, non-exclusive,
-royalty-free, irrevocable patent licence — with the right to
+royalty-free, irrevocable patent license — with the right to
 sublicense — to make, have made, use, sell, offer to sell, import, and
 otherwise transfer your Contribution and any combination of your
-Contribution with the project. This patent licence covers only those
+Contribution with the project. This patent license covers only those
 patent claims you own or control that are necessarily infringed by your
 Contribution or by that combination.
 
-## 5. No trademark licence
+## 5. No trademark license
 
 Nothing in sections 3 or 4 grants you, or anyone the Company sublicenses
 to, any rights to use the Company's or the Zaparoo Project's names,
@@ -82,7 +82,7 @@ You confirm that:
 - Your Contribution is your own original work, or you have permission
   from the copyright holder (for example, your employer) to submit it
   under this CLA.
-- You have identified any third-party code, licences, or patents that
+- You have identified any third-party code, licenses, or patents that
   are included in or required by your Contribution, either in your pull
   request description or in the relevant commit message.
 - Submitting your Contribution does not breach any agreement you have
@@ -96,7 +96,7 @@ distribute anything.
 
 ## 9. Public release
 
-Your Contribution will be released to the public under the same licence
+Your Contribution will be released to the public under the same license
 as the rest of the project (currently PolyForm Noncommercial 1.0.0).
 The Company may also sublicense it to specific partners under different
 terms, as permitted by sections 3 and 4 above.
@@ -110,6 +110,6 @@ to this repository:
 
 The CLA Assistant Lite bot will record your signature in
 `.github/contributors/signatures.json`. You only need to sign once;
-future pull requests will be recognised automatically.
+future pull requests will be recognized automatically.
 
 Questions? Email [legal@zaparoo.org](mailto:legal@zaparoo.org).
