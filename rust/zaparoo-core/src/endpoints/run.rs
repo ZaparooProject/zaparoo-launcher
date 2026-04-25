@@ -10,7 +10,7 @@
 
 use crate::client::{Client, ClientError};
 use crate::media_types::RunParams;
-use crate::store::{Mutation, Tag};
+use crate::store::Mutation;
 use futures_util::future::BoxFuture;
 use std::sync::Arc;
 
@@ -26,9 +26,5 @@ impl Mutation for RunMutation {
         args: Self::Args,
     ) -> BoxFuture<'static, Result<Self::Output, ClientError>> {
         Box::pin(async move { client.run(args).await })
-    }
-
-    fn invalidates(_args: &Self::Args, _result: &Self::Output) -> Vec<Tag> {
-        Vec::new()
     }
 }
