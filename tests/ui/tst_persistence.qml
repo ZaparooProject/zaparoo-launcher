@@ -60,8 +60,12 @@ TestCase {
         main.hubFocus = main.focusSystems
         main.handleKey(Qt.Key_Left)
         main.handleKey(Qt.Key_Right)
+        // Down stays within the (empty) grid; Up at row 0 falls through to
+        // a section flip back to categories — neither path may write a
+        // system id derived from index 0 of an empty model.
+        main.handleKey(Qt.Key_Down)
         compare(Browse.HubState.system_id, "persistence-probe-system",
-                "navigating an empty systems carousel must not overwrite HubState.system_id")
+                "Down on an empty systems grid must not overwrite HubState.system_id")
     }
 
     function test_empty_games_navigation_preserves_games_state(): void {
@@ -69,8 +73,10 @@ TestCase {
         main.activeScreen = main.screenGames
         main.handleKey(Qt.Key_Left)
         main.handleKey(Qt.Key_Right)
+        main.handleKey(Qt.Key_Up)
+        main.handleKey(Qt.Key_Down)
         compare(Browse.GamesState.game_path, "persistence-probe-path",
-                "navigating an empty games carousel must not overwrite GamesState.game_path")
+                "navigating an empty games grid must not overwrite GamesState.game_path")
     }
 
     // Focus/screen flips are user-visible intent, not selection state.

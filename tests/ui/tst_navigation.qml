@@ -98,6 +98,25 @@ TestCase {
         compare(main.hubFocus, main.focusCategories)
     }
 
+    // Up on hub+systems with an empty grid (test harness has no live
+    // catalog) falls through to a section flip back to categories —
+    // mirrors Escape but matches d-pad expectations. With a populated
+    // grid, Up moves a row inside the grid; only the top row escapes.
+    function test_up_on_hub_systems_returns_to_categories(): void {
+        main.hubFocus = main.focusSystems
+        main.handleKey(Qt.Key_Up)
+        compare(main.hubFocus, main.focusCategories)
+    }
+
+    // Down on hub+categories drills into systems (matches d-pad layout
+    // where systems sit visually below). Mirrors Enter without requiring
+    // the user to find the keyboard.
+    function test_down_on_hub_categories_routes_to_systems(): void {
+        main.handleKey(Qt.Key_Down)
+        compare(main.hubFocus, main.focusSystems)
+        compare(main.activeScreen, main.screenHub)
+    }
+
     // Backspace is aliased to Escape in every branch.
     function test_backspace_behaves_like_escape_on_games(): void {
         main.activeScreen = main.screenGames

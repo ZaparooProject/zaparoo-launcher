@@ -12,10 +12,16 @@ Item {
 
     required property var model
     required property Component delegate
-    required property url placeholderCover
 
     property int currentIndex: 0
     readonly property int itemCount: itemRepeater.count
+
+    // Whether this section currently owns user focus. Tile uses this to
+    // gate the selection card so only one section shows the focus cue
+    // at a time when the hub has both a carousel and a grid on screen.
+    // Defaults to true so call sites that don't care (games screen)
+    // keep working untouched.
+    property bool focused: true
 
     property int coverWidth: Sizing.pctH(30)
     property int coverHeight: Sizing.pctH(45)
@@ -31,6 +37,12 @@ Item {
 
             required property int index
             required property string name
+            // Every Browse model exposes a `coverKey` role — the relative
+            // path under `resources/images/` without extension (e.g.
+            // `systems/snes`, `categories/Consoles`). Tile resolves an
+            // embedded cover from the key, or falls through to the
+            // procedural fallback when no PNG matches.
+            required property string coverKey
 
             property int offset: {
                 if (root.itemCount === 0)
@@ -71,8 +83,9 @@ Item {
                 anchors.fill: parent
                 sourceComponent: root.delegate
                 property bool isSelected: coverItem.isSelected
-                property url placeholderCover: root.placeholderCover
+                property bool isFocused: root.focused
                 property string name: coverItem.name
+                property string coverKey: coverItem.coverKey
             }
         }
     }

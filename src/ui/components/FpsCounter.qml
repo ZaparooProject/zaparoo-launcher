@@ -5,14 +5,17 @@
 import QtQuick
 import Zaparoo.Theme
 
-// Displays a live FPS readout in the top-right corner.
-// Green ≥55 FPS, yellow ≥30 FPS, red <30 FPS.
+// Displays a live FPS readout. Green ≥55 FPS, yellow ≥30 FPS, red <30 FPS.
 // Always check this counter stays green at 720p+ when changing visuals.
+// Sizes itself to the label so MainLayout can anchor it anywhere.
 Item {
     id: root
 
     property int fps: 0
     property int _frameCount: 0
+
+    implicitWidth: fpsLabel.implicitWidth
+    implicitHeight: fpsLabel.implicitHeight
 
     Timer {
         interval: 1000
@@ -30,8 +33,8 @@ Item {
     }
 
     Text {
-        anchors.top: parent.top
-        anchors.right: parent.right
+        id: fpsLabel
+        anchors.fill: parent
         // `%1 FPS` stays one string so translators can reorder ("FPS %1")
         // without splitting the label from the number.
         text: qsTr("%1 FPS").arg(root.fps)

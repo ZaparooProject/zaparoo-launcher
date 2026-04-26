@@ -3,13 +3,19 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 
 use cxx_qt::CxxQtType;
-use cxx_qt_lib::{QByteArray, QHash, QHashPair_i32_QByteArray, QModelIndex, QString, QVariant};
+use cxx_qt_lib::{
+    QByteArray, QHash, QHashPair_i32_QByteArray, QModelIndex, QString, QStringList, QVariant,
+};
 use std::pin::Pin;
 use zaparoo_core::endpoints::catalog::CatalogEndpoint;
 use zaparoo_core::remote_resource::ResourceStatus;
 use zaparoo_core::systems_catalog::CatalogData;
 
-const ID_ROLE: i32 = 256 + 1;
+// `coverKey` rather than `id`: bracket-access via `model["id"]` from a
+// QML delegate trips over `id`'s reserved-keyword status, leaving the
+// role unreachable. Renaming sidesteps the reservation entirely and
+// matches the generic carousel cover-key contract used by all models.
+const COVER_KEY_ROLE: i32 = 256 + 1;
 const NAME_ROLE: i32 = 256 + 2;
 const CATEGORY_ROLE: i32 = 256 + 3;
 
@@ -46,6 +52,7 @@ pub mod ffi {
         type QHash_i32_QByteArray = cxx_qt_lib::QHash<cxx_qt_lib::QHashPair_i32_QByteArray>;
         type QByteArray = cxx_qt_lib::QByteArray;
         type QString = cxx_qt_lib::QString;
+        type QStringList = cxx_qt_lib::QStringList;
     }
 
     unsafe extern "RustQt" {
@@ -69,6 +76,9 @@ pub mod ffi {
 
         #[qinvokable]
         fn index_for_system_id(self: &SystemsModel, id: &QString) -> i32;
+
+        #[qinvokable]
+        fn all_cover_keys(self: &SystemsModel) -> QStringList;
 
         #[inherit]
         #[cxx_name = "beginResetModel"]
@@ -106,6 +116,20 @@ fn project(status: &ResourceStatus<CatalogData>) -> (Option<CatalogData>, String
         ResourceStatus::Errored { message, .. } => (None, message.clone()),
         ResourceStatus::Idle | ResourceStatus::Loading => (None, String::new()),
     }
+}
+
+/// Every system cover key in `catalog`, in source order. Returns empty
+/// when `catalog` is `None`. Pulled out so the `all_cover_keys`
+/// qinvokable has a unit-testable seam. Keys are returned as
+/// `systems/<id>` — the relative path under `resources/images/` so the
+/// QML side can resolve the PNG without hardcoding the subdirectory.
+fn cover_keys(catalog: Option<&CatalogData>) -> Vec<String> {
+    catalog.map_or_else(Vec::new, |c| {
+        c.systems
+            .iter()
+            .map(|s| format!("systems/{}", s.id))
+            .collect()
+    })
 }
 
 /// Filter `catalog`'s systems to the named category and re-shape them
@@ -159,7 +183,12 @@ impl ffi::SystemsModel {
         }
         let s = &self.systems[index.row() as usize];
         match role {
-            ID_ROLE => QVariant::from(&QString::from(s.id.as_str())),
+            COVER_KEY_ROLE => {
+                // Relative path under `resources/images/` (no extension).
+                // Tile resolves the PNG via `images/<coverKey>.png`, so
+                // category, system and game tiles share one URL builder.
+                QVariant::from(&QString::from(format!("systems/{}", s.id).as_str()))
+            }
             NAME_ROLE => QVariant::from(&QString::from(s.name.as_str())),
             CATEGORY_ROLE => QVariant::from(&QString::from(s.category.as_str())),
             _ => QVariant::default(),
@@ -168,13 +197,19 @@ impl ffi::SystemsModel {
 
     fn role_names(&self) -> QHash<QHashPair_i32_QByteArray> {
         let mut h = QHash::<QHashPair_i32_QByteArray>::default();
-        h.insert(ID_ROLE, QByteArray::from("id"));
+        h.insert(COVER_KEY_ROLE, QByteArray::from("coverKey"));
         h.insert(NAME_ROLE, QByteArray::from("name"));
         h.insert(CATEGORY_ROLE, QByteArray::from("category"));
         h
     }
 
     fn set_category(mut self: Pin<&mut Self>, category: QString) {
+        // Repeat drill-ins on the same category (e.g. user mashes
+        // Down→Escape→Down) would otherwise rebuild every Tile
+        // delegate for no visible change.
+        if self.rust().current_category == category {
+            return;
+        }
         let cat = category.to_string();
         // Read from `last_ready` rather than the live `ResourceStatus`
         // so a transient `Loading` (a refetch in flight) doesn't wipe
@@ -215,6 +250,18 @@ impl ffi::SystemsModel {
             .position(|s| s.id == needle)
             .map_or(-1, |i| i as i32)
     }
+
+    /// Every system id from the cached catalog, regardless of category.
+    /// Used by the QML side to prime `QPixmapCache` with all system
+    /// logos at startup so category switches don't pay PNG decode the
+    /// first time the user lands on each set.
+    fn all_cover_keys(&self) -> QStringList {
+        let mut list = QStringList::default();
+        for key in cover_keys(self.last_ready.as_ref()) {
+            list.append(QString::from(key.as_str()));
+        }
+        list
+    }
 }
 
 #[cfg(test)]
@@ -226,7 +273,7 @@ mod tests {
         reason = "tests should fail-fast on unexpected errors"
     )]
 
-    use super::{project, rows_for_category};
+    use super::{cover_keys, project, rows_for_category};
     use zaparoo_core::media_types::SystemInfo as MediaSystemInfo;
     use zaparoo_core::remote_resource::ResourceStatus;
     use zaparoo_core::systems_catalog::CatalogData;
@@ -317,5 +364,27 @@ mod tests {
         let catalog = catalog_with(vec![sys("smb", "SMB", "Consoles")]);
         let rows = rows_for_category(Some(&catalog), "DoesNotExist");
         assert!(rows.is_empty());
+    }
+
+    #[test]
+    fn cover_keys_none_returns_empty() {
+        assert!(cover_keys(None).is_empty());
+    }
+
+    #[test]
+    fn cover_keys_returns_every_id_across_categories() {
+        let catalog = catalog_with(vec![
+            sys("smb", "Super Mario Bros", "Consoles"),
+            sys("snk", "SNK Heroes", "Arcade"),
+            sys("zelda", "Zelda", "Consoles"),
+        ]);
+        let keys = cover_keys(Some(&catalog));
+        assert_eq!(keys, vec!["systems/smb", "systems/snk", "systems/zelda"]);
+    }
+
+    #[test]
+    fn cover_keys_empty_catalog_returns_empty() {
+        let catalog = catalog_with(vec![]);
+        assert!(cover_keys(Some(&catalog)).is_empty());
     }
 }

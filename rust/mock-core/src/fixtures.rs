@@ -20,14 +20,14 @@ pub fn version_response() -> Value {
 pub fn systems_response() -> Value {
     json!({
         "systems": [
-            { "id": "nes",     "name": "Nintendo Entertainment System", "category": "Consoles" },
-            { "id": "snes",    "name": "Super Nintendo",                "category": "Consoles" },
-            { "id": "genesis", "name": "Sega Genesis",                  "category": "Consoles" },
-            { "id": "n64",     "name": "Nintendo 64",                   "category": "Consoles" },
-            { "id": "gb",      "name": "Game Boy",                      "category": "Handhelds" },
-            { "id": "gbc",     "name": "Game Boy Color",                "category": "Handhelds" },
-            { "id": "gba",     "name": "Game Boy Advance",              "category": "Handhelds" },
-            { "id": "nds",     "name": "Nintendo DS",                   "category": "Handhelds" },
+            { "id": "nes",     "name": "Nintendo Entertainment System", "category": "Console" },
+            { "id": "snes",    "name": "Super Nintendo",                "category": "Console" },
+            { "id": "genesis", "name": "Sega Genesis",                  "category": "Console" },
+            { "id": "n64",     "name": "Nintendo 64",                   "category": "Console" },
+            { "id": "gb",      "name": "Game Boy",                      "category": "Handheld" },
+            { "id": "gbc",     "name": "Game Boy Color",                "category": "Handheld" },
+            { "id": "gba",     "name": "Game Boy Advance",              "category": "Handheld" },
+            { "id": "nds",     "name": "Nintendo DS",                   "category": "Handheld" },
             { "id": "mame",    "name": "MAME",                          "category": "Arcade" },
             { "id": "neogeo",  "name": "Neo Geo",                       "category": "Arcade" },
         ]

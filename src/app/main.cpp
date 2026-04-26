@@ -71,7 +71,10 @@ int main(int argc, char* argv[])
     qInstallMessageHandler(qtMessageHandler);
 
     QGuiApplication app(argc, argv);
-    QFontDatabase::addApplicationFont(":/qt/qml/Zaparoo/App/resources/fonts/PressStart2P.ttf");
+    QFontDatabase::addApplicationFont(
+        ":/qt/qml/Zaparoo/App/resources/fonts/AtkinsonHyperlegible-Regular.ttf");
+    QFontDatabase::addApplicationFont(
+        ":/qt/qml/Zaparoo/App/resources/fonts/AtkinsonHyperlegible-Bold.ttf");
     QQuickStyle::setStyle("Basic");
 
     // Install the locale .qm translator before constructing the QML engine

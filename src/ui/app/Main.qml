@@ -84,17 +84,36 @@ MainLayout {
                 ? (Browse.GamesState.system_id !== "" ? Browse.GamesState.system_id : Browse.HubState.system_id)
                 : Browse.HubState.system_id
             const idx = savedSystem === "" ? -1 : Browse.SystemsModel.index_for_system_id(savedSystem)
-            root.systemsCarousel.currentIndex = idx >= 0 ? idx : 0
+            // Seed without animating the page-snap — a fresh model is a
+            // category switch, not user navigation, so the previous
+            // page's slide-out would just be a distracting swoop.
+            root.hubScreen.systemsGrid.setCurrentIndexImmediate(idx >= 0 ? idx : 0)
             if (idx >= 0)
                 Browse.GamesModel.set_system(savedSystem)
+            // Hide during teardown/rebuild; gridFadeIn restores opacity
+            // a frame later via a Behavior, masking the rebuild flicker.
+            root.hubScreen.systemsGrid.opacity = 0
+            gridFadeIn.restart()
         }
+    }
+    // Inner-grid opacity ramp on a SystemsModel reset (category switch
+    // or catalog refresh). The displayed opacity is the *product* of
+    // this and the wrapper systemsContainer.opacity (HubScreen.qml).
+    // First drill-in: wrapper ramps 0→1 over 150 ms while this dips
+    // 1→0→1 on a 50 ms delay + 100 ms Behavior, masking the Repeater
+    // rebuild flash. Subsequent in-section category switches: wrapper
+    // stays at 1, only this ramp runs.
+    Timer {
+        id: gridFadeIn
+        interval: 50
+        onTriggered: root.hubScreen.systemsGrid.opacity = 1
     }
     Connections {
         target: Browse.GamesModel
         function onModelReset(): void {
             const savedPath = Browse.GamesState.game_path
             const idx = savedPath === "" ? -1 : Browse.GamesModel.index_for_game_path(savedPath)
-            root.gamesCarousel.currentIndex = idx >= 0 ? idx : 0
+            root.gamesScreen.gamesGrid.setCurrentIndexImmediate(idx >= 0 ? idx : 0)
         }
     }
 

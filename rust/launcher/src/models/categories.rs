@@ -10,6 +10,26 @@ use zaparoo_core::remote_resource::ResourceStatus;
 use zaparoo_core::systems_catalog::CatalogData;
 
 const NAME_ROLE: i32 = 256 + 1; // Qt::UserRole + 1
+const COVER_KEY_ROLE: i32 = 256 + 2;
+
+// Placeholder entry shown at the top of the categories carousel until a
+// real Favorites pipeline lands in Core. Selecting it filters the
+// systems carousel by an unmatched category — the user sees an empty
+// grid, which is the correct fallback for a feature that doesn't exist
+// yet.
+//
+// TODO: replace with a real Favorites endpoint once the Core API
+// surfaces one.
+const FAVORITES_CATEGORY: &str = "Favorites";
+
+// Categories Core surfaces but the launcher doesn't expose. `Other` is
+// the synthesized bucket for systems with no upstream category and adds
+// no value in the UI; `Media` is reserved for non-game content the
+// launcher doesn't have a screen for yet.
+//
+// TODO: drop this hardcoded filter once Core exposes a per-category
+// visibility flag (or once Media has its own screen).
+const HIDDEN_CATEGORIES: &[&str] = &["Other", "Media"];
 
 #[derive(Default)]
 pub struct CategoriesModelRust {
@@ -81,10 +101,28 @@ crate::bind_to_endpoint! {
 /// surfaced error message (empty unless `Errored`).
 fn project(status: &ResourceStatus<CatalogData>) -> (Option<Vec<String>>, String) {
     match status {
-        ResourceStatus::Ready(data) => (Some(data.categories.clone()), String::new()),
+        ResourceStatus::Ready(data) => (Some(visible_categories(&data.categories)), String::new()),
         ResourceStatus::Errored { message, .. } => (None, message.clone()),
         ResourceStatus::Idle | ResourceStatus::Loading => (None, String::new()),
     }
+}
+
+/// Apply the launcher-side category presentation rules to the raw list
+/// from Core: drop hidden categories and prepend the Favorites
+/// placeholder. Pulled out of `project` for unit-test coverage.
+fn visible_categories(raw: &[String]) -> Vec<String> {
+    let mut out = Vec::with_capacity(raw.len() + 1);
+    out.push(FAVORITES_CATEGORY.to_string());
+    for c in raw {
+        if HIDDEN_CATEGORIES
+            .iter()
+            .any(|hidden| c.eq_ignore_ascii_case(hidden))
+        {
+            continue;
+        }
+        out.push(c.clone());
+    }
+    out
 }
 
 fn apply_state(
@@ -118,17 +156,27 @@ impl ffi::CategoriesModel {
         if !index.is_valid() || index.row() < 0 || index.row() >= self.count {
             return QVariant::default();
         }
-        if role == NAME_ROLE {
-            let s = &self.categories[index.row() as usize];
-            QVariant::from(&QString::from(s.as_str()))
-        } else {
-            QVariant::default()
+        match role {
+            NAME_ROLE => {
+                let s = &self.categories[index.row() as usize];
+                QVariant::from(&QString::from(s.as_str()))
+            }
+            COVER_KEY_ROLE => {
+                // Relative path under `resources/images/` (no extension).
+                // Categories without a curated PNG (anything we haven't
+                // bundled yet) still emit a key — Tile's Image fails to
+                // resolve and the procedural fallback takes over.
+                let s = &self.categories[index.row() as usize];
+                QVariant::from(&QString::from(format!("categories/{s}").as_str()))
+            }
+            _ => QVariant::default(),
         }
     }
 
     fn role_names(&self) -> QHash<QHashPair_i32_QByteArray> {
         let mut hash = QHash::<QHashPair_i32_QByteArray>::default();
         hash.insert(NAME_ROLE, QByteArray::from("name"));
+        hash.insert(COVER_KEY_ROLE, QByteArray::from("coverKey"));
         hash
     }
 
@@ -148,5 +196,49 @@ impl ffi::CategoriesModel {
             .iter()
             .position(|c| c == &needle)
             .map_or(-1, |i| i as i32)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(
+        clippy::expect_used,
+        clippy::unwrap_used,
+        clippy::panic,
+        reason = "tests should fail-fast on unexpected errors"
+    )]
+
+    use super::visible_categories;
+
+    #[test]
+    fn favorites_is_prepended_to_visible_list() {
+        let raw = vec!["Consoles".to_string(), "Arcade".to_string()];
+        let visible = visible_categories(&raw);
+        assert_eq!(visible, vec!["Favorites", "Consoles", "Arcade"]);
+    }
+
+    #[test]
+    fn other_and_media_are_filtered_case_insensitively() {
+        let raw = vec![
+            "Arcade".to_string(),
+            "Other".to_string(),
+            "media".to_string(),
+            "Consoles".to_string(),
+        ];
+        let visible = visible_categories(&raw);
+        assert_eq!(visible, vec!["Favorites", "Arcade", "Consoles"]);
+    }
+
+    #[test]
+    fn empty_raw_still_yields_favorites_only() {
+        let visible = visible_categories(&[]);
+        assert_eq!(visible, vec!["Favorites"]);
+    }
+
+    #[test]
+    fn original_casing_is_preserved_for_visible_entries() {
+        let raw = vec!["arcade".to_string(), "CONSOLES".to_string()];
+        let visible = visible_categories(&raw);
+        assert_eq!(visible, vec!["Favorites", "arcade", "CONSOLES"]);
     }
 }

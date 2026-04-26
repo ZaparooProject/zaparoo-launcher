@@ -31,6 +31,6 @@ QtObject {
     readonly property color accent: "#FFB347"
 
     // Fonts
-    readonly property string fontRetro: "Press Start 2P"
+    readonly property string fontUi: "Atkinson Hyperlegible"
     readonly property string fontMono: "monospace"
 }

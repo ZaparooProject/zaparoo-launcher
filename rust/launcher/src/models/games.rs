@@ -19,6 +19,10 @@ const NAME_ROLE: i32 = 256 + 1;
 const PATH_ROLE: i32 = 256 + 2;
 const ZAP_SCRIPT_ROLE: i32 = 256 + 3;
 const SYSTEM_ID_ROLE: i32 = 256 + 4;
+// Until per-game cover art lands, game tiles reuse the parent system
+// logo. The shared carousel delegate looks up `coverKey`, so expose
+// the same value under that role name.
+const COVER_KEY_ROLE: i32 = 256 + 5;
 
 #[derive(Default)]
 pub struct GamesModelRust {
@@ -127,6 +131,14 @@ impl ffi::GamesModel {
             PATH_ROLE => QVariant::from(&QString::from(item.path.as_str())),
             ZAP_SCRIPT_ROLE => QVariant::from(&QString::from(item.zap_script.as_str())),
             SYSTEM_ID_ROLE => QVariant::from(&QString::from(item.system.id.as_str())),
+            COVER_KEY_ROLE => {
+                // Relative path under `resources/images/` (no extension).
+                // Tile resolves the PNG via `images/<coverKey>.png` so all
+                // models share one URL builder.
+                QVariant::from(&QString::from(
+                    format!("systems/{}", item.system.id).as_str(),
+                ))
+            }
             _ => QVariant::default(),
         }
     }
@@ -137,6 +149,7 @@ impl ffi::GamesModel {
         h.insert(PATH_ROLE, QByteArray::from("path"));
         h.insert(ZAP_SCRIPT_ROLE, QByteArray::from("zapScript"));
         h.insert(SYSTEM_ID_ROLE, QByteArray::from("systemId"));
+        h.insert(COVER_KEY_ROLE, QByteArray::from("coverKey"));
         h
     }
 
