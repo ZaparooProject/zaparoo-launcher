@@ -176,6 +176,12 @@ echo 'MISTER_IP=<your-mister-ip>' > .env
 ./scripts/deploy-mister.sh
 ```
 
+To copy and restart an already-built `output/launcher` without rebuilding:
+
+```bash
+./scripts/deploy-mister.sh --skip-build
+```
+
 The MiSTer binary is self-contained. It sets `QT_QPA_PLATFORM=linuxfb` and
 `QT_QUICK_BACKEND=software`, runs `vmode -r W H rgb32` using the configured
 width and height (default `1920×1080`), and starts
