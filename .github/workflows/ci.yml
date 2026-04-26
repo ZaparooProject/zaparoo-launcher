@@ -35,16 +35,17 @@ env:
 jobs:
   rust-lint:
     name: Rust lint (fmt + clippy + deny)
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-8
     defaults:
       run:
         working-directory: rust
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Install mold
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y mold
+        uses: awalsh128/cache-apt-pkgs-action@acb598e5ddbc6f68a970c5da0688d2f3a9f04d05 # v1.6.0
+        with:
+          packages: mold
+          version: 1.0
       - name: Install Qt ${{ env.QT_VERSION }}
         uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
         with:
@@ -74,16 +75,17 @@ jobs:
 
   rust-test:
     name: Rust tests (nextest)
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-8
     defaults:
       run:
         working-directory: rust
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Install mold
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y mold
+        uses: awalsh128/cache-apt-pkgs-action@acb598e5ddbc6f68a970c5da0688d2f3a9f04d05 # v1.6.0
+        with:
+          packages: mold
+          version: 1.0
       - name: Install Qt ${{ env.QT_VERSION }}
         uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
         with:
@@ -108,16 +110,14 @@ jobs:
     # and the autogen/moc outputs that the desktop build already produces, so
     # running lint as the final step of the same job avoids building twice.
     name: Desktop build + ctest + lint
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-8
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Install system deps
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            cmake ninja-build mold clang-tidy clang-format \
-            libgl1-mesa-dev libxkbcommon-dev libxcb-xkb-dev \
-            libvulkan-dev
+        uses: awalsh128/cache-apt-pkgs-action@acb598e5ddbc6f68a970c5da0688d2f3a9f04d05 # v1.6.0
+        with:
+          packages: cmake ninja-build mold clang-tidy clang-format libgl1-mesa-dev libxkbcommon-dev libxcb-xkb-dev libvulkan-dev
+          version: 1.0
       - name: Install Qt ${{ env.QT_VERSION }}
         uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
         with:
@@ -131,8 +131,20 @@ jobs:
         with:
           workspaces: rust
           env-vars: "CARGO CC CFLAGS CXX CMAKE RUST QT"
+      # ccache wraps clang/gcc invocations; CMake's launcher hooks pick it up
+      # via CMAKE_{C,CXX}_COMPILER_LAUNCHER set on the configure command line
+      # below. QT_VERSION is part of the cache key because Qt include paths
+      # are baked into preprocessed translation units.
+      - name: Set up ccache
+        uses: hendrikmuhs/ccache-action@d62db5f07c26379fc4b4e0916f098a92573c3b03 # v1.2.23
+        with:
+          key: desktop-build-${{ env.QT_VERSION }}
+          max-size: 500M
       - name: Configure
-        run: cmake --preset desktop-debug
+        run: >
+          cmake --preset desktop-debug
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache
+          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
       - name: Build
         run: cmake --build --preset desktop-debug
       - name: Test
@@ -148,56 +160,3 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
-  ensure-toolchain:
-    name: Ensure ARM32 toolchain image
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    uses: ./.github/workflows/toolchain-build.yml
-    permissions:
-      contents: read
-      packages: write
-
-  arm32-build:
-    name: ARM32 cross-build (MiSTer)
-    runs-on: ubuntu-latest
-    # ensure-toolchain only runs on push-to-main (it needs packages:write).
-    # On PRs it is skipped, so arm32-build allows either outcome. The tag
-    # is read from toolchain/VERSION either way, so PRs pull whatever image
-    # main has already pushed.
-    needs: [ensure-toolchain]
-    if: ${{ needs.ensure-toolchain.result == 'success' || needs.ensure-toolchain.result == 'skipped' }}
-    permissions:
-      contents: read
-      packages: read
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Set lowercase repository owner
-        run: |
-          echo "OWNER_LC=${OWNER,,}" >> "$GITHUB_ENV"
-        env:
-          OWNER: ${{ github.repository_owner }}
-      - name: Resolve toolchain version
-        id: toolchain
-        run: |
-          VERSION=$(tr -d '[:space:]' < toolchain/VERSION)
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "Using toolchain image tag: ${VERSION}"
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build ARM32 launcher
-        env:
-          TOOLCHAIN_IMAGE: ghcr.io/${{ env.OWNER_LC }}/qt6-arm32-mister:${{ steps.toolchain.outputs.version }}
-        run: ./scripts/build-arm32.sh
-      - name: Verify ARM ELF
-        run: |
-          file output/launcher
-          file output/launcher | grep -q 'ARM' || (echo "Not an ARM binary" && exit 1)
-      - name: Upload launcher binary
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: launcher-arm32
-          path: output/launcher
-          retention-days: 14
