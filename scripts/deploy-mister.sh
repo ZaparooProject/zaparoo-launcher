@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 #
 # Builds the ARM32 binary and deploys it to a MiSTer FPGA over SSH/SCP.
+# Pass --skip-build to deploy an existing output/launcher without rebuilding.
 # Reads MISTER_IP from a .env file in the project root.
 
 set -e
@@ -13,6 +14,28 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 ENV_FILE="${PROJECT_ROOT}/.env"
 REMOTE_PATH="/media/fat/zaparoo/launcher"
 BINARY="${PROJECT_ROOT}/output/launcher"
+SKIP_BUILD=0
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --skip-build)
+            SKIP_BUILD=1
+            shift
+            ;;
+        -h|--help)
+            echo "Usage: $0 [--skip-build]"
+            echo ""
+            echo "Builds output/launcher and deploys it to MiSTer."
+            echo "  --skip-build  Deploy existing output/launcher without rebuilding"
+            exit 0
+            ;;
+        *)
+            echo "Error: unknown argument: $1" >&2
+            echo "Usage: $0 [--skip-build]" >&2
+            exit 1
+            ;;
+    esac
+done
 
 if [ ! -f "${ENV_FILE}" ]; then
     echo "Error: .env file not found at ${ENV_FILE}"
@@ -30,8 +53,16 @@ if [ -z "${MISTER_IP}" ]; then
     exit 1
 fi
 
-echo "=== Building ARM32 binary ==="
-"${SCRIPT_DIR}/build-arm32.sh"
+if [ "${SKIP_BUILD}" -eq 1 ]; then
+    echo "=== Skipping ARM32 build ==="
+    if [ ! -f "${BINARY}" ]; then
+        echo "Error: ${BINARY} does not exist; run ${SCRIPT_DIR}/build-arm32.sh first" >&2
+        exit 1
+    fi
+else
+    echo "=== Building ARM32 binary ==="
+    "${SCRIPT_DIR}/build-arm32.sh"
+fi
 
 echo ""
 echo "=== Deploying to MiSTer at ${MISTER_IP} ==="

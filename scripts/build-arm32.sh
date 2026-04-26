@@ -4,10 +4,11 @@
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 #
 # Cross-compiles the launcher for ARM32 / MiSTer FPGA using Docker.
-# Uses the prebuilt toolchain image; builds the application layer only (~1 min).
+# Uses the official prebuilt toolchain image by default; builds the application
+# layer only (~1 min after the image is cached).
 #
-# If the toolchain image is not present locally it is built automatically
-# (~45 min one-time). Subsequent runs are fast.
+# Set USE_LOCAL_TOOLCHAIN=1 to build and use the local toolchain image from
+# Dockerfile.toolchain instead (~45 min one-time). Subsequent runs are fast.
 
 set -e
 
@@ -15,6 +16,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 OUTPUT_DIR="${PROJECT_ROOT}/output"
 VERSION_FILE="${PROJECT_ROOT}/toolchain/VERSION"
+DOCKER_PLATFORM="${DOCKER_PLATFORM:-linux/amd64}"
 if [ ! -f "${VERSION_FILE}" ]; then
     echo "Error: toolchain version file not found at ${VERSION_FILE}" >&2
     echo "       (PROJECT_ROOT=${PROJECT_ROOT})" >&2
@@ -29,13 +31,39 @@ if ! printf '%s' "${TOOLCHAIN_VERSION}" | grep -Eq '^[A-Za-z0-9_][A-Za-z0-9_.-]{
     echo "       expected:  Docker tag [A-Za-z0-9_][A-Za-z0-9_.-]{0,127}" >&2
     exit 1
 fi
-# CI sets TOOLCHAIN_IMAGE to a GHCR tag; local dev defaults to the image
-# produced by build-toolchain.sh, whose tag derives from toolchain/VERSION.
-TOOLCHAIN_IMAGE="${TOOLCHAIN_IMAGE:-zaparoo/qt6-arm32-mister:${TOOLCHAIN_VERSION}}"
+if ! docker buildx version > /dev/null 2>&1; then
+    echo "Error: Docker Buildx is required for the ARM32 application build." >&2
+    echo "       Docker Desktop includes Buildx." >&2
+    exit 1
+fi
+LOCAL_TOOLCHAIN_IMAGE="zaparoo/qt6-arm32-mister:${TOOLCHAIN_VERSION}"
+OFFICIAL_TOOLCHAIN_IMAGE="ghcr.io/zaparooproject/qt6-arm32-mister:${TOOLCHAIN_VERSION}"
 
-# Build toolchain image locally if it's missing and we're using the local tag.
-# When TOOLCHAIN_IMAGE points at a registry, docker build will pull it.
-if [[ "${TOOLCHAIN_IMAGE}" == zaparoo/qt6-arm32-mister:* ]] \
+# Local dev defaults to the official toolchain image published by this
+# repository's toolchain-build workflow. Set USE_LOCAL_TOOLCHAIN=1 to rebuild
+# Qt and the MiSTer ARM GCC toolchain from Dockerfile.toolchain instead.
+if [ -z "${TOOLCHAIN_IMAGE:-}" ]; then
+    if [ "${USE_LOCAL_TOOLCHAIN:-0}" = "1" ]; then
+        TOOLCHAIN_IMAGE="${LOCAL_TOOLCHAIN_IMAGE}"
+    else
+        TOOLCHAIN_IMAGE="${OFFICIAL_TOOLCHAIN_IMAGE}"
+    fi
+fi
+
+if [[ "${TOOLCHAIN_IMAGE}" == "${OFFICIAL_TOOLCHAIN_IMAGE}" ]] \
+    && ! docker manifest inspect "${TOOLCHAIN_IMAGE}" > /dev/null 2>&1; then
+    echo "Error: official toolchain image is not available: ${TOOLCHAIN_IMAGE}" >&2
+    echo "       If GHCR requires auth, run:" >&2
+    echo "       gh auth refresh -h github.com -s read:packages" >&2
+    echo "       gh auth token | docker login ghcr.io -u <github-user> --password-stdin" >&2
+    echo "       To build the toolchain locally instead, run:" >&2
+    echo "       USE_LOCAL_TOOLCHAIN=1 ./scripts/build-arm32.sh" >&2
+    exit 1
+fi
+
+# Build the toolchain image locally if it is missing and we are using the local
+# tag. When TOOLCHAIN_IMAGE points at a registry, docker build will pull it.
+if [[ "${TOOLCHAIN_IMAGE}" == "${LOCAL_TOOLCHAIN_IMAGE}" ]] \
     && ! docker image inspect "${TOOLCHAIN_IMAGE}" > /dev/null 2>&1; then
     echo "Toolchain image '${TOOLCHAIN_IMAGE}' not found locally."
     echo "Building it now (~45 minutes)..."
@@ -44,9 +72,11 @@ fi
 
 echo "=== Cross-compiling launcher for ARM32 ==="
 echo "Using toolchain image: ${TOOLCHAIN_IMAGE}"
+echo "Docker platform: ${DOCKER_PLATFORM}"
 mkdir -p "${OUTPUT_DIR}"
 
-docker build \
+docker buildx build \
+    --platform "${DOCKER_PLATFORM}" \
     -f "${PROJECT_ROOT}/Dockerfile.arm32" \
     --build-arg "TOOLCHAIN_IMAGE=${TOOLCHAIN_IMAGE}" \
     --output "type=local,dest=${OUTPUT_DIR}" \

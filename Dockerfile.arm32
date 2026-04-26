@@ -42,6 +42,7 @@ RUN mkdir build && cd build && \
         -DCMAKE_BUILD_TYPE=Release \
         -DBUILD_SHARED_LIBS=OFF \
         -DZAPAROO_BUILD_TESTS=OFF \
+        -DQt6LinguistTools_DIR=/opt/qt6-host/lib/cmake/Qt6LinguistTools \
     && ninja
 
 # Output stage — extracts the binary into the host output directory
