@@ -1,6 +1,6 @@
 # cxx-qt Bridge Gotchas
 
-Read this before writing Rust QML models with cxx-qt 0.7 in
+Read this before writing Rust QML models with cxx-qt 0.8 in
 `rust/launcher/src/models/`.
 
 - **`cxx = "1"` must be a direct dependency.** The `#[cxx_qt::bridge]` macro

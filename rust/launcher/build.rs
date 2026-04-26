@@ -8,35 +8,43 @@ fn main() {
     // cxx_qt_build compiles the CXX-Qt bridge code and registers the
     // Zaparoo.Browse QML module. Qt is located via the QMAKE env var
     // (set by ZaparooRust.cmake for ARM32 cross) or PATH qmake6 on desktop.
-    CxxQtBuilder::new()
-        .qt_module("Core")
-        .qt_module("Gui")
-        .qt_module("Qml")
-        .qt_module("Quick")
-        .qt_module("QuickControls2")
-        // Expose the models directory so generated C++ can find model_includes.h.
-        .cc_builder(|cc| {
+    //
+    // 0.8 builder shape: new_qml_module() takes the QmlModule up front and
+    // auto-links Qt Core + Qml; .files([...]) replaces the 0.7 rust_files
+    // field on QmlModule (removed in 0.8).
+    let builder = CxxQtBuilder::new_qml_module(
+        QmlModule::new("Zaparoo.Browse")
+            .version(1, 0)
+            // QAbstractListModel-derived singletons (CategoriesModel, SystemsModel,
+            // GamesModel, BrowseModel) need this for qmllint to follow the
+            // prototype chain back to QObject.
+            .depend("QtQml.Models"),
+    )
+    .qt_module("Gui")
+    .qt_module("Quick")
+    .qt_module("QuickControls2")
+    .files([
+        "src/models/categories.rs",
+        "src/models/systems.rs",
+        "src/models/games.rs",
+        "src/models/browse.rs",
+        "src/models/app_state.rs",
+        "src/models/app_status.rs",
+        "src/models/hub_state.rs",
+        "src/models/games_state.rs",
+        "src/models/input.rs",
+    ]);
+
+    // SAFETY: cc_builder is unsafe in 0.8 because cxx-qt makes no stability
+    // guarantees about the cc::Build instance. We only adjust the include
+    // path so the generated bridge code can find model_includes.h; we do
+    // not mutate flags or sources cxx-qt depends on.
+    let builder = unsafe {
+        builder.cc_builder(|cc| {
             cc.include("src/models");
         })
-        .qml_module(QmlModule::<&str, &str> {
-            uri: "Zaparoo.Browse",
-            version_major: 1,
-            version_minor: 0,
-            rust_files: &[
-                "src/models/categories.rs",
-                "src/models/systems.rs",
-                "src/models/games.rs",
-                "src/models/browse.rs",
-                "src/models/app_state.rs",
-                "src/models/app_status.rs",
-                "src/models/hub_state.rs",
-                "src/models/games_state.rs",
-                "src/models/input.rs",
-            ],
-            qml_files: &[],
-            ..Default::default()
-        })
-        .build();
+    };
+    builder.build();
 
     println!("cargo:rerun-if-env-changed=ZAPAROO_RUNTIME");
     println!("cargo:rerun-if-env-changed=ZAPAROO_DEV_BUILD");

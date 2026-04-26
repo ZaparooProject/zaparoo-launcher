@@ -10,36 +10,12 @@
 # searches the Qt qml output root; copying makes them siblings of the
 # C++-generated App/Theme/Ui modules.
 #
-# Also patches plugin.qmltypes to work around three cxx-qt 0.7 gaps that
-# make qmllint noisy against Rust-backed singletons. Remove the patch
-# block when we upgrade to cxx-qt 0.8, which adds first-class
-# qmllint/qmlls support:
-#
-#   1. `isSingleton: true` / `isCreatable: false` for types declared
-#      `QML_SINGLETON`. The macro lands in the C++ header but
-#      qmltyperegistrar does not forward it to .qmltypes, so without the
-#      patch qmllint treats every `Browse.QAppState.property` access as
-#      a static meta-object lookup and reports [missing-property].
-#
-#   2. `::std::int32_t` → `int`. cxx-qt-gen emits the C++ typedef
-#      verbatim (upstream issue cxx-qt#60). Qt's qmllint has no mapping
-#      from `::std::int32_t` to its built-in `int` type, so every
-#      int-valued property or method return trips [unresolved-type].
-#
-#   3. `prototype: "::rust::cxxqt1::CxxQtType<T>"` /
-#      `"::rust::cxxqt1::CxxQtThreading<T>"` → `"QObject"`. The cxx-qt
-#      bridge templates inherit from QObject at the C++ level, but
-#      qmllint sees them as unresolved types and therefore refuses to
-#      use a singleton as a `Connections.target:` (expects QObject).
-#
-#   4. `isFinal: true` on every Property of a singleton Component. QML
-#      singletons can't be subclassed, so the QQmlCompiler "Member X
-#      can be shadowed" warning is a false positive — qmllint only
-#      suppresses it when the member is marked final. Methods are left
-#      untouched: the qmltypes schema has no isFinal slot for Method
-#      (qmllint itself rejects it with "Expected only name, lineNumber,
-#      ..."), so method-shadowing warnings linger until we upgrade to
-#      cxx-qt 0.8.
+# cxx-qt 0.8 emits qmllint-clean qmltypes natively for singletons, plain
+# `int`, and real C++ prototypes — the 0.7-era patches for those have been
+# removed. The remaining patch injects `isFinal: true` on properties of
+# QML_SINGLETON Components, suppressing qmllint's "Member can be shadowed"
+# false positive (singletons can't be subclassed). Methods get no patch:
+# the qmltypes schema has no isFinal slot for Method.
 #
 # Run via:
 #   cmake -DCARGO_DIR=... -DDEST_QML_DIR=... -P SyncCxxqtQmlModules.cmake
@@ -82,11 +58,13 @@ foreach(_qmldir IN LISTS _qmldirs)
     endforeach()
 endforeach()
 
-# ── Patch plugin.qmltypes for cxx-qt singletons ──────────────────────────────
-# Collect the set of QML element names declared as singletons by scanning
-# every cxx-qt-generated header for a QML_SINGLETON macro paired with a
-# Q_CLASSINFO("QML.Element", "<Name>") line. Then rewrite each synced
-# plugin.qmltypes so qmllint sees those Components as singletons.
+# ── Patch plugin.qmltypes: isFinal: true on singleton properties ─────────────
+# Collect QML_SINGLETON element names from the cxx-qt-generated headers, then
+# rewrite each synced plugin.qmltypes to mark every Property final when *all*
+# Components in the file are known singletons. Only run the patch under that
+# guard: non-singleton types can legitimately be subclassed and marking their
+# members final would be incorrect. Methods are untouched — the qmltypes
+# schema has no isFinal slot for Method.
 
 set(_singleton_names "")
 file(GLOB_RECURSE _all_cxxqt_headers "${CARGO_DIR}/*.cxxqt.h")
@@ -111,41 +89,6 @@ foreach(_qt_file IN LISTS _synced_qmltypes)
     file(READ "${_qt_file}" _qt_content)
     set(_original "${_qt_content}")
 
-    # (1) Inject isSingleton / isCreatable for each QML_SINGLETON class.
-    # Idempotent — rerunning the sync target leaves the file unchanged
-    # once all three patches have already been applied.
-    foreach(_name IN LISTS _singleton_names)
-        string(REGEX MATCH
-            "name: \"${_name}\"\n[ \t]+accessSemantics: \"reference\"\n[ \t]+isSingleton: true"
-            _already "${_qt_content}")
-        if(_already)
-            continue()
-        endif()
-        string(REGEX REPLACE
-            "(name: \"${_name}\"\n)([ \t]+)(accessSemantics: \"reference\")"
-            "\\1\\2\\3\n\\2isSingleton: true\n\\2isCreatable: false"
-            _qt_content "${_qt_content}")
-    endforeach()
-
-    # (2) ::std::int32_t → int. qmltyperegistrar emits the C++ typedef
-    # spelled exactly like this; Qt's qmllint only knows the short form.
-    string(REPLACE "::std::int32_t" "int" _qt_content "${_qt_content}")
-
-    # (3) cxx-qt bridge template → QObject. The templated C++ ancestor
-    # is a QObject mixin, but qmllint can't see through unresolved
-    # template instantiations; collapsing to the concrete base unlocks
-    # Connections.target:, signal bindings, etc.
-    string(REGEX REPLACE
-        "prototype: \"::rust::cxxqt1::CxxQt(Type|Threading)<[^\"]+>\""
-        "prototype: \"QObject\""
-        _qt_content "${_qt_content}")
-
-    # (4) isFinal: true on every Property / multi-line Method.
-    # Only run when *every* Component in the file is a known singleton —
-    # non-singleton types can legitimately be subclassed, and marking
-    # their members final would be incorrect. Today all cxx-qt-backed
-    # types we register are singletons; the guard keeps this honest if
-    # that ever changes.
     string(REGEX MATCHALL
         "    Component \\{\n[ \t]+file: \"[^\"]+\"\n[ \t]+lineNumber: [0-9]+\n[ \t]+name: \"[^\"]+\""
         _component_headers "${_qt_content}")

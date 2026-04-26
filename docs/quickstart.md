@@ -128,7 +128,7 @@ Zero warnings is the bar.
   data flow, Runtime vs Platform distinction.
 - [`docs/qml-gotchas.md`](qml-gotchas.md): QML pitfalls that `qmllint`
   only catches after the fact.
-- [`docs/cxx-qt-bridge.md`](cxx-qt-bridge.md): cxx-qt 0.7 bridge
+- [`docs/cxx-qt-bridge.md`](cxx-qt-bridge.md): cxx-qt 0.8 bridge
   constraints when editing Rust QML models.
 - [`CONTRIBUTING.md`](../CONTRIBUTING.md): CLA flow, PR expectations,
   branch-protection rules.

@@ -35,7 +35,7 @@ raw cargo as the default path; the justfile carries the expected environment.
 - Qt 6.7+ with Qt Quick, QuickControls2, QML, QuickTest, and LinguistTools.
 - C++17 executable at `src/app/main.cpp`; Rust static library linked through
   Corrosion and cxx-qt.
-- Rust workspace is under `rust/`, edition 2021, MSRV 1.90, cxx-qt 0.7.
+- Rust workspace is under `rust/`, edition 2021, MSRV 1.90, cxx-qt 0.8.
 - Desktop builds link Qt dynamically for LGPL compliance.
 - MiSTer ARM32 builds use the Docker toolchain and static Qt.
 
@@ -137,7 +137,7 @@ starts our `launcher`; do not replace that flow with a new wrapper script.
 - `docs/architecture.md` — module graph, data flow, runtime/platform split
 - `docs/building.md` — build matrix, ARM32 toolchain, deploy bundle
 - `docs/qml-gotchas.md` — QML issues qmllint often catches late
-- `docs/cxx-qt-bridge.md` — cxx-qt 0.7 bridge constraints
+- `docs/cxx-qt-bridge.md` — cxx-qt 0.8 bridge constraints
 - `docs/translations.md` — `qsTr()`/`tr()` pipeline and locale catalogs
 - `design/README.md` — Qt Design Studio workflow and designer boundaries
 - `src/LICENSES/` — Qt LGPL notices

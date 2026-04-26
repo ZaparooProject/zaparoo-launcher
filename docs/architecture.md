@@ -23,7 +23,7 @@ src/app/main.cpp
     │     │     Pre-Qt setup on ARM32: vmode resolution switch, zaparoo.sh start.
     │     │     Compiled on all platforms; MiSTer-specific calls are gated by cfg.
     │     │
-    │     ├── src/models/  [Zaparoo.Browse QML module via cxx-qt 0.7]
+    │     ├── src/models/  [Zaparoo.Browse QML module via cxx-qt 0.8]
     │     │     AppStatus, CategoriesModel, SystemsModel, GamesModel,
     │     │     AppState, HubState, GamesState, Input, BrowseModel.
     │     │     All registered via build.rs QmlModule.
