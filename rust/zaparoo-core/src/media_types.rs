@@ -123,6 +123,11 @@ pub struct RunParams {
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
+pub struct ReadersWriteParams {
+    pub text: String,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
 pub struct SystemsParams {}
 
 #[derive(Debug, Clone, Default, Deserialize)]

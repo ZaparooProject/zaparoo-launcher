@@ -36,6 +36,7 @@ Item {
     // and persistence writes. Emitted on empty carousels too so the
     // user's intent to switch screens is still honoured.
     signal requestGamesScreen()
+    signal requestSystemCardWrite(int index)
 
     // Emitted when the user presses Escape from the categories focus.
     // Main.qml decides whether to quit or dismiss a modal.
@@ -117,6 +118,12 @@ Item {
                 Browse.GamesState.system_id = chosen
             }
             hub.requestGamesScreen()
+        } else if (action === "write_card") {
+            if (hub.systemsCarousel.itemCount > 0) {
+                Browse.HubState.system_id =
+                    Browse.SystemsModel.system_id_at(hub.systemsCarousel.currentIndex)
+                hub.requestSystemCardWrite(hub.systemsCarousel.currentIndex)
+            }
         } else if (action === "cancel") {
             hub.section = hub.focusCategories
         }

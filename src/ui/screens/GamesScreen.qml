@@ -28,6 +28,7 @@ Item {
     // Emitted when the user presses Escape — Main.qml flips the
     // active screen back to the hub.
     signal requestHubScreen()
+    signal requestGameCardWrite(int index)
 
     function navigateCarousel(carousel, delta): bool {
         if (carousel.itemCount <= 0)
@@ -57,6 +58,12 @@ Item {
                 Browse.GamesState.game_path =
                     Browse.GamesModel.path_at(games.gamesCarousel.currentIndex)
                 Browse.GamesModel.launch_at(games.gamesCarousel.currentIndex)
+            }
+        } else if (action === "write_card") {
+            if (games.gamesCarousel.itemCount > 0) {
+                Browse.GamesState.game_path =
+                    Browse.GamesModel.path_at(games.gamesCarousel.currentIndex)
+                games.requestGameCardWrite(games.gamesCarousel.currentIndex)
             }
         } else if (action === "cancel") {
             games.requestHubScreen()

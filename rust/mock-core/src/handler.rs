@@ -66,6 +66,11 @@ pub fn dispatch(text: &str) -> String {
             // Upstream returns null on success.
             Some(Value::Null)
         }
+        "readers.write" => {
+            let zap_script = req.params.get("text").and_then(Value::as_str).unwrap_or("");
+            info!(%zap_script, "readers.write");
+            Some(Value::Null)
+        }
         "version" => Some(fixtures::version_response()),
         _ => None,
     };
@@ -182,6 +187,13 @@ mod tests {
     fn run_accepts_any_text_and_returns_null() {
         let req =
             r#"{"jsonrpc":"2.0","id":"1","method":"run","params":{"text":"**launch.system:nes"}}"#;
+        let resp = parse(&dispatch(req));
+        assert!(resp["result"].is_null());
+    }
+
+    #[test]
+    fn readers_write_accepts_text_and_returns_null() {
+        let req = r#"{"jsonrpc":"2.0","id":"1","method":"readers.write","params":{"text":"**launch.system:nes"}}"#;
         let resp = parse(&dispatch(req));
         assert!(resp["result"].is_null());
     }
