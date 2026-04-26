@@ -59,7 +59,7 @@ async fn serve(
         match msg? {
             Message::Text(text) => {
                 let response = handler::dispatch(&text);
-                tx.send(Message::Text(response)).await?;
+                tx.send(Message::Text(response.into())).await?;
             }
             Message::Ping(data) => {
                 tx.send(Message::Pong(data)).await?;

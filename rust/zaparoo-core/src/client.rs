@@ -264,7 +264,7 @@ impl Client {
                                 msg = msg_rx.recv() => {
                                     match msg {
                                         Some(text) => {
-                                            if let Err(e) = write.send(Message::Text(text)).await {
+                                            if let Err(e) = write.send(Message::Text(text.into())).await {
                                                 warn!("ws send error: {e}");
                                                 break;
                                             }
