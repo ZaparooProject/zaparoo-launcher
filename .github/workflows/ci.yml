@@ -1,5 +1,5 @@
 # Zaparoo Launcher
-# Copyright (c) 2026 The Zaparoo Project Contributors.
+# Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 
 name: CI
@@ -25,6 +25,12 @@ env:
   # Qt 6.7.2 (built from source in its own toolchain image); this env is
   # only for desktop CI via aqtinstall.
   QT_VERSION: "6.10.3"
+  # CI doesn't reuse incremental metadata across runs — it only bloats the
+  # cached `target/` and slows the Swatinem post-cache upload.
+  CARGO_INCREMENTAL: 0
+  # Strip debug info from test binaries to keep `target/` small for caching.
+  CARGO_PROFILE_TEST_DEBUG: 0
+  CARGO_TERM_COLOR: always
 
 jobs:
   rust-lint:
@@ -56,7 +62,7 @@ jobs:
           # Qt library paths and linker flags into target/, so stale cache
           # from a different Qt version leaves dangling `-l` refs.
           env-vars: "CARGO CC CFLAGS CXX CMAKE RUST QT"
-      - uses: taiki-e/install-action@74e87cbfa15a59692b158178d8905a61bf6fca95 # v2
+      - uses: taiki-e/install-action@cf525cb33f51aca27cd6fa02034117ab963ff9f1 # v2
         with:
           tool: cargo-deny
       - name: rustfmt
@@ -91,54 +97,17 @@ jobs:
         with:
           workspaces: rust
           env-vars: "CARGO CC CFLAGS CXX CMAKE RUST QT"
-      - uses: taiki-e/install-action@74e87cbfa15a59692b158178d8905a61bf6fca95 # v2
+      - uses: taiki-e/install-action@cf525cb33f51aca27cd6fa02034117ab963ff9f1 # v2
         with:
           tool: cargo-nextest
       - name: nextest
         run: cargo nextest run --workspace
 
   desktop-build:
-    name: Desktop build + ctest
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Install system deps
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            cmake ninja-build mold \
-            libgl1-mesa-dev libxkbcommon-dev libxcb-xkb-dev \
-            libvulkan-dev
-      - name: Install Qt ${{ env.QT_VERSION }}
-        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
-        with:
-          version: ${{ env.QT_VERSION }}
-          modules: qtshadertools
-          cache: true
-      - uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # master
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
-        with:
-          workspaces: rust
-          env-vars: "CARGO CC CFLAGS CXX CMAKE RUST QT"
-      - name: Configure
-        run: cmake --preset desktop-debug
-      - name: Build
-        run: cmake --build --preset desktop-debug
-      - name: Test
-        run: ctest --preset desktop-debug
-      - name: Upload launcher binary
-        if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: launcher-debug-${{ github.run_id }}
-          path: build/bin/launcher
-          if-no-files-found: warn
-          retention-days: 7
-
-  cpp-lint:
-    name: C++ / QML lint
+    # Folds the old `cpp-lint` job in: clang-tidy needs compile_commands.json
+    # and the autogen/moc outputs that the desktop build already produces, so
+    # running lint as the final step of the same job avoids building twice.
+    name: Desktop build + ctest + lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -162,12 +131,22 @@ jobs:
         with:
           workspaces: rust
           env-vars: "CARGO CC CFLAGS CXX CMAKE RUST QT"
-      - name: Configure (required for compile_commands.json)
+      - name: Configure
         run: cmake --preset desktop-debug
-      - name: Build (autogen + moc outputs needed by clang-tidy)
+      - name: Build
         run: cmake --build --preset desktop-debug
+      - name: Test
+        run: ctest --preset desktop-debug
       - name: Lint (clang-format + clang-tidy + qmllint)
         run: cmake --build build --target lint
+      - name: Upload launcher binary
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: launcher-debug-${{ github.run_id }}
+          path: build/bin/launcher
+          if-no-files-found: warn
+          retention-days: 7
 
   ensure-toolchain:
     name: Ensure ARM32 toolchain image
@@ -180,8 +159,12 @@ jobs:
   arm32-build:
     name: ARM32 cross-build (MiSTer)
     runs-on: ubuntu-latest
+    # ensure-toolchain only runs on push-to-main (it needs packages:write).
+    # On PRs it is skipped, so arm32-build allows either outcome. The tag
+    # is read from toolchain/VERSION either way, so PRs pull whatever image
+    # main has already pushed.
     needs: [ensure-toolchain]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: ${{ needs.ensure-toolchain.result == 'success' || needs.ensure-toolchain.result == 'skipped' }}
     permissions:
       contents: read
       packages: read
@@ -192,6 +175,12 @@ jobs:
           echo "OWNER_LC=${OWNER,,}" >> "$GITHUB_ENV"
         env:
           OWNER: ${{ github.repository_owner }}
+      - name: Resolve toolchain version
+        id: toolchain
+        run: |
+          VERSION=$(tr -d '[:space:]' < toolchain/VERSION)
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Using toolchain image tag: ${VERSION}"
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4
         with:
@@ -200,7 +189,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build ARM32 launcher
         env:
-          TOOLCHAIN_IMAGE: ghcr.io/${{ env.OWNER_LC }}/qt6-arm32-mister:${{ needs.ensure-toolchain.outputs.version }}
+          TOOLCHAIN_IMAGE: ghcr.io/${{ env.OWNER_LC }}/qt6-arm32-mister:${{ steps.toolchain.outputs.version }}
         run: ./scripts/build-arm32.sh
       - name: Verify ARM ELF
         run: |

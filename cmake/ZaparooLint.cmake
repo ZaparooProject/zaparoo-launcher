@@ -1,5 +1,5 @@
 # Zaparoo Launcher
-# Copyright (c) 2026 The Zaparoo Project Contributors.
+# Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 #
 # Developer lint targets. Include this AFTER all add_subdirectory() calls so
@@ -94,4 +94,23 @@ add_dependencies(lint format-check tidy)
 
 if(TARGET all_qmllint)
     add_dependencies(lint all_qmllint)
+    # qmllint must see cxx-qt-generated qmldir + plugin.qmltypes under the
+    # Qt QML output root; otherwise Rust-backed singletons resolve as
+    # [unresolved-type]. The aggregate all_qmllint target lists per-module
+    # qmllint targets as siblings — ninja treats the dep list as unordered
+    # and will race qmllint against the sync unless each per-module target
+    # depends on the sync individually.
+    if(TARGET zaparoo_cxxqt_qml_sync)
+        add_dependencies(all_qmllint zaparoo_cxxqt_qml_sync)
+        foreach(_qmllint_target IN ITEMS
+                zaparoo_ui_app_qmllint
+                zaparoo_ui_components_qmllint
+                zaparoo_ui_screens_qmllint
+                zaparoo_ui_theme_qmllint
+                tst_ui_qmllint)
+            if(TARGET ${_qmllint_target})
+                add_dependencies(${_qmllint_target} zaparoo_cxxqt_qml_sync)
+            endif()
+        endforeach()
+    endif()
 endif()

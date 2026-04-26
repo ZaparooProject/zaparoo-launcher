@@ -61,6 +61,10 @@ output/
 # AI agent tooling — local only, not shared
 CLAUDE.md
 .claude/
+.opencode/
 
 # Cargo build cache
 rust/target/
+
+# cxx-qt 0.8 generates this with absolute paths for qmlls/qmllint
+rust/launcher/.qmlls.ini

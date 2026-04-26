@@ -1,37 +1,29 @@
 // Zaparoo Launcher
-// Copyright (c) 2026 The Zaparoo Project Contributors.
+// Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 
 import QtQuick
 import QtQuick.Window
-import QtQuick.Controls
-import Zaparoo.Ui
 import Zaparoo.Theme
+import Zaparoo.Screens
 import Zaparoo.Browse as Browse
 
-ApplicationWindow {
+// cxx-qt 0.7 doesn't emit FINAL markers in plugin.qmltypes, so qmllint
+// flags every call on a Zaparoo.Browse singleton as "can be shadowed".
+// Remove after the cxx-qt 0.8 upgrade.
+// qmllint disable compiler
+
+// Runtime wrapper around MainLayout. The visual tree lives in
+// MainLayout.qml (editable by designers in Qt Design Studio) and the
+// individual screens in Zaparoo.Screens; this file is a thin router
+// that translates raw Qt key events into actions, dispatches them to
+// the active screen (or topmost modal), and persists user-visible
+// navigation state across kills.
+MainLayout {
     id: root
-
-    // Typed local references to singletons — required for property access in tooling.
-    // qmllint disable compiler
-    readonly property Browse.CategoriesModel categoriesRef: Browse.CategoriesModel
-    readonly property Browse.SystemsModel systemsRef: Browse.SystemsModel
-    readonly property Browse.GamesModel gamesRef: Browse.GamesModel
-    // qmllint enable compiler
-
-    // Screen/focus state constants — use these instead of bare string literals.
-    readonly property string screenHub: "hub"
-    readonly property string screenGames: "games"
-    readonly property string focusCategories: "categories"
-    readonly property string focusSystems: "systems"
-
-    property bool fullScreen: false
 
     width: Screen.width
     height: Screen.height
-    visible: true
-    visibility: fullScreen ? Window.FullScreen : Window.Windowed
-    title: "Zaparoo Launcher"
 
     onWidthChanged: {
         Sizing.screenWidth = width
@@ -44,286 +36,127 @@ ApplicationWindow {
     Component.onCompleted: {
         Sizing.screenWidth = width
         Sizing.screenHeight = height
+        // Restore screen/focus synchronously before first paint. The parent
+        // process on MiSTer kills the launcher without notice, so we resume
+        // exactly where we left off. Selection restore happens asynchronously
+        // in the modelReset handlers below as catalog data arrives.
+        const savedScreen = Browse.AppState.active_screen
+        if (savedScreen === root.screenGames || savedScreen === root.screenHub)
+            root.activeScreen = savedScreen
+        const savedFocus = Browse.HubState.focus
+        if (savedFocus === root.focusCategories || savedFocus === root.focusSystems)
+            root.hubFocus = savedFocus
+        // If Core responded before Main.qml finished loading, CategoriesModel
+        // has already emitted modelReset and the Connections below missed it.
+        // Kick the restore chain manually; the set_category cascade re-fires
+        // SystemsModel.modelReset (now wired) which cascades into GamesModel.
+        if (Browse.CategoriesModel.count > 0)
+            root.hubScreen.restoreFromCategoriesReset()
     }
 
-    // Screen state.
-    property string activeScreen: root.screenHub       // screenHub | screenGames
-    property string hubFocus: root.focusCategories     // focusCategories | focusSystems
-
-    // Drives the hub↔games slide transition. 0 = hub centred; width = games centred.
-    property real screenOffset: root.activeScreen === root.screenGames ? width : 0
-
-    Behavior on screenOffset {
-        NumberAnimation {
-            duration: 220
-            easing.type: Easing.OutCubic
-        }
-    }
-
-    // Reset carousel indices when models deliver new data.
+    // Seed carousel indices from persisted state when models deliver new data.
+    // A miss (category renamed, ROM deleted) falls back to index 0 and leaves
+    // the saved identifier untouched on disk — so the user's intent survives
+    // a transient catalog gap. State writes only happen in each screen's
+    // handleAction (user navigation); these programmatic seeds are inert.
+    //
+    // Always cascade into set_category (even on a miss or first-launch empty
+    // HubState.category): SystemsModel is the only way to drive the next
+    // onModelReset handler, and a games-screen restore depends on that chain
+    // firing so GamesModel.set_system runs.
     Connections {
-        target: root.categoriesRef
+        target: Browse.CategoriesModel
         function onModelReset(): void {
-            categoriesCarousel.currentIndex = 0
+            root.hubScreen.restoreFromCategoriesReset()
         }
     }
     Connections {
-        target: root.systemsRef
+        target: Browse.SystemsModel
+        // On a games-screen restore, GamesState.system_id is authoritative;
+        // fall back to HubState.system_id only if it's empty (edge case: user
+        // pressed Enter on an empty systems carousel and we flipped the
+        // screen without ever committing a system). On a hub restore,
+        // HubState.system_id is authoritative — don't peek at GamesState, or
+        // we'd override the user's hub position with a stale games target
+        // from a prior escape-back-to-hub.
         function onModelReset(): void {
-            systemsCarousel.currentIndex = 0
+            const savedSystem = root.activeScreen === root.screenGames
+                ? (Browse.GamesState.system_id !== "" ? Browse.GamesState.system_id : Browse.HubState.system_id)
+                : Browse.HubState.system_id
+            const idx = savedSystem === "" ? -1 : Browse.SystemsModel.index_for_system_id(savedSystem)
+            root.systemsCarousel.currentIndex = idx >= 0 ? idx : 0
+            if (idx >= 0)
+                Browse.GamesModel.set_system(savedSystem)
         }
     }
-    // qmllint disable compiler
     Connections {
-        target: root.gamesRef
+        target: Browse.GamesModel
         function onModelReset(): void {
-            gamesCarousel.currentIndex = 0
-        }
-    }
-    // qmllint enable compiler
-
-    // ── Background ────────────────────────────────────────────────────────────
-
-    Rectangle {
-        anchors.fill: parent
-        color: Theme.bgDeep
-    }
-
-    // ── Logo ──────────────────────────────────────────────────────────────────
-
-    Image {
-        anchors.left: parent.left
-        anchors.top: parent.top
-        anchors.leftMargin: Sizing.pctW(2)
-        anchors.topMargin: Sizing.pctH(2)
-        height: Sizing.pctH(7)
-        fillMode: Image.PreserveAspectFit
-        source: "qrc:/qt/qml/Zaparoo/App/resources/images/logo.png"
-    }
-
-    // ── Hub screen ────────────────────────────────────────────────────────────
-
-    Item {
-        id: hubContainer
-        x: -root.screenOffset
-        width: parent.width
-        height: parent.height
-
-        Carousel {
-            id: categoriesCarousel
-
-            anchors.horizontalCenter: parent.horizontalCenter
-            width: parent.width
-            height: Sizing.pctH(20)
-            y: root.hubFocus === root.focusSystems ? Sizing.pctH(12) : Sizing.pctH(35)
-            coverWidth: Sizing.pctH(20)
-            coverHeight: Sizing.pctH(20)
-            coverSpacing: Sizing.pctH(23)
-
-            model: root.categoriesRef
-            delegate: TextTileDelegate {}
-            placeholderCover: ""
-
-            Behavior on y {
-                NumberAnimation {
-                    duration: 250
-                    easing.type: Easing.OutQuad
-                }
-            }
-        }
-
-        Carousel {
-            id: systemsCarousel
-
-            anchors.horizontalCenter: parent.horizontalCenter
-            width: parent.width
-            height: Sizing.pctH(20)
-            y: Sizing.pctH(36)
-            visible: root.hubFocus === root.focusSystems
-            coverWidth: Sizing.pctH(20)
-            coverHeight: Sizing.pctH(20)
-            coverSpacing: Sizing.pctH(23)
-
-            model: root.systemsRef
-            delegate: TextTileDelegate {}
-            placeholderCover: ""
-        }
-
-        Text {
-            anchors.horizontalCenter: parent.horizontalCenter
-            y: systemsCarousel.y + systemsCarousel.height + Sizing.pctH(1)
-            visible: root.hubFocus === root.focusSystems
-            // qmllint disable compiler
-            text: {
-                root.systemsRef.count
-                return root.systemsRef.system_name_at(systemsCarousel.currentIndex)
-            }
-            // qmllint enable compiler
-            font.family: Theme.fontRetro
-            font.pixelSize: Sizing.fontSize(4)
-            color: Theme.textPrimary
-            renderType: Text.NativeRendering
+            const savedPath = Browse.GamesState.game_path
+            const idx = savedPath === "" ? -1 : Browse.GamesModel.index_for_game_path(savedPath)
+            root.gamesCarousel.currentIndex = idx >= 0 ? idx : 0
         }
     }
 
-    // ── Games screen ──────────────────────────────────────────────────────────
-
-    Item {
-        id: gamesContainer
-        x: parent.width - root.screenOffset
-        width: parent.width
-        height: parent.height
-
-        Carousel {
-            id: gamesCarousel
-
-            anchors.horizontalCenter: parent.horizontalCenter
-            y: Sizing.pctH(12)
-            width: parent.width
-            height: Sizing.pctH(55)
-            // qmllint disable compiler
-            opacity: root.gamesRef.loading ? 0.5 : 1.0
-            model: root.activeScreen === root.screenGames ? root.gamesRef : null
-            // qmllint enable compiler
-            delegate: CoverDelegate {}
-            placeholderCover: "qrc:/qt/qml/Zaparoo/App/resources/images/placeholder/cover_generic.png"
-
-            onCurrentIndexChanged: {
-                // qmllint disable compiler
-                root.gamesRef.set_selected_index(currentIndex)
-                // qmllint enable compiler
-            }
-
-            Behavior on opacity {
-                NumberAnimation {
-                    duration: 100
-                }
-            }
+    // Cross-screen transitions: each screen signals its intent and this
+    // router writes persistence + flips ScreenManager. Keeps the screens
+    // themselves ignorant of AppState so they can be reused in test
+    // harnesses that don't wire the full persistence layer.
+    Connections {
+        target: root.hubScreen
+        function onRequestGamesScreen(): void {
+            ScreenManager.activeScreen = root.screenGames
+            Browse.AppState.active_screen = root.screenGames
         }
-
-        Text {
-            anchors.centerIn: gamesCarousel
-            // qmllint disable compiler
-            visible: root.gamesRef.errorMessage !== ""
-            text: root.gamesRef.errorMessage
-            // qmllint enable compiler
-            font.family: Theme.fontRetro
-            font.pixelSize: Sizing.fontSize(3)
-            color: Theme.textDim
-            wrapMode: Text.WordWrap
-            horizontalAlignment: Text.AlignHCenter
-            width: parent.width * 0.7
-            renderType: Text.NativeRendering
+        function onRequestQuit(): void {
+            Qt.quit()
         }
-
-        Text {
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.top: gamesCarousel.bottom
-            anchors.topMargin: Sizing.pctH(1)
-            // qmllint disable compiler
-            text: {
-                root.gamesRef.count
-                return root.gamesRef.name_at(gamesCarousel.currentIndex)
-            }
-            // qmllint enable compiler
-            font.family: Theme.fontRetro
-            font.pixelSize: Sizing.fontSize(4)
-            color: Theme.textPrimary
-            renderType: Text.NativeRendering
+    }
+    Connections {
+        target: root.gamesScreen
+        function onRequestHubScreen(): void {
+            ScreenManager.activeScreen = root.screenHub
+            Browse.AppState.active_screen = root.screenHub
+        }
+    }
+    // Persist hub section flips (categories ↔ systems) — those don't
+    // trigger a cross-screen signal, but the section change is user
+    // intent we want on disk.
+    Connections {
+        target: root.hubScreen
+        function onSectionChanged(): void {
+            Browse.HubState.focus = root.hubScreen.section
         }
     }
 
-    // ── FPS counter ───────────────────────────────────────────────────────────
-
-    FpsCounter {
-        anchors.top: parent.top
-        anchors.right: parent.right
-        anchors.topMargin: Sizing.pctH(1)
-        anchors.rightMargin: Sizing.pctW(1)
-        z: 200
-    }
-
-    // ── Instructions bar ──────────────────────────────────────────────────────
-
-    Rectangle {
-        id: instructionsBar
-
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        height: Sizing.pctH(6)
-        color: Theme.bgBar
-        border.width: 1
-        border.color: Theme.borderSubtle
-
-        Text {
-            anchors.centerIn: parent
-            text: {
-                if (root.activeScreen === root.screenGames)
-                    return "[<>] GAME  [OK] PLAY  [ESC] BACK"
-                if (root.hubFocus === root.focusSystems)
-                    return "[<>] SYSTEM  [OK] GAMES  [ESC] BACK"
-                return "[<>] CATEGORY  [OK] SELECT  [ESC] QUIT"
-            }
-            font.family: Theme.fontRetro
-            font.pixelSize: Sizing.fontSize(2.5)
-            color: Theme.textDim
-            renderType: Text.NativeRendering
+    // Action router. Called from handleKey (which translates Qt key
+    // codes via Browse.Input.action_for_key) and directly from tests.
+    // Dispatches to the top modal if any, otherwise the active screen.
+    function handleAction(action: string): void {
+        if (ScreenManager.hasModal) {
+            // Modal overlays are a forward-looking extension; no modal
+            // components exist yet, so just swallow input while one is
+            // on the stack rather than leak it to the root screen.
+            return
+        }
+        if (root.activeScreen === root.screenGames) {
+            root.gamesScreen.handleAction(action)
+        } else {
+            root.hubScreen.handleAction(action)
         }
     }
 
-    // ── Keyboard input ────────────────────────────────────────────────────────
+    // Thin boundary shim kept for back-compat with tst_navigation.qml.
+    // Delegates to handleAction so the state machine has a single entry
+    // point regardless of input source.
+    function handleKey(key): void {
+        const action = Browse.Input.action_for_key(key)
+        if (action !== "")
+            root.handleAction(action)
+    }
 
     Item {
         focus: true
         Keys.onPressed: event => root.handleKey(event.key)
     }
-
-    // qmllint disable compiler
-    function navigateCarousel(carousel, delta) {
-        if (carousel.itemCount > 0)
-            carousel.currentIndex = (carousel.currentIndex + delta + carousel.itemCount) % carousel.itemCount
-    }
-
-    // Navigation key router. Called by the focus Item's Keys.onPressed and
-    // directly from tests (offscreen key routing is unreliable). Kept as a
-    // pure function of root state + the three carousel ids.
-    function handleKey(key) {
-        if (root.activeScreen === root.screenGames) {
-            if (key === Qt.Key_Left) {
-                navigateCarousel(gamesCarousel, -1)
-            } else if (key === Qt.Key_Right) {
-                navigateCarousel(gamesCarousel, 1)
-            } else if (key === Qt.Key_Return || key === Qt.Key_Enter) {
-                root.gamesRef.launch_at(gamesCarousel.currentIndex)
-            } else if (key === Qt.Key_Escape || key === Qt.Key_Backspace) {
-                root.activeScreen = root.screenHub
-            }
-        } else if (root.hubFocus === root.focusSystems) {
-            if (key === Qt.Key_Left) {
-                navigateCarousel(systemsCarousel, -1)
-            } else if (key === Qt.Key_Right) {
-                navigateCarousel(systemsCarousel, 1)
-            } else if (key === Qt.Key_Return || key === Qt.Key_Enter) {
-                root.gamesRef.set_system(root.systemsRef.system_id_at(systemsCarousel.currentIndex))
-                gamesCarousel.currentIndex = 0
-                root.activeScreen = root.screenGames
-            } else if (key === Qt.Key_Escape || key === Qt.Key_Backspace) {
-                root.hubFocus = root.focusCategories
-            }
-        } else {
-            if (key === Qt.Key_Left) {
-                navigateCarousel(categoriesCarousel, -1)
-            } else if (key === Qt.Key_Right) {
-                navigateCarousel(categoriesCarousel, 1)
-            } else if (key === Qt.Key_Return || key === Qt.Key_Enter) {
-                systemsCarousel.currentIndex = 0
-                root.systemsRef.set_category(root.categoriesRef.category_at(categoriesCarousel.currentIndex))
-                root.hubFocus = root.focusSystems
-            } else if (key === Qt.Key_Escape || key === Qt.Key_Backspace) {
-                Qt.quit()
-            }
-        }
-    }
-    // qmllint enable compiler
 }

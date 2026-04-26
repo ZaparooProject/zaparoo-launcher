@@ -1,5 +1,5 @@
 # Zaparoo Launcher
-# Copyright (c) 2026 The Zaparoo Project Contributors.
+# Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 
 name: Build ARM32 toolchain image
@@ -89,6 +89,23 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
             echo "Version ${{ steps.version.outputs.version }} will be built"
           fi
+
+      # Qt's PCH compilation in qtdeclarative-arm-build exhausts the runner
+      # disk (~14 GB usable of 22 GB) once the image layers contain the ARM
+      # GCC toolchain, four Qt source trees, and the host + ARM builds. Freeing
+      # the pre-installed Android SDK / .NET / Haskell / tool-cache recovers
+      # ~30 GB and is cheap (~3 min).
+      - name: Free disk space
+        if: steps.check.outputs.exists != 'true'
+        uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          swap-storage: true
+          docker-images: true
 
       - name: Set up Docker Buildx
         if: steps.check.outputs.exists != 'true'

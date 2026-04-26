@@ -1,9 +1,9 @@
 # Zaparoo Launcher
-# Copyright (c) 2026 The Zaparoo Project Contributors.
+# Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 
 [workspace]
-members = ["launcher", "zaparoo-core"]
+members = ["launcher", "mock-core", "zaparoo-core"]
 resolver = "2"
 
 [workspace.package]
@@ -11,16 +11,16 @@ version      = "0.1.0"
 edition      = "2021"
 rust-version = "1.90"
 license      = "LicenseRef-PolyForm-Noncommercial-1.0.0"
-authors      = ["The Zaparoo Project Contributors"]
+authors      = ["Wizzo Pty Ltd and the Zaparoo Project contributors"]
 
 [workspace.dependencies]
 cxx             = "1"
-cxx-qt          = "0.7"
-cxx-qt-lib      = "0.7"
-cxx-qt-build    = "0.7"
+cxx-qt          = "0.8"
+cxx-qt-lib      = "0.8"
+cxx-qt-build    = "0.8"
 serde           = { version = "1", features = ["derive"] }
 serde_json      = "1"
-toml            = "0.8"
+toml            = "1.1"
 tokio           = { version = "1", default-features = false }
 tokio-tungstenite = { version = "0.29", default-features = false, features = ["connect"] }
 tracing         = "0.1"

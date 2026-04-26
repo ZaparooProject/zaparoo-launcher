@@ -1,7 +1,9 @@
 // Zaparoo Launcher
-// Copyright (c) 2026 The Zaparoo Project Contributors.
+// Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 
+#include <QDir>
+#include <QFile>
 #include <QQuickStyle>
 #include <QtQml/qqmlextensionplugin.h>
 #include <QtQuickTest/quicktest.h>
@@ -25,6 +27,13 @@ class UiSetup : public QObject
     // NOLINTNEXTLINE(readability-convert-member-functions-to-static) — Qt slot, must be a member
     void applicationAvailable()
     {
+        // Redirect persistent UI state to a throwaway temp file so the
+        // Browse.AppState/HubState/GamesState setters don't clobber the
+        // real ~/.config/zaparoo/state.toml when tests drive navigation.
+        const QString tmpState = QDir::temp().filePath("zaparoo-test-state.toml");
+        QFile::remove(tmpState);
+        qputenv("ZAPAROO_STATE_FILE", tmpState.toUtf8());
+
         // Match the real launcher's style selection. Also forces the test
         // binary to reference QQuickStyle, which keeps libQt6QuickControls2
         // on the link line under GNU ld --as-needed (cxx-qt-lib's

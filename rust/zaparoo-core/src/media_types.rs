@@ -1,5 +1,5 @@
 // Zaparoo Launcher
-// Copyright (c) 2026 The Zaparoo Project Contributors.
+// Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 
 use serde::{Deserialize, Serialize};
@@ -20,6 +20,13 @@ pub struct MediaSearchParams {
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
+pub struct TagInfo {
+    pub tag: String,
+    #[serde(rename = "type", default)]
+    pub tag_type: String,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MediaItem {
     pub name: String,
@@ -28,6 +35,8 @@ pub struct MediaItem {
     pub zap_script: String,
     #[serde(default)]
     pub system: SystemRef,
+    #[serde(default)]
+    pub tags: Vec<TagInfo>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -35,12 +44,32 @@ pub struct SystemRef {
     pub id: String,
 }
 
+/// Cursor-based pagination envelope shared by `media.search` and
+/// `media.browse`. Fields are all defaulted so an absent envelope (e.g.
+/// browse-root response with no file results) deserializes to "no more
+/// pages."
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct Pagination {
+    #[serde(default)]
+    pub has_next_page: bool,
+    #[serde(default)]
+    pub page_size: u32,
+    #[serde(default)]
+    pub next_cursor: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
 pub struct MediaSearchResult {
     pub results: Vec<MediaItem>,
     #[serde(default)]
-    pub has_next_page: bool,
+    pub pagination: Pagination,
+}
+
+impl MediaSearchResult {
+    pub fn has_next_page(&self) -> bool {
+        self.pagination.has_next_page
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
@@ -57,17 +86,35 @@ pub struct BrowseEntry {
     pub entry_type: String,
     #[serde(default)]
     pub file_count: u32,
+    #[serde(default)]
+    pub system_id: String,
+    #[serde(default)]
+    pub zap_script: String,
+    #[serde(default)]
+    pub relative_path: String,
+    #[serde(default)]
+    pub group: String,
 }
 
 impl BrowseEntry {
+    /// Upstream entry types are `root`, `directory`, and `media`. Both
+    /// roots and directories are navigable containers; media entries are
+    /// leaves.
     pub fn is_folder(&self) -> bool {
-        self.entry_type == "folder" || self.entry_type == "directory"
+        self.entry_type == "directory" || self.entry_type == "root"
     }
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MediaBrowseResult {
+    #[serde(default)]
+    pub path: String,
     pub entries: Vec<BrowseEntry>,
+    #[serde(default)]
+    pub total_files: u32,
+    #[serde(default)]
+    pub pagination: Option<Pagination>,
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
@@ -75,15 +122,20 @@ pub struct RunParams {
     pub text: String,
 }
 
-#[derive(Debug, Clone, Default, Deserialize)]
-pub struct RunResult {}
-
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct SystemsParams {}
 
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct SystemsResult {
     pub systems: Vec<SystemInfo>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct VersionResult {
+    #[serde(default)]
+    pub version: String,
+    #[serde(default)]
+    pub platform: String,
 }
 
 #[cfg(test)]
@@ -95,30 +147,30 @@ mod tests {
         reason = "tests should fail-fast on unexpected errors"
     )]
 
-    use super::{BrowseEntry, MediaSearchResult, SystemsResult};
+    use super::{BrowseEntry, MediaBrowseResult, MediaSearchResult, SystemsResult, VersionResult};
 
     #[test]
-    fn is_folder_accepts_both_spellings() {
-        let folder = BrowseEntry {
-            entry_type: "folder".into(),
-            ..BrowseEntry::default()
-        };
+    fn is_folder_accepts_directory_and_root() {
         let directory = BrowseEntry {
             entry_type: "directory".into(),
             ..BrowseEntry::default()
         };
-        let file = BrowseEntry {
-            entry_type: "file".into(),
+        let root = BrowseEntry {
+            entry_type: "root".into(),
             ..BrowseEntry::default()
         };
-        assert!(folder.is_folder());
+        let media = BrowseEntry {
+            entry_type: "media".into(),
+            ..BrowseEntry::default()
+        };
         assert!(directory.is_folder());
-        assert!(!file.is_folder());
+        assert!(root.is_folder());
+        assert!(!media.is_folder());
     }
 
     #[test]
     fn is_folder_unknown_type_is_false() {
-        for entry_type in ["", "symlink", "archive", "unknown", "FOLDER"] {
+        for entry_type in ["", "folder", "file", "symlink", "archive", "DIRECTORY"] {
             let entry = BrowseEntry {
                 entry_type: entry_type.into(),
                 ..BrowseEntry::default()
@@ -147,24 +199,90 @@ mod tests {
     }
 
     #[test]
-    fn media_search_result_parses_has_next_page() {
+    fn media_search_result_parses_nested_pagination() {
         let json = r#"{
             "results": [
-                {"name":"Game","path":"/p","zapScript":"s","system":{"id":"nes"}}
+                {"name":"Game","path":"/p","zapScript":"s","system":{"id":"nes"},"tags":[]}
             ],
-            "hasNextPage": true
+            "total": -1,
+            "pagination": {
+                "hasNextPage": true,
+                "pageSize": 100,
+                "nextCursor": "abc"
+            }
         }"#;
         let result: MediaSearchResult = serde_json::from_str(json).expect("parse");
         assert_eq!(result.results.len(), 1);
-        assert!(result.has_next_page);
+        assert!(result.has_next_page());
+        assert_eq!(result.pagination.page_size, 100);
+        assert_eq!(result.pagination.next_cursor.as_deref(), Some("abc"));
         assert_eq!(result.results[0].system.id, "nes");
         assert_eq!(result.results[0].zap_script, "s");
     }
 
     #[test]
-    fn media_search_result_defaults_has_next_page() {
+    fn media_search_result_defaults_pagination_when_missing() {
         let json = r#"{"results":[]}"#;
         let result: MediaSearchResult = serde_json::from_str(json).expect("parse");
-        assert!(!result.has_next_page);
+        assert!(!result.has_next_page());
+        assert_eq!(result.pagination.page_size, 0);
+        assert!(result.pagination.next_cursor.is_none());
+    }
+
+    #[test]
+    fn media_search_item_defaults_tags_when_missing() {
+        let json =
+            r#"{"results":[{"name":"G","path":"/p","zapScript":"s","system":{"id":"nes"}}]}"#;
+        let result: MediaSearchResult = serde_json::from_str(json).expect("parse");
+        assert!(result.results[0].tags.is_empty());
+    }
+
+    #[test]
+    fn media_browse_result_parses_envelope_and_pagination() {
+        let json = r#"{
+            "path": "/games",
+            "entries": [
+                {"name":"NES","path":"/games/NES","type":"directory","fileCount":42},
+                {"name":"SMB","path":"/games/NES/smb.nes","type":"media","systemId":"nes","zapScript":"@nes/smb","relativePath":"NES/smb.nes"}
+            ],
+            "totalFiles": 150,
+            "pagination": {"hasNextPage": true, "pageSize": 100, "nextCursor": "x"}
+        }"#;
+        let result: MediaBrowseResult = serde_json::from_str(json).expect("parse");
+        assert_eq!(result.path, "/games");
+        assert_eq!(result.entries.len(), 2);
+        assert!(result.entries[0].is_folder());
+        assert!(!result.entries[1].is_folder());
+        assert_eq!(result.entries[1].system_id, "nes");
+        assert_eq!(result.entries[1].relative_path, "NES/smb.nes");
+        assert_eq!(result.total_files, 150);
+        let pagination = result.pagination.expect("pagination present");
+        assert!(pagination.has_next_page);
+        assert_eq!(pagination.next_cursor.as_deref(), Some("x"));
+    }
+
+    #[test]
+    fn media_browse_result_omits_pagination_when_no_files() {
+        let json = r#"{"entries":[{"name":"/","path":"","type":"root","fileCount":0}]}"#;
+        let result: MediaBrowseResult = serde_json::from_str(json).expect("parse");
+        assert!(result.pagination.is_none());
+        assert_eq!(result.path, "");
+        assert_eq!(result.total_files, 0);
+        assert!(result.entries[0].is_folder());
+    }
+
+    #[test]
+    fn version_result_parses_populated_payload() {
+        let json = r#"{"version":"1.2.3","platform":"mister"}"#;
+        let result: VersionResult = serde_json::from_str(json).expect("parse");
+        assert_eq!(result.version, "1.2.3");
+        assert_eq!(result.platform, "mister");
+    }
+
+    #[test]
+    fn version_result_missing_fields_default_to_empty() {
+        let result: VersionResult = serde_json::from_str("{}").expect("parse");
+        assert_eq!(result.version, "");
+        assert_eq!(result.platform, "");
     }
 }

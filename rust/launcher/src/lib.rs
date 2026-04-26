@@ -1,7 +1,9 @@
 // Zaparoo Launcher
-// Copyright (c) 2026 The Zaparoo Project Contributors.
+// Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 
+#[macro_use]
+mod bind;
 mod mister_runtime;
 mod models;
 
@@ -31,25 +33,85 @@ pub unsafe extern "C" fn zaparoo_log_qt(level: u8, msg_ptr: *const u8, msg_len: 
     }
 }
 
-use std::ffi::c_int;
-use std::sync::Arc;
+use std::ffi::{c_char, c_int, CString};
+use std::sync::{Arc, Mutex, OnceLock};
 use zaparoo_core::{
-    client::Client, config::load_config, logger::install, platform_paths::config_file_path,
-    systems_catalog,
+    client::Client, config::load_config, logger::install, persist, platform,
+    platform_paths::config_file_path, store::Store,
 };
+
+/// Resolved language override, cached after [`zaparoo_rust_init`] so the
+/// C++ side can pull it via [`zaparoo_rust_language_code`] without re-
+/// loading config. An empty string means "use `QLocale::system()`".
+static LANGUAGE_CODE: OnceLock<CString> = OnceLock::new();
+
+/// Returns the resolved UI language override as a NUL-terminated UTF-8
+/// string. An empty string signals "follow `QLocale::system()`"; any
+/// other value is a BCP-47 tag passed straight to `QLocale(code)` in
+/// C++. The pointer is valid for the process lifetime.
+///
+/// Called before [`zaparoo_rust_init`] returns an empty string, since
+/// the `OnceLock` has not yet been populated.
+#[no_mangle]
+pub extern "C" fn zaparoo_rust_language_code() -> *const c_char {
+    LANGUAGE_CODE
+        .get()
+        .map_or_else(|| c"".as_ptr(), |s| s.as_ptr())
+}
+
+/// Installs a panic hook that routes Rust panics through the tracing
+/// registry so they land in the same stderr + JSONL sinks as normal log
+/// output. Without this, a panic on a tokio worker goes to raw stderr
+/// only — invisible on `MiSTer` where stderr is not captured. The hook
+/// chains to the previous default, preserving abort-on-panic semantics.
+fn install_panic_hook() {
+    let default = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let payload = info.payload();
+        let msg = payload
+            .downcast_ref::<&str>()
+            .copied()
+            .or_else(|| payload.downcast_ref::<String>().map(String::as_str))
+            .unwrap_or("<non-string panic payload>");
+        let location = info.location().map_or_else(
+            || "<unknown>".to_string(),
+            |l| format!("{}:{}:{}", l.file(), l.line(), l.column()),
+        );
+        let thread = std::thread::current();
+        let thread_name = thread.name().unwrap_or("<unnamed>");
+        let backtrace = std::backtrace::Backtrace::capture();
+        tracing::error!(
+            target: "panic",
+            "thread '{thread_name}' panicked at {location}: {msg}\n{backtrace}"
+        );
+        default(info);
+    }));
+}
 
 /// Called by the C++ main before `QGuiApplication` is constructed.
 /// Sets up logging, tokio runtime, `MiSTer` pre-Qt env/vmode, WebSocket
-/// client, `SystemsCatalog`, and model globals. Returns 0 on success.
+/// client, `Store` (which owns the endpoint cache), and model globals.
+/// Returns 0 on success.
 #[no_mangle]
 pub extern "C" fn zaparoo_rust_init() -> c_int {
     let config_path = config_file_path();
     let config = load_config(&config_path);
 
+    // Cache the language override so `zaparoo_rust_language_code` (called
+    // from main.cpp before the QML engine loads) can return it without
+    // re-parsing the TOML. `CString::new` only fails on interior NULs,
+    // which a valid BCP-47 tag or the empty sentinel cannot contain —
+    // fall back to empty ("use QLocale::system()") if a user manages it.
+    let _ = LANGUAGE_CODE.set(CString::new(config.language.clone()).unwrap_or_default());
+
     // Leak the guard — it must live for the process lifetime to keep the
     // file-appender thread running. The OS reclaims it on exit.
     let guard = install(&config);
     Box::leak(Box::new(guard));
+
+    // Install after logging so panics go through the same sinks; before
+    // tokio / client setup so a panic during those lines is captured.
+    install_panic_hook();
 
     tracing::info!("Zaparoo Launcher starting");
 
@@ -67,10 +129,18 @@ pub extern "C" fn zaparoo_rust_init() -> c_int {
     mister_runtime::apply_pre_qt_setup(&config);
 
     let client = Client::new(config.core_endpoint.clone(), &runtime);
-    let catalog_tx = systems_catalog::spawn(client.clone(), &runtime);
+    platform::spawn_fetcher(client.clone(), &runtime);
+    let store = Store::new(client.clone(), runtime.clone());
+
+    // Load persisted UI state up front so per-screen singletons can seed
+    // their properties from a consistent snapshot during Initialize.
+    let persist_state = Arc::new(Mutex::new(persist::load()));
 
     // init_globals stores Arcs — runtime keeps running after this fn returns.
-    models::init_globals(runtime, client, catalog_tx);
+    // The `Client` is owned by the `Store` (and the platform fetcher
+    // task), so `init_globals` no longer takes it directly; singletons
+    // reach the client through `global_store()`.
+    models::init_globals(runtime, store, persist_state, config.key_to_action.clone());
 
     0
 }

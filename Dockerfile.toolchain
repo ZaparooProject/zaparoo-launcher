@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.6
 # Zaparoo Launcher
-# Copyright (c) 2026 The Zaparoo Project Contributors.
+# Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 #
 # Builds the reusable Qt + MiSTer ARM32 toolchain base image. Qt upstream
@@ -84,9 +84,16 @@ ARG QT_VERSION
 RUN git clone --depth 1 --branch v${QT_VERSION} https://github.com/qt/qtbase.git && \
     git clone --depth 1 --branch v${QT_VERSION} https://github.com/qt/qtshadertools.git && \
     git clone --depth 1 --branch v${QT_VERSION} https://github.com/qt/qtdeclarative.git && \
+    git clone --depth 1 --branch v${QT_VERSION} https://github.com/qt/qttools.git && \
     git clone --depth 1 --branch v${QT_VERSION} https://github.com/qt/qtwebsockets.git
 
 # Stage 1: Qt6 host build (provides native tools: moc, rcc, qmllint, etc.)
+# PrintSupport is intentionally enabled here even though the launcher itself
+# doesn't print: Qt's `linguist` feature has condition `TARGET Qt::PrintSupport`,
+# and qttools/src/linguist/CMakeLists.txt returns early when that feature is
+# off — taking lupdate/lrelease/lconvert and the Qt6LinguistTools CMake
+# package down with it. The ARM32 target qtbase below stays `-no-feature-
+# printsupport` since the shipping binary never needs it.
 RUN mkdir qtbase-host-build && cd qtbase-host-build && \
     ../qtbase/configure \
         -release \
@@ -97,7 +104,6 @@ RUN mkdir qtbase-host-build && cd qtbase-host-build && \
         -no-openssl \
         -no-dbus \
         -no-feature-accessibility \
-        -no-feature-printsupport \
         -no-feature-sql \
         -qt-zlib \
         -qt-libpng \
@@ -115,6 +121,30 @@ RUN mkdir qtshadertools-host-build && cd qtshadertools-host-build && \
 
 RUN mkdir qtdeclarative-host-build && cd qtdeclarative-host-build && \
     /opt/qt6-host/bin/qt-configure-module ../qtdeclarative \
+    && cmake --build . --parallel $(nproc) \
+    && cmake --install .
+
+# qttools (host only): provides lupdate/lrelease + the Qt6LinguistTools
+# CMake package that qt_add_translations() requires at configure time.
+# Feature-gated to the subset we use: Linguist command-line tools. The
+# `linguist` feature is set explicitly so a future qtbase tweak can't
+# silently disable it again — its only condition is `TARGET Qt::PrintSupport`,
+# which the host qtbase above provides. The other FEATURE_* knobs disable
+# GUI tools (assistant, designer) and CLI utilities we don't ship; pulling
+# them in would either drag QtWidgets/Network into a host build that doesn't
+# need them or build code we never invoke. Not cross-compiled for ARM32 —
+# the launcher only needs .qm files at runtime, which are architecture-
+# independent.
+RUN mkdir qttools-host-build && cd qttools-host-build && \
+    /opt/qt6-host/bin/qt-configure-module ../qttools \
+        -- \
+        -DFEATURE_linguist=ON \
+        -DFEATURE_assistant=OFF \
+        -DFEATURE_designer=OFF \
+        -DFEATURE_qtattributionsscanner=OFF \
+        -DFEATURE_qdbus=OFF \
+        -DFEATURE_qtdiag=OFF \
+        -DFEATURE_qtplugininfo=OFF \
     && cmake --build . --parallel $(nproc) \
     && cmake --install .
 

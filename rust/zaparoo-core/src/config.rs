@@ -1,8 +1,10 @@
 // Zaparoo Launcher
-// Copyright (c) 2026 The Zaparoo Project Contributors.
+// Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 
+use crate::input_actions;
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::path::Path;
 use tracing::warn;
 
@@ -12,6 +14,16 @@ pub struct Config {
     pub video_width: u32,
     pub video_height: u32,
     pub debug_logging: bool,
+    /// Language override for the UI, passed to `QTranslator` via the
+    /// C++ entry point. Empty string means "follow `QLocale::system()`";
+    /// any non-empty value is treated as a BCP-47 tag (e.g. `en_US`,
+    /// `ja`, `de_DE`). Populated from `[general] language` in the config
+    /// file; the literal `auto` is normalised to an empty string.
+    pub language: String,
+    /// Qt key code → action name. Built at load time by merging
+    /// `[input.keyboard]` overrides onto `input_actions::default_bindings()`
+    /// and inverting.
+    pub key_to_action: HashMap<i32, String>,
 }
 
 impl Default for Config {
@@ -21,6 +33,8 @@ impl Default for Config {
             video_width: 1920,
             video_height: 1080,
             debug_logging: false,
+            language: String::new(),
+            key_to_action: input_actions::invert(&input_actions::default_bindings()),
         }
     }
 }
@@ -28,11 +42,20 @@ impl Default for Config {
 #[derive(Deserialize, Default)]
 struct RawConfig {
     #[serde(default)]
+    general: RawGeneral,
+    #[serde(default)]
     core: RawCore,
     #[serde(default)]
     video: RawVideo,
     #[serde(default)]
     logging: RawLogging,
+    #[serde(default)]
+    input: RawInput,
+}
+
+#[derive(Deserialize, Default)]
+struct RawGeneral {
+    language: Option<String>,
 }
 
 #[derive(Deserialize, Default)]
@@ -51,6 +74,12 @@ struct RawLogging {
     debug: Option<bool>,
 }
 
+#[derive(Deserialize, Default)]
+struct RawInput {
+    #[serde(default)]
+    keyboard: HashMap<String, Vec<String>>,
+}
+
 pub fn load_config(path: &Path) -> Config {
     let mut cfg = Config::default();
     let Ok(src) = std::fs::read_to_string(path) else {
@@ -63,8 +92,26 @@ pub fn load_config(path: &Path) -> Config {
             return cfg;
         }
     };
+    if let Some(lang) = raw.general.language {
+        // "auto" is the documented opt-in to system-locale detection; treat
+        // it as an empty override so the C++ side just calls `QLocale::system()`.
+        cfg.language = if lang.eq_ignore_ascii_case("auto") {
+            String::new()
+        } else {
+            lang
+        };
+    }
     if let Some(ep) = raw.core.endpoint {
         cfg.core_endpoint = ep;
+    }
+    // Env-var override wins over both the built-in default and any
+    // launcher.toml setting. Used by run-dev.sh to point the launcher at
+    // mock-core (port 27497) without forcing the user to maintain a
+    // throwaway launcher.toml.
+    if let Ok(ep) = std::env::var("ZAPAROO_CORE_ENDPOINT") {
+        if !ep.is_empty() {
+            cfg.core_endpoint = ep;
+        }
     }
     if let Some(w) = raw.video.width {
         cfg.video_width = w;
@@ -74,6 +121,13 @@ pub fn load_config(path: &Path) -> Config {
     }
     if let Some(d) = raw.logging.debug {
         cfg.debug_logging = d;
+    }
+    if !raw.input.keyboard.is_empty() {
+        let mut merged = input_actions::default_bindings();
+        for (action, keys) in raw.input.keyboard {
+            merged.insert(action, keys);
+        }
+        cfg.key_to_action = input_actions::invert(&merged);
     }
     cfg
 }
@@ -103,6 +157,57 @@ mod tests {
         assert_eq!(cfg.video_width, 1920);
         assert_eq!(cfg.video_height, 1080);
         assert!(!cfg.debug_logging);
+        assert_eq!(cfg.language, "");
+        // Default keyboard bindings populate the map.
+        assert!(!cfg.key_to_action.is_empty());
+    }
+
+    #[test]
+    fn language_auto_is_normalised_to_empty() {
+        let f = write_tmp("[general]\nlanguage = \"auto\"\n");
+        let cfg = load_config(f.path());
+        assert_eq!(cfg.language, "");
+    }
+
+    #[test]
+    fn language_auto_is_case_insensitive() {
+        let f = write_tmp("[general]\nlanguage = \"AUTO\"\n");
+        let cfg = load_config(f.path());
+        assert_eq!(cfg.language, "");
+    }
+
+    #[test]
+    fn language_explicit_code_passes_through() {
+        let f = write_tmp("[general]\nlanguage = \"ja_JP\"\n");
+        let cfg = load_config(f.path());
+        assert_eq!(cfg.language, "ja_JP");
+    }
+
+    #[test]
+    fn keyboard_override_replaces_default_for_that_action() {
+        use crate::input_actions::{actions, qt_key_code};
+
+        let toml = r#"
+            [input.keyboard]
+            accept = ["Space"]
+        "#;
+        let f = write_tmp(toml);
+        let cfg = load_config(f.path());
+        let space = qt_key_code("Space").unwrap();
+        let enter = qt_key_code("Enter").unwrap();
+        assert_eq!(
+            cfg.key_to_action.get(&space).map(String::as_str),
+            Some(actions::ACCEPT)
+        );
+        // Enter is no longer bound to accept: the user's list replaced
+        // the default for this action entirely.
+        assert!(!cfg.key_to_action.contains_key(&enter));
+        // Cancel defaults survive untouched.
+        let escape = qt_key_code("Escape").unwrap();
+        assert_eq!(
+            cfg.key_to_action.get(&escape).map(String::as_str),
+            Some(actions::CANCEL)
+        );
     }
 
     #[test]
@@ -153,5 +258,31 @@ mod tests {
         let f = write_tmp("");
         let cfg = load_config(f.path());
         assert_eq!(cfg.video_width, Config::default().video_width);
+    }
+
+    // Single test because std::env is process-global; splitting into
+    // separate #[test]s would race when nextest runs them in parallel.
+    #[test]
+    fn env_var_overrides_endpoint_and_empty_string_is_ignored() {
+        const KEY: &str = "ZAPAROO_CORE_ENDPOINT";
+        let prior = std::env::var(KEY).ok();
+        let f = write_tmp("[core]\nendpoint = \"ws://example.com/api\"\n");
+
+        std::env::set_var(KEY, "ws://localhost:27497/api/v0.1");
+        assert_eq!(
+            load_config(f.path()).core_endpoint,
+            "ws://localhost:27497/api/v0.1"
+        );
+
+        // Empty value is treated as unset so accidentally exporting an
+        // empty ZAPAROO_CORE_ENDPOINT in a shell rc file doesn't blank
+        // out the user's launcher.toml.
+        std::env::set_var(KEY, "");
+        assert_eq!(load_config(f.path()).core_endpoint, "ws://example.com/api");
+
+        match prior {
+            Some(v) => std::env::set_var(KEY, v),
+            None => std::env::remove_var(KEY),
+        }
     }
 }

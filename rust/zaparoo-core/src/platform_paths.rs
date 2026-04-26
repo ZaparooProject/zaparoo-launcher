@@ -1,15 +1,12 @@
 // Zaparoo Launcher
-// Copyright (c) 2026 The Zaparoo Project Contributors.
+// Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 
+use crate::runtime;
 use std::path::PathBuf;
 
-pub fn is_mister() -> bool {
-    std::path::Path::new("/media/fat").exists()
-}
-
 pub fn config_file_path() -> PathBuf {
-    if is_mister() {
+    if runtime::current().is_mister() {
         PathBuf::from("/media/fat/zaparoo/launcher.toml")
     } else {
         dirs_next::config_dir()
@@ -20,7 +17,7 @@ pub fn config_file_path() -> PathBuf {
 }
 
 pub fn log_file_path() -> PathBuf {
-    if is_mister() {
+    if runtime::current().is_mister() {
         PathBuf::from("/tmp/zaparoo/launcher.log")
     } else {
         dirs_next::data_local_dir()
@@ -28,6 +25,24 @@ pub fn log_file_path() -> PathBuf {
             .join("zaparoo")
             .join("logs")
             .join("launcher.log")
+    }
+}
+
+pub fn state_file_path() -> PathBuf {
+    // ZAPAROO_STATE_FILE lets tests (and ad-hoc runs) redirect state
+    // persistence away from the real user path. Checked first so the
+    // override applies on every platform.
+    if let Ok(custom) = std::env::var("ZAPAROO_STATE_FILE") {
+        if !custom.is_empty() {
+            return PathBuf::from(custom);
+        }
+    }
+    if runtime::current().is_mister() {
+        PathBuf::from("/tmp/zaparoo/state.toml")
+    } else {
+        let mut path = config_file_path();
+        path.set_file_name("state.toml");
+        path
     }
 }
 
@@ -40,7 +55,8 @@ mod tests {
         reason = "tests should fail-fast on unexpected errors"
     )]
 
-    use super::{config_file_path, is_mister, log_file_path};
+    use super::{config_file_path, log_file_path, state_file_path};
+    use crate::runtime;
 
     #[test]
     fn paths_end_with_expected_filenames() {
@@ -55,18 +71,25 @@ mod tests {
             log.file_name().and_then(|n| n.to_str()),
             Some("launcher.log")
         );
+
+        let state = state_file_path();
+        assert_eq!(
+            state.file_name().and_then(|n| n.to_str()),
+            Some("state.toml")
+        );
     }
 
     #[test]
-    fn mister_detection_matches_configured_paths() {
-        // When /media/fat is absent, paths route through dirs_next (per-user dirs)
+    fn runtime_matches_configured_paths() {
+        // When runtime is Desktop, paths route through dirs_next (per-user dirs)
         // rather than the fixed MiSTer locations. Asserts the branches stay in sync.
-        if is_mister() {
+        if runtime::current().is_mister() {
             assert_eq!(
                 config_file_path().to_str(),
                 Some("/media/fat/zaparoo/launcher.toml")
             );
             assert_eq!(log_file_path().to_str(), Some("/tmp/zaparoo/launcher.log"));
+            assert_eq!(state_file_path().to_str(), Some("/tmp/zaparoo/state.toml"));
         } else {
             let cfg = config_file_path();
             assert!(
@@ -78,6 +101,25 @@ mod tests {
                 log.ends_with("zaparoo/logs/launcher.log"),
                 "log path did not end with zaparoo/logs/launcher.log: {log:?}"
             );
+            let state = state_file_path();
+            assert!(
+                state.ends_with("zaparoo/state.toml"),
+                "state path did not end with zaparoo/state.toml: {state:?}"
+            );
         }
+    }
+
+    #[test]
+    fn state_file_sits_next_to_config_file_on_desktop() {
+        if runtime::current().is_mister() {
+            return;
+        }
+        let cfg = config_file_path();
+        let state = state_file_path();
+        assert_eq!(
+            cfg.parent(),
+            state.parent(),
+            "state.toml must be a sibling of launcher.toml: cfg={cfg:?} state={state:?}"
+        );
     }
 }

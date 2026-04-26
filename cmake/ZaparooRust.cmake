@@ -1,5 +1,5 @@
 # Zaparoo Launcher
-# Copyright (c) 2026 The Zaparoo Project Contributors.
+# Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 #
 # Rust/Cargo integration via Corrosion. Builds zaparoo_launcher_rs as a
@@ -51,7 +51,7 @@ corrosion_set_env_vars(zaparoo_launcher_rs
     "QMAKE=${_rs_qmake}"
 )
 if(_rs_qt6_core_type STREQUAL "STATIC_LIBRARY")
-    corrosion_set_env_vars(zaparoo_launcher_rs "ZAPAROO_MISTER=1")
+    corrosion_set_env_vars(zaparoo_launcher_rs "ZAPAROO_RUNTIME=mister")
 endif()
 if(ZAPAROO_DEV)
     corrosion_set_env_vars(zaparoo_launcher_rs "ZAPAROO_DEV_BUILD=1")
@@ -107,6 +107,17 @@ target_link_libraries(launcher
         Qt6::QuickControls2
 )
 
+# Dummy CMake target satisfying qmlimportscanner's lookup for the cxx-qt
+# plugin. build/qml/Zaparoo/Browse/qmldir declares `optional plugin
+# Zaparoo_Browse`, and qt_import_qml_plugins() warns when that name has
+# no matching CMake target. The real plugin code is baked into
+# zaparoo_launcher_rs (already linked above); the INTERFACE target here
+# is a no-op link-wise but silences the "plugin will not be linked"
+# warning. Defined at global scope so tests/ui sees it too.
+if(NOT TARGET Zaparoo_Browse)
+    add_library(Zaparoo_Browse INTERFACE)
+endif()
+
 # Critical: documented Qt static-plugin machinery. Runs qmlimportscanner,
 # traverses the QML module dependency graph, and emits correct
 # Q_IMPORT_QML_PLUGIN calls + --whole-archive link lines for every Qt
@@ -140,4 +151,37 @@ endif()
 
 set_target_properties(launcher PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+)
+
+# ── Translations ─────────────────────────────────────────────────────────────
+# lrelease compiles .ts → .qm and qt_add_translations embeds them into the
+# launcher binary under qrc:/i18n/ (the default RESOURCE_PREFIX). main.cpp
+# loads the locale-matching .qm with `QTranslator::load(locale, "launcher",
+# "_", ":/i18n")` before the QML engine runs.
+#
+# IMMEDIATE_CALL runs source collection inline instead of deferring to the
+# end of the top-level directory scope. Without it, qt_add_translations
+# defers until CMake finalises PROJECT_SOURCE_DIR and the generated resource
+# targets land after link-time, producing missing-dependency errors on
+# parallel builds (Corrosion-provided staticlibs are visited out of order).
+qt_add_translations(launcher
+    TS_FILES "${CMAKE_SOURCE_DIR}/src/ui/translations/launcher_en.ts"
+    RESOURCE_PREFIX "/i18n"
+    IMMEDIATE_CALL
+)
+
+# ── cxx-qt QML module sync for tooling ───────────────────────────────────────
+# cxx-qt writes qmldir + plugin.qmltypes under cargo's OUT_DIR, which qmllint
+# does not search. Copy them into ${QT_QML_OUTPUT_DIRECTORY}/<module>/ so
+# qmllint's -I path resolves types (Browse.QAppState, Browse.GamesModel, …)
+# exposed by the Rust staticlib. The cmake script globs at build time because
+# Corrosion's hash-segmented path is not known at configure time.
+add_custom_target(zaparoo_cxxqt_qml_sync
+    COMMAND ${CMAKE_COMMAND}
+        -DCARGO_DIR=${CMAKE_BINARY_DIR}/cargo
+        -DDEST_QML_DIR=${CMAKE_BINARY_DIR}/qml
+        -P ${CMAKE_SOURCE_DIR}/cmake/SyncCxxqtQmlModules.cmake
+    DEPENDS cargo-build_zaparoo_launcher_rs
+    COMMENT "Syncing cxx-qt QML module manifests into ${CMAKE_BINARY_DIR}/qml"
+    VERBATIM
 )

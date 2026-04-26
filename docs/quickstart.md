@@ -1,0 +1,134 @@
+# Quickstart
+
+## 1. Install prerequisites
+
+Install the pieces you do not already have.
+
+### Linux
+
+**Fedora / RHEL:**
+```bash
+sudo dnf install qt6-qtdeclarative-devel qt6-qtquickcontrols2-devel \
+    qt6-qttools-devel cmake ninja-build mold clang-tools-extra just
+```
+
+**Ubuntu / Debian:**
+```bash
+sudo apt install qt6-declarative-dev qt6-quick-controls2-dev \
+    qt6-tools-dev qt6-l10n-tools cmake ninja-build mold \
+    clang-tidy clang-format just
+```
+
+(If `just` isn't packaged for your distro, install it with
+`cargo install --locked just` after Rust is set up.)
+
+### Rust
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+cargo install --locked cargo-nextest cargo-deny
+```
+
+### macOS / Windows
+
+macOS is best-effort and not covered in CI. Qt package names change often
+enough that Linux is the supported path unless you are prepared to debug local
+setup. Windows is not tested; use WSL2.
+
+## 2. Clone and build
+
+```bash
+git clone https://github.com/ZaparooProject/zaparoo-launcher.git
+cd zaparoo-launcher
+just build
+```
+
+The first build pulls and compiles the Rust and Qt dependencies. Incremental
+builds are much faster after that.
+
+## 3. Start the mock Core
+
+In one terminal:
+
+```bash
+just mock-core
+```
+
+You should see:
+
+```text
+mock-core listening on ws://127.0.0.1:27497/api/v0.1
+```
+
+The mock serves three categories (Consoles, Handhelds, Arcade), ten systems,
+and fifty games. That is enough data to exercise every launcher screen.
+
+`27497` is offset from the real Core's `7497` so a real Core, or another Core
+test instance, can run on the same machine without colliding with the mock. The
+launcher still defaults to `7497` in production. `just run-dev` points it at
+the mock through `ZAPAROO_CORE_ENDPOINT`; `just run` reads
+`~/.config/zaparoo/launcher.toml` as usual.
+
+### Pick a different port
+
+If something already uses `27497`, override it at startup:
+
+```bash
+MOCK_CORE_ADDR=127.0.0.1:9000 just mock-core
+ZAPAROO_CORE_ENDPOINT=ws://127.0.0.1:9000/api/v0.1 just run-dev
+```
+
+`ZAPAROO_CORE_ENDPOINT` always wins over `~/.config/zaparoo/launcher.toml`.
+
+## 4. Run the launcher
+
+In a second terminal:
+
+```bash
+just run-dev
+```
+
+`run-dev` is windowed and points at the mock. `just run` is the
+production-style runner: it respects `~/.config/zaparoo/launcher.toml` and
+starts fullscreen.
+
+## 5. Check the result
+
+- The launcher window opens.
+- A **categories** carousel fills with "Arcade", "Consoles",
+  "Handhelds". Left/Right cycles between them.
+- Pressing Enter drops you into the **systems** carousel for that
+  category.
+- Pressing Enter on a system opens the **games** carousel (five
+  entries per system).
+- Pressing Enter on a game sends a `run` RPC to the mock. The mock logs the
+  selected game's zap script, but the launcher keeps running because nothing is
+  actually launched.
+- Escape backs out; Escape on the top level quits.
+
+The FPS counter in the corner should stay green (≥ 55). Red means the UI fell
+below 30 FPS and needs investigation.
+
+## 6. Run tests and lints
+
+Before you open a pull request:
+
+```bash
+just lint    # clang-format, clang-tidy, qmllint, rustfmt, clippy, cargo-deny
+just test    # ctest + cargo nextest
+```
+
+Zero warnings is the bar.
+
+## Next steps
+
+- [`docs/building.md`](building.md): sanitizer builds, ARM32
+  cross-build for MiSTer, deployment.
+- [`docs/architecture.md`](architecture.md): module graph, Rust↔QML
+  data flow, Runtime vs Platform distinction.
+- [`docs/qml-gotchas.md`](qml-gotchas.md): QML pitfalls that `qmllint`
+  only catches after the fact.
+- [`docs/cxx-qt-bridge.md`](cxx-qt-bridge.md): cxx-qt 0.8 bridge
+  constraints when editing Rust QML models.
+- [`CONTRIBUTING.md`](../CONTRIBUTING.md): CLA flow, PR expectations,
+  branch-protection rules.
