@@ -50,7 +50,11 @@ if [ -z "${TOOLCHAIN_IMAGE:-}" ]; then
     fi
 fi
 
+# Skip the registry probe when the image is already in the local daemon, so
+# offline rebuilds and expired GHCR tokens still work as long as it has been
+# pulled at least once.
 if [[ "${TOOLCHAIN_IMAGE}" == "${OFFICIAL_TOOLCHAIN_IMAGE}" ]] \
+    && ! docker image inspect "${TOOLCHAIN_IMAGE}" > /dev/null 2>&1 \
     && ! docker manifest inspect "${TOOLCHAIN_IMAGE}" > /dev/null 2>&1; then
     echo "Error: official toolchain image is not available: ${TOOLCHAIN_IMAGE}" >&2
     echo "       If GHCR requires auth, run:" >&2
