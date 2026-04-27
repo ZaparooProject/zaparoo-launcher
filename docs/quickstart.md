@@ -99,9 +99,10 @@ starts fullscreen.
   "Consoles", "Handhelds". Left/Right cycles between them.
   ("Favorites" is a placeholder until a real Favorites endpoint
   lands in Core; selecting it shows an empty systems grid.)
-- Pressing Enter drops you into the **systems** carousel for that
-  category.
-- Pressing Enter on a system opens the **games** carousel (five
+- Pressing Enter drops you into the **paged systems grid** for that
+  category. Use Left/Right to move within a page; the grid wraps to
+  the next page at the row edge.
+- Pressing Enter on a system opens the **paged games grid** (five
   entries per system).
 - Pressing Enter on a game sends a `run` RPC to the mock. The mock logs the
   selected game's zap script, but the launcher keeps running because nothing is

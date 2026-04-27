@@ -31,23 +31,25 @@ Item {
     // active screen back to the hub.
     signal requestHubScreen()
 
+    // Move selection by (dx, dy) and commit the new game path on
+    // success. Unlike HubScreen's _handleSystems, none of the games-grid
+    // directions have a row-edge escape branch, so all four cardinal
+    // actions share this exact body.
+    function _performMove(dx: int, dy: int): void {
+        if (games.gamesGrid.moveSelection(dx, dy))
+            Browse.GamesState.game_path =
+                Browse.GamesModel.path_at(games.gamesGrid.currentIndex)
+    }
+
     function handleAction(action: string): void {
         if (action === "left") {
-            if (games.gamesGrid.moveSelection(-1, 0))
-                Browse.GamesState.game_path =
-                    Browse.GamesModel.path_at(games.gamesGrid.currentIndex)
+            games._performMove(-1, 0)
         } else if (action === "right") {
-            if (games.gamesGrid.moveSelection(1, 0))
-                Browse.GamesState.game_path =
-                    Browse.GamesModel.path_at(games.gamesGrid.currentIndex)
+            games._performMove(1, 0)
         } else if (action === "up") {
-            if (games.gamesGrid.moveSelection(0, -1))
-                Browse.GamesState.game_path =
-                    Browse.GamesModel.path_at(games.gamesGrid.currentIndex)
+            games._performMove(0, -1)
         } else if (action === "down") {
-            if (games.gamesGrid.moveSelection(0, 1))
-                Browse.GamesState.game_path =
-                    Browse.GamesModel.path_at(games.gamesGrid.currentIndex)
+            games._performMove(0, 1)
         } else if (action === "accept") {
             if (games.gamesGrid.itemCount > 0) {
                 // Persist before handing control away. Directional moves
@@ -104,8 +106,11 @@ Item {
         // own dot band internally so this lands in clean space).
         anchors.top: gamesGrid.bottom
         anchors.topMargin: Sizing.pctH(1)
-        // Reading count registers the binding for model-reset updates.
-        text: Browse.GamesModel.count >= 0
+        // Reading count registers the binding for model-reset updates;
+        // the bounds check guards against a stale currentIndex during
+        // the reset window.
+        text: gamesGrid.currentIndex >= 0
+              && gamesGrid.currentIndex < Browse.GamesModel.count
               ? Browse.GamesModel.name_at(gamesGrid.currentIndex)
               : ""
         font.family: Theme.fontUi

@@ -104,7 +104,7 @@ Item {
         height: cover.status === Image.Ready
                 ? Math.min(parent.height, cover.paintedHeight + 2 * _padding)
                 : parent.height
-        radius: Math.max(4, Sizing.pctH(1.2))
+        radius: Sizing.pctH(1.2)
         color: Qt.rgba(1, 1, 1, 0.08)
         opacity: root.delegateIsSelected && root.delegateIsFocused ? 1.0 : 0.0
 

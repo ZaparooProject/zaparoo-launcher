@@ -60,12 +60,20 @@ TestCase {
         main.hubFocus = main.focusSystems
         main.handleKey(Qt.Key_Left)
         main.handleKey(Qt.Key_Right)
-        // Down stays within the (empty) grid; Up at row 0 falls through to
-        // a section flip back to categories — neither path may write a
-        // system id derived from index 0 of an empty model.
+        // Down stays within the (empty) grid; Up at row 0 falls through
+        // to a section flip back to categories — neither path may write
+        // a system id derived from index 0 of an empty model.
         main.handleKey(Qt.Key_Down)
         compare(Browse.HubState.system_id, "persistence-probe-system",
                 "Down on an empty systems grid must not overwrite HubState.system_id")
+        // Restore systems focus so Up exercises the empty-systems path
+        // (the prior Down may have flipped sections via the same
+        // fall-through). Up on an empty grid hits the section-flip
+        // branch that mirrors Escape — it must also not write system_id.
+        main.hubFocus = main.focusSystems
+        main.handleKey(Qt.Key_Up)
+        compare(Browse.HubState.system_id, "persistence-probe-system",
+                "Up on an empty systems grid must not overwrite HubState.system_id")
     }
 
     function test_empty_games_navigation_preserves_games_state(): void {

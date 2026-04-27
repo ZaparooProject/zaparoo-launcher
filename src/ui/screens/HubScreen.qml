@@ -142,12 +142,15 @@ Item {
     //
     // Called from two sites in Main.qml — the Component.onCompleted
     // early-arrival path (catalog already seeded synchronously) and the
-    // CategoriesModel.onModelReset listener (later refreshes). The
-    // window where both could fire is tiny but non-zero, so guard
-    // against the redundant work here. SystemsModel.set_category has
-    // its own same-category early-return, but the carousel-index
-    // assignment is QML-side; mirror Rust's `is_empty` recovery clause
-    // so a stale-but-empty model still gets a retry shot.
+    // CategoriesModel.onModelReset listener (later refreshes). On a
+    // refresh the category list can reorder, so the carousel index
+    // MUST be re-seeded even when SystemsModel is already on the
+    // chosen category — otherwise the visible carousel slot drifts
+    // off the systems grid below it. Only the expensive set_category
+    // call is gated; the QML-side index assignment is cheap and
+    // idempotent. The `is_empty` clause mirrors Rust's same-named
+    // recovery in SystemsModel::set_category so a stale-but-empty
+    // model still gets a retry shot.
     function restoreFromCategoriesReset(): void {
         const savedCategory = Browse.HubState.category
         const idx = savedCategory === ""
@@ -157,10 +160,10 @@ Item {
         const chosenCategory = idx >= 0
                                ? savedCategory
                                : Browse.CategoriesModel.category_at(chosenIndex)
+        hub.categoriesCarousel.currentIndex = chosenIndex
         if (Browse.SystemsModel.current_category === chosenCategory
             && Browse.SystemsModel.count > 0)
             return
-        hub.categoriesCarousel.currentIndex = chosenIndex
         Browse.SystemsModel.set_category(chosenCategory)
     }
 
@@ -442,9 +445,12 @@ Item {
             anchors.top: systemsGrid.bottom
             anchors.topMargin: Sizing.pctH(2.5)
             // Reading Browse.SystemsModel.count registers the binding
-            // for model resets; the comparison is always true so the
-            // result is the system name at the current grid index.
-            text: Browse.SystemsModel.count >= 0
+            // so a model reset re-evaluates the lookup. The bounds
+            // check is honest (count is always >= 0, but currentIndex
+            // can stale-out across resets) and matches the Rust-side
+            // out-of-range fallback in system_name_at.
+            text: systemsGrid.currentIndex >= 0
+                  && systemsGrid.currentIndex < Browse.SystemsModel.count
                   ? Browse.SystemsModel.system_name_at(systemsGrid.currentIndex)
                   : ""
             font.family: Theme.fontUi
