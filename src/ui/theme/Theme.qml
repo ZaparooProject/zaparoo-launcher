@@ -13,6 +13,11 @@ QtObject {
     readonly property color bgMid: "#252550"
     readonly property color bgPanel: "#1a1a35"
     readonly property color bgBar: "#0a0a15"
+    // Card surface used for tile bodies in carousels/grids. Sits a step
+    // above bgPanel so a solid white icon+label silhouette has clear
+    // contrast — the page bg pattern stays visible in the gaps between
+    // tiles, and each tile reads as a self-contained chip.
+    readonly property color surfaceCard: "#2a2a45"
 
     // Borders
     readonly property color borderSubtle: "#1a1a2e"

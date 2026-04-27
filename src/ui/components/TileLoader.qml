@@ -19,4 +19,8 @@ Loader {
     required property bool isFocused
     required property string name
     required property string coverKey
+    // Default 1.0 so the existing cover-fitting Tile delegate (which
+    // ignores this property) keeps painting at full opacity. The hub
+    // categories carousel binds this to drive its activation fade.
+    property real imagesOpacity: 1.0
 }

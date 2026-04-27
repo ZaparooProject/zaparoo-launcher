@@ -169,12 +169,18 @@ Item {
 
     // Returns true if the carousel actually moved. Empty carousels leave
     // disk state alone — see tst_persistence.qml for the regression
-    // guarded against.
+    // guarded against. Past either end the index wraps modulo itemCount
+    // so right-at-end whips to 0 and left-at-start whips to itemCount-1;
+    // the existing `Behavior on x` in Carousel.qml animates the long
+    // sweep so the user sees the focus snap back to the opposite end.
     function _navigateCarousel(carousel, delta): bool {
         if (carousel.itemCount <= 0)
             return false
-        carousel.currentIndex =
-            (carousel.currentIndex + delta + carousel.itemCount) % carousel.itemCount
+        const count = carousel.itemCount
+        const next = ((carousel.currentIndex + delta) % count + count) % count
+        if (next === carousel.currentIndex)
+            return false
+        carousel.currentIndex = next
         return true
     }
 
@@ -261,36 +267,42 @@ Item {
     Carousel {
         id: categoriesCarousel
 
-        // Carousel grows when categories has focus and shrinks when the
-        // user drills into the systems grid, so the focused section
-        // always feels like the centre of attention. The animated
-        // shrink runs alongside the y-slide so the carousel "tucks
-        // away" smoothly. Sizes/spacings stay in pctH so 240p MiSTer
-        // and 720p+ desktop both scale.
-        readonly property int _heightFocused: Sizing.pctH(28)
-        readonly property int _heightCompact: Sizing.pctH(20)
-        readonly property int _spacingFocused: Sizing.pctH(32)
-        readonly property int _spacingCompact: Sizing.pctH(23)
+        // Cell layout is constant across the activation transition: only
+        // y and imagesOpacity animate. The image area is a square equal
+        // to coverWidth; the label sits inside the cell below it.
+        // _labelHeight and _gap mirror HubCategoryTile's internal
+        // constants so the cell box fits its contents exactly and the
+        // _yActivated maths land the label row at pctH(12) — clear of
+        // the logo (bottom at pctH(9)) and the top-right HUD.
+        readonly property int _gap: Sizing.pctH(1)
+        readonly property int _labelHeight:
+            Sizing.fontSize(2.4) + Sizing.pctH(0.8)
+        readonly property int _imageSide: Sizing.pctH(22)
+        readonly property int _coverWidth: _imageSide
+        readonly property int _coverHeight: _imageSide + _gap + _labelHeight
+        readonly property int _coverSpacing: Sizing.pctH(28)
+        // Band has a small extra strip beyond the cell so the selected
+        // tile's 1.1× scale doesn't get clipped by the band edges.
+        readonly property int _bandHeight: _coverHeight + Sizing.pctH(2)
+        readonly property int _yFocused: Sizing.pctH(30)
+        // Translate the carousel up so the label row (which sits at
+        // imageSide + gap below the cell top) lands at pctH(12) —
+        // pctH(3) of breathing room below the logo's pctH(9) bottom.
+        readonly property int _yActivated:
+            Sizing.pctH(12) - _imageSide - _gap
 
         anchors.horizontalCenter: parent.horizontalCenter
         width: parent.width
-        height: hub.section === hub.focusSystems
-                ? _heightCompact
-                : _heightFocused
-        y: hub.section === hub.focusSystems ? Sizing.pctH(4) : Sizing.pctH(30)
-        coverWidth: hub.section === hub.focusSystems
-                    ? _heightCompact
-                    : _heightFocused
-        coverHeight: hub.section === hub.focusSystems
-                     ? _heightCompact
-                     : _heightFocused
-        coverSpacing: hub.section === hub.focusSystems
-                      ? _spacingCompact
-                      : _spacingFocused
+        height: _bandHeight
+        y: hub.section === hub.focusSystems ? _yActivated : _yFocused
+        coverWidth: _coverWidth
+        coverHeight: _coverHeight
+        coverSpacing: _coverSpacing
+        imagesOpacity: hub.section === hub.focusSystems ? 0.0 : 1.0
         focused: hub.section === hub.focusCategories
 
         model: Browse.CategoriesModel
-        delegate: Tile {}
+        delegate: HubCategoryTile {}
 
         Behavior on y {
             NumberAnimation {
@@ -298,25 +310,7 @@ Item {
                 easing.type: Easing.OutQuad
             }
         }
-        Behavior on height {
-            NumberAnimation {
-                duration: hub._carouselTransitionMs
-                easing.type: Easing.OutQuad
-            }
-        }
-        Behavior on coverWidth {
-            NumberAnimation {
-                duration: hub._carouselTransitionMs
-                easing.type: Easing.OutQuad
-            }
-        }
-        Behavior on coverHeight {
-            NumberAnimation {
-                duration: hub._carouselTransitionMs
-                easing.type: Easing.OutQuad
-            }
-        }
-        Behavior on coverSpacing {
+        Behavior on imagesOpacity {
             NumberAnimation {
                 duration: hub._carouselTransitionMs
                 easing.type: Easing.OutQuad

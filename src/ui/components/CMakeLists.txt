@@ -11,6 +11,7 @@ qt_add_qml_module(
     QML_FILES
         Carousel.qml
         FpsCounter.qml
+        HubCategoryTile.qml
         PagedGrid.qml
         Tile.qml
         TileLoader.qml
