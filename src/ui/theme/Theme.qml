@@ -31,6 +31,14 @@ QtObject {
     readonly property color accent: "#FFB347"
 
     // Fonts
-    readonly property string fontRetro: "Press Start 2P"
+    readonly property string fontUi: "Atkinson Hyperlegible"
     readonly property string fontMono: "monospace"
+
+    // Section-flip duration in ms. Carousel y-slide and the systems-reveal
+    // wrapper Transition are coupled — the wrapper PauseAnimation must
+    // last at least as long as the carousel slide, otherwise the systems
+    // grid fades in while the carousel is still travelling and the user
+    // sees a freeze-mid-animation. Bumping one without the other reopens
+    // that bug. Read both off this single source of truth.
+    readonly property int transitionDuration: 250
 }

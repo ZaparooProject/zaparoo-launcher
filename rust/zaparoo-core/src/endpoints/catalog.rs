@@ -121,10 +121,10 @@ mod tests {
     #[test]
     fn shape_catalog_snapshot_matches_fixture() {
         let systems = vec![
-            sys("snes", "Super Nintendo", "Consoles"),
-            sys("nes", "Nintendo", "Consoles"),
-            sys("gb", "Game Boy", "Handhelds"),
-            sys("mame", "MAME", "arcade"),
+            sys("SNES", "Super Nintendo", "Consoles"),
+            sys("NES", "Nintendo", "Consoles"),
+            sys("Gameboy", "Game Boy", "Handhelds"),
+            sys("MAME", "MAME", "arcade"),
             sys("odd", "Odd One", ""),
         ];
         insta::assert_debug_snapshot!(shape_catalog(systems));

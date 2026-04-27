@@ -71,7 +71,22 @@ int main(int argc, char* argv[])
     qInstallMessageHandler(qtMessageHandler);
 
     QGuiApplication app(argc, argv);
-    QFontDatabase::addApplicationFont(":/qt/qml/Zaparoo/App/resources/fonts/PressStart2P.ttf");
+    // addApplicationFont returns -1 on failure (broken qrc path,
+    // unreadable file). Logging the failure mode keeps a refactor that
+    // breaks the resource alias from silently degrading to the default
+    // font with no clue in the logs.
+    const QString regularPath =
+        QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/AtkinsonHyperlegible-Regular.ttf");
+    const QString boldPath =
+        QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/AtkinsonHyperlegible-Bold.ttf");
+    if (QFontDatabase::addApplicationFont(regularPath) == -1)
+    {
+        qWarning("Failed to register font: %s", qUtf8Printable(regularPath));
+    }
+    if (QFontDatabase::addApplicationFont(boldPath) == -1)
+    {
+        qWarning("Failed to register font: %s", qUtf8Printable(boldPath));
+    }
     QQuickStyle::setStyle("Basic");
 
     // Install the locale .qm translator before constructing the QML engine

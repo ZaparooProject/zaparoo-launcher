@@ -189,10 +189,10 @@ mod tests {
 
     #[test]
     fn systems_result_deserialises_camelcase_payload() {
-        let json = r#"{"systems":[{"id":"nes","name":"Nintendo","category":"Consoles"}]}"#;
+        let json = r#"{"systems":[{"id":"NES","name":"Nintendo","category":"Consoles"}]}"#;
         let result: SystemsResult = serde_json::from_str(json).expect("parse");
         assert_eq!(result.systems.len(), 1);
-        assert_eq!(result.systems[0].id, "nes");
+        assert_eq!(result.systems[0].id, "NES");
         assert_eq!(result.systems[0].category, "Consoles");
     }
 
@@ -207,7 +207,7 @@ mod tests {
     fn media_search_result_parses_nested_pagination() {
         let json = r#"{
             "results": [
-                {"name":"Game","path":"/p","zapScript":"s","system":{"id":"nes"},"tags":[]}
+                {"name":"Game","path":"/p","zapScript":"s","system":{"id":"NES"},"tags":[]}
             ],
             "total": -1,
             "pagination": {
@@ -221,7 +221,7 @@ mod tests {
         assert!(result.has_next_page());
         assert_eq!(result.pagination.page_size, 100);
         assert_eq!(result.pagination.next_cursor.as_deref(), Some("abc"));
-        assert_eq!(result.results[0].system.id, "nes");
+        assert_eq!(result.results[0].system.id, "NES");
         assert_eq!(result.results[0].zap_script, "s");
     }
 
@@ -237,7 +237,7 @@ mod tests {
     #[test]
     fn media_search_item_defaults_tags_when_missing() {
         let json =
-            r#"{"results":[{"name":"G","path":"/p","zapScript":"s","system":{"id":"nes"}}]}"#;
+            r#"{"results":[{"name":"G","path":"/p","zapScript":"s","system":{"id":"NES"}}]}"#;
         let result: MediaSearchResult = serde_json::from_str(json).expect("parse");
         assert!(result.results[0].tags.is_empty());
     }
@@ -248,7 +248,7 @@ mod tests {
             "path": "/games",
             "entries": [
                 {"name":"NES","path":"/games/NES","type":"directory","fileCount":42},
-                {"name":"SMB","path":"/games/NES/smb.nes","type":"media","systemId":"nes","zapScript":"@nes/smb","relativePath":"NES/smb.nes"}
+                {"name":"SMB","path":"/games/NES/smb.nes","type":"media","systemId":"NES","zapScript":"@NES/smb","relativePath":"NES/smb.nes"}
             ],
             "totalFiles": 150,
             "pagination": {"hasNextPage": true, "pageSize": 100, "nextCursor": "x"}
@@ -258,7 +258,7 @@ mod tests {
         assert_eq!(result.entries.len(), 2);
         assert!(result.entries[0].is_folder());
         assert!(!result.entries[1].is_folder());
-        assert_eq!(result.entries[1].system_id, "nes");
+        assert_eq!(result.entries[1].system_id, "NES");
         assert_eq!(result.entries[1].relative_path, "NES/smb.nes");
         assert_eq!(result.total_files, 150);
         let pagination = result.pagination.expect("pagination present");

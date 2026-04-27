@@ -196,11 +196,11 @@ mod tests {
                 schema_version: HUB_SCHEMA,
                 focus: "systems".into(),
                 category: "Consoles".into(),
-                system_id: "nes".into(),
+                system_id: "NES".into(),
             },
             games: GamesState {
                 schema_version: GAMES_SCHEMA,
-                system_id: "nes".into(),
+                system_id: "NES".into(),
                 game_path: "/roms/smb.nes".into(),
             },
         };
@@ -235,7 +235,7 @@ system_id = "ancient_sys"
 
 [games]
 schema_version = {GAMES_SCHEMA}
-system_id = "nes"
+system_id = "NES"
 game_path = "/roms/smb.nes"
 "#
         );
@@ -244,7 +244,7 @@ game_path = "/roms/smb.nes"
         assert_eq!(state.active_screen, "games");
         assert_eq!(state.hub, HubState::default(), "hub should reset");
         assert_eq!(state.games.schema_version, GAMES_SCHEMA);
-        assert_eq!(state.games.system_id, "nes");
+        assert_eq!(state.games.system_id, "NES");
         assert_eq!(state.games.game_path, "/roms/smb.nes");
     }
 
@@ -319,12 +319,12 @@ game_path = "/roms/smb.nes"
 schema_version = {HUB_SCHEMA}
 focus = "categories"
 category = "Arcade"
-system_id = "nes"
+system_id = "NES"
 future_field = "ignored"
 
 [games]
 schema_version = {GAMES_SCHEMA}
-system_id = "nes"
+system_id = "NES"
 game_path = "/x.rom"
 "#
         );
