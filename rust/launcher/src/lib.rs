@@ -34,11 +34,70 @@ pub unsafe extern "C" fn zaparoo_log_qt(level: u8, msg_ptr: *const u8, msg_len: 
 }
 
 use std::ffi::{c_char, c_int, CString};
+use std::io::Write as _;
+use std::os::fd::AsRawFd;
+use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use zaparoo_core::{
-    client::Client, config::load_config, logger::install, persist, platform,
-    platform_paths::config_file_path, store::Store,
+    client::Client,
+    config::load_config,
+    logger::install,
+    persist, platform,
+    platform_paths::{config_file_path, log_file_path, stderr_log_path},
+    store::Store,
 };
+
+/// Pre-opened append-mode fd to `launcher.log`, used by the native-crash
+/// signal handler. A signal handler must be async-signal-safe — it cannot
+/// allocate, format, or call `tracing::*` — so the fd is opened during
+/// init and the handler writes a fixed marker via `libc::write(2)`.
+/// `-1` means "not yet installed"; the handler no-ops in that case.
+static CRASH_FD: AtomicI32 = AtomicI32::new(-1);
+
+/// Routes our own stderr to a file before any other init runs. The
+/// `MiSTer` wrapper launches the binary with `2>/dev/null`, so the
+/// chained default panic hook (`thread '...' panicked at ...`), libc
+/// `abort()` diagnostics, glibc backtrace prints, and any kernel
+/// signal-default output would otherwise vanish. After this call every
+/// byte written to fd 2 lands in `launcher.stderr.log` for the process
+/// lifetime.
+fn redirect_stderr() {
+    let path = stderr_log_path();
+    if let Some(dir) = path.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    let Ok(file) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+    else {
+        return;
+    };
+    let raw = file.as_raw_fd();
+    // SAFETY: dup2 with two valid fds. STDERR_FILENO is the constant 2
+    // and `raw` is the fd of the just-opened file. On failure dup2
+    // returns -1 which we don't act on (worst case: stderr still points
+    // at the original /dev/null).
+    unsafe {
+        libc::dup2(raw, libc::STDERR_FILENO);
+    }
+    // Leak the File so its drop doesn't close the underlying fd we just
+    // dup'd onto stderr. The duplicated fd at 2 keeps the file alive
+    // for the process lifetime.
+    std::mem::forget(file);
+
+    // Boot marker so successive runs are visually separated in the
+    // append-mode file. Direct write to stderr (now redirected) instead
+    // of `eprintln!` so we don't trip clippy::print_stderr.
+    let pid = std::process::id();
+    let timestamp = time::OffsetDateTime::now_utc()
+        .format(&time::format_description::well_known::Rfc3339)
+        .unwrap_or_default();
+    let _ = writeln!(
+        std::io::stderr().lock(),
+        "\n=== launcher pid={pid} starting at {timestamp} ==="
+    );
+}
 
 /// Resolved language override, cached after [`zaparoo_rust_init`] so the
 /// C++ side can pull it via [`zaparoo_rust_language_code`] without re-
@@ -64,6 +123,12 @@ pub extern "C" fn zaparoo_rust_language_code() -> *const c_char {
 /// output. Without this, a panic on a tokio worker goes to raw stderr
 /// only — invisible on `MiSTer` where stderr is not captured. The hook
 /// chains to the previous default, preserving abort-on-panic semantics.
+///
+/// Also writes the panic line synchronously to `launcher.log` via
+/// blocking `OpenOptions::append`. The async tracing-appender writer
+/// can lose its buffered tail if the process aborts (e.g. SIGABRT after
+/// the chained default hook); the blocking append is durable before we
+/// hand off.
 fn install_panic_hook() {
     let default = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
@@ -80,12 +145,102 @@ fn install_panic_hook() {
         let thread = std::thread::current();
         let thread_name = thread.name().unwrap_or("<unnamed>");
         let backtrace = std::backtrace::Backtrace::capture();
-        tracing::error!(
-            target: "panic",
-            "thread '{thread_name}' panicked at {location}: {msg}\n{backtrace}"
-        );
+        let line = format!("thread '{thread_name}' panicked at {location}: {msg}\n{backtrace}");
+
+        // Best-effort blocking write to launcher.log. Each call opens a
+        // fresh fd in append mode so we don't depend on any state that
+        // a partially-corrupted process might have torn down.
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(log_file_path())
+        {
+            let _ = writeln!(f, "PANIC: {line}");
+            let _ = f.flush();
+            let _ = f.sync_data();
+        }
+
+        tracing::error!(target: "panic", "{line}");
         default(info);
     }));
+}
+
+/// Native-crash signal handler. Writes a fixed boundary marker to the
+/// pre-opened `launcher.log` fd, then re-raises with the default
+/// disposition so the kernel's normal handling (core dump, exit code)
+/// runs. Async-signal-safe — no allocations, no formatting, no tracing.
+extern "C" fn crash_handler(signum: c_int) {
+    let fd = CRASH_FD.load(Ordering::Relaxed);
+    if fd >= 0 {
+        let prefix = b"\n*** native crash: signal ";
+        let name = signal_name(signum);
+        let suffix = b" - see launcher.stderr.log for details ***\n";
+        // SAFETY: write(2) is async-signal-safe per POSIX. The fd was
+        // opened in init and stored in CRASH_FD; if it's still >= 0 we
+        // can write to it. Buffer pointers are static byte literals or
+        // an &'static str returned by signal_name.
+        unsafe {
+            libc::write(fd, prefix.as_ptr().cast(), prefix.len());
+            libc::write(fd, name.as_ptr().cast(), name.len());
+            libc::write(fd, suffix.as_ptr().cast(), suffix.len());
+        }
+    }
+    // Reset to default disposition and re-raise so the kernel's normal
+    // signal handling runs after we logged the boundary marker.
+    // SAFETY: signal() and raise() are async-signal-safe per POSIX.
+    unsafe {
+        libc::signal(signum, libc::SIG_DFL);
+        libc::raise(signum);
+    }
+}
+
+const fn signal_name(signum: c_int) -> &'static str {
+    match signum {
+        libc::SIGSEGV => "SIGSEGV",
+        libc::SIGBUS => "SIGBUS",
+        libc::SIGABRT => "SIGABRT",
+        libc::SIGILL => "SIGILL",
+        libc::SIGFPE => "SIGFPE",
+        _ => "UNKNOWN",
+    }
+}
+
+/// Installs a `SIGSEGV/SIGBUS/SIGABRT/SIGILL/SIGFPE` handler that writes
+/// a boundary marker to `launcher.log` before re-raising. Catches native
+/// crashes from cxx-qt FFI, static Qt platform code, and `qFatal()`
+/// aborts that would otherwise bypass the Rust panic hook entirely.
+fn install_crash_signal_handler() {
+    let path = log_file_path();
+    if let Some(dir) = path.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    let Ok(file) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+    else {
+        return;
+    };
+    let raw = file.as_raw_fd();
+    CRASH_FD.store(raw, Ordering::Relaxed);
+    // Leak the File so its drop doesn't close the fd we just stored in
+    // CRASH_FD. The signal handler reads this fd for the process lifetime.
+    std::mem::forget(file);
+
+    for &sig in &[
+        libc::SIGSEGV,
+        libc::SIGBUS,
+        libc::SIGABRT,
+        libc::SIGILL,
+        libc::SIGFPE,
+    ] {
+        // SAFETY: signal() with a valid signal number and an async-
+        // signal-safe handler. The handler resets to SIG_DFL and
+        // re-raises, so this doesn't permanently swallow the signal.
+        unsafe {
+            libc::signal(sig, crash_handler as libc::sighandler_t);
+        }
+    }
 }
 
 /// Called by the C++ main before `QGuiApplication` is constructed.
@@ -94,6 +249,12 @@ fn install_panic_hook() {
 /// Returns 0 on success.
 #[no_mangle]
 pub extern "C" fn zaparoo_rust_init() -> c_int {
+    // FIRST: redirect our own stderr to a file so any panic, abort, or
+    // glibc diagnostic in the rest of init lands on disk instead of in
+    // the wrapper's /dev/null. Independent of tracing — must run before
+    // logger setup so even a panic during `install(&config)` is captured.
+    redirect_stderr();
+
     let config_path = config_file_path();
     let config = load_config(&config_path);
 
@@ -112,6 +273,12 @@ pub extern "C" fn zaparoo_rust_init() -> c_int {
     // Install after logging so panics go through the same sinks; before
     // tokio / client setup so a panic during those lines is captured.
     install_panic_hook();
+
+    // Catches native crashes (SIGSEGV/SIGBUS/SIGABRT/SIGILL/SIGFPE) that
+    // never enter the Rust panic hook — cxx-qt FFI faults, static-Qt
+    // platform code, qFatal() aborts. Writes a boundary marker to
+    // launcher.log before re-raising with the default disposition.
+    install_crash_signal_handler();
 
     tracing::info!("Zaparoo Launcher starting");
 

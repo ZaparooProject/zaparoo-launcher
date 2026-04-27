@@ -1648,6 +1648,8 @@ dependencies = [
  "cxx-qt",
  "cxx-qt-build",
  "cxx-qt-lib",
+ "libc",
+ "time",
  "tokio",
  "tracing",
  "zaparoo-core",

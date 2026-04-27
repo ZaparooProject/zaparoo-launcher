@@ -28,6 +28,23 @@ pub fn log_file_path() -> PathBuf {
     }
 }
 
+/// Path to the raw stderr capture file. The launcher dup2's its own
+/// `STDERR_FILENO` onto this file early in startup so that the chained
+/// default panic hook, libc `abort()` diagnostics, glibc backtraces, and
+/// any kernel signal-default output land in a durable location instead
+/// of `/dev/null` (which is where the `MiSTer` wrapper sends stderr).
+pub fn stderr_log_path() -> PathBuf {
+    if runtime::current().is_mister() {
+        PathBuf::from("/tmp/zaparoo/launcher.stderr.log")
+    } else {
+        dirs_next::data_local_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join("zaparoo")
+            .join("logs")
+            .join("launcher.stderr.log")
+    }
+}
+
 pub fn state_file_path() -> PathBuf {
     // ZAPAROO_STATE_FILE lets tests (and ad-hoc runs) redirect state
     // persistence away from the real user path. Checked first so the
@@ -55,7 +72,7 @@ mod tests {
         reason = "tests should fail-fast on unexpected errors"
     )]
 
-    use super::{config_file_path, log_file_path, state_file_path};
+    use super::{config_file_path, log_file_path, state_file_path, stderr_log_path};
     use crate::runtime;
 
     #[test]
@@ -70,6 +87,12 @@ mod tests {
         assert_eq!(
             log.file_name().and_then(|n| n.to_str()),
             Some("launcher.log")
+        );
+
+        let stderr_log = stderr_log_path();
+        assert_eq!(
+            stderr_log.file_name().and_then(|n| n.to_str()),
+            Some("launcher.stderr.log")
         );
 
         let state = state_file_path();
@@ -89,6 +112,10 @@ mod tests {
                 Some("/media/fat/zaparoo/launcher.toml")
             );
             assert_eq!(log_file_path().to_str(), Some("/tmp/zaparoo/launcher.log"));
+            assert_eq!(
+                stderr_log_path().to_str(),
+                Some("/tmp/zaparoo/launcher.stderr.log")
+            );
             assert_eq!(state_file_path().to_str(), Some("/tmp/zaparoo/state.toml"));
         } else {
             let cfg = config_file_path();
@@ -100,6 +127,11 @@ mod tests {
             assert!(
                 log.ends_with("zaparoo/logs/launcher.log"),
                 "log path did not end with zaparoo/logs/launcher.log: {log:?}"
+            );
+            let stderr_log = stderr_log_path();
+            assert!(
+                stderr_log.ends_with("zaparoo/logs/launcher.stderr.log"),
+                "stderr log path did not end with zaparoo/logs/launcher.stderr.log: {stderr_log:?}"
             );
             let state = state_file_path();
             assert!(

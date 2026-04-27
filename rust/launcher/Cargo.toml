@@ -26,6 +26,8 @@ cxx-qt       = { workspace = true }
 cxx-qt-lib   = { workspace = true, features = ["qt_gui", "qt_qml", "qt_quickcontrols"] }
 tokio        = { workspace = true, features = ["rt-multi-thread"] }
 tracing      = { workspace = true }
+time         = { workspace = true }
+libc         = "0.2"
 
 [build-dependencies]
 cxx-qt-build = { workspace = true, features = ["link_qt_object_files"] }
