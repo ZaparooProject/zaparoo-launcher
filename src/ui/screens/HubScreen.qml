@@ -253,10 +253,10 @@ Item {
             }
             hub.requestGamesScreen()
         } else if (action === "write_card") {
-            if (hub.systemsCarousel.itemCount > 0) {
+            if (hub.systemsGrid.itemCount > 0) {
                 Browse.HubState.system_id =
-                    Browse.SystemsModel.system_id_at(hub.systemsCarousel.currentIndex)
-                hub.requestSystemCardWrite(hub.systemsCarousel.currentIndex)
+                    Browse.SystemsModel.system_id_at(hub.systemsGrid.currentIndex)
+                hub.requestSystemCardWrite(hub.systemsGrid.currentIndex)
             }
         } else if (action === "cancel") {
             hub.section = hub.focusCategories

@@ -64,10 +64,10 @@ Item {
                 Browse.GamesModel.launch_at(games.gamesGrid.currentIndex)
             }
         } else if (action === "write_card") {
-            if (games.gamesCarousel.itemCount > 0) {
+            if (games.gamesGrid.itemCount > 0) {
                 Browse.GamesState.game_path =
-                    Browse.GamesModel.path_at(games.gamesCarousel.currentIndex)
-                games.requestGameCardWrite(games.gamesCarousel.currentIndex)
+                    Browse.GamesModel.path_at(games.gamesGrid.currentIndex)
+                games.requestGameCardWrite(games.gamesGrid.currentIndex)
             }
         } else if (action === "cancel") {
             games.requestHubScreen()
