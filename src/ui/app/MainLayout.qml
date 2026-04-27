@@ -364,9 +364,9 @@ ApplicationWindow {
         Text {
             anchors.centerIn: parent
             text: root.activeScreen === root.screenGames
-                  ? qsTr("[<>] GAME [OK] PLAY [TAB] CARD [ESC]")
+                  ? qsTr("[<>] GAME [OK] PLAY [TAB] FLASH CARD [ESC]")
                   : (root.hubFocus === root.focusSystems
-                     ? qsTr("[<>] SYS [OK] GAMES [TAB] CARD [ESC]")
+                     ? qsTr("[<>] SYS [OK] GAMES [TAB] FLASH CARD [ESC]")
                      : qsTr("[<>] CATEGORY  [OK] SELECT  [ESC] QUIT"))
             font.family: Theme.fontUi
             font.pixelSize: Sizing.fontSize(2.5)
