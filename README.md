@@ -13,13 +13,13 @@ need the full menu.
 
 ```bash
 just build && just run    # desktop
-./scripts/build-arm32.sh  # MiSTer ARM32 cross-build (Docker-only)
+just arm32                # MiSTer ARM32 cross-build (requires Docker)
 just test                 # ctest + cargo nextest
 just lint                 # clang-format, clang-tidy, qmllint, rustfmt, clippy, cargo-deny
 ```
 
 The MiSTer ARM32 path uses the official Docker Buildx toolchain image and does
-not need Qt, CMake, Rust, or `just` installed on the host.
+not need Qt, CMake, or Rust installed on the host.
 
 `just test` and `just lint` need `cargo-nextest` and `cargo-deny`:
 
