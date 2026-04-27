@@ -16,19 +16,13 @@ const COVER_KEY_ROLE: i32 = 256 + 2;
 // real Favorites pipeline lands in Core. Selecting it filters the
 // systems carousel by an unmatched category — the user sees an empty
 // grid, which is the correct fallback for a feature that doesn't exist
-// yet.
-//
-// TODO: replace with a real Favorites endpoint once the Core API
-// surfaces one.
+// yet. Tracked in #20.
 const FAVORITES_CATEGORY: &str = "Favorites";
 
 // Categories Core surfaces but the launcher doesn't expose. `Other` is
 // the synthesized bucket for systems with no upstream category and adds
 // no value in the UI; `Media` is reserved for non-game content the
-// launcher doesn't have a screen for yet.
-//
-// TODO: drop this hardcoded filter once Core exposes a per-category
-// visibility flag (or once Media has its own screen).
+// launcher doesn't have a screen for yet. Tracked in #21.
 const HIDDEN_CATEGORIES: &[&str] = &["Other", "Media"];
 
 #[derive(Default)]
@@ -105,6 +99,24 @@ fn project(status: &ResourceStatus<CatalogData>) -> (Option<Vec<String>>, String
         ResourceStatus::Errored { message, .. } => (None, message.clone()),
         ResourceStatus::Idle | ResourceStatus::Loading => (None, String::new()),
     }
+}
+
+/// Find `needle` in `haystack` with case-sensitive equality. Returns
+/// the position as i32, or -1 if not found / empty needle. The
+/// case-sensitive contract is deliberate: `HubState.category` is
+/// persisted to disk and the launcher re-derives the carousel index
+/// from that string. A case-insensitive lookup would silently coerce
+/// "consoles" into "Consoles" if Core ever returned mixed case,
+/// hiding a real upstream bug. Pulled out of `index_for_category`
+/// so the contract is unit-testable without a `QObject` instance.
+fn position_of(haystack: &[String], needle: &str) -> i32 {
+    if needle.is_empty() {
+        return -1;
+    }
+    haystack
+        .iter()
+        .position(|c| c == needle)
+        .map_or(-1, |i| i as i32)
 }
 
 /// Apply the launcher-side category presentation rules to the raw list
@@ -188,14 +200,7 @@ impl ffi::CategoriesModel {
     }
 
     fn index_for_category(&self, name: &QString) -> i32 {
-        let needle = name.to_string();
-        if needle.is_empty() {
-            return -1;
-        }
-        self.categories
-            .iter()
-            .position(|c| c == &needle)
-            .map_or(-1, |i| i as i32)
+        position_of(&self.categories, &name.to_string())
     }
 }
 
@@ -208,7 +213,34 @@ mod tests {
         reason = "tests should fail-fast on unexpected errors"
     )]
 
-    use super::visible_categories;
+    use super::{position_of, visible_categories};
+
+    #[test]
+    fn position_of_returns_index_on_case_exact_match() {
+        let items = vec!["Consoles".to_string(), "Arcade".to_string()];
+        assert_eq!(position_of(&items, "Arcade"), 1);
+    }
+
+    #[test]
+    fn position_of_is_case_sensitive_and_returns_minus_one_on_mismatch() {
+        let items = vec!["Consoles".to_string(), "Arcade".to_string()];
+        // Mixed case must NOT match — HubState.category is persisted as
+        // an exact string and the lookup is case-sensitive on purpose.
+        assert_eq!(position_of(&items, "arcade"), -1);
+        assert_eq!(position_of(&items, "ARCADE"), -1);
+    }
+
+    #[test]
+    fn position_of_empty_needle_returns_minus_one() {
+        let items = vec!["Consoles".to_string()];
+        assert_eq!(position_of(&items, ""), -1);
+    }
+
+    #[test]
+    fn position_of_missing_returns_minus_one() {
+        let items = vec!["Consoles".to_string()];
+        assert_eq!(position_of(&items, "Missing"), -1);
+    }
 
     #[test]
     fn favorites_is_prepended_to_visible_list() {

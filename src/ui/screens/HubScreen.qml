@@ -7,15 +7,53 @@ import Zaparoo.Theme
 import Zaparoo.Ui
 import Zaparoo.Browse as Browse
 
-// cxx-qt 0.7 doesn't emit FINAL markers in plugin.qmltypes, so qmllint
-// flags every call on a Zaparoo.Browse singleton as "can be shadowed".
-// Remove after the cxx-qt 0.8 upgrade.
+// cxx-qt 0.8 patches `isFinal: true` on singleton properties but the
+// qmltypes schema has no `isFinal` slot for Method, so every qinvokable
+// call on a Zaparoo.Browse singleton (set_category, set_system,
+// index_for_category, etc.) still trips qmllint's "Member can be
+// shadowed" check. Until the schema grows method-level finality,
+// suppress the compiler category file-wide.
 // qmllint disable compiler
 
 // Hub screen — categories carousel on top, systems paged grid below once
 // the user drills in. Owns its own focus state and navigation actions.
 // See `handleAction` for the state machine and the Connections blocks
 // for the persistence restore cascade.
+//
+// ── Systems-reveal orchestration ────────────────────────────────────────
+//
+// Driving the systems grid is the most fragile area in this file. It
+// coordinates five animation primitives, three properties, and two
+// reset signals to hide a ~200 ms synchronous model rebuild behind a
+// single perceived transition. The contract:
+//
+//   1. Drill-in (focusCategories → focusSystems with a chosen category):
+//      `_pendingCategory` is stashed first; `section` flips after.
+//      The wrapper Transition sequences:
+//          PauseAnimation (Theme.transitionDuration)
+//        → ScriptAction    (consume `_pendingCategory`, call
+//                           SystemsModel.set_category which triggers
+//                           the synchronous model reset)
+//        → NumberAnimation (opacity 0→1, 150 ms).
+//      The PauseAnimation matches the carousel's y-Behavior so the
+//      grid never fades in over a still-travelling carousel.
+//
+//   2. Escape (focusSystems → focusCategories):
+//      `onSectionChanged` clears `_pendingCategory` so a mid-drill-in
+//      cancellation can't queue a stale category for the next drill-in.
+//      The wrapper Transition runs in reverse (opacity 1→0).
+//
+//   3. Category-switch refetch (`runSystemsReseedDip`, called on
+//      SystemsModel.modelReset from Main.qml's restore cascade):
+//      Dips `systemsGrid.opacity` 1→0→1 via the gridFadeIn Timer
+//      so the user sees a fade rather than a flash on in-section
+//      category changes. Guarded by `systemsContainerOpacity < 1`
+//      so it doesn't fire during the wrapper Transition itself.
+//
+// `Theme.transitionDuration` is the single source of truth for the
+// 250 ms coupling between (1)'s PauseAnimation and the carousel's
+// y-Behavior. Bumping one without the other reopens the freeze-mid-
+// animation bug the wrapper exists to hide.
 Item {
     id: hub
 
@@ -25,6 +63,14 @@ Item {
     // built-in bool. Redeclaring it here would override a FINAL
     // base-class property and fail QML compile.
     property string section: hub.focusCategories
+
+    // Single source of truth for the carousel slide+shrink duration.
+    // The wrapper Transition's PauseAnimation must wait for the same
+    // interval, otherwise the grid would fade in over a still-moving
+    // carousel. `Theme.transitionDuration` carries the canonical value;
+    // alias it here so the rest of the file reads `_carouselTransitionMs`
+    // (matches the historical name and signals scope).
+    readonly property int _carouselTransitionMs: Theme.transitionDuration
 
     // Stash the chosen category here when the user drills in. The
     // wrapper's hidden→shown Transition (below) consumes it after the
@@ -51,6 +97,12 @@ Item {
     // reaching through nested item ids.
     property alias categoriesCarousel: categoriesCarousel
     property alias systemsGrid: systemsGrid
+    // Wrapper opacity, surfaced so Main.qml's reset handler can decide
+    // whether to run the inner-dip animation. When the wrapper is
+    // mid-transition (< 1), it already masks the Repeater rebuild;
+    // stacking the inner dip on top would produce a non-monotonic
+    // product opacity.
+    readonly property real systemsContainerOpacity: systemsContainer.opacity
 
     // Emitted when the user presses Enter on a populated systems grid —
     // Main.qml handles the screen flip via ScreenManager and persistence
@@ -62,10 +114,40 @@ Item {
     // Main.qml decides whether to quit or dismiss a modal.
     signal requestQuit()
 
+    // Mask the Repeater rebuild flash that follows an in-section
+    // category switch by dipping `systemsGrid.opacity` 1→0→1. The 50 ms
+    // hold gives the Repeater time to rebuild before the 100 ms opacity
+    // Behavior on `systemsGrid` ramps it back up. No-op when the wrapper
+    // `systemsContainer` is mid-transition: the wrapper's own 0→1 ramp
+    // already hides the rebuild, and stacking the inner dip on top
+    // would multiply into a non-monotonic visible opacity. Main.qml
+    // calls this from `Browse.SystemsModel.onModelReset`.
+    function runSystemsReseedDip(): void {
+        if (hub.systemsContainerOpacity < 1)
+            return
+        systemsGrid.opacity = 0
+        gridFadeIn.restart()
+    }
+
+    Timer {
+        id: gridFadeIn
+        interval: 50
+        onTriggered: systemsGrid.opacity = 1
+    }
+
     // Restore the hub from the persisted `Browse.HubState.category`
     // (or index 0 if the saved value is missing from the model). Always
     // cascades into `SystemsModel.set_category` so the systems-model
     // reset handler fires and drives the next step of the restore chain.
+    //
+    // Called from two sites in Main.qml — the Component.onCompleted
+    // early-arrival path (catalog already seeded synchronously) and the
+    // CategoriesModel.onModelReset listener (later refreshes). The
+    // window where both could fire is tiny but non-zero, so guard
+    // against the redundant work here. SystemsModel.set_category has
+    // its own same-category early-return, but the carousel-index
+    // assignment is QML-side; mirror Rust's `is_empty` recovery clause
+    // so a stale-but-empty model still gets a retry shot.
     function restoreFromCategoriesReset(): void {
         const savedCategory = Browse.HubState.category
         const idx = savedCategory === ""
@@ -75,6 +157,9 @@ Item {
         const chosenCategory = idx >= 0
                                ? savedCategory
                                : Browse.CategoriesModel.category_at(chosenIndex)
+        if (Browse.SystemsModel.current_category === chosenCategory
+            && Browse.SystemsModel.count > 0)
+            return
         hub.categoriesCarousel.currentIndex = chosenIndex
         Browse.SystemsModel.set_category(chosenCategory)
     }
@@ -82,7 +167,7 @@ Item {
     // Returns true if the carousel actually moved. Empty carousels leave
     // disk state alone — see tst_persistence.qml for the regression
     // guarded against.
-    function navigateCarousel(carousel, delta): bool {
+    function _navigateCarousel(carousel, delta): bool {
         if (carousel.itemCount <= 0)
             return false
         carousel.currentIndex =
@@ -100,11 +185,11 @@ Item {
 
     function _handleCategories(action: string): void {
         if (action === "left") {
-            if (hub.navigateCarousel(hub.categoriesCarousel, -1))
+            if (hub._navigateCarousel(hub.categoriesCarousel, -1))
                 Browse.HubState.category =
                     Browse.CategoriesModel.category_at(hub.categoriesCarousel.currentIndex)
         } else if (action === "right") {
-            if (hub.navigateCarousel(hub.categoriesCarousel, 1))
+            if (hub._navigateCarousel(hub.categoriesCarousel, 1))
                 Browse.HubState.category =
                     Browse.CategoriesModel.category_at(hub.categoriesCarousel.currentIndex)
         } else if (action === "accept" || action === "down") {
@@ -206,31 +291,31 @@ Item {
 
         Behavior on y {
             NumberAnimation {
-                duration: 250
+                duration: hub._carouselTransitionMs
                 easing.type: Easing.OutQuad
             }
         }
         Behavior on height {
             NumberAnimation {
-                duration: 250
+                duration: hub._carouselTransitionMs
                 easing.type: Easing.OutQuad
             }
         }
         Behavior on coverWidth {
             NumberAnimation {
-                duration: 250
+                duration: hub._carouselTransitionMs
                 easing.type: Easing.OutQuad
             }
         }
         Behavior on coverHeight {
             NumberAnimation {
-                duration: 250
+                duration: hub._carouselTransitionMs
                 easing.type: Easing.OutQuad
             }
         }
         Behavior on coverSpacing {
             NumberAnimation {
-                duration: 250
+                duration: hub._carouselTransitionMs
                 easing.type: Easing.OutQuad
             }
         }
@@ -241,9 +326,9 @@ Item {
     // 250 ms y-Behavior above) and only then does the grid fade in,
     // so the freshly-built grid never paints over the moving carousel.
     // Container.opacity multiplies with the inner systemsGrid.opacity
-    // (driven by Main.qml on category-switch model resets) so first
-    // entry pays the wrapper transition and later category switches
-    // pay only the inner reset fade.
+    // (driven by `runSystemsReseedDip` on category-switch model resets)
+    // so first entry pays the wrapper transition and later category
+    // switches pay only the inner reset fade.
     Item {
         id: systemsContainer
 
@@ -280,11 +365,14 @@ Item {
                 from: "hidden"
                 to: "shown"
                 SequentialAnimation {
-                    // Wait for the carousel's 250 ms y-slide and size
-                    // shrink to finish. PauseAnimation +
-                    // NumberAnimation is software-rendering safe.
+                    // Wait for the carousel's slide + shrink to finish
+                    // before the heavy reset and the fade-in. Pinned to
+                    // the same constant as the carousel Behaviors so a
+                    // pacing tweak there doesn't desync this pause.
+                    // PauseAnimation + NumberAnimation is
+                    // software-rendering safe.
                     PauseAnimation {
-                        duration: 250
+                        duration: hub._carouselTransitionMs
                     }
                     // Reset SystemsModel only after the carousel's
                     // animations have completed. set_category blocks
@@ -332,11 +420,11 @@ Item {
             delegate: Tile {}
 
             // Inner opacity is multiplied with the wrapper opacity
-            // above, so the visible value is `wrapper * inner`. Main.qml
-            // toggles this 1→0→1 on every SystemsModel reset to mask
-            // the Repeater rebuild flash; on the first drill-in the
-            // wrapper is also ramping 0→1, and the product stays
-            // monotonically increasing.
+            // above. Main.qml toggles this 1→0→1 *only* on in-section
+            // category switches (wrapper opacity already at 1) so the
+            // visible product is monotonic. During a drill-in the
+            // wrapper opacity 0→1 ramp masks the rebuild and the inner
+            // dip is suppressed — see Main.qml SystemsModel.onModelReset.
             Behavior on opacity {
                 NumberAnimation {
                     duration: 100

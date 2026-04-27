@@ -79,13 +79,13 @@ Item {
                 }
             }
 
-            Loader {
+            TileLoader {
                 anchors.fill: parent
                 sourceComponent: root.delegate
-                property bool isSelected: coverItem.isSelected
-                property bool isFocused: root.focused
-                property string name: coverItem.name
-                property string coverKey: coverItem.coverKey
+                isSelected: coverItem.isSelected
+                isFocused: root.focused
+                name: coverItem.name
+                coverKey: coverItem.coverKey
             }
         }
     }

@@ -8,9 +8,11 @@ import Zaparoo.Theme
 import Zaparoo.Screens
 import Zaparoo.Browse as Browse
 
-// cxx-qt 0.7 doesn't emit FINAL markers in plugin.qmltypes, so qmllint
-// flags every call on a Zaparoo.Browse singleton as "can be shadowed".
-// Remove after the cxx-qt 0.8 upgrade.
+// cxx-qt 0.8 patches `isFinal: true` on singleton properties but the
+// qmltypes schema has no `isFinal` slot for Method, so every qinvokable
+// call on a Zaparoo.Browse singleton still trips qmllint's "Member can
+// be shadowed" check. Until the schema grows method-level finality,
+// suppress the compiler category file-wide.
 // qmllint disable compiler
 
 // Runtime wrapper around MainLayout. The visual tree lives in
@@ -43,15 +45,19 @@ MainLayout {
         const savedScreen = Browse.AppState.active_screen
         if (savedScreen === root.screenGames || savedScreen === root.screenHub)
             root.activeScreen = savedScreen
+        // Order matters: if the catalog is already ready, run the restore
+        // *before* flipping hubFocus. set_category is a synchronous
+        // ~200 ms main-thread freeze; doing it first lets the wrapper
+        // Transition + carousel Behaviors that hubFocus triggers start
+        // cleanly afterwards instead of being delayed by the freeze.
+        // When the catalog isn't ready yet, the modelReset Connection
+        // below fires the restore later — well after any startup
+        // animations have ended.
+        if (Browse.CategoriesModel.count > 0)
+            root.hubScreen.restoreFromCategoriesReset()
         const savedFocus = Browse.HubState.focus
         if (savedFocus === root.focusCategories || savedFocus === root.focusSystems)
             root.hubFocus = savedFocus
-        // If Core responded before Main.qml finished loading, CategoriesModel
-        // has already emitted modelReset and the Connections below missed it.
-        // Kick the restore chain manually; the set_category cascade re-fires
-        // SystemsModel.modelReset (now wired) which cascades into GamesModel.
-        if (Browse.CategoriesModel.count > 0)
-            root.hubScreen.restoreFromCategoriesReset()
     }
 
     // Seed carousel indices from persisted state when models deliver new data.
@@ -90,23 +96,11 @@ MainLayout {
             root.hubScreen.systemsGrid.setCurrentIndexImmediate(idx >= 0 ? idx : 0)
             if (idx >= 0)
                 Browse.GamesModel.set_system(savedSystem)
-            // Hide during teardown/rebuild; gridFadeIn restores opacity
-            // a frame later via a Behavior, masking the rebuild flicker.
-            root.hubScreen.systemsGrid.opacity = 0
-            gridFadeIn.restart()
+            // Inner-dip mask for the Repeater rebuild flash; HubScreen
+            // owns the Timer + Behavior and gates on its own wrapper
+            // opacity, so this is a no-op during a drill-in.
+            root.hubScreen.runSystemsReseedDip()
         }
-    }
-    // Inner-grid opacity ramp on a SystemsModel reset (category switch
-    // or catalog refresh). The displayed opacity is the *product* of
-    // this and the wrapper systemsContainer.opacity (HubScreen.qml).
-    // First drill-in: wrapper ramps 0→1 over 150 ms while this dips
-    // 1→0→1 on a 50 ms delay + 100 ms Behavior, masking the Repeater
-    // rebuild flash. Subsequent in-section category switches: wrapper
-    // stays at 1, only this ramp runs.
-    Timer {
-        id: gridFadeIn
-        interval: 50
-        onTriggered: root.hubScreen.systemsGrid.opacity = 1
     }
     Connections {
         target: Browse.GamesModel

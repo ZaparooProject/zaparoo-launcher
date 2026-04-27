@@ -44,8 +44,12 @@ Item {
     readonly property int currentRow: Math.floor((currentIndex % pageSize) / columns)
 
     // Reserved chrome around the cell area. The dot band is reserved even
-    // when pageCount === 1 so cell metrics don't reflow when navigation
-    // crosses a page-count boundary mid-session.
+    // when pageCount === 1 so cell metrics stay stable when the model is
+    // swapped for one with a different pageCount — e.g. switching from a
+    // single-page category like "Arcade" to a multi-page one like
+    // "Consoles", or between systems whose game counts straddle pageSize.
+    // Without the reservation, cellWidth/cellHeight would jump as the dot
+    // band appears or disappears.
     readonly property int sideInset: Sizing.pctW(5)
     readonly property int topInset: Sizing.pctH(1)
     readonly property int dotsBandHeight: Sizing.pctH(4)
@@ -151,10 +155,33 @@ Item {
     // Defensive clamp: if the model shrinks below the saved index, keep
     // us in-bounds. The screens' onModelReset handlers re-seed
     // currentIndex immediately afterwards via setCurrentIndexImmediate,
-    // but we shouldn't render with a stale index in the gap.
+    // but we shouldn't render with a stale index in the gap. Suspend
+    // the page-snap Behavior the same way setCurrentIndexImmediate
+    // does, otherwise a clamp that crosses a page boundary (e.g. 50→3
+    // items with currentIndex on the last page) animates a ghost slide
+    // before the screen-layer reseed lands. Qt.callLater defers the
+    // clear past the binding ripple so currentPage settles first.
     onItemCountChanged: {
-        if (root.currentIndex >= root.itemCount)
+        if (root.currentIndex >= root.itemCount) {
+            root._suspendPageAnim = true
             root.currentIndex = Math.max(0, root.itemCount - 1)
+            Qt.callLater(() => { root._suspendPageAnim = false })
+        }
+    }
+
+    // Resolution-boundary changes (window resize across the 300/600 px
+    // height thresholds in Sizing.qml) reshuffle pageSize and therefore
+    // currentPage. Without suppression, track.x's Behavior runs a ghost
+    // slide animation the user never asked for. Defer clearing the
+    // flag with Qt.callLater so it survives the dependent binding
+    // updates triggered by the columns/rows change.
+    onColumnsChanged: {
+        root._suspendPageAnim = true
+        Qt.callLater(() => { root._suspendPageAnim = false })
+    }
+    onRowsChanged: {
+        root._suspendPageAnim = true
+        Qt.callLater(() => { root._suspendPageAnim = false })
     }
 
     clip: true
@@ -208,13 +235,13 @@ Item {
                 // clipped by neighbours below/right of it.
                 z: isSelected ? 1 : 0
 
-                Loader {
+                TileLoader {
                     anchors.fill: parent
                     sourceComponent: root.delegate
-                    property bool isSelected: cellItem.isSelected
-                    property bool isFocused: root.focused
-                    property string name: cellItem.name
-                    property string coverKey: cellItem.coverKey
+                    isSelected: cellItem.isSelected
+                    isFocused: root.focused
+                    name: cellItem.name
+                    coverKey: cellItem.coverKey
                 }
             }
         }

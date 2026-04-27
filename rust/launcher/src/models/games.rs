@@ -253,19 +253,27 @@ impl ffi::GamesModel {
     }
 
     fn index_for_game_path(&self, path: &QString) -> i32 {
-        let needle = path.to_string();
-        if needle.is_empty() {
-            return -1;
-        }
-        self.items
-            .iter()
-            .position(|item| item.path == needle)
-            .map_or(-1, |i| i as i32)
+        position_of_game_path(&self.items, &path.to_string())
     }
 
     fn set_selected_index(mut self: Pin<&mut Self>, index: i32) {
         self.as_mut().rust_mut().selected_index = index;
     }
+}
+
+/// Find `needle` in `items` with case-sensitive path equality. Returns
+/// position as i32, or -1 if not found / empty needle. Filesystem
+/// paths are case-sensitive on Linux (and the launcher's `MiSTer`
+/// target), so a case-insensitive lookup would mask a real upstream
+/// path drift. Pulled out of `index_for_game_path` for testability.
+fn position_of_game_path(items: &[MediaItem], needle: &str) -> i32 {
+    if needle.is_empty() {
+        return -1;
+    }
+    items
+        .iter()
+        .position(|item| item.path == needle)
+        .map_or(-1, |i| i as i32)
 }
 
 /// Pure projection of a `ResourceStatus<MediaSearchResult>` onto the
@@ -369,7 +377,7 @@ mod tests {
         reason = "tests should fail-fast on unexpected errors"
     )]
 
-    use super::{project_status, Projection};
+    use super::{position_of_game_path, project_status, Projection};
     use zaparoo_core::media_types::{MediaItem, MediaSearchResult, Pagination, SystemRef};
     use zaparoo_core::remote_resource::ResourceStatus;
 
@@ -404,7 +412,7 @@ mod tests {
     #[test]
     fn ready_with_results_projects_count_and_items() {
         let result = MediaSearchResult {
-            results: vec![item("smb", "nes"), item("zelda", "nes")],
+            results: vec![item("smb", "NES"), item("zelda", "NES")],
             pagination: Pagination::default(),
         };
         match project_status(ResourceStatus::Ready(result)) {
@@ -442,7 +450,7 @@ mod tests {
     #[test]
     fn ready_with_pagination_propagates_has_next_page() {
         let result = MediaSearchResult {
-            results: vec![item("smb", "nes")],
+            results: vec![item("smb", "NES")],
             pagination: Pagination {
                 has_next_page: true,
                 page_size: 100,
@@ -475,5 +483,34 @@ mod tests {
             Projection::Errored { message } => assert_eq!(message, "connection refused"),
             other => panic!("expected Errored, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn position_of_game_path_returns_index_on_case_exact_match() {
+        let items = vec![item("smb", "NES"), item("zelda", "NES")];
+        assert_eq!(position_of_game_path(&items, "/p/zelda"), 1);
+    }
+
+    #[test]
+    fn position_of_game_path_is_case_sensitive() {
+        let items = vec![item("smb", "NES")];
+        // GamesState.game_path is persisted as the exact upstream path
+        // and the launcher's targets (Linux desktop, MiSTer) are
+        // case-sensitive filesystems; case-insensitive lookup would
+        // silently match a different file.
+        assert_eq!(position_of_game_path(&items, "/P/SMB"), -1);
+        assert_eq!(position_of_game_path(&items, "/p/SMB"), -1);
+    }
+
+    #[test]
+    fn position_of_game_path_empty_needle_returns_minus_one() {
+        let items = vec![item("smb", "NES")];
+        assert_eq!(position_of_game_path(&items, ""), -1);
+    }
+
+    #[test]
+    fn position_of_game_path_missing_returns_minus_one() {
+        let items = vec![item("smb", "NES")];
+        assert_eq!(position_of_game_path(&items, "/p/missing"), -1);
     }
 }

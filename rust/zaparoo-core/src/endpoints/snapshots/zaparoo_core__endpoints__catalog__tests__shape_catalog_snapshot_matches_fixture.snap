@@ -1,22 +1,21 @@
 ---
 source: zaparoo-core/src/endpoints/catalog.rs
-assertion_line: 130
 expression: shape_catalog(systems)
 ---
 CatalogData {
     systems: [
         SystemInfo {
-            id: "gb",
+            id: "Gameboy",
             name: "Game Boy",
             category: "Handhelds",
         },
         SystemInfo {
-            id: "mame",
+            id: "MAME",
             name: "MAME",
             category: "arcade",
         },
         SystemInfo {
-            id: "nes",
+            id: "NES",
             name: "Nintendo",
             category: "Consoles",
         },
@@ -26,7 +25,7 @@ CatalogData {
             category: "",
         },
         SystemInfo {
-            id: "snes",
+            id: "SNES",
             name: "Super Nintendo",
             category: "Consoles",
         },

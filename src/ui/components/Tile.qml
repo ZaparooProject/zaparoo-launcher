@@ -10,6 +10,18 @@ import Zaparoo.Theme
 // carries the cell; once the logo is ready the fallback fades out and
 // the logo fades in, so the tile never flashes between states. The
 // selected tile scales up slightly for at-a-glance focus.
+//
+// Parent contract — Tile must be loaded inside a host that exposes:
+//   - isSelected: bool   — true when this tile is the focused selection
+//   - isFocused:  bool   — true when the section owning this tile has user focus
+//   - name:       string — model display name (drives the procedural fallback)
+//   - coverKey:   string — relative path under resources/images/ (no extension)
+//
+// Carousel.qml and PagedGrid.qml both wrap their Tile delegate in a
+// Loader that defines exactly these four properties; QML's late-binding
+// model means a caller that forgets one fails silently at runtime
+// rather than at build time, so the Component.onCompleted check below
+// converts that footgun into a loud warning.
 Item {
     id: root
 
@@ -22,14 +34,32 @@ Item {
     readonly property string delegateCoverKey: parent.coverKey
     // qmllint enable missing-property compiler
 
+    Component.onCompleted: {
+        // Self-check the parent contract. Logs once at construction so
+        // a future caller that drops Tile into a non-conforming wrapper
+        // sees the failure mode immediately instead of debugging
+        // mysteriously empty tiles. The parent.X reads are the same
+        // statically-unknowable shape as the property declarations
+        // above, so the same suppression applies.
+        // qmllint disable missing-property compiler
+        if (typeof parent.isSelected !== "boolean"
+            || typeof parent.isFocused !== "boolean"
+            || typeof parent.name !== "string"
+            || typeof parent.coverKey !== "string") {
+            console.warn(
+                "Tile: parent does not satisfy the delegate contract "
+                + "(expected isSelected:bool, isFocused:bool, "
+                + "name:string, coverKey:string)")
+        }
+        // qmllint enable missing-property compiler
+    }
+
     // `coverKey` is the relative path under `resources/images/` without
     // extension — `systems/snes`, `categories/Consoles`, etc. The model
-    // chooses the subdirectory; Tile is agnostic.
+    // chooses the subdirectory; Tile is agnostic. Resources.coverUrl is
+    // the single source of truth for the qrc layout — see Resources.qml.
     readonly property url _coverSource:
-        root.delegateCoverKey !== ""
-        ? Qt.resolvedUrl("qrc:/qt/qml/Zaparoo/App/resources/images/"
-                         + root.delegateCoverKey + ".png")
-        : ""
+        Resources.coverUrl(root.delegateCoverKey)
     readonly property bool _hasCover: cover.status === Image.Ready
 
     // Selected tiles bump up a hair so the user can see at a glance

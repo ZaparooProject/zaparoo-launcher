@@ -44,7 +44,7 @@ TestCase {
     }
 
     // CategoriesModel is empty in this test harness (no live Core).
-    // Left/Right must not call navigateCarousel → _at(0) → "" on an
+    // Left/Right must not call _navigateCarousel → _at(0) → "" on an
     // empty model, because that would wipe the saved category from
     // persisted state.
     function test_empty_categories_navigation_preserves_hub_state(): void {

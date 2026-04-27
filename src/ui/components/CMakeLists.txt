@@ -13,6 +13,7 @@ qt_add_qml_module(
         FpsCounter.qml
         PagedGrid.qml
         Tile.qml
+        TileLoader.qml
 )
 
 target_link_libraries(

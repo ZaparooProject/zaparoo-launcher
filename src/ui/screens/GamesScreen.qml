@@ -7,9 +7,11 @@ import Zaparoo.Theme
 import Zaparoo.Ui
 import Zaparoo.Browse as Browse
 
-// cxx-qt 0.7 doesn't emit FINAL markers in plugin.qmltypes, so qmllint
-// flags every call on a Zaparoo.Browse singleton as "can be shadowed".
-// Remove after the cxx-qt 0.8 upgrade.
+// cxx-qt 0.8 patches `isFinal: true` on singleton properties but the
+// qmltypes schema has no `isFinal` slot for Method, so every qinvokable
+// call on a Zaparoo.Browse singleton (path_at, set_system, etc.) still
+// trips qmllint's "Member can be shadowed" check. Until the schema grows
+// method-level finality, suppress the compiler category file-wide.
 // qmllint disable compiler
 
 // Games screen — paged grid driven by `Browse.GamesModel`. Owns the

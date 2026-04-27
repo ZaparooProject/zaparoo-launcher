@@ -10,9 +10,11 @@ import Zaparoo.Theme
 import Zaparoo.Screens
 import Zaparoo.Browse as Browse
 
-// cxx-qt 0.7 doesn't emit FINAL markers in plugin.qmltypes, so qmllint
-// flags every call on a Zaparoo.Browse singleton as "can be shadowed".
-// Remove after the cxx-qt 0.8 upgrade.
+// cxx-qt 0.8 patches `isFinal: true` on singleton properties but the
+// qmltypes schema has no `isFinal` slot for Method, so every qinvokable
+// call on a Zaparoo.Browse singleton (all_cover_keys, etc.) still trips
+// qmllint's "Member can be shadowed" check. Until the schema grows
+// method-level finality, suppress the compiler category file-wide.
 // qmllint disable compiler
 
 // Visual tree. Edit this file in Qt Design Studio; the state machine
@@ -66,7 +68,10 @@ ApplicationWindow {
     // Two-way sync between root.activeScreen and ScreenManager.activeScreen.
     // Binding-breaking assignments (tests setting root.activeScreen = "games")
     // still propagate to ScreenManager; ScreenManager changes (from the
-    // screens) still update root.activeScreen.
+    // screens) still update root.activeScreen. The `if (X !== Y)` guard
+    // on each side prevents the obvious cycle. Adding any transformation
+    // between the two sides would defeat the guard — see #24 for the
+    // tracked single-source-of-truth refactor.
     onActiveScreenChanged: {
         if (ScreenManager.activeScreen !== root.activeScreen)
             ScreenManager.activeScreen = root.activeScreen
@@ -112,41 +117,27 @@ ApplicationWindow {
     // arrives, priming Qt's pixmap cache. Without this, the *first*
     // category switch pays the PNG decode for that category's logos —
     // a visible stutter the user noticed. Subsequent visits are free.
+    //
+    // Bound directly to SystemsModel.cover_keys: the property is set
+    // *after* the model's internal `last_ready` snapshot inside
+    // `apply_state`, so the changed-signal can only fire once the keys
+    // are real. No cross-model coupling, no Component.onCompleted seed.
 
     Item {
         id: coverPrefetch
         visible: false
 
-        property var coverKeys: []
-
-        Connections {
-            target: Browse.CategoriesModel
-            // CategoriesModel.modelReset is the canonical "catalog
-            // became ready" signal — same trigger Main.qml uses for
-            // its restore cascade. SystemsModel.all_cover_keys()
-            // reads from `last_ready`, which is populated by then.
-            function onModelReset(): void {
-                coverPrefetch.coverKeys = Browse.SystemsModel.all_cover_keys()
-            }
-        }
-
-        Component.onCompleted: {
-            // Catalog may already be ready before this Item finishes
-            // constructing. Seed once so we don't miss the first reset.
-            if (Browse.CategoriesModel.count > 0)
-                coverPrefetch.coverKeys = Browse.SystemsModel.all_cover_keys()
-        }
-
         Repeater {
-            model: coverPrefetch.coverKeys
+            model: Browse.SystemsModel.cover_keys
 
             Image {
                 required property string modelData
 
-                // `coverKey` carries the subdirectory (e.g. `systems/snes`)
-                // so the prefetch URL builder is the same one Tile uses.
-                source: "qrc:/qt/qml/Zaparoo/App/resources/images/"
-                        + modelData + ".png"
+                // `coverKey` carries the subdirectory (e.g. `systems/SNES`).
+                // Resources.coverUrl is the same builder Tile.qml uses, so
+                // this prefetch and the visible Image hit the same
+                // QPixmapCache slot — see Resources.qml.
+                source: Resources.coverUrl(modelData)
                 // Match Tile.qml's sourceSize so the prefetch and the
                 // visible Image share a QPixmapCache entry. A different
                 // sourceSize would key a separate cache slot and the
