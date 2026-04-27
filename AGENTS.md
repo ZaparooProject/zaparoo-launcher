@@ -50,8 +50,6 @@ raw cargo as the default path; the justfile carries the expected environment.
   any time.
 - Wrap user-visible QML strings in `qsTr()` and C++ strings in `tr()`. Use
   `%1`/`%2` placeholders for runtime values so translators can reorder text.
-- Check `src/ui/components/FpsCounter.qml` after visual changes. It must stay
-  green (>=55 FPS) at 720p+ and not fall red (<30 FPS) at 240p.
 
 ## Ask First
 

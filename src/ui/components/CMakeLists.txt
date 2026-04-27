@@ -10,9 +10,10 @@ qt_add_qml_module(
     VERSION 1.0
     QML_FILES
         Carousel.qml
-        CoverDelegate.qml
         FpsCounter.qml
-        TextTileDelegate.qml
+        PagedGrid.qml
+        Tile.qml
+        TileLoader.qml
 )
 
 target_link_libraries(

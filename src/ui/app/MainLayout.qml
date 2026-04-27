@@ -10,9 +10,11 @@ import Zaparoo.Theme
 import Zaparoo.Screens
 import Zaparoo.Browse as Browse
 
-// cxx-qt 0.7 doesn't emit FINAL markers in plugin.qmltypes, so qmllint
-// flags every call on a Zaparoo.Browse singleton as "can be shadowed".
-// Remove after the cxx-qt 0.8 upgrade.
+// cxx-qt 0.8 patches `isFinal: true` on singleton properties but the
+// qmltypes schema has no `isFinal` slot for Method, so every qinvokable
+// call on a Zaparoo.Browse singleton (all_cover_keys, etc.) still trips
+// qmllint's "Member can be shadowed" check. Until the schema grows
+// method-level finality, suppress the compiler category file-wide.
 // qmllint disable compiler
 
 // Visual tree. Edit this file in Qt Design Studio; the state machine
@@ -49,13 +51,10 @@ ApplicationWindow {
     visibility: root.fullScreen ? Window.FullScreen : Window.Windowed
     title: qsTr("Zaparoo Launcher")
 
-    // Aliases so Main.qml (and existing tests) can drive the carousels
-    // without reaching through nested component ids.
-    property alias categoriesCarousel: hubScreen.categoriesCarousel
-    property alias systemsCarousel: hubScreen.systemsCarousel
-    property alias gamesCarousel: gamesScreen.gamesCarousel
-
-    // Screen/manager plumbing exposed for Main.qml's orchestration.
+    // Screen plumbing exposed for Main.qml's orchestration. Anything
+    // inside the screens (categories carousel, systems/games grids) is
+    // reached via root.hubScreen.* / root.gamesScreen.* — no per-widget
+    // aliases here.
     property alias hubScreen: hubScreen
     property alias gamesScreen: gamesScreen
 
@@ -69,7 +68,10 @@ ApplicationWindow {
     // Two-way sync between root.activeScreen and ScreenManager.activeScreen.
     // Binding-breaking assignments (tests setting root.activeScreen = "games")
     // still propagate to ScreenManager; ScreenManager changes (from the
-    // screens) still update root.activeScreen.
+    // screens) still update root.activeScreen. The `if (X !== Y)` guard
+    // on each side prevents the obvious cycle. Adding any transformation
+    // between the two sides would defeat the guard — see #24 for the
+    // tracked single-source-of-truth refactor.
     onActiveScreenChanged: {
         if (ScreenManager.activeScreen !== root.activeScreen)
             ScreenManager.activeScreen = root.activeScreen
@@ -87,6 +89,64 @@ ApplicationWindow {
     Rectangle {
         anchors.fill: parent
         color: Theme.bgDeep
+    }
+
+    // Faint circuit-trace texture, tiled across the whole window. The
+    // PNG is pre-rendered from resources/images/bg-circuit.svg at the
+    // source pattern's native 304×304 size, with white at ~8 % alpha
+    // baked into the pixmap so QtSvg isn't needed at runtime. Sits
+    // between bgDeep and the rest of the tree so logos, captions, and
+    // selection cards stay fully legible. `Image.Tile` is software-
+    // rendered, so this is MiSTer-safe; `cache: true` keeps the
+    // pixmap in QPixmapCache after first decode.
+    Image {
+        anchors.fill: parent
+        source: "qrc:/qt/qml/Zaparoo/App/resources/images/bg-circuit.png"
+        fillMode: Image.Tile
+        cache: true
+        smooth: false        // 1:1 tile — filtering would just blur the lines
+        // Synchronous so the first frame paints with the texture instead
+        // of flashing the bare bgDeep underneath. One small PNG decode
+        // at startup is cheap.
+        asynchronous: false
+    }
+
+    // ── System logo prefetch ─────────────────────────────────────────────────
+    //
+    // Hidden Repeater that loads every system PNG once the catalog
+    // arrives, priming Qt's pixmap cache. Without this, the *first*
+    // category switch pays the PNG decode for that category's logos —
+    // a visible stutter the user noticed. Subsequent visits are free.
+    //
+    // Bound directly to SystemsModel.cover_keys: the property is set
+    // *after* the model's internal `last_ready` snapshot inside
+    // `apply_state`, so the changed-signal can only fire once the keys
+    // are real. No cross-model coupling, no Component.onCompleted seed.
+
+    Item {
+        id: coverPrefetch
+        visible: false
+
+        Repeater {
+            model: Browse.SystemsModel.cover_keys
+
+            Image {
+                required property string modelData
+
+                // `coverKey` carries the subdirectory (e.g. `systems/SNES`).
+                // Resources.coverUrl is the same builder Tile.qml uses, so
+                // this prefetch and the visible Image hit the same
+                // QPixmapCache slot — see Resources.qml.
+                source: Resources.coverUrl(modelData)
+                // Match Tile.qml's sourceSize so the prefetch and the
+                // visible Image share a QPixmapCache entry. A different
+                // sourceSize would key a separate cache slot and the
+                // prefetch wouldn't help.
+                sourceSize.width: 256
+                asynchronous: true
+                cache: true
+            }
+        }
     }
 
     // ── Logo ──────────────────────────────────────────────────────────────────
@@ -118,12 +178,56 @@ ApplicationWindow {
         active: root.activeScreen === root.screenGames
     }
 
-    // ── FPS counter ───────────────────────────────────────────────────────────
+    // ── Top-right HUD ─────────────────────────────────────────────────────────
+    //
+    // Clock now; status icons later. The Row is right-anchored so new icons
+    // can be prepended on the left without resizing or repositioning.
 
-    FpsCounter {
+    Row {
+        id: topHud
+
         anchors.top: parent.top
         anchors.right: parent.right
-        anchors.topMargin: Sizing.pctH(1)
+        anchors.topMargin: Sizing.pctH(2)
+        anchors.rightMargin: Sizing.pctW(2)
+        spacing: Sizing.pctW(1.5)
+        z: 200
+
+        // Status icons go here, before clockLabel.
+
+        Text {
+            id: clockLabel
+
+            // 30s tick keeps the displayed minute fresh without per-second
+            // wakeups; minutes-only display means we never need finer.
+            property string currentTime: Qt.formatDateTime(new Date(), "HH:mm")
+
+            text: clockLabel.currentTime
+            font.family: Theme.fontUi
+            font.pixelSize: Sizing.fontSize(2.5)
+            color: Theme.textPrimary
+            renderType: Text.NativeRendering
+
+            Timer {
+                interval: 30000
+                running: true
+                repeat: true
+                triggeredOnStart: true
+                onTriggered: clockLabel.currentTime =
+                    Qt.formatDateTime(new Date(), "HH:mm")
+            }
+        }
+    }
+
+    // ── FPS counter ───────────────────────────────────────────────────────────
+    //
+    // Sits in the bottom-right corner above the (conditional) status strip
+    // so it never overlaps the top HUD or the bottom bars.
+
+    FpsCounter {
+        anchors.bottom: statusStrip.top
+        anchors.right: parent.right
+        anchors.bottomMargin: Sizing.pctH(1)
         anchors.rightMargin: Sizing.pctW(1)
         z: 200
     }
@@ -168,7 +272,7 @@ ApplicationWindow {
                 if (state === 1) return qsTr("Connecting to Zaparoo Core…");
                 return qsTr("Disconnected from Zaparoo Core");
             }
-            font.family: Theme.fontRetro
+            font.family: Theme.fontUi
             font.pixelSize: Sizing.fontSize(2.5)
             color: Theme.textPrimary
             renderType: Text.NativeRendering
@@ -195,7 +299,7 @@ ApplicationWindow {
                   : (root.hubFocus === root.focusSystems
                      ? qsTr("[<>] SYSTEM  [OK] GAMES  [ESC] BACK")
                      : qsTr("[<>] CATEGORY  [OK] SELECT  [ESC] QUIT"))
-            font.family: Theme.fontRetro
+            font.family: Theme.fontUi
             font.pixelSize: Sizing.fontSize(2.5)
             color: Theme.textDim
             renderType: Text.NativeRendering

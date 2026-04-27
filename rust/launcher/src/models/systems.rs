@@ -3,13 +3,19 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 
 use cxx_qt::CxxQtType;
-use cxx_qt_lib::{QByteArray, QHash, QHashPair_i32_QByteArray, QModelIndex, QString, QVariant};
+use cxx_qt_lib::{
+    QByteArray, QHash, QHashPair_i32_QByteArray, QModelIndex, QString, QStringList, QVariant,
+};
 use std::pin::Pin;
 use zaparoo_core::endpoints::catalog::CatalogEndpoint;
 use zaparoo_core::remote_resource::ResourceStatus;
 use zaparoo_core::systems_catalog::CatalogData;
 
-const ID_ROLE: i32 = 256 + 1;
+// `coverKey` rather than `id`: bracket-access via `model["id"]` from a
+// QML delegate trips over `id`'s reserved-keyword status, leaving the
+// role unreachable. Renaming sidesteps the reservation entirely and
+// matches the generic carousel cover-key contract used by all models.
+const COVER_KEY_ROLE: i32 = 256 + 1;
 const NAME_ROLE: i32 = 256 + 2;
 const CATEGORY_ROLE: i32 = 256 + 3;
 
@@ -31,6 +37,12 @@ pub struct SystemsModelRust {
     // instead of wiping the carousel until the catalog returns to
     // `Ready`.
     last_ready: Option<CatalogData>,
+    // Cover-key list mirroring `last_ready`. Exposed as a qproperty so
+    // the QML side can bind a prefetch Repeater directly. Updated
+    // *after* `last_ready` inside `apply_state`, so the property's
+    // notify signal is the only racy-safe trigger for "catalog cover
+    // keys are stable now."
+    cover_keys: QStringList,
 }
 
 #[cxx_qt::bridge]
@@ -46,6 +58,7 @@ pub mod ffi {
         type QHash_i32_QByteArray = cxx_qt_lib::QHash<cxx_qt_lib::QHashPair_i32_QByteArray>;
         type QByteArray = cxx_qt_lib::QByteArray;
         type QString = cxx_qt_lib::QString;
+        type QStringList = cxx_qt_lib::QStringList;
     }
 
     unsafe extern "RustQt" {
@@ -56,6 +69,7 @@ pub mod ffi {
         #[qproperty(i32, count)]
         #[qproperty(QString, current_category)]
         #[qproperty(QString, error_message)]
+        #[qproperty(QStringList, cover_keys)]
         type SystemsModel = super::SystemsModelRust;
 
         #[qinvokable]
@@ -108,6 +122,38 @@ fn project(status: &ResourceStatus<CatalogData>) -> (Option<CatalogData>, String
     }
 }
 
+/// Every system cover key in `catalog`, in source order. Returns empty
+/// when `catalog` is `None`. Pulled out so the `all_cover_keys`
+/// qinvokable has a unit-testable seam. Keys are returned as
+/// `systems/<id>` — the relative path under `resources/images/` so the
+/// QML side can resolve the PNG without hardcoding the subdirectory.
+fn cover_keys(catalog: Option<&CatalogData>) -> Vec<String> {
+    catalog.map_or_else(Vec::new, |c| {
+        c.systems
+            .iter()
+            .map(|s| format!("systems/{}", s.id))
+            .collect()
+    })
+}
+
+/// Find `needle` in `systems` with case-sensitive id equality. Returns
+/// position as i32, or -1 if not found / empty needle. The
+/// case-sensitive contract is deliberate: `HubState.system_id` is
+/// persisted as the exact ID Core surfaced, and the artwork bundled
+/// under `resources/images/systems/<id>.png` matches that exact case
+/// (Linux qrc lookups are case-sensitive). A case-insensitive lookup
+/// would mask an upstream case drift in Core. Pulled out so the
+/// contract is unit-testable.
+fn position_of_system_id(systems: &[SystemInfo], needle: &str) -> i32 {
+    if needle.is_empty() {
+        return -1;
+    }
+    systems
+        .iter()
+        .position(|s| s.id == needle)
+        .map_or(-1, |i| i as i32)
+}
+
 /// Filter `catalog`'s systems to the named category and re-shape them
 /// into the local row type. Returns empty when `catalog` is `None` so
 /// `set_category` and `apply_state` share one filter+map definition.
@@ -136,7 +182,20 @@ fn apply_state(mut model: Pin<&mut ffi::SystemsModel>, (data, err): (Option<Cata
             model.as_mut().end_reset_model();
             model.as_mut().count_changed();
         }
+        let new_keys = cover_keys(Some(&data));
         model.as_mut().rust_mut().last_ready = Some(data);
+        // Set `cover_keys` *after* `last_ready` so anything observing
+        // the property's notify signal sees a fully-populated model.
+        // The setter only fires `cover_keys_changed` when the list
+        // actually differs, so duplicate `Ready` events won't churn
+        // the prefetch Repeater.
+        let mut qlist = QStringList::default();
+        for k in new_keys {
+            qlist.append(QString::from(k.as_str()));
+        }
+        if model.cover_keys != qlist {
+            model.as_mut().set_cover_keys(qlist);
+        }
     }
     let qerr = QString::from(err.as_str());
     if model.error_message != qerr {
@@ -159,7 +218,12 @@ impl ffi::SystemsModel {
         }
         let s = &self.systems[index.row() as usize];
         match role {
-            ID_ROLE => QVariant::from(&QString::from(s.id.as_str())),
+            COVER_KEY_ROLE => {
+                // Relative path under `resources/images/` (no extension).
+                // Tile resolves the PNG via `images/<coverKey>.png`, so
+                // category, system and game tiles share one URL builder.
+                QVariant::from(&QString::from(format!("systems/{}", s.id).as_str()))
+            }
             NAME_ROLE => QVariant::from(&QString::from(s.name.as_str())),
             CATEGORY_ROLE => QVariant::from(&QString::from(s.category.as_str())),
             _ => QVariant::default(),
@@ -168,13 +232,22 @@ impl ffi::SystemsModel {
 
     fn role_names(&self) -> QHash<QHashPair_i32_QByteArray> {
         let mut h = QHash::<QHashPair_i32_QByteArray>::default();
-        h.insert(ID_ROLE, QByteArray::from("id"));
+        h.insert(COVER_KEY_ROLE, QByteArray::from("coverKey"));
         h.insert(NAME_ROLE, QByteArray::from("name"));
         h.insert(CATEGORY_ROLE, QByteArray::from("category"));
         h
     }
 
     fn set_category(mut self: Pin<&mut Self>, category: QString) {
+        // Repeat drill-ins on the same *populated* category (e.g. user
+        // mashes Down→Escape→Down) would otherwise rebuild every Tile
+        // delegate for no visible change. The `is_empty` guard lets a
+        // re-call recover from a stale-but-empty model — e.g. the
+        // catalog refetched and the previously-current category now
+        // has no systems, and a caller wants to retry the same value.
+        if self.rust().current_category == category && !self.rust().systems.is_empty() {
+            return;
+        }
         let cat = category.to_string();
         // Read from `last_ready` rather than the live `ResourceStatus`
         // so a transient `Loading` (a refetch in flight) doesn't wipe
@@ -206,14 +279,7 @@ impl ffi::SystemsModel {
     }
 
     fn index_for_system_id(&self, id: &QString) -> i32 {
-        let needle = id.to_string();
-        if needle.is_empty() {
-            return -1;
-        }
-        self.systems
-            .iter()
-            .position(|s| s.id == needle)
-            .map_or(-1, |i| i as i32)
+        position_of_system_id(&self.systems, &id.to_string())
     }
 }
 
@@ -226,7 +292,7 @@ mod tests {
         reason = "tests should fail-fast on unexpected errors"
     )]
 
-    use super::{project, rows_for_category};
+    use super::{cover_keys, position_of_system_id, project, rows_for_category, SystemInfo};
     use zaparoo_core::media_types::SystemInfo as MediaSystemInfo;
     use zaparoo_core::remote_resource::ResourceStatus;
     use zaparoo_core::systems_catalog::CatalogData;
@@ -317,5 +383,64 @@ mod tests {
         let catalog = catalog_with(vec![sys("smb", "SMB", "Consoles")]);
         let rows = rows_for_category(Some(&catalog), "DoesNotExist");
         assert!(rows.is_empty());
+    }
+
+    #[test]
+    fn cover_keys_none_returns_empty() {
+        assert!(cover_keys(None).is_empty());
+    }
+
+    #[test]
+    fn cover_keys_returns_every_id_across_categories() {
+        let catalog = catalog_with(vec![
+            sys("smb", "Super Mario Bros", "Consoles"),
+            sys("snk", "SNK Heroes", "Arcade"),
+            sys("zelda", "Zelda", "Consoles"),
+        ]);
+        let keys = cover_keys(Some(&catalog));
+        assert_eq!(keys, vec!["systems/smb", "systems/snk", "systems/zelda"]);
+    }
+
+    #[test]
+    fn cover_keys_empty_catalog_returns_empty() {
+        let catalog = catalog_with(vec![]);
+        assert!(cover_keys(Some(&catalog)).is_empty());
+    }
+
+    fn local_sys(id: &str) -> SystemInfo {
+        SystemInfo {
+            id: id.into(),
+            name: id.into(),
+            category: "Consoles".into(),
+        }
+    }
+
+    #[test]
+    fn position_of_system_id_returns_index_on_case_exact_match() {
+        let systems = vec![local_sys("NES"), local_sys("SNES")];
+        assert_eq!(position_of_system_id(&systems, "SNES"), 1);
+    }
+
+    #[test]
+    fn position_of_system_id_is_case_sensitive() {
+        let systems = vec![local_sys("NES"), local_sys("SNES")];
+        // HubState.system_id is persisted exact and the bundled
+        // artwork (`resources/images/systems/<id>.png`) matches that
+        // exact case — case-insensitive lookup would silently mask a
+        // Core case-drift bug.
+        assert_eq!(position_of_system_id(&systems, "snes"), -1);
+        assert_eq!(position_of_system_id(&systems, "Snes"), -1);
+    }
+
+    #[test]
+    fn position_of_system_id_empty_needle_returns_minus_one() {
+        let systems = vec![local_sys("NES")];
+        assert_eq!(position_of_system_id(&systems, ""), -1);
+    }
+
+    #[test]
+    fn position_of_system_id_missing_returns_minus_one() {
+        let systems = vec![local_sys("NES")];
+        assert_eq!(position_of_system_id(&systems, "Missing"), -1);
     }
 }

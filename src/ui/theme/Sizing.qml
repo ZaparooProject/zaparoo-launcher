@@ -18,6 +18,14 @@ QtObject {
     // Visible carousel covers: fewer at very low resolution to avoid crowding.
     readonly property int visibleCovers: screenHeight < 300 ? 3 : 5
 
+    // Paged grid shape: chosen by screen height so the same grid reads
+    // sensibly from MiSTer 240p through 1080p. Width × height of one
+    // page in tiles; product is the page size used by `PagedGrid`.
+    readonly property int gridColumns: screenHeight < 300 ? 3
+                                       : screenHeight < 600 ? 4
+                                       : 5
+    readonly property int gridRows: screenHeight < 300 ? 2 : 3
+
     function pctH(percent: real): int {
         return Math.round(screenHeight * percent / 100)
     }

@@ -130,13 +130,13 @@ mod tests {
 
     #[test]
     fn media_search_filters_by_system() {
-        let req = r#"{"jsonrpc":"2.0","id":"1","method":"media.search","params":{"systems":["nes"],"maxResults":100}}"#;
+        let req = r#"{"jsonrpc":"2.0","id":"1","method":"media.search","params":{"systems":["NES"],"maxResults":100}}"#;
         let resp = parse(&dispatch(req));
         let results = resp["result"]["results"].as_array().expect("array");
         assert!(!results.is_empty());
         assert!(results
             .iter()
-            .all(|g| g["system"]["id"].as_str() == Some("nes")));
+            .all(|g| g["system"]["id"].as_str() == Some("NES")));
     }
 
     #[test]

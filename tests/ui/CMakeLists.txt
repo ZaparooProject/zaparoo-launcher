@@ -13,6 +13,7 @@ qt_add_qml_module(
         tst_navigation.qml
         tst_sizing.qml
         tst_persistence.qml
+        tst_paged_grid.qml
     IMPORTS
         Zaparoo.App
         Zaparoo.Browse
