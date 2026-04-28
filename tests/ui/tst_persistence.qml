@@ -26,7 +26,6 @@ TestCase {
 
     function init(): void {
         main.activeScreen = main.screenHub
-        main.hubFocus = main.focusCategories
         tryCompare(main, "screenOffset", 0, 2000)
     }
 
@@ -56,20 +55,20 @@ TestCase {
 
     function test_empty_systems_navigation_preserves_systems_state(): void {
         Browse.SystemsState.system_id = "persistence-probe-system"
-        main.hubFocus = main.focusSystems
+        main.activeScreen = main.screenSystems
         main.handleKey(Qt.Key_Left)
         main.handleKey(Qt.Key_Right)
         // Down stays within the (empty) grid; Up at row 0 falls through
-        // to a section flip back to categories — neither path may write
-        // a system id derived from index 0 of an empty model.
+        // to a peer-screen flip back to hub — neither path may write a
+        // system id derived from index 0 of an empty model.
         main.handleKey(Qt.Key_Down)
         compare(Browse.SystemsState.system_id, "persistence-probe-system",
                 "Down on an empty systems grid must not overwrite SystemsState.system_id")
-        // Restore systems focus so Up exercises the empty-systems path
-        // (the prior Down may have flipped sections via the same
-        // fall-through). Up on an empty grid hits the section-flip
-        // branch that mirrors Escape — it must also not write system_id.
-        main.hubFocus = main.focusSystems
+        // Restore systems screen so Up exercises the empty-systems
+        // path (the prior Down didn't flip — _performMove just returned
+        // false). Up on an empty grid hits the screen-flip branch that
+        // mirrors Escape — it must also not write system_id.
+        main.activeScreen = main.screenSystems
         main.handleKey(Qt.Key_Up)
         compare(Browse.SystemsState.system_id, "persistence-probe-system",
                 "Up on an empty systems grid must not overwrite SystemsState.system_id")
@@ -88,15 +87,18 @@ TestCase {
 
     // Screen flips are user-visible intent, not selection state. They
     // should persist even when the underlying model is empty (so the
-    // launcher resumes on the right screen next boot). The hub's
-    // internal section flip (categories ↔ systems) used to persist
-    // through HubState.focus; that field was dropped — first launch
-    // after a kill always lands on the categories carousel.
+    // launcher resumes on the right screen next boot).
+    function test_screen_flip_on_empty_categories_persists_active_screen(): void {
+        main.handleKey(Qt.Key_Return)
+        compare(Browse.AppState.active_screen, main.screenSystems,
+                "Enter must flip active_screen to systems even on an empty categories carousel")
+    }
+
     function test_screen_flip_on_empty_systems_persists_active_screen(): void {
-        main.hubFocus = main.focusSystems
+        main.activeScreen = main.screenSystems
         main.handleKey(Qt.Key_Return)
         compare(Browse.AppState.active_screen, main.screenGames,
-                "Enter must flip active_screen even on an empty carousel")
+                "Enter must flip active_screen to games even on an empty systems carousel")
     }
 
     // Enter commits the highlighted selection into HubState so first-launch
@@ -113,7 +115,7 @@ TestCase {
 
     function test_enter_on_empty_systems_preserves_systems_state(): void {
         Browse.SystemsState.system_id = "persistence-probe-system"
-        main.hubFocus = main.focusSystems
+        main.activeScreen = main.screenSystems
         main.handleKey(Qt.Key_Return)
         compare(Browse.SystemsState.system_id, "persistence-probe-system",
                 "Enter on an empty systems carousel must not overwrite SystemsState.system_id")

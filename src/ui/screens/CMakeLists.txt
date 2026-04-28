@@ -16,6 +16,7 @@ qt_add_qml_module(
     QML_FILES
         ScreenManager.qml
         HubScreen.qml
+        SystemsScreen.qml
         GamesScreen.qml
     IMPORTS
         Zaparoo.Ui

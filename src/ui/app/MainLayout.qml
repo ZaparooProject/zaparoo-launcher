@@ -25,22 +25,25 @@ import Zaparoo.Browse as Browse
 ApplicationWindow {
     id: root
 
-    // Screen/focus constants re-exported from the manager + HubScreen so
-    // tests and Main.qml can reference them without importing both.
+    // Screen constants re-exported from the manager so tests and
+    // Main.qml can reference them without importing Zaparoo.Screens.
     readonly property string screenHub: ScreenManager.screenHub
+    readonly property string screenSystems: ScreenManager.screenSystems
     readonly property string screenGames: ScreenManager.screenGames
-    readonly property string focusCategories: hubScreen.focusCategories
-    readonly property string focusSystems: hubScreen.focusSystems
 
     // Runtime state. `activeScreen` mirrors ScreenManager's property
     // (two-way synced below so direct assignment from tests still
-    // works). `hubFocus` aliases HubScreen's internal focus.
+    // works).
     property bool fullScreen: false
     property string activeScreen: ScreenManager.activeScreen
-    property alias hubFocus: hubScreen.section
 
-    // Drives the hub↔games slide transition. 0 = hub centred; width = games centred.
-    property real screenOffset: root.activeScreen === root.screenGames ? root.width : 0
+    // Drives the 3-screen slide transition. 0 = hub centred;
+    // width = systems centred; 2*width = games centred. Step 8
+    // drops the slide entirely.
+    property real screenOffset:
+        root.activeScreen === root.screenGames    ? 2 * root.width
+      : root.activeScreen === root.screenSystems  ? root.width
+      :                                             0
 
     // Defaults keep the design canvas at a sensible aspect for Design
     // Studio. Main.qml overrides these at runtime with Screen.width /
@@ -53,9 +56,10 @@ ApplicationWindow {
 
     // Screen plumbing exposed for Main.qml's orchestration. Anything
     // inside the screens (categories carousel, systems/games grids) is
-    // reached via root.hubScreen.* / root.gamesScreen.* — no per-widget
-    // aliases here.
+    // reached via root.hubScreen.* / root.systemsScreen.* /
+    // root.gamesScreen.* — no per-widget aliases here.
     property alias hubScreen: hubScreen
+    property alias systemsScreen: systemsScreen
     property alias gamesScreen: gamesScreen
 
     property bool cardWriteModalVisible: false
@@ -137,9 +141,17 @@ ApplicationWindow {
         height: parent.height
     }
 
+    SystemsScreen {
+        id: systemsScreen
+        x: parent.width - root.screenOffset
+        width: parent.width
+        height: parent.height
+        active: root.activeScreen === root.screenSystems
+    }
+
     GamesScreen {
         id: gamesScreen
-        x: parent.width - root.screenOffset
+        x: 2 * parent.width - root.screenOffset
         width: parent.width
         height: parent.height
         active: root.activeScreen === root.screenGames
@@ -327,9 +339,9 @@ ApplicationWindow {
             anchors.centerIn: parent
             text: root.activeScreen === root.screenGames
                   ? qsTr("[<>] GAME [OK] PLAY [TAB] FLASH CARD [ESC]")
-                  : (root.hubFocus === root.focusSystems
-                     ? qsTr("[<>] SYS [OK] GAMES [TAB] FLASH CARD [ESC]")
-                     : qsTr("[<>] CATEGORY  [OK] SELECT  [ESC] QUIT"))
+                : root.activeScreen === root.screenSystems
+                  ? qsTr("[<>] SYS [OK] GAMES [TAB] FLASH CARD [ESC]")
+                  : qsTr("[<>] CATEGORY  [OK] SELECT  [ESC] QUIT")
             font.family: Theme.fontUi
             font.pixelSize: Sizing.fontSize(2.5)
             color: Theme.textDim

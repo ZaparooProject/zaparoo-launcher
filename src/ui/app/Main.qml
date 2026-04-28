@@ -49,21 +49,21 @@ MainLayout {
     Component.onCompleted: {
         Sizing.screenWidth = width
         Sizing.screenHeight = height
-        // Restore screen/focus synchronously before first paint. The parent
-        // process on MiSTer kills the launcher without notice, so we resume
-        // exactly where we left off. Selection restore happens asynchronously
-        // in the modelReset handlers below as catalog data arrives.
+        // Restore screen synchronously before first paint. The parent
+        // process on MiSTer kills the launcher without notice, so we
+        // resume exactly where we left off. Selection restore happens
+        // asynchronously in the modelReset handlers below as catalog
+        // data arrives.
         const savedScreen = Browse.AppState.active_screen
-        if (savedScreen === root.screenGames || savedScreen === root.screenHub)
+        if (savedScreen === root.screenGames
+            || savedScreen === root.screenSystems
+            || savedScreen === root.screenHub)
             root.activeScreen = savedScreen
-        // Order matters: if the catalog is already ready, run the restore
-        // *before* flipping hubFocus. set_category is a synchronous
-        // ~200 ms main-thread freeze; doing it first lets the wrapper
-        // Transition + carousel Behaviors that hubFocus triggers start
-        // cleanly afterwards instead of being delayed by the freeze.
-        // When the catalog isn't ready yet, the modelReset Connection
-        // below fires the restore later — well after any startup
-        // animations have ended.
+        // If the catalog is already ready, fire the restore here so
+        // the cascade (set_category → SystemsModel reset → seed
+        // currentIndex → set_system → GamesModel reset) lands before
+        // first paint. Otherwise the CategoriesModel.onModelReset
+        // Connection below fires it on first delivery.
         if (Browse.CategoriesModel.count > 0)
             root.hubScreen.restoreFromCategoriesReset()
     }
@@ -89,10 +89,10 @@ MainLayout {
         // On a games-screen restore, GamesState.system_id is authoritative;
         // fall back to SystemsState.system_id only if it's empty (edge case:
         // user pressed Enter on an empty systems carousel and we flipped the
-        // screen without ever committing a system). On a hub restore,
-        // SystemsState.system_id is authoritative — don't peek at GamesState,
-        // or we'd override the user's hub position with a stale games target
-        // from a prior escape-back-to-hub.
+        // screen without ever committing a system). On a hub or systems
+        // restore, SystemsState.system_id is authoritative — don't peek at
+        // GamesState, or we'd override the user's position with a stale
+        // games target from a prior escape-back-up-the-stack.
         function onModelReset(): void {
             const savedSystem = root.activeScreen === root.screenGames
                 ? (Browse.GamesState.system_id !== "" ? Browse.GamesState.system_id : Browse.SystemsState.system_id)
@@ -101,13 +101,9 @@ MainLayout {
             // Seed without animating the page-snap — a fresh model is a
             // category switch, not user navigation, so the previous
             // page's slide-out would just be a distracting swoop.
-            root.hubScreen.systemsGrid.setCurrentIndexImmediate(idx >= 0 ? idx : 0)
+            root.systemsScreen.systemsGrid.setCurrentIndexImmediate(idx >= 0 ? idx : 0)
             if (idx >= 0)
                 Browse.GamesModel.set_system(savedSystem)
-            // Inner-dip mask for the Repeater rebuild flash; HubScreen
-            // owns the Timer + Behavior and gates on its own wrapper
-            // opacity, so this is a no-op during a drill-in.
-            root.hubScreen.runSystemsReseedDip()
         }
     }
     Connections {
@@ -125,6 +121,20 @@ MainLayout {
     // harnesses that don't wire the full persistence layer.
     Connections {
         target: root.hubScreen
+        function onRequestSystemsScreen(): void {
+            ScreenManager.activeScreen = root.screenSystems
+            Browse.AppState.active_screen = root.screenSystems
+        }
+        function onRequestQuit(): void {
+            Qt.quit()
+        }
+    }
+    Connections {
+        target: root.systemsScreen
+        function onRequestHubScreen(): void {
+            ScreenManager.activeScreen = root.screenHub
+            Browse.AppState.active_screen = root.screenHub
+        }
         function onRequestGamesScreen(): void {
             ScreenManager.activeScreen = root.screenGames
             Browse.AppState.active_screen = root.screenGames
@@ -133,15 +143,12 @@ MainLayout {
             root.beginCardWrite("systems")
             Browse.SystemsModel.write_card_at(index)
         }
-        function onRequestQuit(): void {
-            Qt.quit()
-        }
     }
     Connections {
         target: root.gamesScreen
-        function onRequestHubScreen(): void {
-            ScreenManager.activeScreen = root.screenHub
-            Browse.AppState.active_screen = root.screenHub
+        function onRequestSystemsScreen(): void {
+            ScreenManager.activeScreen = root.screenSystems
+            Browse.AppState.active_screen = root.screenSystems
         }
         function onRequestGameCardWrite(index: int): void {
             root.beginCardWrite("games")
@@ -210,6 +217,8 @@ MainLayout {
         }
         if (root.activeScreen === root.screenGames) {
             root.gamesScreen.handleAction(action)
+        } else if (root.activeScreen === root.screenSystems) {
+            root.systemsScreen.handleAction(action)
         } else {
             root.hubScreen.handleAction(action)
         }
@@ -234,10 +243,10 @@ MainLayout {
     Item {
         focus: true
         // Drop auto-repeated key events. A held Escape — or a brief
-        // stuck press while the main thread is blocked on the systems
-        // model reset — would otherwise queue a burst of `cancel`
-        // actions that flip focusSystems → focusCategories and then
-        // immediately quit on the next one. Real intent only.
+        // stuck press while the main thread is blocked on a model
+        // reset — would otherwise queue a burst of `cancel` actions
+        // that walk back through games → systems → hub → quit on
+        // a single press. Real intent only.
         Keys.onPressed: event => {
             if (event.isAutoRepeat)
                 return

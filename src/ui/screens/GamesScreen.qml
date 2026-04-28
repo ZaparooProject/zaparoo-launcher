@@ -15,21 +15,22 @@ import Zaparoo.Browse as Browse
 // qmllint disable compiler
 
 // Games screen — paged grid driven by `Browse.GamesModel`. Owns the
-// action dispatch for the games subset; emits `requestHubScreen` on
-// Escape so Main.qml can drive the cross-screen transition.
+// action dispatch for the games subset; emits `requestSystemsScreen`
+// on Escape so Main.qml can drive the cross-screen back-jump.
 Item {
     id: games
 
     property alias gamesGrid: gamesGrid
 
     // Set by the compositor (MainLayout) from `ScreenManager.activeScreen`.
-    // Gates the games-model binding so the hub screen doesn't pay for
-    // delegate instantiation while it's not in view.
+    // Gates the games-model binding so the off-screen instance doesn't
+    // pay for delegate instantiation while it's not in view.
     property bool active: false
 
     // Emitted when the user presses Escape — Main.qml flips the
-    // active screen back to the hub.
-    signal requestHubScreen()
+    // active screen back to SystemsScreen (one peer up the back-stack;
+    // a second Escape from there pops to Hub).
+    signal requestSystemsScreen()
     signal requestGameCardWrite(int index)
 
     // Move selection by (dx, dy) and commit the new game path on
@@ -70,7 +71,7 @@ Item {
                 games.requestGameCardWrite(games.gamesGrid.currentIndex)
             }
         } else if (action === "cancel") {
-            games.requestHubScreen()
+            games.requestSystemsScreen()
         }
     }
 
