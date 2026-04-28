@@ -83,28 +83,18 @@ Item {
         y: Sizing.pctH(8)
         width: parent.width
         height: Sizing.pctH(72)
-        opacity: Browse.GamesModel.loading ? 0.5 : 1.0
         model: games.active ? Browse.GamesModel : null
         delegate: Tile {}
-
-        Behavior on opacity {
-            NumberAnimation {
-                duration: 100
-            }
-        }
     }
 
-    Text {
+    ScreenStateOverlay {
         anchors.centerIn: gamesGrid
-        visible: (Browse.GamesModel.error_message ?? "") !== ""
-        text: Browse.GamesModel.error_message ?? ""
-        font.family: Theme.fontUi
-        font.pixelSize: Sizing.fontSize(3)
-        color: Theme.textDim
-        wrapMode: Text.WordWrap
-        horizontalAlignment: Text.AlignHCenter
-        width: parent.width * 0.7
-        renderType: Text.NativeRendering
+        width: gamesGrid.width
+        height: gamesGrid.height
+        loading: Browse.GamesModel.loading
+        errorMessage: Browse.GamesModel.error_message ?? ""
+        count: Browse.GamesModel.count
+        emptyText: qsTr("No games in this system")
     }
 
     Text {

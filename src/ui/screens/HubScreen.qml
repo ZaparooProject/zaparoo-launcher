@@ -348,6 +348,19 @@ Item {
         }
     }
 
+    // CategoriesModel has no `loading` qproperty — the catalog is fetched
+    // eagerly via bind_to_endpoint!. The brief cold-launch window where
+    // count===0 surfaces as "No categories" is acceptable per the
+    // "Loading is brief" locked decision in MVP_PLAN.md.
+    ScreenStateOverlay {
+        anchors.centerIn: categoriesCarousel
+        width: categoriesCarousel.width
+        height: categoriesCarousel.height
+        errorMessage: Browse.CategoriesModel.error_message ?? ""
+        count: Browse.CategoriesModel.count
+        emptyText: qsTr("No categories")
+    }
+
     // Wrapper that drives a sequenced reveal: when focus enters the
     // systems section, the categories carousel slides up first (its
     // 250 ms y-Behavior above) and only then does the grid fade in,
@@ -458,6 +471,16 @@ Item {
                     easing.type: Easing.OutQuad
                 }
             }
+        }
+
+        ScreenStateOverlay {
+            anchors.centerIn: systemsGrid
+            width: systemsGrid.width
+            height: systemsGrid.height
+            loading: Browse.SystemsModel.loading
+            errorMessage: Browse.SystemsModel.error_message ?? ""
+            count: Browse.SystemsModel.count
+            emptyText: qsTr("No systems in this category")
         }
 
         Text {

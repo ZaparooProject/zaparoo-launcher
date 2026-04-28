@@ -13,6 +13,7 @@ qt_add_qml_module(
         FpsCounter.qml
         HubCategoryTile.qml
         PagedGrid.qml
+        ScreenStateOverlay.qml
         Tile.qml
         TileLoader.qml
 )
