@@ -6,9 +6,9 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Zaparoo.Theme
 
-// Horizontal carousel. Items lay out as a flat finite line centred on
+// Horizontal carousel. Items lay out as a flat finite line centered on
 // currentIndex — no wrap. Each tile fades its own opacity based on its
-// horizontal centre's distance from the carousel edges, so background
+// horizontal center's distance from the carousel edges, so background
 // content (logo, status, bg pattern) shows through cleanly instead of
 // being painted over by a solid edge gradient.
 Item {
@@ -35,7 +35,7 @@ Item {
     // activation fade. Tiles that don't care just ignore it.
     property real imagesOpacity: 1.0
 
-    // Width of the per-tile fade band on each edge. A tile whose centre
+    // Width of the per-tile fade band on each edge. A tile whose center
     // is fadeWidth away from the carousel edge is fully visible; at the
     // edge itself it's fully transparent. Linear ramp in between.
     property int edgeFadeWidth: Sizing.pctW(8)

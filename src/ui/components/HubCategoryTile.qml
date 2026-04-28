@@ -47,23 +47,6 @@ Item {
         // qmllint enable missing-property compiler
     }
 
-    transformOrigin: Item.Center
-    // The selected-tile bump scales with imagesOpacity so the activated
-    // strip (imagesOpacity → 0) lands at 1.0× across all tiles —
-    // that's what lines the labels up at a uniform baseline. In
-    // focused mode (imagesOpacity = 1) the selected tile shows its
-    // full 1.06× zoom.
-    scale: root.delegateIsSelected
-           ? 1.0 + 0.06 * root.delegateImagesOpacity
-           : 1.0
-
-    Behavior on scale {
-        NumberAnimation {
-            duration: 120
-            easing.type: Easing.OutQuad
-        }
-    }
-
     readonly property int _gap: Sizing.pctH(1)
     readonly property int _labelHeight: Sizing.fontSize(2.4) + Sizing.pctH(0.8)
     readonly property int _padding: Sizing.pctH(3)
@@ -102,8 +85,8 @@ Item {
     }
 
     // Icon. Fills the area between the top padding and the label,
-    // centred horizontally. PreserveAspectFit means the 512×512
-    // silhouette PNG renders as a centred square inside whichever
+    // centered horizontally. PreserveAspectFit means the 512×512
+    // silhouette PNG renders as a centered square inside whichever
     // dimension is the tighter constraint.
     Image {
         id: icon

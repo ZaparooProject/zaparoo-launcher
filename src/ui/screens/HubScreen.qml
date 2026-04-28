@@ -302,7 +302,7 @@ Item {
         // to coverWidth; the label sits inside the cell below it.
         // _labelHeight and _gap mirror HubCategoryTile's internal
         // constants so the cell box fits its contents exactly and the
-        // _yActivated maths land the label row at pctH(12) — clear of
+        // _yActivated math lands the label row at pctH(12) — clear of
         // the logo (bottom at pctH(9)) and the top-right HUD.
         readonly property int _gap: Sizing.pctH(1)
         readonly property int _labelHeight:

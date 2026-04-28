@@ -81,10 +81,12 @@ fn redirect_stderr() {
     unsafe {
         libc::dup2(raw, libc::STDERR_FILENO);
     }
-    // Leak the File so its drop doesn't close the underlying fd we just
-    // dup'd onto stderr. The duplicated fd at 2 keeps the file alive
-    // for the process lifetime.
-    std::mem::forget(file);
+    // `file` drops at end of scope, which closes `raw`. The kernel
+    // keeps the underlying open file description alive because
+    // STDERR_FILENO still refers to it after the dup2 above — fd 2
+    // remains valid for the process lifetime, fed by every subsequent
+    // write to stderr.
+    drop(file);
 
     // Boot marker so successive runs are visually separated in the
     // append-mode file. Direct write to stderr (now redirected) instead
