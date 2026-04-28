@@ -27,12 +27,16 @@ Item {
     property int count: 0
     property string emptyText: qsTr("Nothing here")
 
-    readonly property string state:
+    // Named `viewState` rather than `state` — `Item.state` is a
+    // built-in slot wired to `states:` / `transitions:`, and shadowing
+    // it would silently break any future maintainer who adds state
+    // animations to the overlay or a subclass.
+    readonly property string viewState:
         overlay.loading ? "loading"
         : (overlay.errorMessage !== "" ? "error"
         : (overlay.count === 0 ? "empty" : "ready"))
 
-    visible: overlay.state !== "ready"
+    visible: overlay.viewState !== "ready"
 
     Column {
         anchors.centerIn: parent
@@ -41,9 +45,9 @@ Item {
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
             text: {
-                if (overlay.state === "loading") return qsTr("Loading…")
-                if (overlay.state === "error")   return qsTr("Failed to load")
-                if (overlay.state === "empty")   return overlay.emptyText
+                if (overlay.viewState === "loading") return qsTr("Loading…")
+                if (overlay.viewState === "error")   return qsTr("Failed to load")
+                if (overlay.viewState === "empty")   return overlay.emptyText
                 return ""
             }
             font.family: Theme.fontUi
@@ -55,7 +59,7 @@ Item {
 
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
-            visible: overlay.state === "error" && overlay.errorMessage !== ""
+            visible: overlay.viewState === "error" && overlay.errorMessage !== ""
             text: overlay.errorMessage
             font.family: Theme.fontUi
             font.pixelSize: Sizing.fontSize(2.4)

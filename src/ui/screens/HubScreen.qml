@@ -128,8 +128,9 @@ Item {
         readonly property int _coverHeight: _imageSide + _gap + _labelHeight
         readonly property int _coverSpacing: Sizing.pctH(28)
         // Band has a small extra strip beyond the cell so the selected
-        // tile's 1.06× scale (plus the focus outline ring) doesn't get
-        // clipped by the band edges.
+        // tile's 1.06× scale doesn't get clipped by the band edges. The
+        // focus outline ring is drawn inset against the card edge, so
+        // it never bleeds past the cell — only the scale needs slack.
         readonly property int _bandHeight: _coverHeight + Sizing.pctH(2)
 
         anchors.horizontalCenter: parent.horizontalCenter

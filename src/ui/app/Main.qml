@@ -119,26 +119,23 @@ MainLayout {
     // router writes persistence + flips ScreenManager. Keeps the screens
     // themselves ignorant of AppState so they can be reused in test
     // harnesses that don't wire the full persistence layer.
+    //
+    // The runtime + persistence writes always go together — naming the
+    // pair as a single helper makes the invariant explicit and keeps
+    // the four request handlers below a single line each.
+    function _goto(screen: string): void {
+        ScreenManager.activeScreen = screen
+        Browse.AppState.active_screen = screen
+    }
     Connections {
         target: root.hubScreen
-        function onRequestSystemsScreen(): void {
-            ScreenManager.activeScreen = root.screenSystems
-            Browse.AppState.active_screen = root.screenSystems
-        }
-        function onRequestQuit(): void {
-            Qt.quit()
-        }
+        function onRequestSystemsScreen(): void { root._goto(root.screenSystems) }
+        function onRequestQuit(): void { Qt.quit() }
     }
     Connections {
         target: root.systemsScreen
-        function onRequestHubScreen(): void {
-            ScreenManager.activeScreen = root.screenHub
-            Browse.AppState.active_screen = root.screenHub
-        }
-        function onRequestGamesScreen(): void {
-            ScreenManager.activeScreen = root.screenGames
-            Browse.AppState.active_screen = root.screenGames
-        }
+        function onRequestHubScreen(): void { root._goto(root.screenHub) }
+        function onRequestGamesScreen(): void { root._goto(root.screenGames) }
         function onRequestSystemCardWrite(index: int): void {
             root.beginCardWrite("systems")
             Browse.SystemsModel.write_card_at(index)
@@ -146,10 +143,7 @@ MainLayout {
     }
     Connections {
         target: root.gamesScreen
-        function onRequestSystemsScreen(): void {
-            ScreenManager.activeScreen = root.screenSystems
-            Browse.AppState.active_screen = root.screenSystems
-        }
+        function onRequestSystemsScreen(): void { root._goto(root.screenSystems) }
         function onRequestGameCardWrite(index: int): void {
             root.beginCardWrite("games")
             Browse.GamesModel.write_card_at(index)

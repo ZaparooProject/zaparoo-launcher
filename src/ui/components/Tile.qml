@@ -86,22 +86,6 @@ Item {
         }
     }
 
-    // Focus outline ring. Sits *outside* the card with a thin gap so
-    // the outline reads as a separate ring rather than a thick border
-    // on the card. Gated on `_focusedSelection` so only the focused
-    // tile in the focused section lights up — keeps two grids on
-    // screen (carousel + grid) from competing for the eye.
-    Rectangle {
-        anchors.centerIn: parent
-        width: parent.width + 2 * (root._outlineGap + root._outlineWidth)
-        height: parent.height + 2 * (root._outlineGap + root._outlineWidth)
-        color: "transparent"
-        border.color: Theme.textPrimary
-        border.width: root._outlineWidth
-        radius: Sizing.pctH(1.6)
-        visible: root._focusedSelection
-    }
-
     // Tile body. Solid card so the white icon + label have a high-
     // contrast surface. Always visible — no opacity gating — which is
     // the unified-Tile contract: every grid renders the same shape.
@@ -109,6 +93,29 @@ Item {
         anchors.fill: parent
         radius: Sizing.pctH(1.2)
         color: Theme.surfaceCard
+    }
+
+    // Focus outline ring. Drawn *inside* the card edge so the ring
+    // never bleeds past the cell bounds — that's the project standard:
+    // borders/outlines stay within their parent rather than overflowing
+    // it. Keeps the ring out of PagedGrid's clip rect at the row edges
+    // and means callers don't have to reserve bleed room for it. Gated
+    // on `_focusedSelection` so only the focused tile in the focused
+    // section lights up — keeps two grids on screen (carousel + grid)
+    // from competing for the eye. Drawn after the card so the border
+    // sits on top; the icon/label padding (`_padding = pctH(3)`) is far
+    // larger than the inset (`_outlineGap = pctH(0.4)`), so the ring
+    // never overlaps content.
+    Rectangle {
+        anchors.fill: parent
+        anchors.margins: root._outlineGap
+        color: "transparent"
+        border.color: Theme.textPrimary
+        border.width: root._outlineWidth
+        // Card radius minus the inset margin keeps the ring concentric
+        // with the card corners.
+        radius: Sizing.pctH(0.8)
+        visible: root._focusedSelection
     }
 
     // Icon area. Spans from the top padding down to just above the
