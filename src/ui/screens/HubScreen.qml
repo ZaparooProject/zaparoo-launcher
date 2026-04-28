@@ -111,8 +111,8 @@ Item {
 
         // Cell layout. The image area is a square equal to coverWidth;
         // the label sits inside the cell below it. _labelHeight and
-        // _gap mirror HubCategoryTile's internal constants so the cell
-        // box fits its contents exactly.
+        // _gap mirror Tile's internal constants so the cell box fits
+        // its contents exactly.
         readonly property int _gap: Sizing.pctH(1)
         readonly property int _labelHeight:
             Sizing.fontSize(2.4) + Sizing.pctH(0.8)
@@ -121,7 +121,8 @@ Item {
         readonly property int _coverHeight: _imageSide + _gap + _labelHeight
         readonly property int _coverSpacing: Sizing.pctH(28)
         // Band has a small extra strip beyond the cell so the selected
-        // tile's 1.1× scale doesn't get clipped by the band edges.
+        // tile's 1.06× scale (plus the focus outline ring) doesn't get
+        // clipped by the band edges.
         readonly property int _bandHeight: _coverHeight + Sizing.pctH(2)
 
         anchors.horizontalCenter: parent.horizontalCenter
@@ -133,7 +134,7 @@ Item {
         coverSpacing: _coverSpacing
 
         model: Browse.CategoriesModel
-        delegate: HubCategoryTile {}
+        delegate: Tile {}
     }
 
     // CategoriesModel has no `loading` qproperty — the catalog is

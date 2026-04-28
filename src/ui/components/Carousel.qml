@@ -31,10 +31,6 @@ Item {
     property int coverHeight: Sizing.pctH(45)
     property int coverSpacing: Sizing.pctH(35)
 
-    // 0..1, multiplies into delegates that opt into the hub-style
-    // activation fade. Tiles that don't care just ignore it.
-    property real imagesOpacity: 1.0
-
     // Width of the per-tile fade band on each edge. A tile whose center
     // is fadeWidth away from the carousel edge is fully visible; at the
     // edge itself it's fully transparent. Linear ramp in between.
@@ -87,12 +83,12 @@ Item {
                 return Math.max(0, Math.min(1, dist / root.edgeFadeWidth))
             }
             visible: isVisible
-            // Lerp toward 1.0 as imagesOpacity drops so the activated strip
-            // (imagesOpacity = 0) lands at scale 1.0 across every tile —
-            // that's what lines the labels up at a uniform baseline. In
-            // focused mode (imagesOpacity = 1) the selected tile shows its
-            // full 1.1× zoom and unselected tiles their 0.85×.
-            scale: 1.0 + ((isSelected ? 0.1 : -0.15) * root.imagesOpacity)
+            // Carousel owns the de-emphasis of unselected neighbours;
+            // the unified Tile applies its own selected-bump internally.
+            // Compounding 1.0 × Tile's 1.06× lands the focused tile on
+            // spec, 0.85× × 1.0 keeps the carousel's "everything but the
+            // chosen one shrinks" feel.
+            scale: isSelected ? 1.0 : 0.85
 
             Behavior on x {
                 enabled: coverItem.isVisible
@@ -114,7 +110,6 @@ Item {
                 isFocused: root.focused
                 name: coverItem.name
                 coverKey: coverItem.coverKey
-                imagesOpacity: root.imagesOpacity
             }
         }
     }
