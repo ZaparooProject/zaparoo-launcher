@@ -138,16 +138,31 @@ MainLayout {
         ScreenManager.activeScreen = screen
         Browse.AppState.active_screen = screen
     }
+
+    // True when Hub drilled straight into Games via the MiSTer
+    // Arcade-bypass shortcut, so cancel-from-Games returns directly
+    // to Hub rather than the Systems screen the user never saw. Set
+    // by the hub's onRequestGamesScreen handler, cleared by the
+    // systems' onRequestGamesScreen handler (normal drill-down) and
+    // by the games' onRequestSystemsScreen handler after routing.
+    property bool _gamesEnteredFromHub: false
+
     Connections {
         target: root.hubScreen
         function onRequestSystemsScreen(): void { root._goto(root.screenSystems) }
-        function onRequestGamesScreen(): void { root._goto(root.screenGames) }
+        function onRequestGamesScreen(): void {
+            root._gamesEnteredFromHub = true
+            root._goto(root.screenGames)
+        }
         function onRequestQuit(): void { Qt.quit() }
     }
     Connections {
         target: root.systemsScreen
         function onRequestHubScreen(): void { root._goto(root.screenHub) }
-        function onRequestGamesScreen(): void { root._goto(root.screenGames) }
+        function onRequestGamesScreen(): void {
+            root._gamesEnteredFromHub = false
+            root._goto(root.screenGames)
+        }
         function onRequestSystemCardWrite(index: int): void {
             root.beginCardWrite("systems")
             Browse.SystemsModel.write_card_at(index)
@@ -155,7 +170,14 @@ MainLayout {
     }
     Connections {
         target: root.gamesScreen
-        function onRequestSystemsScreen(): void { root._goto(root.screenSystems) }
+        function onRequestSystemsScreen(): void {
+            if (root._gamesEnteredFromHub) {
+                root._gamesEnteredFromHub = false
+                root._goto(root.screenHub)
+            } else {
+                root._goto(root.screenSystems)
+            }
+        }
         function onRequestGameCardWrite(index: int): void {
             root.beginCardWrite("games")
             Browse.GamesModel.write_card_at(index)

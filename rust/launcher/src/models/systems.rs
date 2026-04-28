@@ -216,6 +216,16 @@ fn apply_state(mut model: Pin<&mut ffi::SystemsModel>, (data, err): (Option<Cata
     if model.error_message != qerr {
         model.as_mut().set_error_message(qerr);
     }
+    // An error is a terminal state for the in-flight load — any
+    // worker spawned by an earlier `set_category` is invalidated by
+    // the seq bump above (or never ran because there was no fresh
+    // catalog), so this is the authoritative loading clear for the
+    // error path. Without it the spinner sticks on after the catalog
+    // surfaces an error mid-flight. Idle/Loading projects to
+    // `(None, "")`, so leave `loading` alone there.
+    if !err.is_empty() && model.loading {
+        model.as_mut().set_loading(false);
+    }
 }
 
 impl ffi::SystemsModel {

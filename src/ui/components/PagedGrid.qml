@@ -266,10 +266,15 @@ Item {
                 // element, small dirty rect — partial-update friendly
                 // even when the cell area was busy with a fresh layout
                 // this frame. `running: dot.isCurrent` retriggers the
-                // animation each time a new dot becomes current; the
-                // old dot's animation stops and snaps back to scale 1.
+                // animation each time a new dot becomes current.
+                // `alwaysRunToEnd: true` lets the previous-current
+                // dot's pulse complete its cycle back to scale 1 when
+                // the user mashes through pages, instead of being cut
+                // off mid-bounce and leaving the dot at an
+                // intermediate size.
                 SequentialAnimation on scale {
                     running: dot.isCurrent
+                    alwaysRunToEnd: true
                     NumberAnimation {
                         from: 1; to: 1.4
                         duration: 80

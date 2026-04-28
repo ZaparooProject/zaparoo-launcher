@@ -196,9 +196,12 @@ Item {
     // Label. Hidden when no curated cover is available so the procedural
     // fallback (which fills the whole icon area with the name) doesn't
     // double up with a second copy of the same string in the bottom strip.
-    // Selection cue is color + weight only —
-    // no scale, no underline — so labels line up at a uniform baseline
-    // across the row.
+    // Height collapses to 0 in that case so the cover area (and with it
+    // the fallback Text anchored to it) gets the full vertical space
+    // minus padding — without the collapse, the invisible label still
+    // reserves `_labelHeight` and leaves a blank strip at the bottom of
+    // the cell. Selection cue is color + weight only — no scale, no
+    // underline — so labels line up at a uniform baseline across the row.
     Text {
         id: label
 
@@ -208,7 +211,7 @@ Item {
             horizontalCenter: parent.horizontalCenter
         }
         width: parent.width - 2 * root._padding
-        height: root._labelHeight
+        height: root._hasCover ? root._labelHeight : 0
         text: root.delegateName
         font.family: Theme.fontUi
         font.pixelSize: Sizing.fontSize(2.6)
