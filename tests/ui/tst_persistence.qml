@@ -7,6 +7,14 @@ import QtTest
 import Zaparoo.App
 import Zaparoo.Browse as Browse
 
+// cxx-qt 0.8 patches `isFinal: true` on singleton properties but the
+// qmltypes schema has no `isFinal` slot for Method, so every direct
+// read or write of a Browse.* singleton property still trips qmllint's
+// "Member can be shadowed" check. Until the schema grows method-level
+// finality, suppress the compiler category file-wide — same pattern
+// every other QML file in the tree uses.
+// qmllint disable compiler
+
 // Regression tests for the kill/relaunch persistence flow. The failure
 // these guard against: during restore the carousels seed their
 // currentIndex *programmatically*; prior revisions wrote that seeded
@@ -26,7 +34,6 @@ TestCase {
 
     function init(): void {
         main.activeScreen = main.screenHub
-        tryCompare(main, "screenOffset", 0, 2000)
     }
 
     // Browse.* singletons are process-wide, so state writes leak across

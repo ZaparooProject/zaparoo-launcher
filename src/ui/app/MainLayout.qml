@@ -37,14 +37,6 @@ ApplicationWindow {
     property bool fullScreen: false
     property string activeScreen: ScreenManager.activeScreen
 
-    // Drives the 3-screen slide transition. 0 = hub centred;
-    // width = systems centred; 2*width = games centred. Step 8
-    // drops the slide entirely.
-    property real screenOffset:
-        root.activeScreen === root.screenGames    ? 2 * root.width
-      : root.activeScreen === root.screenSystems  ? root.width
-      :                                             0
-
     // Defaults keep the design canvas at a sensible aspect for Design
     // Studio. Main.qml overrides these at runtime with Screen.width /
     // Screen.height, so the live launcher still fills the screen.
@@ -65,14 +57,27 @@ ApplicationWindow {
     property bool cardWriteModalVisible: false
     property bool cardWriteFailed: false
 
-    signal cancelCardWriteRequested()
+    // Per-screen state derivation. Shape mirrors ScreenStateOverlay's
+    // `state` ternary so the help bar and the in-screen overlay agree
+    // on what state each screen is in. Hub has no Loading row —
+    // CategoriesModel binds eagerly via bind_to_endpoint! and exposes
+    // no `loading` qproperty, so a count-of-zero collapses straight
+    // into Empty (matching the overlay's existing behavior on Hub).
+    readonly property string systemsScreenState:
+        Browse.SystemsModel.loading ? "loading"
+        : ((Browse.SystemsModel.error_message ?? "") !== "" ? "error"
+        : (Browse.SystemsModel.count === 0 ? "empty" : "ready"))
 
-    Behavior on screenOffset {
-        NumberAnimation {
-            duration: 220
-            easing.type: Easing.OutCubic
-        }
-    }
+    readonly property string gamesScreenState:
+        Browse.GamesModel.loading ? "loading"
+        : ((Browse.GamesModel.error_message ?? "") !== "" ? "error"
+        : (Browse.GamesModel.count === 0 ? "empty" : "ready"))
+
+    readonly property string hubScreenState:
+        (Browse.CategoriesModel.error_message ?? "") !== "" ? "error"
+        : (Browse.CategoriesModel.count === 0 ? "empty" : "ready")
+
+    signal cancelCardWriteRequested()
 
     // Two-way sync between root.activeScreen and ScreenManager.activeScreen.
     // Binding-breaking assignments (tests setting root.activeScreen = "games")
@@ -134,27 +139,37 @@ ApplicationWindow {
 
     // ── Screen containers ─────────────────────────────────────────────────────
 
+    // Stacked container — only the active screen paints. Hard-cut peer
+    // transitions per MVP_PLAN's locked decisions: a 220 ms slide
+    // across three viewport widths cost cycles MiSTer doesn't have on
+    // a transition the user crosses on every drill-down. Each screen's
+    // `active` doubles as its `visible` gate so a single matcher drives
+    // both model-binding gating and paint gating.
     HubScreen {
         id: hubScreen
-        x: -root.screenOffset
+        x: 0
         width: parent.width
         height: parent.height
+        active: root.activeScreen === root.screenHub
+        visible: hubScreen.active
     }
 
     SystemsScreen {
         id: systemsScreen
-        x: parent.width - root.screenOffset
+        x: 0
         width: parent.width
         height: parent.height
         active: root.activeScreen === root.screenSystems
+        visible: systemsScreen.active
     }
 
     GamesScreen {
         id: gamesScreen
-        x: 2 * parent.width - root.screenOffset
+        x: 0
         width: parent.width
         height: parent.height
         active: root.activeScreen === root.screenGames
+        visible: gamesScreen.active
     }
 
     // ── Card writer modal ────────────────────────────────────────────────────
@@ -287,11 +302,35 @@ ApplicationWindow {
 
         Text {
             anchors.centerIn: parent
-            text: root.activeScreen === root.screenGames
-                  ? qsTr("[<>] GAME [OK] PLAY [TAB] FLASH CARD [ESC]")
-                : root.activeScreen === root.screenSystems
-                  ? qsTr("[<>] SYS [OK] GAMES [TAB] FLASH CARD [ESC]")
-                  : qsTr("[<>] CATEGORY  [OK] SELECT  [ESC] QUIT")
+            // (activeScreen, screenState, modal?)-keyed lookup. The modal
+            // row wins outright; otherwise per-screen text varies with
+            // the screen's data-state (Loading / Error / Empty / Ready).
+            // Error and Empty share the retry-or-back row everywhere
+            // because the user has the same options in both. Note the
+            // hint text mentions [OK] RETRY but no screen wires a retry
+            // handler yet — recovery is currently Esc-back, re-enter.
+            text: {
+                if (root.cardWriteModalVisible)
+                    return qsTr("[ESC] CANCEL");
+                if (root.activeScreen === root.screenHub) {
+                    if (root.hubScreenState === "ready")
+                        return qsTr("[<>] CATEGORY  [OK] SELECT  [ESC] QUIT");
+                    return qsTr("[OK] RETRY  [ESC] QUIT");
+                }
+                if (root.activeScreen === root.screenSystems) {
+                    if (root.systemsScreenState === "loading")
+                        return qsTr("[ESC] BACK");
+                    if (root.systemsScreenState === "ready")
+                        return qsTr("[<>] SYSTEM  [OK] GAMES  [TAB] FLASH CARD  [ESC] BACK");
+                    return qsTr("[OK] RETRY  [ESC] BACK");
+                }
+                // games
+                if (root.gamesScreenState === "loading")
+                    return qsTr("[ESC] BACK");
+                if (root.gamesScreenState === "ready")
+                    return qsTr("[<>] GAME  [OK] PLAY  [TAB] FLASH CARD  [ESC] BACK");
+                return qsTr("[OK] RETRY  [ESC] BACK");
+            }
             font.family: Theme.fontUi
             font.pixelSize: Sizing.fontSize(2.5)
             color: Theme.textDim

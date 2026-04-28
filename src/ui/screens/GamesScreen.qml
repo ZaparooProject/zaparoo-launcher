@@ -77,6 +77,29 @@ Item {
 
     // ── Visual tree ───────────────────────────────────────────────────────────
 
+    // Top label — active system name. Composed via SystemsModel because
+    // GamesModel only carries `current_system_id`, not the human name.
+    // The id-fallback covers the brief navigate window before
+    // SystemsModel sees the new id and the test harness case where
+    // SystemsModel is empty; the user sees the id rather than nothing.
+    Text {
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: parent.top
+        anchors.topMargin: Sizing.pctH(2)
+        text: {
+            const sid = Browse.GamesModel.current_system_id
+            if (sid === "")
+                return ""
+            const idx = Browse.SystemsModel.index_for_system_id(sid)
+            return idx >= 0 ? Browse.SystemsModel.system_name_at(idx) : sid
+        }
+        font.family: Theme.fontUi
+        font.pixelSize: Sizing.fontSize(4)
+        font.weight: Font.Medium
+        color: Theme.textPrimary
+        renderType: Text.NativeRendering
+    }
+
     PagedGrid {
         id: gamesGrid
 
@@ -96,24 +119,5 @@ Item {
         errorMessage: Browse.GamesModel.error_message ?? ""
         count: Browse.GamesModel.count
         emptyText: qsTr("No games in this system")
-    }
-
-    Text {
-        anchors.horizontalCenter: parent.horizontalCenter
-        // Caption sits directly under the grid (the grid reserves its
-        // own dot band internally so this lands in clean space).
-        anchors.top: gamesGrid.bottom
-        anchors.topMargin: Sizing.pctH(1)
-        // Reading count registers the binding for model-reset updates;
-        // the bounds check guards against a stale currentIndex during
-        // the reset window.
-        text: gamesGrid.currentIndex >= 0
-              && gamesGrid.currentIndex < Browse.GamesModel.count
-              ? Browse.GamesModel.name_at(gamesGrid.currentIndex)
-              : ""
-        font.family: Theme.fontUi
-        font.pixelSize: Sizing.fontSize(2.5)
-        color: Theme.textPrimary
-        renderType: Text.NativeRendering
     }
 }

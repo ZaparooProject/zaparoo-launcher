@@ -83,6 +83,22 @@ Item {
 
     // ── Visual tree ───────────────────────────────────────────────────────────
 
+    // Top label — active category. Replaces the pre-Step-8 below-grid
+    // focused-system caption; the unified Tile labels each system itself,
+    // so the on-screen context the caption was carrying (which category
+    // the user drilled into) moves up here.
+    Text {
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: parent.top
+        anchors.topMargin: Sizing.pctH(2)
+        text: Browse.SystemsModel.current_category
+        font.family: Theme.fontUi
+        font.pixelSize: Sizing.fontSize(4)
+        font.weight: Font.Medium
+        color: Theme.textPrimary
+        renderType: Text.NativeRendering
+    }
+
     PagedGrid {
         id: systemsGrid
 
@@ -102,25 +118,5 @@ Item {
         errorMessage: Browse.SystemsModel.error_message ?? ""
         count: Browse.SystemsModel.count
         emptyText: qsTr("No systems in this category")
-    }
-
-    Text {
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.top: systemsGrid.bottom
-        anchors.topMargin: Sizing.pctH(2.5)
-        // Reading Browse.SystemsModel.count registers the binding so
-        // a model reset re-evaluates the lookup. The bounds check is
-        // honest (count is always >= 0, but currentIndex can stale-out
-        // across resets) and matches the Rust-side out-of-range
-        // fallback in system_name_at.
-        text: systemsGrid.currentIndex >= 0
-              && systemsGrid.currentIndex < Browse.SystemsModel.count
-              ? Browse.SystemsModel.system_name_at(systemsGrid.currentIndex)
-              : ""
-        font.family: Theme.fontUi
-        font.pixelSize: Sizing.fontSize(4)
-        font.weight: Font.Medium
-        color: Theme.textPrimary
-        renderType: Text.NativeRendering
     }
 }

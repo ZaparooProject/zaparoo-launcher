@@ -24,6 +24,13 @@ Item {
 
     property alias categoriesCarousel: categoriesCarousel
 
+    // Set by the compositor (MainLayout) from `ScreenManager.activeScreen`.
+    // Today there's no model gating to do here (CategoriesModel binds
+    // eagerly via bind_to_endpoint!), but the property keeps the three
+    // screens shaped identically so the stacked-container matcher in
+    // MainLayout doesn't need a special case for Hub.
+    property bool active: true
+
     signal requestSystemsScreen()
     signal requestQuit()
 

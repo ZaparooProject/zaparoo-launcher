@@ -24,25 +24,30 @@ TestCase {
 
     function init(): void {
         main.activeScreen = main.screenHub
-        // Let the screenOffset animation settle before each test.
-        tryCompare(main, "screenOffset", 0, 2000)
     }
 
     function test_initial_state_is_hub(): void {
         compare(main.activeScreen, main.screenHub)
-        compare(main.screenOffset, 0)
+        compare(main.hubScreen.visible, true)
+        compare(main.systemsScreen.visible, false)
+        compare(main.gamesScreen.visible, false)
     }
 
-    function test_activating_systems_screen_shifts_offset_to_width(): void {
+    // Hard-cut peer screens: only the active screen is visible at any
+    // time. Replaces the prior screenOffset-shift assertions; the slide
+    // is gone (Step 8) and `visible` is now the observable contract.
+    function test_activating_systems_screen_makes_systems_visible(): void {
         main.activeScreen = main.screenSystems
-        tryCompare(main, "screenOffset", main.width, 2000,
-                   "screenOffset should animate to window width on systems screen")
+        compare(main.systemsScreen.visible, true)
+        compare(main.hubScreen.visible, false)
+        compare(main.gamesScreen.visible, false)
     }
 
-    function test_activating_games_screen_shifts_offset_to_double_width(): void {
+    function test_activating_games_screen_makes_games_visible(): void {
         main.activeScreen = main.screenGames
-        tryCompare(main, "screenOffset", 2 * main.width, 2000,
-                   "screenOffset should animate to 2× window width on games screen")
+        compare(main.gamesScreen.visible, true)
+        compare(main.hubScreen.visible, false)
+        compare(main.systemsScreen.visible, false)
     }
 
     // Enter on hub categories drills into systems screen.
