@@ -102,8 +102,19 @@ MainLayout {
             // category switch, not user navigation, so the previous
             // page's slide-out would just be a distracting swoop.
             root.systemsScreen.systemsGrid.setCurrentIndexImmediate(idx >= 0 ? idx : 0)
-            if (idx >= 0)
+            if (idx >= 0) {
                 Browse.GamesModel.set_system(savedSystem)
+            } else if (root.activeScreen === root.screenGames
+                       && Browse.SystemsModel.count > 0) {
+                // Games-screen restore where the saved id is missing
+                // (renamed system, ROM deleted): drive GamesModel from
+                // the visible row 0 fallback so the user sees real
+                // games for whichever system the grid landed on, not a
+                // stale list from a prior session. Persisted
+                // GamesState.system_id is left untouched so the user's
+                // intent survives a transient catalog gap.
+                Browse.GamesModel.set_system(Browse.SystemsModel.system_id_at(0))
+            }
         }
     }
     Connections {
@@ -206,8 +217,13 @@ MainLayout {
             // (action_error variant for game launch / settings reset
             // / etc.), generalise into a per-modal handler table
             // rather than chaining ifs.
+            // Only "cancel" aborts an in-flight card write. Treating
+            // "accept" the same way would let a fat-fingered OK during
+            // pending kill the write the user actually wanted; on
+            // success/error the modal auto-dismisses via
+            // handleCardWriteStatus, so accept has nothing to do here.
             if (ScreenManager.topModal === root.modalCardWrite
-                    && (action === "cancel" || action === "accept")) {
+                    && action === "cancel") {
                 root.cancelCardWrite()
             }
             // While a modal owns input, swallow everything not handled

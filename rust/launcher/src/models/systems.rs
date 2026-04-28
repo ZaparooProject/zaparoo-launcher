@@ -9,7 +9,7 @@ use std::pin::Pin;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::task::JoinHandle;
-use tracing::warn;
+use tracing::{trace, warn};
 use zaparoo_core::endpoints::catalog::CatalogEndpoint;
 use zaparoo_core::endpoints::readers_write::ReadersWriteMutation;
 use zaparoo_core::media_types::ReadersWriteParams;
@@ -313,8 +313,16 @@ impl ffi::SystemsModel {
         let handle = global_runtime().spawn(async move {
             let rows = rows_for_category(catalog.as_ref(), &cat);
             let count = rows.len() as i32;
+            let cat_for_log = cat.clone();
             let _ = qt_thread.queue(move |mut model| {
-                if seq.load(Ordering::SeqCst) != ticket {
+                let current = seq.load(Ordering::SeqCst);
+                if current != ticket {
+                    trace!(
+                        category = %cat_for_log,
+                        ticket,
+                        current,
+                        "discarding stale set_category callback"
+                    );
                     return;
                 }
                 model.as_mut().begin_reset_model();

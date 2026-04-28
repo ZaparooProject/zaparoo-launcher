@@ -193,7 +193,10 @@ Item {
         }
     }
 
-    // Label. Always visible. Selection cue is colour + weight only —
+    // Label. Hidden when no curated cover is available so the procedural
+    // fallback (which fills the whole icon area with the name) doesn't
+    // double up with a second copy of the same string in the bottom strip.
+    // Selection cue is color + weight only —
     // no scale, no underline — so labels line up at a uniform baseline
     // across the row.
     Text {
@@ -219,5 +222,6 @@ Item {
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
         renderType: Text.NativeRendering
+        visible: root._hasCover
     }
 }

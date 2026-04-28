@@ -53,7 +53,19 @@ foreach(_candidate IN LISTS _all_qmldirs)
     file(TIMESTAMP "${_candidate}" _ts UTC)
     set(_existing "${_qmldir_${_slot}}")
     set(_existing_ts "${_qmldir_ts_${_slot}}")
-    if(_existing STREQUAL "" OR _ts STRGREATER "${_existing_ts}")
+    set(_replace FALSE)
+    if(_existing STREQUAL "")
+        set(_replace TRUE)
+    elseif(_ts STRGREATER "${_existing_ts}")
+        set(_replace TRUE)
+    elseif(_ts STREQUAL "${_existing_ts}" AND _candidate STRLESS "${_existing}")
+        # Stable tie-break: when filesystem timestamps match (second
+        # precision can collide on a fast incremental rebuild) pick the
+        # lexicographically smaller path so two runs from the same tree
+        # always sync the same source.
+        set(_replace TRUE)
+    endif()
+    if(_replace)
         set(_qmldir_${_slot} "${_candidate}")
         set(_qmldir_ts_${_slot} "${_ts}")
         set(_qmldir_module_${_slot} "${_module_path}")

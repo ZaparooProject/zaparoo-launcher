@@ -23,7 +23,7 @@ import Zaparoo.Theme
 // Page changes are instant cuts (no fade, no slide). On Qt Quick's
 // Software adaptation the renderer cannot keep up with a per-frame
 // alpha ramp over a busy grid — translucent overlays don't subtract
-// from the dirty region, so every cell underneath re-rasterises per
+// from the dirty region, so every cell underneath re-rasterizes per
 // frame (text labels, cover images, card bodies). The only animated
 // cue on a page change is a brief scale pulse on the page-dot for
 // the new page: small element, small dirty rect, partial-update

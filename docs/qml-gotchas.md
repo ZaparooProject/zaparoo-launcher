@@ -26,7 +26,7 @@ fact; avoiding them is faster.
 ## Software-renderer animation costs
 
 The MiSTer build runs on Qt Quick's Software adaptation — raster paint engine,
-basic (non-threaded) render loop. There's no GPU; every frame is rasterised by
+basic (non-threaded) render loop. There's no GPU; every frame is rasterized by
 `QPainter` on the CPU.
 
 ### Mental model: painted area dominates, animation choice is downstream
@@ -46,7 +46,7 @@ animation choice does to that product:
    covers (`color.a == 1`) subtract their area from the obscured region,
    so the live cells underneath don't repaint. Translucent overlays
    (`opacity < 1`) do *not* subtract — every cell under a fading
-   rectangle re-rasterises per frame, even though "only the rectangle's
+   rectangle re-rasterizes per frame, even though "only the rectangle's
    alpha is changing."
 
 So when picking transitions: don't ask "should this fade or slide or
@@ -57,7 +57,7 @@ Two follow-on rules from the same model:
 
 - **Translation is free, but its content isn't.** Moving an Item by 1 px
   costs almost nothing if the Item is small (a page-dot, a single tile).
-  Moving a band of 12 tiles costs the rasterise of all 12 tiles per
+  Moving a band of 12 tiles costs the rasterize of all 12 tiles per
   frame, because the dirty rectangle covers the whole band.
 - **Fractional DPR is the absolute version of this.** When Qt's screen
   scale is non-integer, partial updates are disabled and the *entire
@@ -83,7 +83,7 @@ Pick animations from the cheap column when targeting MiSTer.
 A fading `Rectangle` (or any Item with `opacity < 1`) over a busy grid does
 *not* save paint work — the renderer treats the overlay as non-opaque and
 unions its area into the dirty region instead of subtracting it from the
-obscured region. Every cell underneath re-rasterises per frame: text labels,
+obscured region. Every cell underneath re-rasterizes per frame: text labels,
 cover images, card bodies. References:
 [`qsgsoftwarerenderablenode.cpp::update()`](https://github.com/qt/qtdeclarative/blob/dev/src/quick/scenegraph/adaptations/software/qsgsoftwarerenderablenode.cpp)
 clears `m_isOpaque` whenever opacity < 1;
@@ -119,7 +119,7 @@ plain animations, and `layer.enabled` without an effect.
 
 ### Recommendation
 
-For state-change feedback, prefer instant cuts with a small localised cue
+For state-change feedback, prefer instant cuts with a small localized cue
 (page-dot pulse, focus-ring blink, help-bar text change) over any fade.
 Cues are small elements with small dirty rectangles; they paint cheaply
 on raster regardless of DPR or partial-update status. Reach for a fade

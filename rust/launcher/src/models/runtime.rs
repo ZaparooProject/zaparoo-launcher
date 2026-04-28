@@ -5,7 +5,7 @@
 // `Browse.Runtime` — process-level constant: where is the launcher
 // binary running? Reads `zaparoo_core::runtime::current()` once at
 // construction and exposes `is_mister` for QML branches that need to
-// gate behaviour on the host (e.g. the Arcade-bypass shortcut on
+// gate behavior on the host (e.g. the Arcade-bypass shortcut on
 // MiSTer, where the Arcade category contains exactly one system and
 // the second navigate would be redundant).
 //
@@ -32,7 +32,10 @@ pub mod ffi {
         #[qobject]
         #[qml_element]
         #[qml_singleton]
-        #[qproperty(bool, is_mister)]
+        // READ + CONSTANT — the value is decided once during
+        // Initialize::initialize and never changes; no setter is
+        // exposed to QML, no NOTIFY signal is generated.
+        #[qproperty(bool, is_mister, READ, CONSTANT)]
         type Runtime = super::RuntimeRust;
     }
 
