@@ -159,66 +159,16 @@ ApplicationWindow {
 
     // ── Card writer modal ────────────────────────────────────────────────────
 
-    Rectangle {
-        id: cardWriteScrim
+    Modal {
+        id: cardWriteModal
 
-        anchors.fill: parent
-        visible: root.cardWriteModalVisible
-        color: "#99000000"
-        z: 300
-
-        Rectangle {
-            anchors.centerIn: parent
-            width: Math.min(parent.width * 0.78, Sizing.pctH(82))
-            height: Sizing.pctH(34)
-            color: Theme.bgPanel
-            border.width: 2
-            border.color: root.cardWriteFailed ? Theme.textPrimary : Theme.accent
-
-            Text {
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.top: parent.top
-                anchors.topMargin: Sizing.pctH(7)
-                anchors.leftMargin: Sizing.pctW(5)
-                anchors.rightMargin: Sizing.pctW(5)
-                text: root.cardWriteFailed
-                      ? qsTr("Writing failed")
-                      : qsTr("Put a writable card near the reader")
-                font.family: Theme.fontRetro
-                font.pixelSize: Sizing.fontSize(3)
-                color: Theme.textPrimary
-                wrapMode: Text.WordWrap
-                horizontalAlignment: Text.AlignHCenter
-                renderType: Text.NativeRendering
-            }
-
-            Rectangle {
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.bottom: parent.bottom
-                anchors.bottomMargin: Sizing.pctH(5)
-                width: Sizing.pctW(22)
-                height: Sizing.pctH(7)
-                color: Theme.bgBar
-                border.width: 1
-                border.color: Theme.borderMid
-                visible: !root.cardWriteFailed
-
-                Text {
-                    anchors.centerIn: parent
-                    text: qsTr("Cancel")
-                    font.family: Theme.fontRetro
-                    font.pixelSize: Sizing.fontSize(2.4)
-                    color: Theme.textPrimary
-                    renderType: Text.NativeRendering
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-                    onClicked: root.cancelCardWriteRequested()
-                }
-            }
-        }
+        open: root.cardWriteModalVisible
+        kind: "transient"
+        failed: root.cardWriteFailed
+        title: root.cardWriteFailed
+               ? qsTr("Writing failed")
+               : qsTr("Put a writable card near the reader")
+        onCancelRequested: root.cancelCardWriteRequested()
     }
 
     // ── Top-right HUD ─────────────────────────────────────────────────────────

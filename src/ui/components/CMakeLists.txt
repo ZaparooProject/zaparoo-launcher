@@ -12,6 +12,7 @@ qt_add_qml_module(
         Carousel.qml
         FpsCounter.qml
         HubCategoryTile.qml
+        Modal.qml
         PagedGrid.qml
         ScreenStateOverlay.qml
         Tile.qml

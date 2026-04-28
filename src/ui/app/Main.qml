@@ -207,6 +207,10 @@ MainLayout {
     // Dispatches to the top modal if any, otherwise the active screen.
     function handleAction(action: string): void {
         if (ScreenManager.hasModal) {
+            // Single-consumer dispatch. When a second modal lands
+            // (action_error variant for game launch / settings reset
+            // / etc.), generalise into a per-modal handler table
+            // rather than chaining ifs.
             if (ScreenManager.topModal === root.modalCardWrite
                     && (action === "cancel" || action === "accept")) {
                 root.cancelCardWrite()
