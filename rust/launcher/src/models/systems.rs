@@ -8,6 +8,7 @@ use cxx_qt_lib::{QByteArray, QHash, QHashPair_i32_QByteArray, QModelIndex, QStri
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use tokio::task::JoinHandle;
 use tracing::warn;
 use zaparoo_core::endpoints::catalog::CatalogEndpoint;
 use zaparoo_core::endpoints::readers_write::ReadersWriteMutation;
@@ -33,6 +34,7 @@ pub struct SystemInfo {
 pub struct SystemsModelRust {
     systems: Vec<SystemInfo>,
     count: i32,
+    loading: bool,
     current_category: QString,
     error_message: QString,
     card_write_pending: bool,
@@ -44,6 +46,21 @@ pub struct SystemsModelRust {
     // instead of wiping the carousel until the catalog returns to
     // `Ready`.
     last_ready: Option<CatalogData>,
+    // Cancellation handle for the in-flight `set_category` filter.
+    // The filter itself is short (microseconds on ARM); spawning is
+    // what enables the loading→ready four-state UI on the systems
+    // grid and aborts a queued result when the user has already
+    // moved on.
+    pending_task: Option<JoinHandle<()>>,
+    // Monotonic ticket bumped on each `set_category`, and again by
+    // `apply_state` whenever a fresh catalog supersedes whatever
+    // the in-flight worker is computing. The worker's queued
+    // closure captures the ticket value at spawn time and bails
+    // when `seq` has advanced — closing the window where a stale
+    // filter result lands on top of newer rows. Distinct from
+    // `card_write_seq` — different concerns, must not share a
+    // counter.
+    seq: Arc<AtomicU64>,
 }
 
 #[cxx_qt::bridge]
@@ -67,6 +84,7 @@ pub mod ffi {
         #[qml_element]
         #[qml_singleton]
         #[qproperty(i32, count)]
+        #[qproperty(bool, loading)]
         #[qproperty(QString, current_category)]
         #[qproperty(QString, error_message)]
         #[qproperty(bool, card_write_pending)]
@@ -167,6 +185,16 @@ fn apply_state(mut model: Pin<&mut ffi::SystemsModel>, (data, err): (Option<Cata
     if let Some(data) = data {
         let cat = model.rust().current_category.to_string();
         if !cat.is_empty() {
+            // Invalidate any in-flight `set_category` worker so its
+            // queued result — computed against the pre-update catalog
+            // — doesn't land on top of the fresher rows we're about
+            // to write. The Qt event loop is single-threaded, so the
+            // bump and the worker callback's `seq.load` are serialized:
+            // any callback that runs after this point sees a mismatch
+            // and bails. Without this bump the worker becomes the
+            // authoritative writer for the moment, and stale rows
+            // win.
+            model.rust().seq.fetch_add(1, Ordering::SeqCst);
             let rows = rows_for_category(Some(&data), &cat);
             let count = rows.len() as i32;
             model.as_mut().begin_reset_model();
@@ -174,6 +202,13 @@ fn apply_state(mut model: Pin<&mut ffi::SystemsModel>, (data, err): (Option<Cata
             model.as_mut().rust_mut().count = count;
             model.as_mut().end_reset_model();
             model.as_mut().count_changed();
+            // A fresh catalog arrival is the authoritative resolver
+            // for `loading`: any worker spawned by an earlier
+            // `set_category` has just been invalidated above and its
+            // queued callback will bail rather than clear `loading`.
+            if model.loading {
+                model.as_mut().set_loading(false);
+            }
         }
         model.as_mut().rust_mut().last_ready = Some(data);
     }
@@ -229,19 +264,70 @@ impl ffi::SystemsModel {
             return;
         }
         let cat = category.to_string();
-        // Read from `last_ready` rather than the live `ResourceStatus`
-        // so a transient `Loading` (a refetch in flight) doesn't wipe
-        // the carousel between the user's category change and the
-        // refetch completing.
-        let rows = rows_for_category(self.rust().last_ready.as_ref(), &cat);
-        let count = rows.len() as i32;
-        self.as_mut().begin_reset_model();
-        self.as_mut().rust_mut().systems = rows;
-        self.as_mut().rust_mut().count = count;
-        self.as_mut().rust_mut().current_category = category;
-        self.as_mut().end_reset_model();
-        self.as_mut().count_changed();
-        self.as_mut().current_category_changed();
+
+        // User-visible reset happens synchronously so QML sees fresh
+        // state immediately, before the worker has even scheduled.
+        // Drop the prior category's rows here too — otherwise the
+        // grid would keep painting (and accepting input on) the
+        // outgoing category until the worker resolves.
+        self.as_mut().set_current_category(category);
+        if !self.loading {
+            self.as_mut().set_loading(true);
+        }
+        if !self.error_message.is_empty() {
+            self.as_mut().set_error_message(QString::default());
+        }
+        if !self.systems.is_empty() {
+            self.as_mut().begin_reset_model();
+            self.as_mut().rust_mut().systems.clear();
+            self.as_mut().rust_mut().count = 0;
+            self.as_mut().end_reset_model();
+            self.as_mut().count_changed();
+        }
+
+        // Abort the prior task so it stops enqueuing further callbacks.
+        // Any callback already on the Qt event loop is still pending —
+        // the `seq` ticket below is what discards those stale ones.
+        if let Some(handle) = self.as_mut().rust_mut().pending_task.take() {
+            handle.abort();
+        }
+
+        // Bump the ticket *before* spawning. The new worker captures
+        // this value; any earlier-worker callback still in the Qt
+        // queue captured the previous ticket and will bail when it
+        // sees the mismatch. `apply_state` also bumps this ticket
+        // when a fresh catalog arrives mid-flight.
+        let seq = self.rust().seq.clone();
+        let ticket = seq.fetch_add(1, Ordering::SeqCst) + 1;
+
+        // Snapshot the catalog for the worker. Reading from
+        // `last_ready` rather than the live `ResourceStatus` means a
+        // transient `Loading` (a refetch in flight) doesn't wipe the
+        // carousel between the user's category change and the refetch
+        // completing. The clone is small (~hundreds of `SystemInfo`
+        // rows, microseconds on ARM) and unavoidable without
+        // Arc-wrapping `last_ready`, which is out of scope.
+        let catalog = self.rust().last_ready.clone();
+
+        let qt_thread = self.qt_thread();
+        let handle = global_runtime().spawn(async move {
+            let rows = rows_for_category(catalog.as_ref(), &cat);
+            let count = rows.len() as i32;
+            let _ = qt_thread.queue(move |mut model| {
+                if seq.load(Ordering::SeqCst) != ticket {
+                    return;
+                }
+                model.as_mut().begin_reset_model();
+                model.as_mut().rust_mut().systems = rows;
+                model.as_mut().rust_mut().count = count;
+                model.as_mut().end_reset_model();
+                model.as_mut().count_changed();
+                if model.loading {
+                    model.as_mut().set_loading(false);
+                }
+            });
+        });
+        self.as_mut().rust_mut().pending_task = Some(handle);
     }
 
     fn system_id_at(&self, index: i32) -> QString {
