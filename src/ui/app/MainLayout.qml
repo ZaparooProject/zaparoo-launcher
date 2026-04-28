@@ -12,9 +12,9 @@ import Zaparoo.Browse as Browse
 
 // cxx-qt 0.8 patches `isFinal: true` on singleton properties but the
 // qmltypes schema has no `isFinal` slot for Method, so every qinvokable
-// call on a Zaparoo.Browse singleton (all_cover_keys, etc.) still trips
-// qmllint's "Member can be shadowed" check. Until the schema grows
-// method-level finality, suppress the compiler category file-wide.
+// call on a Zaparoo.Browse singleton still trips qmllint's "Member can
+// be shadowed" check. Until the schema grows method-level finality,
+// suppress the compiler category file-wide.
 // qmllint disable compiler
 
 // Visual tree. Edit this file in Qt Design Studio; the state machine
@@ -114,44 +114,6 @@ ApplicationWindow {
         // of flashing the bare bgDeep underneath. One small PNG decode
         // at startup is cheap.
         asynchronous: false
-    }
-
-    // ── System logo prefetch ─────────────────────────────────────────────────
-    //
-    // Hidden Repeater that loads every system PNG once the catalog
-    // arrives, priming Qt's pixmap cache. Without this, the *first*
-    // category switch pays the PNG decode for that category's logos —
-    // a visible stutter the user noticed. Subsequent visits are free.
-    //
-    // Bound directly to SystemsModel.cover_keys: the property is set
-    // *after* the model's internal `last_ready` snapshot inside
-    // `apply_state`, so the changed-signal can only fire once the keys
-    // are real. No cross-model coupling, no Component.onCompleted seed.
-
-    Item {
-        id: coverPrefetch
-        visible: false
-
-        Repeater {
-            model: Browse.SystemsModel.cover_keys
-
-            Image {
-                required property string modelData
-
-                // `coverKey` carries the subdirectory (e.g. `systems/SNES`).
-                // Resources.coverUrl is the same builder Tile.qml uses, so
-                // this prefetch and the visible Image hit the same
-                // QPixmapCache slot — see Resources.qml.
-                source: Resources.coverUrl(modelData)
-                // Match Tile.qml's sourceSize so the prefetch and the
-                // visible Image share a QPixmapCache entry. A different
-                // sourceSize would key a separate cache slot and the
-                // prefetch wouldn't help.
-                sourceSize.width: 256
-                asynchronous: true
-                cache: true
-            }
-        }
     }
 
     // ── Logo ──────────────────────────────────────────────────────────────────

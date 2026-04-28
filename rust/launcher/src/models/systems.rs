@@ -4,9 +4,7 @@
 
 use crate::models::{global_runtime, global_store};
 use cxx_qt::{CxxQtType, Threading};
-use cxx_qt_lib::{
-    QByteArray, QHash, QHashPair_i32_QByteArray, QModelIndex, QString, QStringList, QVariant,
-};
+use cxx_qt_lib::{QByteArray, QHash, QHashPair_i32_QByteArray, QModelIndex, QString, QVariant};
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -46,12 +44,6 @@ pub struct SystemsModelRust {
     // instead of wiping the carousel until the catalog returns to
     // `Ready`.
     last_ready: Option<CatalogData>,
-    // Cover-key list mirroring `last_ready`. Exposed as a qproperty so
-    // the QML side can bind a prefetch Repeater directly. Updated
-    // *after* `last_ready` inside `apply_state`, so the property's
-    // notify signal is the only racy-safe trigger for "catalog cover
-    // keys are stable now."
-    cover_keys: QStringList,
 }
 
 #[cxx_qt::bridge]
@@ -67,7 +59,6 @@ pub mod ffi {
         type QHash_i32_QByteArray = cxx_qt_lib::QHash<cxx_qt_lib::QHashPair_i32_QByteArray>;
         type QByteArray = cxx_qt_lib::QByteArray;
         type QString = cxx_qt_lib::QString;
-        type QStringList = cxx_qt_lib::QStringList;
     }
 
     unsafe extern "RustQt" {
@@ -80,7 +71,6 @@ pub mod ffi {
         #[qproperty(QString, error_message)]
         #[qproperty(bool, card_write_pending)]
         #[qproperty(QString, card_write_error)]
-        #[qproperty(QStringList, cover_keys)]
         type SystemsModel = super::SystemsModelRust;
 
         #[qinvokable]
@@ -139,20 +129,6 @@ fn project(status: &ResourceStatus<CatalogData>) -> (Option<CatalogData>, String
     }
 }
 
-/// Every system cover key in `catalog`, in source order. Returns empty
-/// when `catalog` is `None`. Pulled out so the `all_cover_keys`
-/// qinvokable has a unit-testable seam. Keys are returned as
-/// `systems/<id>` — the relative path under `resources/images/` so the
-/// QML side can resolve the PNG without hardcoding the subdirectory.
-fn cover_keys(catalog: Option<&CatalogData>) -> Vec<String> {
-    catalog.map_or_else(Vec::new, |c| {
-        c.systems
-            .iter()
-            .map(|s| format!("systems/{}", s.id))
-            .collect()
-    })
-}
-
 /// Find `needle` in `systems` with case-sensitive id equality. Returns
 /// position as i32, or -1 if not found / empty needle. The
 /// case-sensitive contract is deliberate: `SystemsState.system_id` is
@@ -199,20 +175,7 @@ fn apply_state(mut model: Pin<&mut ffi::SystemsModel>, (data, err): (Option<Cata
             model.as_mut().end_reset_model();
             model.as_mut().count_changed();
         }
-        let new_keys = cover_keys(Some(&data));
         model.as_mut().rust_mut().last_ready = Some(data);
-        // Set `cover_keys` *after* `last_ready` so anything observing
-        // the property's notify signal sees a fully-populated model.
-        // The setter only fires `cover_keys_changed` when the list
-        // actually differs, so duplicate `Ready` events won't churn
-        // the prefetch Repeater.
-        let mut qlist = QStringList::default();
-        for k in new_keys {
-            qlist.append(QString::from(k.as_str()));
-        }
-        if model.cover_keys != qlist {
-            model.as_mut().set_cover_keys(qlist);
-        }
     }
     let qerr = QString::from(err.as_str());
     if model.error_message != qerr {
@@ -365,7 +328,7 @@ mod tests {
         reason = "tests should fail-fast on unexpected errors"
     )]
 
-    use super::{cover_keys, position_of_system_id, project, rows_for_category, SystemInfo};
+    use super::{position_of_system_id, project, rows_for_category, SystemInfo};
     use zaparoo_core::media_types::SystemInfo as MediaSystemInfo;
     use zaparoo_core::remote_resource::ResourceStatus;
     use zaparoo_core::systems_catalog::CatalogData;
@@ -456,28 +419,6 @@ mod tests {
         let catalog = catalog_with(vec![sys("smb", "SMB", "Consoles")]);
         let rows = rows_for_category(Some(&catalog), "DoesNotExist");
         assert!(rows.is_empty());
-    }
-
-    #[test]
-    fn cover_keys_none_returns_empty() {
-        assert!(cover_keys(None).is_empty());
-    }
-
-    #[test]
-    fn cover_keys_returns_every_id_across_categories() {
-        let catalog = catalog_with(vec![
-            sys("smb", "Super Mario Bros", "Consoles"),
-            sys("snk", "SNK Heroes", "Arcade"),
-            sys("zelda", "Zelda", "Consoles"),
-        ]);
-        let keys = cover_keys(Some(&catalog));
-        assert_eq!(keys, vec!["systems/smb", "systems/snk", "systems/zelda"]);
-    }
-
-    #[test]
-    fn cover_keys_empty_catalog_returns_empty() {
-        let catalog = catalog_with(vec![]);
-        assert!(cover_keys(Some(&catalog)).is_empty());
     }
 
     fn local_sys(id: &str) -> SystemInfo {
