@@ -170,6 +170,15 @@ MainLayout {
 
     Item {
         focus: true
-        Keys.onPressed: event => root.handleKey(event.key)
+        // Drop auto-repeated key events. A held Escape — or a brief
+        // stuck press while the main thread is blocked on the systems
+        // model reset — would otherwise queue a burst of `cancel`
+        // actions that flip focusSystems → focusCategories and then
+        // immediately quit on the next one. Real intent only.
+        Keys.onPressed: event => {
+            if (event.isAutoRepeat)
+                return
+            root.handleKey(event.key)
+        }
     }
 }

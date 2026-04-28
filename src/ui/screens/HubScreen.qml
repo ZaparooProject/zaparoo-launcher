@@ -89,8 +89,29 @@ Item {
     // Clear it here so the invariant "non-empty == reset still
     // pending" stays honest.
     onSectionChanged: {
-        if (hub.section !== hub.focusSystems)
+        if (hub.section !== hub.focusSystems) {
             hub._pendingCategory = ""
+            // Arm the cancel-debounce: a second `cancel` arriving
+            // within 300 ms of returning to focusCategories shouldn't
+            // quit the app. Covers fast double-tap and any
+            // post-section-flip key burst that slipped past the
+            // autorepeat filter in Main.qml.
+            hub._quitGuard = true
+            quitGuardTimer.restart()
+        }
+    }
+
+    // Window where a `cancel` arriving on focusCategories is treated
+    // as part of the "leave systems" press rather than an intent to
+    // quit. Cleared 300 ms after the section flip — long enough to
+    // absorb stragglers, short enough that a deliberate Escape still
+    // quits.
+    property bool _quitGuard: false
+
+    Timer {
+        id: quitGuardTimer
+        interval: 300
+        onTriggered: hub._quitGuard = false
     }
 
     // Exposed so MainLayout/tests can reach carousel/grid state without
@@ -221,6 +242,8 @@ Item {
             }
             hub.section = hub.focusSystems
         } else if (action === "cancel") {
+            if (hub._quitGuard)
+                return
             hub.requestQuit()
         }
     }
