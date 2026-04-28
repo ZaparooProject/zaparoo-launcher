@@ -64,11 +64,15 @@ TestCase {
         compare(main.activeScreen, main.screenSystems)
     }
 
-    // Enter on systems drills into games screen.
-    function test_enter_on_systems_routes_to_games(): void {
+    // Enter on an empty systems screen retries the current load (the
+    // help bar's [OK] RETRY contract); it must not flip to games. The
+    // test harness has no live catalog, so Systems is always Empty
+    // here — the Ready-state drill into games is exercised live.
+    function test_enter_on_empty_systems_does_not_flip_to_games(): void {
         main.activeScreen = main.screenSystems
         main.handleKey(Qt.Key_Return)
-        compare(main.activeScreen, main.screenGames)
+        compare(main.activeScreen, main.screenSystems,
+                "Enter on an empty systems screen must retry, not flip to games")
     }
 
     // Escape on games goes back to systems (one peer up the stack).

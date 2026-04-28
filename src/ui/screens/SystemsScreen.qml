@@ -46,6 +46,18 @@ Item {
         return false
     }
 
+    // Mirrors ScreenStateOverlay's `state` ternary so accept routing and
+    // the in-screen overlay agree on which state we're in.
+    function _state(): string {
+        if (Browse.SystemsModel.loading)
+            return "loading"
+        if ((Browse.SystemsModel.error_message ?? "") !== "")
+            return "error"
+        if (Browse.SystemsModel.count === 0)
+            return "empty"
+        return "ready"
+    }
+
     function handleAction(action: string): void {
         if (action === "left") {
             systems._performMove(-1, 0)
@@ -62,13 +74,28 @@ Item {
             if (!systems._performMove(0, -1))
                 systems.requestHubScreen()
         } else if (action === "accept") {
-            if (systems.systemsGrid.itemCount > 0) {
-                const chosen =
-                    Browse.SystemsModel.system_id_at(systems.systemsGrid.currentIndex)
-                Browse.GamesModel.set_system(chosen)
-                Browse.SystemsState.system_id = chosen
-                Browse.GamesState.system_id = chosen
+            // Accept routing depends on the screen's data state, matching
+            // the help bar vocabulary in MainLayout.qml. Loading swallows
+            // the press (load is in flight); Error/Empty re-fires the
+            // current load (the [OK] RETRY behavior the help bar
+            // promises); Ready drills into Games as before. The retry is
+            // gated on a non-empty current_category so an Accept on a
+            // first-launch screen with no category set doesn't flush the
+            // model.
+            const state = systems._state()
+            if (state === "loading")
+                return
+            if (state === "error" || state === "empty") {
+                const cat = Browse.SystemsModel.current_category
+                if (cat !== "")
+                    Browse.SystemsModel.set_category(cat)
+                return
             }
+            const chosen =
+                Browse.SystemsModel.system_id_at(systems.systemsGrid.currentIndex)
+            Browse.GamesModel.set_system(chosen)
+            Browse.SystemsState.system_id = chosen
+            Browse.GamesState.system_id = chosen
             systems.requestGamesScreen()
         } else if (action === "write_card") {
             if (systems.systemsGrid.itemCount > 0) {

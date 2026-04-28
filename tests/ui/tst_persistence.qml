@@ -92,20 +92,30 @@ TestCase {
                 "navigating an empty games grid must not overwrite GamesState.game_path")
     }
 
-    // Screen flips are user-visible intent, not selection state. They
-    // should persist even when the underlying model is empty (so the
-    // launcher resumes on the right screen next boot).
+    // Screen flips are user-visible intent, not selection state. On Hub
+    // they should persist even when the underlying model is empty (so
+    // the launcher resumes on the right screen next boot). Systems and
+    // Games own a [OK] RETRY contract on non-Ready accept, so Enter on
+    // an empty Systems carousel re-fires the current load instead of
+    // flipping forward — the screen-flip-on-empty rule is Hub-only.
     function test_screen_flip_on_empty_categories_persists_active_screen(): void {
         main.handleKey(Qt.Key_Return)
         compare(Browse.AppState.active_screen, main.screenSystems,
                 "Enter must flip active_screen to systems even on an empty categories carousel")
     }
 
-    function test_screen_flip_on_empty_systems_persists_active_screen(): void {
+    // Symmetric to the Hub test above: that one proves the flip *does*
+    // write AppState; this one proves Systems retry *doesn't*. Seed a
+    // sentinel because test isolation clears AppState in cleanup() and
+    // setting `main.activeScreen` directly bypasses the request-signal
+    // path that writes AppState — so we need a non-empty starting value
+    // to detect a stray write.
+    function test_enter_on_empty_systems_does_not_persist_games_screen(): void {
+        Browse.AppState.active_screen = "persistence-probe-screen"
         main.activeScreen = main.screenSystems
         main.handleKey(Qt.Key_Return)
-        compare(Browse.AppState.active_screen, main.screenGames,
-                "Enter must flip active_screen to games even on an empty systems carousel")
+        compare(Browse.AppState.active_screen, "persistence-probe-screen",
+                "Enter on an empty systems carousel must retry, not flip — AppState.active_screen must not be overwritten")
     }
 
     // Enter commits the highlighted selection into HubState so first-launch

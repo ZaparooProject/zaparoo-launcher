@@ -305,17 +305,20 @@ ApplicationWindow {
             // (activeScreen, screenState, modal?)-keyed lookup. The modal
             // row wins outright; otherwise per-screen text varies with
             // the screen's data-state (Loading / Error / Empty / Ready).
-            // Error and Empty share the retry-or-back row everywhere
-            // because the user has the same options in both. Note the
-            // hint text mentions [OK] RETRY but no screen wires a retry
-            // handler yet — recovery is currently Esc-back, re-enter.
+            // Error and Empty share the retry-or-back row on Systems and
+            // Games (both wire `accept` to re-fire `set_category` /
+            // `set_system` in non-Ready state). Hub has no retry handler
+            // — CategoriesModel binds eagerly via bind_to_endpoint! and
+            // recovers automatically — so its non-Ready row drops [OK]
+            // RETRY rather than promising behavior the screen doesn't
+            // implement.
             text: {
                 if (root.cardWriteModalVisible)
                     return qsTr("[ESC] CANCEL");
                 if (root.activeScreen === root.screenHub) {
                     if (root.hubScreenState === "ready")
                         return qsTr("[<>] CATEGORY  [OK] SELECT  [ESC] QUIT");
-                    return qsTr("[OK] RETRY  [ESC] QUIT");
+                    return qsTr("[ESC] QUIT");
                 }
                 if (root.activeScreen === root.screenSystems) {
                     if (root.systemsScreenState === "loading")

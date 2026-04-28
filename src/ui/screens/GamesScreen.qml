@@ -43,6 +43,18 @@ Item {
                 Browse.GamesModel.path_at(games.gamesGrid.currentIndex)
     }
 
+    // Mirrors ScreenStateOverlay's `state` ternary so accept routing and
+    // the in-screen overlay agree on which state we're in.
+    function _state(): string {
+        if (Browse.GamesModel.loading)
+            return "loading"
+        if ((Browse.GamesModel.error_message ?? "") !== "")
+            return "error"
+        if (Browse.GamesModel.count === 0)
+            return "empty"
+        return "ready"
+    }
+
     function handleAction(action: string): void {
         if (action === "left") {
             games._performMove(-1, 0)
@@ -53,17 +65,32 @@ Item {
         } else if (action === "down") {
             games._performMove(0, 1)
         } else if (action === "accept") {
-            if (games.gamesGrid.itemCount > 0) {
-                // Persist before handing control away. Directional moves
-                // already write game_path on every step, but the user may
-                // press Accept on the first highlighted game without
-                // navigating, leaving game_path stale from a prior system.
-                // Writing here makes the commit explicit so a kill during
-                // launch resumes on the correct game.
-                Browse.GamesState.game_path =
-                    Browse.GamesModel.path_at(games.gamesGrid.currentIndex)
-                Browse.GamesModel.launch_at(games.gamesGrid.currentIndex)
+            // Accept routing depends on the screen's data state, matching
+            // the help bar vocabulary in MainLayout.qml. Loading swallows
+            // the press (load is in flight); Error/Empty re-fires the
+            // current load (the [OK] RETRY behavior the help bar
+            // promises); Ready launches the highlighted game. The retry
+            // is gated on a non-empty current_system_id so an Accept on a
+            // first-launch screen with no system set doesn't flush the
+            // model.
+            const state = games._state()
+            if (state === "loading")
+                return
+            if (state === "error" || state === "empty") {
+                const sid = Browse.GamesModel.current_system_id
+                if (sid !== "")
+                    Browse.GamesModel.set_system(sid)
+                return
             }
+            // Persist before handing control away. Directional moves
+            // already write game_path on every step, but the user may
+            // press Accept on the first highlighted game without
+            // navigating, leaving game_path stale from a prior system.
+            // Writing here makes the commit explicit so a kill during
+            // launch resumes on the correct game.
+            Browse.GamesState.game_path =
+                Browse.GamesModel.path_at(games.gamesGrid.currentIndex)
+            Browse.GamesModel.launch_at(games.gamesGrid.currentIndex)
         } else if (action === "write_card") {
             if (games.gamesGrid.itemCount > 0) {
                 Browse.GamesState.game_path =
