@@ -193,15 +193,18 @@ Item {
         }
     }
 
-    // Label. Hidden when no curated cover is available so the procedural
-    // fallback (which fills the whole icon area with the name) doesn't
-    // double up with a second copy of the same string in the bottom strip.
-    // Height collapses to 0 in that case so the cover area (and with it
-    // the fallback Text anchored to it) gets the full vertical space
-    // minus padding — without the collapse, the invisible label still
-    // reserves `_labelHeight` and leaves a blank strip at the bottom of
-    // the cell. Selection cue is color + weight only — no scale, no
-    // underline — so labels line up at a uniform baseline across the row.
+    // Label. Always visible. The procedural fallback briefly shows the
+    // same name on top of the cover area while the curated PNG is in
+    // `Image.Status.Loading` (which Qt enters even on QPixmapCache
+    // hits when `source` changes), so the strip and the fallback show
+    // the same text for a frame or two — that's fine. Gating the
+    // label's visibility or height on `_hasCover` would force a
+    // layout shift and an opacity Behavior on every carousel
+    // navigation, which compounds with the 150 ms `Behavior on x`
+    // slide and turns into visible chop on Qt Quick's Software
+    // adaptation. Selection cue is color + weight only — no scale,
+    // no underline — so labels line up at a uniform baseline across
+    // the row.
     Text {
         id: label
 
@@ -211,7 +214,7 @@ Item {
             horizontalCenter: parent.horizontalCenter
         }
         width: parent.width - 2 * root._padding
-        height: root._hasCover ? root._labelHeight : 0
+        height: root._labelHeight
         text: root.delegateName
         font.family: Theme.fontUi
         font.pixelSize: Sizing.fontSize(2.6)
@@ -225,6 +228,5 @@ Item {
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
         renderType: Text.NativeRendering
-        visible: root._hasCover
     }
 }
