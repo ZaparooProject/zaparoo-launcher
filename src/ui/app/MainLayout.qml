@@ -139,37 +139,56 @@ ApplicationWindow {
 
     // ── Screen containers ─────────────────────────────────────────────────────
 
-    // Stacked container — only the active screen paints. Hard-cut peer
-    // transitions per MVP_PLAN's locked decisions: a 220 ms slide
-    // across three viewport widths cost cycles MiSTer doesn't have on
-    // a transition the user crosses on every drill-down. Each screen's
-    // `active` doubles as its `visible` gate so a single matcher drives
-    // both model-binding gating and paint gating.
-    HubScreen {
-        id: hubScreen
-        x: 0
-        width: parent.width
-        height: parent.height
-        active: root.activeScreen === root.screenHub
-        visible: hubScreen.active
-    }
+    // Stacked container — only the active screen paints. Hub →
+    // Systems → Games drill-downs (and Esc back) are instant cuts:
+    // bind `visible` directly on the live `activeScreen` and let
+    // Qt's scene graph swap which screen paints in one frame.
+    //
+    // Earlier iterations tried a horizontal slide, then a direct
+    // opacity fade on the screen container, then an overlay-rectangle
+    // fade. All three were structurally too expensive for Qt Quick's
+    // Software adaptation when the destination screen is a dense
+    // grid. Translucent overlays don't subtract from the renderer's
+    // dirty region, so every cell underneath re-rasterises per frame
+    // throughout the fade — text labels, cover images, card bodies.
+    // Instant cuts paint the new screen exactly once. See
+    // docs/qml-gotchas.md → "Software-renderer animation costs"
+    // for the full reasoning.
+    //
+    // No additional cue on screen change: the help-bar text changes
+    // instantly, the screen body swaps, and the user just pressed
+    // OK or Esc — the action is deliberate and the feedback is
+    // immediate. The page-dot pulse inside `PagedGrid` is the only
+    // animated transition cue in the launcher.
+    //
+    // The wrapper `Item` stays for grouping clarity; with no fade
+    // machinery it carries no buffered state. Model bindings stay
+    // live across deactivations so Esc back to systems doesn't
+    // re-instantiate the whole delegate tree — Items with
+    // `visible: false` skip painting but keep their scene graph
+    // alive and their decoded covers warm.
+    Item {
+        id: stackedScreens
 
-    SystemsScreen {
-        id: systemsScreen
-        x: 0
-        width: parent.width
-        height: parent.height
-        active: root.activeScreen === root.screenSystems
-        visible: systemsScreen.active
-    }
+        anchors.fill: parent
 
-    GamesScreen {
-        id: gamesScreen
-        x: 0
-        width: parent.width
-        height: parent.height
-        active: root.activeScreen === root.screenGames
-        visible: gamesScreen.active
+        HubScreen {
+            id: hubScreen
+            anchors.fill: parent
+            visible: root.activeScreen === root.screenHub
+        }
+
+        SystemsScreen {
+            id: systemsScreen
+            anchors.fill: parent
+            visible: root.activeScreen === root.screenSystems
+        }
+
+        GamesScreen {
+            id: gamesScreen
+            anchors.fill: parent
+            visible: root.activeScreen === root.screenGames
+        }
     }
 
     // ── Card writer modal ────────────────────────────────────────────────────

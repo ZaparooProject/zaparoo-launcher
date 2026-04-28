@@ -55,10 +55,29 @@ Item {
 
     readonly property int _gap: Sizing.pctH(1)
     readonly property int _padding: Sizing.pctH(3)
+    // Sized for two lines of label text — long system names like
+    // "Super Nintendo Entertainment System" wrap rather than truncate
+    // on a single line. Hub categories are short and just leave the
+    // second line empty (the icon area shrinks slightly to compensate;
+    // pctH(22) cover stays comfortable).
+    //
+    // Driven off FontMetrics.height (= ascent + descent + leading) for
+    // the actual rendered line height instead of the glyph pixel size.
+    // The earlier `2 * Sizing.fontSize(2.6)` formula only allocated 2×
+    // the pixel size, which is ~1.66× a rendered line — so two-line
+    // wrapping silently collapsed to one line + ellipsis. The
+    // `Math.ceil` guards against a fractional value truncating one
+    // pixel shy of fitting the second line.
     readonly property int _labelHeight:
-        Sizing.fontSize(2.4) + Sizing.pctH(0.8)
+        Math.ceil(2 * labelFm.height) + Sizing.pctH(0.4)
     readonly property int _outlineGap: Sizing.pctH(0.4)
     readonly property int _outlineWidth: Sizing.pctH(0.6)
+
+    FontMetrics {
+        id: labelFm
+        font.family: Theme.fontUi
+        font.pixelSize: Sizing.fontSize(2.6)
+    }
 
     readonly property bool _focusedSelection:
         root.delegateIsSelected && root.delegateIsFocused
@@ -72,10 +91,9 @@ Item {
     readonly property bool _hasCover: cover.status === Image.Ready
 
     // Selected tile bumps up a hair so the user can see at a glance
-    // which one is current. Software-rendering safe: Qt rasterises the
-    // scaled item once per frame, no shaders involved. PagedGrid bumps
-    // cellItem.z for the selected slot, so the scaled tile draws on top
-    // of its right/bottom neighbours.
+    // which one is current. PagedGrid bumps cellItem.z for the
+    // selected slot, so the scaled tile draws on top of its
+    // right/bottom neighbours.
     transformOrigin: Item.Center
     scale: root.delegateIsSelected ? 1.06 : 1.0
 
@@ -137,8 +155,8 @@ Item {
         // Pin to the system PNGs' native width (256). A size-dependent
         // binding here would force a re-decode every frame the cell
         // animates — a constant value means QPixmapCache hits once per
-        // logo and reuses the decoded pixmap across the whole
-        // transition. Combined with `smooth: true`, downscaling to the
+        // logo and reuses the decoded pixmap across each layout
+        // change. Combined with `smooth: true`, downscaling to the
         // actual cell width is bilinear-filtered on draw.
         sourceSize.width: 256
         fillMode: Image.PreserveAspectFit
@@ -161,7 +179,7 @@ Item {
         text: root.delegateName
         font.family: Theme.fontUi
         font.pixelSize: Sizing.fontSize(2.4)
-        color: root.delegateIsSelected ? Theme.textPrimary : Theme.textDim
+        color: root.delegateIsSelected ? Theme.textPrimary : Theme.textLabel
         wrapMode: Text.WordWrap
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
@@ -190,9 +208,13 @@ Item {
         height: root._labelHeight
         text: root.delegateName
         font.family: Theme.fontUi
-        font.pixelSize: Sizing.fontSize(2.4)
+        font.pixelSize: Sizing.fontSize(2.6)
         font.weight: root._focusedSelection ? Font.Medium : Font.Normal
-        color: root._focusedSelection ? Theme.textPrimary : Theme.textDim
+        color: root._focusedSelection ? Theme.textPrimary : Theme.textLabel
+        // WordWrap (not Wrap) to avoid mid-word breaks like "Nint-endo".
+        // Two lines max — anything longer elides on the second line.
+        wrapMode: Text.WordWrap
+        maximumLineCount: 2
         elide: Text.ElideRight
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter

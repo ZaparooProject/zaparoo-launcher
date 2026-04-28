@@ -24,14 +24,8 @@ Item {
 
     property alias categoriesCarousel: categoriesCarousel
 
-    // Set by the compositor (MainLayout) from `ScreenManager.activeScreen`.
-    // Today there's no model gating to do here (CategoriesModel binds
-    // eagerly via bind_to_endpoint!), but the property keeps the three
-    // screens shaped identically so the stacked-container matcher in
-    // MainLayout doesn't need a special case for Hub.
-    property bool active: true
-
     signal requestSystemsScreen()
+    signal requestGamesScreen()
     signal requestQuit()
 
     // Restore the hub from the persisted `Browse.HubState.category`
@@ -83,27 +77,59 @@ Item {
         return true
     }
 
+    // Side-effect of every carousel commit: persist HubState and
+    // ask SystemsModel to filter to the new category. The set_category
+    // call doubles as a prefetch trigger — by the time the user drills
+    // in with Accept, the systems and their cover pixmaps are already
+    // loaded, so SystemsScreen paints its first frame from QPixmapCache
+    // instead of cycling through procedural fallbacks. Repeat calls
+    // short-circuit inside SystemsModel when the model is already on
+    // the requested category.
+    function _commitCategory(category: string): void {
+        Browse.HubState.category = category
+        Browse.SystemsModel.set_category(category)
+    }
+
     function handleAction(action: string): void {
         if (action === "left") {
             if (hub._navigateCarousel(hub.categoriesCarousel, -1))
-                Browse.HubState.category =
-                    Browse.CategoriesModel.category_at(hub.categoriesCarousel.currentIndex)
+                hub._commitCategory(
+                    Browse.CategoriesModel.category_at(hub.categoriesCarousel.currentIndex))
         } else if (action === "right") {
             if (hub._navigateCarousel(hub.categoriesCarousel, 1))
-                Browse.HubState.category =
-                    Browse.CategoriesModel.category_at(hub.categoriesCarousel.currentIndex)
-        } else if (action === "accept" || action === "down") {
-            // Both Accept and Down drill into the systems screen. Down
-            // matches d-pad / gamepad expectations (the systems grid
-            // sits visually below); Accept stays for keyboard users.
-            // set_category is async (Step 4a), so this returns
-            // immediately; the systems load proceeds in parallel with
-            // the cross-screen flip Main.qml fires off the signal.
-            if (hub.categoriesCarousel.itemCount > 0) {
-                const chosen =
-                    Browse.CategoriesModel.category_at(hub.categoriesCarousel.currentIndex)
-                Browse.HubState.category = chosen
-                Browse.SystemsModel.set_category(chosen)
+                hub._commitCategory(
+                    Browse.CategoriesModel.category_at(hub.categoriesCarousel.currentIndex))
+        } else if (action === "accept") {
+            // Accept drills into the systems screen. set_category is
+            // async (Step 4a) so this returns immediately; the systems
+            // load proceeds in parallel with the cross-screen flip
+            // Main.qml fires off the signal. Almost always a no-op
+            // here because left/right already committed the category;
+            // kept for the case where the user hits Accept without
+            // ever moving the carousel.
+            if (hub.categoriesCarousel.itemCount <= 0) {
+                hub.requestSystemsScreen()
+                return
+            }
+            const chosen = Browse.CategoriesModel.category_at(hub.categoriesCarousel.currentIndex)
+            hub._commitCategory(chosen)
+            // MiSTer-only: the Arcade category contains exactly one system,
+            // so the second navigate would be redundant. When _commitCategory
+            // has already populated SystemsModel synchronously (the common
+            // case — left/right earlier prefetched it), drill straight to
+            // games. On a cold-restore Accept where SystemsModel hasn't
+            // populated yet (count === 0), fall through to the normal
+            // systems-screen flow; the user can then hit Accept again.
+            if (Browse.Runtime.is_mister
+                && chosen === "Arcade"
+                && Browse.SystemsModel.current_category === chosen
+                && Browse.SystemsModel.count === 1) {
+                const systemId = Browse.SystemsModel.system_id_at(0)
+                Browse.SystemsState.system_id = systemId
+                Browse.GamesState.system_id = systemId
+                Browse.GamesModel.set_system(systemId)
+                hub.requestGamesScreen()
+                return
             }
             hub.requestSystemsScreen()
         } else if (action === "cancel") {

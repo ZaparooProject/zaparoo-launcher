@@ -130,6 +130,7 @@ MainLayout {
     Connections {
         target: root.hubScreen
         function onRequestSystemsScreen(): void { root._goto(root.screenSystems) }
+        function onRequestGamesScreen(): void { root._goto(root.screenGames) }
         function onRequestQuit(): void { Qt.quit() }
     }
     Connections {

@@ -24,19 +24,14 @@ Item {
 
     property alias systemsGrid: systemsGrid
 
-    // Set by the compositor (MainLayout) from `ScreenManager.activeScreen`.
-    // Gates the systems-model binding so the off-screen instance doesn't
-    // pay for delegate instantiation while it's not in view.
-    property bool active: false
-
     signal requestHubScreen()
     signal requestGamesScreen()
     signal requestSystemCardWrite(int index)
 
     // Move selection by (dx, dy) and commit the new system id on
-    // success. Returns the moveSelection result so callers can use the
-    // false branch to escape (Up at the top row falls through to the
-    // hub).
+    // success. Returns the moveSelection result; row/column moves wrap
+    // within the grid (no row-edge escape), so callers don't need to
+    // act on the false branch — Esc is the only back path.
     function _performMove(dx: int, dy: int): bool {
         if (systems.systemsGrid.moveSelection(dx, dy)) {
             Browse.SystemsState.system_id =
@@ -66,13 +61,10 @@ Item {
         } else if (action === "down") {
             systems._performMove(0, 1)
         } else if (action === "up") {
-            // Up inside the grid moves a row; Up at the top row falls
-            // through to the hub. Mirrors the pre-split UX where Up
-            // at row 0 escaped the embedded systems section back to
-            // categories — preserved here as a peer-screen back-jump
-            // so d-pad muscle memory still works.
-            if (!systems._performMove(0, -1))
-                systems.requestHubScreen()
+            // Up inside the grid moves a row; at the top row it wraps
+            // to the bottom row of the same page. Use Escape to back
+            // out to the hub.
+            systems._performMove(0, -1)
         } else if (action === "accept") {
             // Accept routing depends on the screen's data state, matching
             // the help bar vocabulary in MainLayout.qml. Loading swallows
@@ -114,10 +106,15 @@ Item {
     // focused-system caption; the unified Tile labels each system itself,
     // so the on-screen context the caption was carrying (which category
     // the user drilled into) moves up here.
+    //
+    // The screen Item fills the whole window, so the label has to clear
+    // the MainLayout logo (topMargin pctH(2) + height pctH(7) — bottom
+    // edge at pctH(9)) with a pctH(2) gap.
     Text {
+        id: topLabel
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: parent.top
-        anchors.topMargin: Sizing.pctH(2)
+        anchors.topMargin: Sizing.pctH(11)
         text: Browse.SystemsModel.current_category
         font.family: Theme.fontUi
         font.pixelSize: Sizing.fontSize(4)
@@ -126,14 +123,19 @@ Item {
         renderType: Text.NativeRendering
     }
 
+    // Grid fills the safe zone between the top label and the help bar.
+    // bottomMargin = MainLayout's instructionsBar height (pctH(6)) +
+    // pctH(2) gap. If you change the help-bar height, update this too.
     PagedGrid {
         id: systemsGrid
 
-        anchors.horizontalCenter: parent.horizontalCenter
-        y: Sizing.pctH(8)
-        width: parent.width
-        height: Sizing.pctH(72)
-        model: systems.active ? Browse.SystemsModel : null
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: topLabel.bottom
+        anchors.topMargin: Sizing.pctH(2)
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: Sizing.pctH(8)
+        model: Browse.SystemsModel
         delegate: Tile {}
     }
 

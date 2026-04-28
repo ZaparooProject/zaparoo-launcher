@@ -22,11 +22,6 @@ Item {
 
     property alias gamesGrid: gamesGrid
 
-    // Set by the compositor (MainLayout) from `ScreenManager.activeScreen`.
-    // Gates the games-model binding so the off-screen instance doesn't
-    // pay for delegate instantiation while it's not in view.
-    property bool active: false
-
     // Emitted when the user presses Escape — Main.qml flips the
     // active screen back to SystemsScreen (one peer up the back-stack;
     // a second Escape from there pops to Hub).
@@ -109,10 +104,15 @@ Item {
     // The id-fallback covers the brief navigate window before
     // SystemsModel sees the new id and the test harness case where
     // SystemsModel is empty; the user sees the id rather than nothing.
+    //
+    // The screen Item fills the whole window, so the label has to clear
+    // the MainLayout logo (topMargin pctH(2) + height pctH(7) — bottom
+    // edge at pctH(9)) with a pctH(2) gap.
     Text {
+        id: topLabel
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: parent.top
-        anchors.topMargin: Sizing.pctH(2)
+        anchors.topMargin: Sizing.pctH(11)
         text: {
             const sid = Browse.GamesModel.current_system_id
             if (sid === "")
@@ -127,14 +127,19 @@ Item {
         renderType: Text.NativeRendering
     }
 
+    // Grid fills the safe zone between the top label and the help bar.
+    // bottomMargin = MainLayout's instructionsBar height (pctH(6)) +
+    // pctH(2) gap. If you change the help-bar height, update this too.
     PagedGrid {
         id: gamesGrid
 
-        anchors.horizontalCenter: parent.horizontalCenter
-        y: Sizing.pctH(8)
-        width: parent.width
-        height: Sizing.pctH(72)
-        model: games.active ? Browse.GamesModel : null
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: topLabel.bottom
+        anchors.topMargin: Sizing.pctH(2)
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: Sizing.pctH(8)
+        model: Browse.GamesModel
         delegate: Tile {}
     }
 

@@ -63,22 +63,15 @@ TestCase {
     function test_empty_systems_navigation_preserves_systems_state(): void {
         Browse.SystemsState.system_id = "persistence-probe-system"
         main.activeScreen = main.screenSystems
+        // None of these keys flip screens on an empty grid — they're
+        // all in-grid moves that no-op when there's nothing to move
+        // to. None may write a system id derived from index 0.
         main.handleKey(Qt.Key_Left)
         main.handleKey(Qt.Key_Right)
-        // Down stays within the (empty) grid; Up at row 0 falls through
-        // to a peer-screen flip back to hub — neither path may write a
-        // system id derived from index 0 of an empty model.
         main.handleKey(Qt.Key_Down)
-        compare(Browse.SystemsState.system_id, "persistence-probe-system",
-                "Down on an empty systems grid must not overwrite SystemsState.system_id")
-        // Restore systems screen so Up exercises the empty-systems
-        // path (the prior Down didn't flip — _performMove just returned
-        // false). Up on an empty grid hits the screen-flip branch that
-        // mirrors Escape — it must also not write system_id.
-        main.activeScreen = main.screenSystems
         main.handleKey(Qt.Key_Up)
         compare(Browse.SystemsState.system_id, "persistence-probe-system",
-                "Up on an empty systems grid must not overwrite SystemsState.system_id")
+                "Navigating an empty systems grid must not overwrite SystemsState.system_id")
     }
 
     function test_empty_games_navigation_preserves_games_state(): void {

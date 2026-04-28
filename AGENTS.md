@@ -69,6 +69,16 @@ raw cargo as the default path; the justfile carries the expected environment.
   `Qt5Compat.GraphicalEffects`, Qt Quick Studio shapes, or custom shaders.
   Stick to software-rendering-safe types such as `Rectangle`, `Image`, `Text`,
   `Repeater`, `Item`, `NumberAnimation`, and `ColorAnimation`.
+- Do not animate properties that force a large dirty rectangle on busy content:
+  no translucent (`opacity < 1`) overlays over a grid, no fading or scaling of
+  a parent that contains many delegates, no slide-translation of a band of
+  tiles. Qt Software-adaptation cost is dominated by *painted pixels per frame
+  × per-pixel cost*, not by the animated property — a fading rectangle over 15
+  tiles repaints all 15 tiles per frame, because translucent nodes do not
+  subtract from the renderer's obscured region. Pick animations whose dirty
+  rect is small (page-dot pulse, focus-ring blink, single-tile move) and let
+  the rest of the scene stay static. See `docs/qml-gotchas.md` →
+  "Software-renderer animation costs".
 - Do not hardcode pixel sizes or fixed element counts in UI. Use
   `Sizing.pctH()`, `Sizing.pctW()`, `Sizing.fontSize()`, and
   `Sizing.visibleCovers`.

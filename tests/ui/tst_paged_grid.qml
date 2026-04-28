@@ -9,8 +9,8 @@ import Zaparoo.Ui
 
 // Direct moveSelection coverage. PagedGrid wraps in surprising ways
 // (page-overshoot lands on last existing item, single-page wraps,
-// row-grid refuses out-of-range as the screen-layer escape signal),
-// so each branch needs its own explicit case.
+// vertical wrap stays within the current page), so each branch needs
+// its own explicit case.
 //
 // Test geometry pinned to 1280×480, which makes Sizing yield a 4×3
 // grid (pageSize=12). All test indices below assume that layout.
@@ -90,19 +90,43 @@ TestCase {
         compare(grid.currentIndex, 4)
     }
 
-    function test_up_at_top_row_refuses(): void {
+    function test_up_at_top_row_wraps_to_bottom_of_same_page(): void {
         fillModel(20)
-        // currentIndex 0 → row 0; up returns false (escape signal).
-        compare(grid.moveSelection(0, -1), false)
-        compare(grid.currentIndex, 0)
+        // currentIndex 0 → page 0, row 0, col 0. Up wraps to row 2,
+        // col 0 on the same page → index 8.
+        compare(grid.moveSelection(0, -1), true)
+        compare(grid.currentIndex, 8)
     }
 
-    function test_down_at_bottom_row_refuses(): void {
+    function test_down_at_bottom_row_wraps_to_top_of_same_page(): void {
         fillModel(20)
         grid.setCurrentIndexImmediate(8) // (page 0, row 2, col 0)
         compare(grid.currentRow, 2)
+        compare(grid.moveSelection(0, 1), true)
+        // Wraps to (page 0, row 0, col 0) → index 0.
+        compare(grid.currentIndex, 0)
+    }
+
+    function test_down_into_partial_page_hole_clamps_to_last_existing(): void {
+        // 14 items: page 1 has rows 0 (cells 12..15) — but only 12, 13
+        // exist (indices 12, 13). Standing at (page 1, row 0, col 1)
+        // = index 13 and pressing down would land on (page 1, row 1,
+        // col 1) = index 17, which doesn't exist. Clamps to the last
+        // item on page 1 (13). No move, returns false.
+        fillModel(14)
+        grid.setCurrentIndexImmediate(13)
         compare(grid.moveSelection(0, 1), false)
-        compare(grid.currentIndex, 8)
+        compare(grid.currentIndex, 13)
+    }
+
+    function test_up_into_partial_page_hole_clamps_to_last_existing(): void {
+        // 14 items as above. From (page 1, row 0, col 1) = 13, up wraps
+        // to (page 1, row 2, col 1) = 21 — doesn't exist. Clamps to the
+        // last item on page 1 (13). No move, returns false.
+        fillModel(14)
+        grid.setCurrentIndexImmediate(13)
+        compare(grid.moveSelection(0, -1), false)
+        compare(grid.currentIndex, 13)
     }
 
     function test_right_crosses_page_boundary_to_full_target(): void {
