@@ -32,6 +32,7 @@ pub mod games_state;
 pub mod hub_state;
 pub mod input;
 pub mod systems;
+pub mod system_status;
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, OnceLock};
@@ -43,12 +44,14 @@ static RUNTIME: OnceLock<Arc<Runtime>> = OnceLock::new();
 static STORE: OnceLock<Arc<Store>> = OnceLock::new();
 static PERSIST_STATE: OnceLock<Arc<Mutex<PersistedState>>> = OnceLock::new();
 static INPUT_BINDINGS: OnceLock<HashMap<i32, String>> = OnceLock::new();
+static CORE_IS_LOCAL: OnceLock<bool> = OnceLock::new();
 
 pub fn init_globals(
     runtime: Arc<Runtime>,
     store: Arc<Store>,
     persist_state: Arc<Mutex<PersistedState>>,
     input_bindings: HashMap<i32, String>,
+    core_is_local: bool,
 ) {
     RUNTIME
         .set(runtime)
@@ -62,6 +65,9 @@ pub fn init_globals(
     INPUT_BINDINGS
         .set(input_bindings)
         .unwrap_or_else(|_| panic!("INPUT_BINDINGS already initialized"));
+    CORE_IS_LOCAL
+        .set(core_is_local)
+        .unwrap_or_else(|_| panic!("CORE_IS_LOCAL already initialized"));
 }
 
 pub fn global_runtime() -> Arc<Runtime> {
@@ -77,6 +83,10 @@ pub fn input_bindings() -> HashMap<i32, String> {
         .get()
         .expect("INPUT_BINDINGS not initialized")
         .clone()
+}
+
+pub fn core_is_local() -> bool {
+    *CORE_IS_LOCAL.get().expect("CORE_IS_LOCAL not initialized")
 }
 
 pub fn persist_state() -> Arc<Mutex<PersistedState>> {

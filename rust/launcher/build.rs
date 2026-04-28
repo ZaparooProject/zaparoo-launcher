@@ -33,6 +33,7 @@ fn main() {
         "src/models/hub_state.rs",
         "src/models/games_state.rs",
         "src/models/input.rs",
+        "src/models/system_status.rs",
     ]);
 
     // SAFETY: cc_builder is unsafe in 0.8 because cxx-qt makes no stability

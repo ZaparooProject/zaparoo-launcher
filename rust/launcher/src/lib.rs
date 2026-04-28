@@ -309,7 +309,14 @@ pub extern "C" fn zaparoo_rust_init() -> c_int {
     // The `Client` is owned by the `Store` (and the platform fetcher
     // task), so `init_globals` no longer takes it directly; singletons
     // reach the client through `global_store()`.
-    models::init_globals(runtime, store, persist_state, config.key_to_action.clone());
+    let core_is_local = core_endpoint_is_loopback(&config.core_endpoint);
+    models::init_globals(
+        runtime,
+        store,
+        persist_state,
+        config.key_to_action.clone(),
+        core_is_local,
+    );
 
     0
 }
@@ -319,4 +326,56 @@ pub extern "C" fn zaparoo_rust_init() -> c_int {
 #[no_mangle]
 pub extern "C" fn zaparoo_rust_post_qt_start() {
     mister_runtime::ensure_core_service_running();
+}
+
+fn core_endpoint_is_loopback(endpoint: &str) -> bool {
+    let Some(host) = endpoint_host(endpoint) else {
+        return false;
+    };
+    let host = host.trim().trim_matches('.').to_lowercase();
+    if host == "localhost" {
+        return true;
+    }
+    host.parse::<std::net::IpAddr>()
+        .is_ok_and(|ip| ip.is_loopback())
+}
+
+fn endpoint_host(endpoint: &str) -> Option<&str> {
+    let after_scheme = endpoint
+        .split_once("://")
+        .map_or(endpoint, |(_, rest)| rest);
+    let authority = after_scheme.split('/').next()?.rsplit('@').next()?;
+    if let Some(bracketed) = authority.strip_prefix('[') {
+        return bracketed.split_once(']').map(|(host, _)| host);
+    }
+    authority.split(':').next().filter(|host| !host.is_empty())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::core_endpoint_is_loopback;
+
+    #[test]
+    fn loopback_core_endpoints_are_local() {
+        for endpoint in [
+            "ws://127.0.0.1:7497/api/v0.1",
+            "ws://127.12.0.2:7497/api/v0.1",
+            "ws://localhost:7497/api/v0.1",
+            "ws://[::1]:7497/api/v0.1",
+        ] {
+            assert!(core_endpoint_is_loopback(endpoint), "{endpoint}");
+        }
+    }
+
+    #[test]
+    fn remote_core_endpoints_are_not_local() {
+        for endpoint in [
+            "ws://10.0.0.50:7497/api/v0.1",
+            "ws://mister.local:7497/api/v0.1",
+            "ws://192.168.1.9:7497/api/v0.1",
+            "",
+        ] {
+            assert!(!core_endpoint_is_loopback(endpoint), "{endpoint}");
+        }
+    }
 }

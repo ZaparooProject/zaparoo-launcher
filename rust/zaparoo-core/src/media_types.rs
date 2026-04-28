@@ -136,6 +136,50 @@ pub struct SystemsResult {
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReaderInfo {
+    #[serde(default)]
+    pub id: String,
+    #[serde(default)]
+    pub reader_id: String,
+    #[serde(default)]
+    pub driver: String,
+    #[serde(default)]
+    pub info: String,
+    #[serde(default)]
+    pub connected: bool,
+    #[serde(default)]
+    pub capabilities: Vec<String>,
+}
+
+impl ReaderInfo {
+    pub fn is_nfc_reader(&self) -> bool {
+        if !self.connected {
+            return false;
+        }
+        let driver = self.driver.to_lowercase();
+        let info = self.info.to_lowercase();
+        let has_nfc_capability = self
+            .capabilities
+            .iter()
+            .any(|capability| capability.eq_ignore_ascii_case("nfc"));
+        has_nfc_capability
+            || driver.contains("pn532")
+            || driver.contains("acr122")
+            || driver.contains("rc522")
+            || info.contains("pn532")
+            || info.contains("acr122")
+            || info.contains("rc522")
+    }
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct ReadersResult {
+    #[serde(default)]
+    pub readers: Vec<ReaderInfo>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
 pub struct VersionResult {
     #[serde(default)]
     pub version: String,
@@ -152,7 +196,10 @@ mod tests {
         reason = "tests should fail-fast on unexpected errors"
     )]
 
-    use super::{BrowseEntry, MediaBrowseResult, MediaSearchResult, SystemsResult, VersionResult};
+    use super::{
+        BrowseEntry, MediaBrowseResult, MediaSearchResult, ReaderInfo, ReadersResult,
+        SystemsResult, VersionResult,
+    };
 
     #[test]
     fn is_folder_accepts_directory_and_root() {
@@ -240,6 +287,43 @@ mod tests {
             r#"{"results":[{"name":"G","path":"/p","zapScript":"s","system":{"id":"NES"}}]}"#;
         let result: MediaSearchResult = serde_json::from_str(json).expect("parse");
         assert!(result.results[0].tags.is_empty());
+    }
+
+    #[test]
+    fn readers_result_deserialises_current_shape() {
+        let json = r#"{
+            "readers": [
+                {
+                    "id": "/dev/ttyUSB0",
+                    "readerId": "pn532-ujqixjv6",
+                    "driver": "pn532",
+                    "info": "PN532 (1-2.3.1)",
+                    "capabilities": ["read", "write"],
+                    "connected": true
+                }
+            ]
+        }"#;
+        let result: ReadersResult = serde_json::from_str(json).expect("parse");
+        assert_eq!(result.readers.len(), 1);
+        assert_eq!(result.readers[0].id, "/dev/ttyUSB0");
+        assert_eq!(result.readers[0].reader_id, "pn532-ujqixjv6");
+        assert!(result.readers[0].is_nfc_reader());
+    }
+
+    #[test]
+    fn nfc_reader_detection_requires_connection() {
+        let connected = ReaderInfo {
+            driver: "acr122usb".into(),
+            connected: true,
+            ..ReaderInfo::default()
+        };
+        let disconnected = ReaderInfo {
+            driver: "pn532".into(),
+            connected: false,
+            ..ReaderInfo::default()
+        };
+        assert!(connected.is_nfc_reader());
+        assert!(!disconnected.is_nfc_reader());
     }
 
     #[test]

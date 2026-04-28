@@ -14,8 +14,8 @@
 // instead of disappearing into a queue.
 
 use crate::media_types::{
-    MediaBrowseParams, MediaBrowseResult, MediaSearchParams, MediaSearchResult, ReadersWriteParams,
-    RunParams, SystemsParams, SystemsResult, VersionResult,
+    MediaBrowseParams, MediaBrowseResult, MediaSearchParams, MediaSearchResult, ReadersResult,
+    ReadersWriteParams, RunParams, SystemsParams, SystemsResult, VersionResult,
 };
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
@@ -23,7 +23,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tokio::sync::{mpsc, oneshot, watch};
+use tokio::sync::{broadcast, mpsc, oneshot, watch};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::{debug, info, warn};
 use uuid::Uuid;
@@ -110,6 +110,8 @@ struct RpcResponse {
     id: Option<String>,
     result: Option<Value>,
     error: Option<RpcError>,
+    method: Option<String>,
+    params: Option<Value>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -136,6 +138,38 @@ type PendingMap = Arc<Mutex<HashMap<String, oneshot::Sender<Result<Value, Client
 /// `call()` fails fast with `not connected` instead of queueing into a
 /// channel that might be drained against a later session.
 type OutboundSlot = Arc<Mutex<Option<mpsc::UnboundedSender<String>>>>;
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Notification {
+    pub method: String,
+    pub params: Value,
+}
+
+#[allow(clippy::unwrap_used, reason = "mutex poisoning is unrecoverable")]
+fn handle_incoming(
+    resp: RpcResponse,
+    pending: &PendingMap,
+    notifications: &broadcast::Sender<Notification>,
+) {
+    if let Some(id) = resp.id {
+        let sender = pending.lock().unwrap().remove(&id);
+        if let Some(tx) = sender {
+            let result = if let Some(err) = resp.error {
+                Err(ClientError {
+                    message: err.message,
+                })
+            } else {
+                Ok(resp.result.unwrap_or(Value::Null))
+            };
+            let _ = tx.send(result);
+        }
+    } else if let Some(method) = resp.method {
+        let _ = notifications.send(Notification {
+            method,
+            params: resp.params.unwrap_or(Value::Null),
+        });
+    }
+}
 
 /// Bookkeeping for the connection state machine. Extracted from the
 /// connect loop so the transition rules can be unit-tested without
@@ -207,6 +241,7 @@ impl ConnectionFsm {
 pub struct Client {
     tx: OutboundSlot,
     pending: PendingMap,
+    notifications: broadcast::Sender<Notification>,
     pub connection: Arc<watch::Sender<ConnectionState>>,
 }
 
@@ -219,10 +254,13 @@ impl Client {
         let connection_clone = connection_arc.clone();
         let tx_slot: OutboundSlot = Arc::new(Mutex::new(None));
         let tx_slot_clone = tx_slot.clone();
+        let (notification_tx, _) = broadcast::channel(64);
+        let notification_tx_clone = notification_tx.clone();
 
         let client = Arc::new(Self {
             tx: tx_slot,
             pending,
+            notifications: notification_tx,
             connection: connection_arc,
         });
 
@@ -276,18 +314,7 @@ impl Client {
                                     match msg {
                                         Some(Ok(Message::Text(text))) => {
                                             if let Ok(resp) = serde_json::from_str::<RpcResponse>(text.as_str()) {
-                                                if let Some(id) = resp.id {
-                                                    #[allow(clippy::unwrap_used, reason = "mutex poisoning is unrecoverable")]
-                                                    let sender = pending_clone.lock().unwrap().remove(&id);
-                                                    if let Some(tx) = sender {
-                                                        let result = if let Some(err) = resp.error {
-                                                            Err(ClientError { message: err.message })
-                                                        } else {
-                                                            Ok(resp.result.unwrap_or(Value::Null))
-                                                        };
-                                                        let _ = tx.send(result);
-                                                    }
-                                                }
+                                                handle_incoming(resp, &pending_clone, &notification_tx_clone);
                                             }
                                         }
                                         Some(Ok(Message::Close(_))) | None => {
@@ -334,6 +361,10 @@ impl Client {
         });
 
         client
+    }
+
+    pub fn subscribe_notifications(&self) -> broadcast::Receiver<Notification> {
+        self.notifications.subscribe()
     }
 
     async fn call<P: Serialize>(&self, method: &str, params: &P) -> Result<Value, ClientError> {
@@ -386,6 +417,15 @@ impl Client {
         struct P {}
         let _ = params;
         let val = self.call("systems", &P {}).await?;
+        serde_json::from_value(val).map_err(|e| ClientError {
+            message: e.to_string(),
+        })
+    }
+
+    pub async fn readers(&self) -> Result<ReadersResult, ClientError> {
+        #[derive(Serialize)]
+        struct P {}
+        let val = self.call("readers", &P {}).await?;
         serde_json::from_value(val).map_err(|e| ClientError {
             message: e.to_string(),
         })

@@ -21,13 +21,14 @@ pub use endpoint::Endpoint;
 pub use mutation::Mutation;
 pub use tag::Tag;
 
-use crate::client::{Client, ClientError};
+use crate::client::{Client, ClientError, Notification};
 use crate::remote_resource::{RemoteResource, ResourceStatus};
 use std::any::Any;
 use std::collections::HashMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::sync::{Arc, Mutex};
 use tokio::runtime::Runtime;
+use tokio::sync::broadcast;
 
 /// Cache lookup key for `Store::subscribe`. Combines the endpoint's
 /// `NAME` with a hash of its `Args`. Endpoints are expected to choose
@@ -90,6 +91,10 @@ impl Store {
             runtime,
             inner: Arc::new(Mutex::new(Inner::default())),
         })
+    }
+
+    pub fn subscribe_notifications(&self) -> broadcast::Receiver<Notification> {
+        self.client.subscribe_notifications()
     }
 
     /// Get (or create) the shared `RemoteResource` for endpoint `E`

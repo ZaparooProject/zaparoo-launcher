@@ -249,8 +249,8 @@ ApplicationWindow {
 
     // ── Top-right HUD ─────────────────────────────────────────────────────────
     //
-    // Clock now; status icons later. The Row is right-anchored so new icons
-    // can be prepended on the left without resizing or repositioning.
+    // Host status icons plus clock. The Row is right-anchored so icons
+    // can appear/disappear without moving the clock away from the edge.
 
     Row {
         id: topHud
@@ -259,10 +259,32 @@ ApplicationWindow {
         anchors.right: parent.right
         anchors.topMargin: Sizing.pctH(2)
         anchors.rightMargin: Sizing.pctW(2)
-        spacing: Sizing.pctW(1.5)
+        spacing: Sizing.pctW(1)
         z: 200
 
-        // Status icons go here, before clockLabel.
+        StatusIcon {
+            visible: Browse.SystemStatus.has_nfc
+            source: Resources.statusIconUrl("nfc")
+            name: "NFC"
+        }
+
+        StatusIcon {
+            visible: Browse.SystemStatus.has_wifi_internet
+            source: Resources.statusIconUrl("wifi")
+            name: "Wi-Fi"
+        }
+
+        StatusIcon {
+            visible: Browse.SystemStatus.has_lan_internet
+            source: Resources.statusIconUrl("lan")
+            name: "LAN"
+        }
+
+        StatusIcon {
+            visible: Browse.SystemStatus.has_bluetooth
+            source: Resources.statusIconUrl("bt")
+            name: "Bluetooth"
+        }
 
         Text {
             id: clockLabel

@@ -24,4 +24,10 @@ QtObject {
             return ""
         return baseUrl + "images/" + key + ".png"
     }
+
+    function statusIconUrl(name: string): url {
+        if (name === "")
+            return ""
+        return baseUrl + "images/status/" + name + ".xpm"
+    }
 }
