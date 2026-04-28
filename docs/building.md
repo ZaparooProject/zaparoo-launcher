@@ -43,14 +43,20 @@ If `just` isn't packaged for your distro, install it the same way:
 
 ### MiSTer ARM32 cross-build
 
-- Docker (any recent version)
-- x86_64 host (no emulation needed; pure cross-compilation)
+- Docker with Buildx (Docker Desktop includes it)
+- x86_64 Linux Docker platform (`linux/amd64`)
 - ~8 GB disk space for the toolchain image
 
 The toolchain Docker image provides the ARM build environment. Cargo still gets
 its target and linker settings from `rust/.cargo/config.toml`; the desktop
 `mold` linker setting lives there too. You should not need to edit Cargo config
 by hand.
+
+macOS users only need Docker Desktop for the ARM32 path. The build scripts
+default to Docker platform `linux/amd64`, including on Apple Silicon Macs,
+because the MiSTer ARM GCC toolchain is the official x86_64 Linux release from
+Arm. Apple Silicon hosts therefore build through Docker's amd64 emulation while
+the project itself is still pure ARM32 cross-compilation inside the container.
 
 ## Desktop builds
 
@@ -75,7 +81,29 @@ cmake --build --preset desktop-debug
 
 ## MiSTer ARM32 cross-build
 
-First run, building Qt from source (~45 min):
+The default path uses the official prebuilt toolchain image published by this
+repository:
+
+```bash
+./scripts/build-arm32.sh
+```
+
+This pulls
+`ghcr.io/zaparooproject/qt6-arm32-mister:<toolchain/VERSION>` if it is not
+already cached locally, builds the application in Docker, and writes the MiSTer
+binary to `output/launcher`. It does not require `just`, Qt, CMake, Rust, or
+the ARM toolchain on the host.
+
+If GHCR asks for authentication, authorize the GitHub CLI with package-read
+scope and log Docker in:
+
+```bash
+gh auth refresh -h github.com -s read:packages
+gh auth token | docker login ghcr.io -u <github-user> --password-stdin
+```
+
+If you need to rebuild the toolchain image locally, building Qt from source
+takes about 45 minutes:
 
 ```bash
 ./scripts/build-toolchain.sh
@@ -84,13 +112,21 @@ First run, building Qt from source (~45 min):
 This creates the local `zaparoo/qt6-arm32-mister:<version>` Docker image. The
 tag comes from `toolchain/VERSION`.
 
-Later builds usually take under a minute:
+Use that local toolchain image for the application build with:
 
 ```bash
-just arm32           # output/launcher
+USE_LOCAL_TOOLCHAIN=1 ./scripts/build-arm32.sh
 ```
 
-If the toolchain image is missing, `build-arm32.sh` rebuilds it.
+Later builds usually take under a minute because Docker reuses the toolchain
+and application layers.
+
+`DOCKER_PLATFORM` defaults to `linux/amd64`. Override it only if you are using
+a different compatible toolchain image:
+
+```bash
+DOCKER_PLATFORM=linux/amd64 ./scripts/build-arm32.sh
+```
 
 Check the ARM binary:
 
@@ -136,7 +172,14 @@ your PATH (`qmake6` or `qmake` must be findable).
 ## Deploy to MiSTer
 
 ```bash
-just deploy-mister
+echo 'MISTER_IP=<your-mister-ip>' > .env
+./scripts/deploy-mister.sh
+```
+
+To copy and restart an already-built `output/launcher` without rebuilding:
+
+```bash
+./scripts/deploy-mister.sh --skip-build
 ```
 
 The MiSTer binary is self-contained. It sets `QT_QPA_PLATFORM=linuxfb` and

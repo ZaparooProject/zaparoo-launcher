@@ -11,8 +11,9 @@ use std::sync::Arc;
 use tokio::task::JoinHandle;
 use tracing::warn;
 use zaparoo_core::endpoints::media_search::MediaSearchEndpoint;
+use zaparoo_core::endpoints::readers_write::ReadersWriteMutation;
 use zaparoo_core::endpoints::run::RunMutation;
-use zaparoo_core::media_types::{MediaItem, MediaSearchResult, RunParams};
+use zaparoo_core::media_types::{MediaItem, MediaSearchResult, ReadersWriteParams, RunParams};
 use zaparoo_core::remote_resource::ResourceStatus;
 
 const NAME_ROLE: i32 = 256 + 1;
@@ -33,6 +34,8 @@ pub struct GamesModelRust {
     has_next_page: bool,
     current_system_id: QString,
     selected_index: i32,
+    card_write_pending: bool,
+    card_write_error: QString,
     // Cancellation handle for the QML-bridge watcher of the currently
     // selected system. The `RemoteResource` itself lives in the store's
     // cache (keyed by system id), so a re-subscribe to a previously
@@ -47,6 +50,9 @@ pub struct GamesModelRust {
     // queued by the old system's watcher runs on the Qt thread after
     // the new system's state has already been applied.
     seq: Arc<AtomicU64>,
+    // Invalidates stale card-write completions after the user cancels or
+    // starts another write before the previous RPC returns.
+    card_write_seq: Arc<AtomicU64>,
 }
 
 #[cxx_qt::bridge]
@@ -74,6 +80,8 @@ pub mod ffi {
         #[qproperty(QString, error_message)]
         #[qproperty(bool, has_next_page)]
         #[qproperty(QString, current_system_id)]
+        #[qproperty(bool, card_write_pending)]
+        #[qproperty(QString, card_write_error)]
         type GamesModel = super::GamesModelRust;
 
         #[qinvokable]
@@ -81,6 +89,12 @@ pub mod ffi {
 
         #[qinvokable]
         fn launch_at(self: Pin<&mut GamesModel>, index: i32);
+
+        #[qinvokable]
+        fn write_card_at(self: Pin<&mut GamesModel>, index: i32);
+
+        #[qinvokable]
+        fn cancel_card_write(self: Pin<&mut GamesModel>);
 
         #[qinvokable]
         fn name_at(self: &GamesModel, index: i32) -> QString;
@@ -236,6 +250,62 @@ impl ffi::GamesModel {
                 warn!("run failed for {name}: {}", e.message);
             }
         });
+    }
+
+    fn write_card_at(mut self: Pin<&mut Self>, index: i32) {
+        if index < 0 || index >= self.count {
+            self.as_mut()
+                .set_card_write_error(QString::from("invalid selection"));
+            self.as_mut().set_card_write_pending(false);
+            return;
+        }
+        let item = &self.items[index as usize];
+        if item.zap_script.is_empty() {
+            self.as_mut()
+                .set_card_write_error(QString::from("missing zap script"));
+            self.as_mut().set_card_write_pending(false);
+            return;
+        }
+        let text = item.zap_script.clone();
+        let name = item.name.clone();
+        let store = global_store();
+        let seq = self.rust().card_write_seq.clone();
+        let ticket = seq.fetch_add(1, Ordering::SeqCst) + 1;
+        self.as_mut().set_card_write_error(QString::default());
+        self.as_mut().set_card_write_pending(true);
+        let qt_thread = self.qt_thread();
+        global_runtime().spawn(async move {
+            let result = store
+                .run_mutation::<ReadersWriteMutation>(ReadersWriteParams { text })
+                .await;
+            let _ = qt_thread.queue(move |mut model| {
+                if seq.load(Ordering::SeqCst) != ticket {
+                    return;
+                }
+                let error = match result {
+                    Ok(()) => QString::default(),
+                    Err(e) => {
+                        warn!("card write failed for {name}: {}", e.message);
+                        QString::from(e.message.as_str())
+                    }
+                };
+                model.as_mut().set_card_write_error(error);
+                model.as_mut().set_card_write_pending(false);
+            });
+        });
+    }
+
+    fn cancel_card_write(mut self: Pin<&mut Self>) {
+        self.as_mut()
+            .rust()
+            .card_write_seq
+            .fetch_add(1, Ordering::SeqCst);
+        if !self.card_write_error.is_empty() {
+            self.as_mut().set_card_write_error(QString::default());
+        }
+        if self.card_write_pending {
+            self.as_mut().set_card_write_pending(false);
+        }
     }
 
     fn name_at(&self, index: i32) -> QString {

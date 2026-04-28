@@ -5,11 +5,15 @@
 name: Build ARM32 toolchain image
 
 on:
-  # No `push` trigger: CI's ensure-toolchain job invokes this workflow via
-  # workflow_call on every push to main, and its "check if version exists"
-  # gate skips the expensive build when toolchain/VERSION is unchanged. A
-  # push trigger would just race the workflow_call caller for the same
-  # registry tag.
+  # On main, a push that touches toolchain/VERSION or Dockerfile.toolchain
+  # auto-publishes the matching image. The "check if version exists" gate
+  # below makes the workflow a no-op when the tag is already in the
+  # registry, so re-runs are cheap and idempotent.
+  push:
+    branches: [main]
+    paths:
+      - 'toolchain/VERSION'
+      - 'Dockerfile.toolchain'
   workflow_dispatch:
     inputs:
       version:

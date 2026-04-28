@@ -27,6 +27,17 @@ MainLayout {
     width: Screen.width
     height: Screen.height
 
+    readonly property string modalCardWrite: "card_write"
+    property string cardWriteOwner: ""
+    readonly property bool activeCardWritePending:
+        root.cardWriteOwner === "systems" ? Browse.SystemsModel.card_write_pending
+        : root.cardWriteOwner === "games" ? Browse.GamesModel.card_write_pending
+        : false
+    readonly property string activeCardWriteError:
+        root.cardWriteOwner === "systems" ? Browse.SystemsModel.card_write_error
+        : root.cardWriteOwner === "games" ? Browse.GamesModel.card_write_error
+        : ""
+
     onWidthChanged: {
         Sizing.screenWidth = width
         Sizing.screenHeight = height
@@ -121,6 +132,10 @@ MainLayout {
             ScreenManager.activeScreen = root.screenGames
             Browse.AppState.active_screen = root.screenGames
         }
+        function onRequestSystemCardWrite(index: int): void {
+            root.beginCardWrite("systems")
+            Browse.SystemsModel.write_card_at(index)
+        }
         function onRequestQuit(): void {
             Qt.quit()
         }
@@ -130,6 +145,10 @@ MainLayout {
         function onRequestHubScreen(): void {
             ScreenManager.activeScreen = root.screenHub
             Browse.AppState.active_screen = root.screenHub
+        }
+        function onRequestGameCardWrite(index: int): void {
+            root.beginCardWrite("games")
+            Browse.GamesModel.write_card_at(index)
         }
     }
     // Persist hub section flips (categories ↔ systems) — those don't
@@ -142,14 +161,64 @@ MainLayout {
         }
     }
 
+    onActiveCardWritePendingChanged: root.handleCardWriteStatus()
+    onActiveCardWriteErrorChanged: root.handleCardWriteStatus()
+    onCancelCardWriteRequested: root.cancelCardWrite()
+
+    function beginCardWrite(owner: string): void {
+        if (owner === "systems")
+            Browse.SystemsModel.cancel_card_write()
+        else if (owner === "games")
+            Browse.GamesModel.cancel_card_write()
+        root.cardWriteOwner = owner
+        root.cardWriteFailed = false
+        root.cardWriteModalVisible = true
+        cardWriteFailureTimer.stop()
+        if (ScreenManager.topModal !== root.modalCardWrite)
+            ScreenManager.pushModal(root.modalCardWrite)
+    }
+
+    function handleCardWriteStatus(): void {
+        if (!root.cardWriteModalVisible || root.cardWriteOwner === "")
+            return
+        if (root.activeCardWritePending)
+            return
+        if (root.activeCardWriteError !== "") {
+            root.cardWriteFailed = true
+            cardWriteFailureTimer.restart()
+        } else {
+            root.hideCardWriteModal()
+        }
+    }
+
+    function cancelCardWrite(): void {
+        if (root.cardWriteOwner === "systems")
+            Browse.SystemsModel.cancel_card_write()
+        else if (root.cardWriteOwner === "games")
+            Browse.GamesModel.cancel_card_write()
+        root.hideCardWriteModal()
+    }
+
+    function hideCardWriteModal(): void {
+        cardWriteFailureTimer.stop()
+        root.cardWriteModalVisible = false
+        root.cardWriteFailed = false
+        root.cardWriteOwner = ""
+        if (ScreenManager.topModal === root.modalCardWrite)
+            ScreenManager.popModal()
+    }
+
     // Action router. Called from handleKey (which translates Qt key
     // codes via Browse.Input.action_for_key) and directly from tests.
     // Dispatches to the top modal if any, otherwise the active screen.
     function handleAction(action: string): void {
         if (ScreenManager.hasModal) {
-            // Modal overlays are a forward-looking extension; no modal
-            // components exist yet, so just swallow input while one is
-            // on the stack rather than leak it to the root screen.
+            if (ScreenManager.topModal === root.modalCardWrite
+                    && (action === "cancel" || action === "accept")) {
+                root.cancelCardWrite()
+            }
+            // While a modal owns input, swallow everything not handled
+            // above rather than leak it to the root screen.
             return
         }
         if (root.activeScreen === root.screenGames) {
@@ -166,6 +235,13 @@ MainLayout {
         const action = Browse.Input.action_for_key(key)
         if (action !== "")
             root.handleAction(action)
+    }
+
+    Timer {
+        id: cardWriteFailureTimer
+        interval: 1500
+        repeat: false
+        onTriggered: root.hideCardWriteModal()
     }
 
     Item {

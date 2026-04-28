@@ -15,9 +15,13 @@ ListModel {
     property string error_message: ""
     property bool has_next_page: false
     property string current_system_id: ""
+    property bool card_write_pending: false
+    property string card_write_error: ""
 
     function set_system(_system_id: string): void {}
     function launch_at(_index: int): void {}
+    function write_card_at(_index: int): void {}
+    function cancel_card_write(): void {}
 
     function name_at(index: int): string {
         return index >= 0 && index < count ? get(index).name : ""

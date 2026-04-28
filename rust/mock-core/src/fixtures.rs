@@ -70,7 +70,7 @@ pub fn media_browse_response(params: &Value) -> Value {
                 "path": format!("{path}/{file}"),
                 "type": "media",
                 "systemId": system,
-                "zapScript": format!("**launch.system:{system}"),
+                "zapScript": format!("@{system}/{file}"),
                 "relativePath": file,
             })
         })
@@ -95,7 +95,7 @@ fn games_for_systems<'a>(systems: &'a [&'a str]) -> impl Iterator<Item = Value> 
         Some(json!({
             "name": name,
             "path": format!("/mock/{system}/{file}"),
-            "zapScript": format!("**launch.system:{system}"),
+            "zapScript": format!("@{system}/{file}"),
             "system": { "id": system, "name": system, "category": "" },
             "tags": [],
         }))

@@ -2,12 +2,18 @@
 // Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 
-use cxx_qt::CxxQtType;
+use crate::models::{global_runtime, global_store};
+use cxx_qt::{CxxQtType, Threading};
 use cxx_qt_lib::{
     QByteArray, QHash, QHashPair_i32_QByteArray, QModelIndex, QString, QStringList, QVariant,
 };
 use std::pin::Pin;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
+use tracing::warn;
 use zaparoo_core::endpoints::catalog::CatalogEndpoint;
+use zaparoo_core::endpoints::readers_write::ReadersWriteMutation;
+use zaparoo_core::media_types::ReadersWriteParams;
 use zaparoo_core::remote_resource::ResourceStatus;
 use zaparoo_core::systems_catalog::CatalogData;
 
@@ -31,6 +37,9 @@ pub struct SystemsModelRust {
     count: i32,
     current_category: QString,
     error_message: QString,
+    card_write_pending: bool,
+    card_write_error: QString,
+    card_write_seq: Arc<AtomicU64>,
     // Last-known-good catalog. Updated by `apply_state` on every
     // `Ready`; never cleared on `Loading`/`Errored`. Lets
     // `set_category` keep populating rows during a transient refetch
@@ -69,6 +78,8 @@ pub mod ffi {
         #[qproperty(i32, count)]
         #[qproperty(QString, current_category)]
         #[qproperty(QString, error_message)]
+        #[qproperty(bool, card_write_pending)]
+        #[qproperty(QString, card_write_error)]
         #[qproperty(QStringList, cover_keys)]
         type SystemsModel = super::SystemsModelRust;
 
@@ -80,6 +91,12 @@ pub mod ffi {
 
         #[qinvokable]
         fn system_name_at(self: &SystemsModel, index: i32) -> QString;
+
+        #[qinvokable]
+        fn write_card_at(self: Pin<&mut SystemsModel>, index: i32);
+
+        #[qinvokable]
+        fn cancel_card_write(self: Pin<&mut SystemsModel>);
 
         #[qinvokable]
         fn index_for_system_id(self: &SystemsModel, id: &QString) -> i32;
@@ -276,6 +293,62 @@ impl ffi::SystemsModel {
             return QString::default();
         }
         QString::from(self.systems[index as usize].name.as_str())
+    }
+
+    fn write_card_at(mut self: Pin<&mut Self>, index: i32) {
+        if index < 0 || index >= self.count {
+            self.as_mut()
+                .set_card_write_error(QString::from("invalid selection"));
+            self.as_mut().set_card_write_pending(false);
+            return;
+        }
+        let system = &self.systems[index as usize];
+        if system.id.is_empty() {
+            self.as_mut()
+                .set_card_write_error(QString::from("missing system id"));
+            self.as_mut().set_card_write_pending(false);
+            return;
+        }
+        let text = format!("**launch.system:{}", system.id);
+        let name = system.name.clone();
+        let store = global_store();
+        let seq = self.rust().card_write_seq.clone();
+        let ticket = seq.fetch_add(1, Ordering::SeqCst) + 1;
+        self.as_mut().set_card_write_error(QString::default());
+        self.as_mut().set_card_write_pending(true);
+        let qt_thread = self.qt_thread();
+        global_runtime().spawn(async move {
+            let result = store
+                .run_mutation::<ReadersWriteMutation>(ReadersWriteParams { text })
+                .await;
+            let _ = qt_thread.queue(move |mut model| {
+                if seq.load(Ordering::SeqCst) != ticket {
+                    return;
+                }
+                let error = match result {
+                    Ok(()) => QString::default(),
+                    Err(e) => {
+                        warn!("card write failed for {name}: {}", e.message);
+                        QString::from(e.message.as_str())
+                    }
+                };
+                model.as_mut().set_card_write_error(error);
+                model.as_mut().set_card_write_pending(false);
+            });
+        });
+    }
+
+    fn cancel_card_write(mut self: Pin<&mut Self>) {
+        self.as_mut()
+            .rust()
+            .card_write_seq
+            .fetch_add(1, Ordering::SeqCst);
+        if !self.card_write_error.is_empty() {
+            self.as_mut().set_card_write_error(QString::default());
+        }
+        if self.card_write_pending {
+            self.as_mut().set_card_write_pending(false);
+        }
     }
 
     fn index_for_system_id(&self, id: &QString) -> i32 {

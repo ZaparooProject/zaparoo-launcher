@@ -30,6 +30,7 @@ Item {
     // Emitted when the user presses Escape — Main.qml flips the
     // active screen back to the hub.
     signal requestHubScreen()
+    signal requestGameCardWrite(int index)
 
     // Move selection by (dx, dy) and commit the new game path on
     // success. Unlike HubScreen's _handleSystems, none of the games-grid
@@ -61,6 +62,12 @@ Item {
                 Browse.GamesState.game_path =
                     Browse.GamesModel.path_at(games.gamesGrid.currentIndex)
                 Browse.GamesModel.launch_at(games.gamesGrid.currentIndex)
+            }
+        } else if (action === "write_card") {
+            if (games.gamesGrid.itemCount > 0) {
+                Browse.GamesState.game_path =
+                    Browse.GamesModel.path_at(games.gamesGrid.currentIndex)
+                games.requestGameCardWrite(games.gamesGrid.currentIndex)
             }
         } else if (action === "cancel") {
             games.requestHubScreen()

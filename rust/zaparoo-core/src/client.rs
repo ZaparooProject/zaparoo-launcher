@@ -14,8 +14,8 @@
 // instead of disappearing into a queue.
 
 use crate::media_types::{
-    MediaBrowseParams, MediaBrowseResult, MediaSearchParams, MediaSearchResult, RunParams,
-    SystemsParams, SystemsResult, VersionResult,
+    MediaBrowseParams, MediaBrowseResult, MediaSearchParams, MediaSearchResult, ReadersWriteParams,
+    RunParams, SystemsParams, SystemsResult, VersionResult,
 };
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
@@ -435,6 +435,11 @@ impl Client {
         // `uid`, `data`, `unsafe`) flow through with no client edits.
         // Upstream returns null on success; swallow it.
         self.call("run", &params).await?;
+        Ok(())
+    }
+
+    pub async fn readers_write(&self, params: ReadersWriteParams) -> Result<(), ClientError> {
+        self.call("readers.write", &params).await?;
         Ok(())
     }
 

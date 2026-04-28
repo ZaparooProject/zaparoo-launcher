@@ -107,6 +107,9 @@ starts fullscreen.
 - Pressing Enter on a game sends a `run` RPC to the mock. The mock logs the
   selected game's zap script, but the launcher keeps running because nothing is
   actually launched.
+- Pressing Tab on a system or game sends a `readers.write` RPC with the
+  selected entry's zap script. The launcher shows a card-write modal while the
+  request is pending; the mock logs the write request.
 - Escape backs out; Escape on the top level quits.
 
 The FPS counter in the corner should stay green (≥ 55). Red means the UI fell
