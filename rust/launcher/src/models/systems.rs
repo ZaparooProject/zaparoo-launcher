@@ -155,7 +155,7 @@ fn cover_keys(catalog: Option<&CatalogData>) -> Vec<String> {
 
 /// Find `needle` in `systems` with case-sensitive id equality. Returns
 /// position as i32, or -1 if not found / empty needle. The
-/// case-sensitive contract is deliberate: `HubState.system_id` is
+/// case-sensitive contract is deliberate: `SystemsState.system_id` is
 /// persisted as the exact ID Core surfaced, and the artwork bundled
 /// under `resources/images/systems/<id>.png` matches that exact case
 /// (Linux qrc lookups are case-sensitive). A case-insensitive lookup
@@ -497,7 +497,7 @@ mod tests {
     #[test]
     fn position_of_system_id_is_case_sensitive() {
         let systems = vec![local_sys("NES"), local_sys("SNES")];
-        // HubState.system_id is persisted exact and the bundled
+        // SystemsState.system_id is persisted exact and the bundled
         // artwork (`resources/images/systems/<id>.png`) matches that
         // exact case — case-insensitive lookup would silently mask a
         // Core case-drift bug.

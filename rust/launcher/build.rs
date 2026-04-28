@@ -31,6 +31,7 @@ fn main() {
         "src/models/app_state.rs",
         "src/models/app_status.rs",
         "src/models/hub_state.rs",
+        "src/models/systems_state.rs",
         "src/models/games_state.rs",
         "src/models/input.rs",
     ]);

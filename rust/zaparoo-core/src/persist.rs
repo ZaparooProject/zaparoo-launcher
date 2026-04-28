@@ -24,7 +24,8 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use tracing::warn;
 
-pub const HUB_SCHEMA: u32 = 1;
+pub const HUB_SCHEMA: u32 = 2;
+pub const SYSTEMS_SCHEMA: u32 = 1;
 pub const GAMES_SCHEMA: u32 = 1;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -32,6 +33,7 @@ pub const GAMES_SCHEMA: u32 = 1;
 pub struct PersistedState {
     pub active_screen: String,
     pub hub: HubState,
+    pub systems: SystemsState,
     pub games: GamesState,
 }
 
@@ -39,17 +41,29 @@ pub struct PersistedState {
 #[serde(default)]
 pub struct HubState {
     pub schema_version: u32,
-    pub focus: String,
     pub category: String,
-    pub system_id: String,
 }
 
 impl Default for HubState {
     fn default() -> Self {
         Self {
             schema_version: HUB_SCHEMA,
-            focus: String::new(),
             category: String::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct SystemsState {
+    pub schema_version: u32,
+    pub system_id: String,
+}
+
+impl Default for SystemsState {
+    fn default() -> Self {
+        Self {
+            schema_version: SYSTEMS_SCHEMA,
             system_id: String::new(),
         }
     }
@@ -98,6 +112,13 @@ fn load_from(path: &Path) -> PersistedState {
             state.hub.schema_version, HUB_SCHEMA
         );
         state.hub = HubState::default();
+    }
+    if state.systems.schema_version != SYSTEMS_SCHEMA {
+        warn!(
+            "persist: systems section version {} != expected {}; resetting section",
+            state.systems.schema_version, SYSTEMS_SCHEMA
+        );
+        state.systems = SystemsState::default();
     }
     if state.games.schema_version != GAMES_SCHEMA {
         warn!(
@@ -172,7 +193,8 @@ mod tests {
     )]
 
     use super::{
-        load_from, save_to, GamesState, HubState, PersistedState, GAMES_SCHEMA, HUB_SCHEMA,
+        load_from, save_to, GamesState, HubState, PersistedState, SystemsState, GAMES_SCHEMA,
+        HUB_SCHEMA, SYSTEMS_SCHEMA,
     };
     use std::thread;
 
@@ -183,6 +205,7 @@ mod tests {
         let state = load_from(&path);
         assert_eq!(state, PersistedState::default());
         assert_eq!(state.hub.schema_version, HUB_SCHEMA);
+        assert_eq!(state.systems.schema_version, SYSTEMS_SCHEMA);
         assert_eq!(state.games.schema_version, GAMES_SCHEMA);
     }
 
@@ -194,8 +217,10 @@ mod tests {
             active_screen: "games".into(),
             hub: HubState {
                 schema_version: HUB_SCHEMA,
-                focus: "systems".into(),
                 category: "Consoles".into(),
+            },
+            systems: SystemsState {
+                schema_version: SYSTEMS_SCHEMA,
                 system_id: "NES".into(),
             },
             games: GamesState {
@@ -222,16 +247,18 @@ mod tests {
     fn section_with_unknown_schema_version_resets_only_that_section() {
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("state.toml");
-        // Hub with a stale version; games at current. Hub must reset,
-        // games must be preserved intact.
+        // Hub with a stale version; systems and games at current. Hub
+        // must reset, the others must be preserved intact.
         let on_disk = format!(
             r#"active_screen = "games"
 
 [hub]
 schema_version = 999
-focus = "systems"
 category = "ancient"
-system_id = "ancient_sys"
+
+[systems]
+schema_version = {SYSTEMS_SCHEMA}
+system_id = "NES"
 
 [games]
 schema_version = {GAMES_SCHEMA}
@@ -243,9 +270,46 @@ game_path = "/roms/smb.nes"
         let state = load_from(&path);
         assert_eq!(state.active_screen, "games");
         assert_eq!(state.hub, HubState::default(), "hub should reset");
+        assert_eq!(state.systems.schema_version, SYSTEMS_SCHEMA);
+        assert_eq!(state.systems.system_id, "NES");
         assert_eq!(state.games.schema_version, GAMES_SCHEMA);
         assert_eq!(state.games.system_id, "NES");
         assert_eq!(state.games.game_path, "/roms/smb.nes");
+    }
+
+    #[test]
+    fn stale_systems_section_resets_independently() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("state.toml");
+        // Systems at a stale version; hub and games at current. Only
+        // systems must reset.
+        let on_disk = format!(
+            r#"active_screen = "systems"
+
+[hub]
+schema_version = {HUB_SCHEMA}
+category = "Console"
+
+[systems]
+schema_version = 999
+system_id = "ancient_sys"
+
+[games]
+schema_version = {GAMES_SCHEMA}
+system_id = "NES"
+game_path = "/roms/smb.nes"
+"#
+        );
+        std::fs::write(&path, on_disk).expect("write");
+        let state = load_from(&path);
+        assert_eq!(state.hub.schema_version, HUB_SCHEMA);
+        assert_eq!(state.hub.category, "Console");
+        assert_eq!(
+            state.systems,
+            SystemsState::default(),
+            "systems should reset"
+        );
+        assert_eq!(state.games.system_id, "NES");
     }
 
     #[test]
@@ -269,8 +333,10 @@ game_path = "/roms/smb.nes"
                             active_screen: format!("screen-{i}"),
                             hub: HubState {
                                 schema_version: HUB_SCHEMA,
-                                focus: format!("focus-{j}"),
                                 category: format!("cat-{i}-{j}"),
+                            },
+                            systems: SystemsState {
+                                schema_version: SYSTEMS_SCHEMA,
                                 system_id: format!("sys-{i}-{j}"),
                             },
                             games: GamesState {
@@ -289,14 +355,16 @@ game_path = "/roms/smb.nes"
         }
         let final_state = load_from(&path);
         assert!(final_state.active_screen.starts_with("screen-"));
-        assert!(final_state.hub.focus.starts_with("focus-"));
+        assert!(final_state.hub.category.starts_with("cat-"));
+        assert!(final_state.systems.system_id.starts_with("sys-"));
         assert_eq!(final_state.hub.schema_version, HUB_SCHEMA);
+        assert_eq!(final_state.systems.schema_version, SYSTEMS_SCHEMA);
         assert_eq!(final_state.games.schema_version, GAMES_SCHEMA);
     }
 
     #[test]
     fn empty_sections_deserialise_via_default() {
-        // A file with only `active_screen` — both sections should
+        // A file with only `active_screen` — every section should
         // populate from `Default`, which sets the current schema_version.
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("state.toml");
@@ -304,6 +372,7 @@ game_path = "/roms/smb.nes"
         let state = load_from(&path);
         assert_eq!(state.active_screen, "hub");
         assert_eq!(state.hub, HubState::default());
+        assert_eq!(state.systems, SystemsState::default());
         assert_eq!(state.games, GamesState::default());
     }
 
@@ -317,8 +386,11 @@ game_path = "/roms/smb.nes"
         let on_disk = format!(
             r#"[hub]
 schema_version = {HUB_SCHEMA}
-focus = "categories"
 category = "Arcade"
+future_field = "ignored"
+
+[systems]
+schema_version = {SYSTEMS_SCHEMA}
 system_id = "NES"
 future_field = "ignored"
 
@@ -331,6 +403,7 @@ game_path = "/x.rom"
         std::fs::write(&path, on_disk).expect("write");
         let state = load_from(&path);
         assert_eq!(state.hub.category, "Arcade");
+        assert_eq!(state.systems.system_id, "NES");
         assert_eq!(state.games.game_path, "/x.rom");
     }
 }

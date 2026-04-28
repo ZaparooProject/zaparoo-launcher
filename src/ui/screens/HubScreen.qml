@@ -252,38 +252,38 @@ Item {
     function _handleSystems(action: string): void {
         if (action === "left") {
             if (hub.systemsGrid.moveSelection(-1, 0))
-                Browse.HubState.system_id =
+                Browse.SystemsState.system_id =
                     Browse.SystemsModel.system_id_at(hub.systemsGrid.currentIndex)
         } else if (action === "right") {
             if (hub.systemsGrid.moveSelection(1, 0))
-                Browse.HubState.system_id =
+                Browse.SystemsState.system_id =
                     Browse.SystemsModel.system_id_at(hub.systemsGrid.currentIndex)
         } else if (action === "up") {
             // Up inside the grid moves a row; Up on the top row escapes
             // back to the categories carousel. moveSelection refuses an
             // out-of-range row, so we use that as the trigger.
             if (hub.systemsGrid.moveSelection(0, -1)) {
-                Browse.HubState.system_id =
+                Browse.SystemsState.system_id =
                     Browse.SystemsModel.system_id_at(hub.systemsGrid.currentIndex)
             } else {
                 hub.section = hub.focusCategories
             }
         } else if (action === "down") {
             if (hub.systemsGrid.moveSelection(0, 1))
-                Browse.HubState.system_id =
+                Browse.SystemsState.system_id =
                     Browse.SystemsModel.system_id_at(hub.systemsGrid.currentIndex)
         } else if (action === "accept") {
             if (hub.systemsGrid.itemCount > 0) {
                 const chosen =
                     Browse.SystemsModel.system_id_at(hub.systemsGrid.currentIndex)
                 Browse.GamesModel.set_system(chosen)
-                Browse.HubState.system_id = chosen
+                Browse.SystemsState.system_id = chosen
                 Browse.GamesState.system_id = chosen
             }
             hub.requestGamesScreen()
         } else if (action === "write_card") {
             if (hub.systemsGrid.itemCount > 0) {
-                Browse.HubState.system_id =
+                Browse.SystemsState.system_id =
                     Browse.SystemsModel.system_id_at(hub.systemsGrid.currentIndex)
                 hub.requestSystemCardWrite(hub.systemsGrid.currentIndex)
             }

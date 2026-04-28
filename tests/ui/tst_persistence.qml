@@ -36,9 +36,8 @@ TestCase {
     // a clean Component.onCompleted path.
     function cleanup(): void {
         Browse.AppState.active_screen = ""
-        Browse.HubState.focus = ""
         Browse.HubState.category = ""
-        Browse.HubState.system_id = ""
+        Browse.SystemsState.system_id = ""
         Browse.GamesState.system_id = ""
         Browse.GamesState.game_path = ""
     }
@@ -55,8 +54,8 @@ TestCase {
                 "navigating an empty categories carousel must not overwrite HubState.category")
     }
 
-    function test_empty_systems_navigation_preserves_hub_state(): void {
-        Browse.HubState.system_id = "persistence-probe-system"
+    function test_empty_systems_navigation_preserves_systems_state(): void {
+        Browse.SystemsState.system_id = "persistence-probe-system"
         main.hubFocus = main.focusSystems
         main.handleKey(Qt.Key_Left)
         main.handleKey(Qt.Key_Right)
@@ -64,16 +63,16 @@ TestCase {
         // to a section flip back to categories — neither path may write
         // a system id derived from index 0 of an empty model.
         main.handleKey(Qt.Key_Down)
-        compare(Browse.HubState.system_id, "persistence-probe-system",
-                "Down on an empty systems grid must not overwrite HubState.system_id")
+        compare(Browse.SystemsState.system_id, "persistence-probe-system",
+                "Down on an empty systems grid must not overwrite SystemsState.system_id")
         // Restore systems focus so Up exercises the empty-systems path
         // (the prior Down may have flipped sections via the same
         // fall-through). Up on an empty grid hits the section-flip
         // branch that mirrors Escape — it must also not write system_id.
         main.hubFocus = main.focusSystems
         main.handleKey(Qt.Key_Up)
-        compare(Browse.HubState.system_id, "persistence-probe-system",
-                "Up on an empty systems grid must not overwrite HubState.system_id")
+        compare(Browse.SystemsState.system_id, "persistence-probe-system",
+                "Up on an empty systems grid must not overwrite SystemsState.system_id")
     }
 
     function test_empty_games_navigation_preserves_games_state(): void {
@@ -87,15 +86,12 @@ TestCase {
                 "navigating an empty games grid must not overwrite GamesState.game_path")
     }
 
-    // Focus/screen flips are user-visible intent, not selection state.
-    // They should persist even when the underlying model is empty (so
-    // the launcher resumes on the right screen next boot).
-    function test_focus_flip_on_empty_categories_persists_hub_focus(): void {
-        main.handleKey(Qt.Key_Return)
-        compare(Browse.HubState.focus, main.focusSystems,
-                "Enter must flip hubFocus even on an empty carousel")
-    }
-
+    // Screen flips are user-visible intent, not selection state. They
+    // should persist even when the underlying model is empty (so the
+    // launcher resumes on the right screen next boot). The hub's
+    // internal section flip (categories ↔ systems) used to persist
+    // through HubState.focus; that field was dropped — first launch
+    // after a kill always lands on the categories carousel.
     function test_screen_flip_on_empty_systems_persists_active_screen(): void {
         main.hubFocus = main.focusSystems
         main.handleKey(Qt.Key_Return)
@@ -115,12 +111,12 @@ TestCase {
                 "Enter on an empty categories carousel must not overwrite HubState.category")
     }
 
-    function test_enter_on_empty_systems_preserves_hub_state(): void {
-        Browse.HubState.system_id = "persistence-probe-system"
+    function test_enter_on_empty_systems_preserves_systems_state(): void {
+        Browse.SystemsState.system_id = "persistence-probe-system"
         main.hubFocus = main.focusSystems
         main.handleKey(Qt.Key_Return)
-        compare(Browse.HubState.system_id, "persistence-probe-system",
-                "Enter on an empty systems carousel must not overwrite HubState.system_id")
+        compare(Browse.SystemsState.system_id, "persistence-probe-system",
+                "Enter on an empty systems carousel must not overwrite SystemsState.system_id")
     }
 
     function test_enter_on_empty_games_preserves_games_state(): void {

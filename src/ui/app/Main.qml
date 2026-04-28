@@ -66,9 +66,6 @@ MainLayout {
         // animations have ended.
         if (Browse.CategoriesModel.count > 0)
             root.hubScreen.restoreFromCategoriesReset()
-        const savedFocus = Browse.HubState.focus
-        if (savedFocus === root.focusCategories || savedFocus === root.focusSystems)
-            root.hubFocus = savedFocus
     }
 
     // Seed carousel indices from persisted state when models deliver new data.
@@ -90,16 +87,16 @@ MainLayout {
     Connections {
         target: Browse.SystemsModel
         // On a games-screen restore, GamesState.system_id is authoritative;
-        // fall back to HubState.system_id only if it's empty (edge case: user
-        // pressed Enter on an empty systems carousel and we flipped the
+        // fall back to SystemsState.system_id only if it's empty (edge case:
+        // user pressed Enter on an empty systems carousel and we flipped the
         // screen without ever committing a system). On a hub restore,
-        // HubState.system_id is authoritative — don't peek at GamesState, or
-        // we'd override the user's hub position with a stale games target
+        // SystemsState.system_id is authoritative — don't peek at GamesState,
+        // or we'd override the user's hub position with a stale games target
         // from a prior escape-back-to-hub.
         function onModelReset(): void {
             const savedSystem = root.activeScreen === root.screenGames
-                ? (Browse.GamesState.system_id !== "" ? Browse.GamesState.system_id : Browse.HubState.system_id)
-                : Browse.HubState.system_id
+                ? (Browse.GamesState.system_id !== "" ? Browse.GamesState.system_id : Browse.SystemsState.system_id)
+                : Browse.SystemsState.system_id
             const idx = savedSystem === "" ? -1 : Browse.SystemsModel.index_for_system_id(savedSystem)
             // Seed without animating the page-snap — a fresh model is a
             // category switch, not user navigation, so the previous
@@ -151,16 +148,6 @@ MainLayout {
             Browse.GamesModel.write_card_at(index)
         }
     }
-    // Persist hub section flips (categories ↔ systems) — those don't
-    // trigger a cross-screen signal, but the section change is user
-    // intent we want on disk.
-    Connections {
-        target: root.hubScreen
-        function onSectionChanged(): void {
-            Browse.HubState.focus = root.hubScreen.section
-        }
-    }
-
     onActiveCardWritePendingChanged: root.handleCardWriteStatus()
     onActiveCardWriteErrorChanged: root.handleCardWriteStatus()
     onCancelCardWriteRequested: root.cancelCardWrite()
