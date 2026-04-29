@@ -15,17 +15,22 @@ import Zaparoo.Browse as Browse
 // file-wide.
 // qmllint disable compiler
 
-// Systems screen — paged grid driven by `Browse.SystemsModel`. Owns the
-// action dispatch for the systems subset; emits `requestHubScreen` on
-// Escape (or Up at the top row) and `requestGamesScreen` on Accept so
-// Main.qml can drive the cross-screen transition.
+// Systems screen — paged grid driven by `Browse.SystemsModel`. Pure
+// input dispatcher: emits `requestAccept(systemId)` on Accept (with
+// "" payload to signal Empty/Error retry intent),
+// `requestSystemCardWrite(index)` on the card-write action, and
+// `requestHubScreen()` on Escape. Cross-screen orchestration (model
+// fills, transition overlay, screen flip) lives in Main.qml;
+// `transitioning` is written by the router so the grid hides during
+// the loading wait.
 Item {
     id: systems
 
     property alias systemsGrid: systemsGrid
+    property bool transitioning: false
 
+    signal requestAccept(systemId: string)
     signal requestHubScreen()
-    signal requestGamesScreen()
     signal requestSystemCardWrite(int index)
 
     // Move selection by (dx, dy) and commit the new system id on
@@ -68,27 +73,20 @@ Item {
         } else if (action === "accept") {
             // Accept routing depends on the screen's data state, matching
             // the help bar vocabulary in MainLayout.qml. Loading swallows
-            // the press (load is in flight); Error/Empty re-fires the
-            // current load (the [OK] RETRY behavior the help bar
-            // promises); Ready drills into Games as before. The retry is
-            // gated on a non-empty current_category so an Accept on a
-            // first-launch screen with no category set doesn't flush the
-            // model.
+            // the press at the screen layer (no signal emitted).
+            // Empty/Error emit `requestAccept("")` to signal the router
+            // to retry the current load (the [OK] RETRY contract).
+            // Ready emits `requestAccept(systemId)` to drill into Games.
             const state = systems._state()
             if (state === "loading")
                 return
             if (state === "error" || state === "empty") {
-                const cat = Browse.SystemsModel.current_category
-                if (cat !== "")
-                    Browse.SystemsModel.set_category(cat)
+                systems.requestAccept("")
                 return
             }
             const chosen =
                 Browse.SystemsModel.system_id_at(systems.systemsGrid.currentIndex)
-            Browse.GamesModel.set_system(chosen)
-            Browse.SystemsState.system_id = chosen
-            Browse.GamesState.system_id = chosen
-            systems.requestGamesScreen()
+            systems.requestAccept(chosen)
         } else if (action === "write_card") {
             if (systems.systemsGrid.itemCount > 0) {
                 Browse.SystemsState.system_id =
@@ -137,6 +135,11 @@ Item {
         anchors.bottomMargin: Sizing.pctH(8)
         model: Browse.SystemsModel
         delegate: Tile {}
+
+        // Hide the tiles while the router holds us here on a forward
+        // transition (Systems → Games) so the centred "Loading…" cue
+        // (painted from Main.qml) reads alone over the cleared grid.
+        visible: !systems.transitioning
     }
 
     ScreenStateOverlay {

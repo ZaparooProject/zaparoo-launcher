@@ -6,11 +6,15 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Zaparoo.Theme
 
-// Horizontal carousel. Items lay out as a flat finite line centered on
-// currentIndex — no wrap. Each tile fades its own opacity based on its
-// horizontal center's distance from the carousel edges, so background
-// content (logo, status, bg pattern) shows through cleanly instead of
-// being painted over by a solid edge gradient.
+// Horizontal carousel. Up to visibleCovers items centred on
+// currentIndex on a flat finite line — the leftmost item sits at a
+// negative offset, the rightmost at a positive one. Tiles past the
+// visible band hard-cut to invisible — no fade ramp, since
+// translucent overlays force per-frame repaint of the busy
+// background underneath on Qt Software adaptation (see CLAUDE.md →
+// "no fading or scaling of a parent that contains many delegates").
+// The hard-cut at the band edge matches the instant-cut idiom used
+// everywhere else.
 Item {
     id: root
 
@@ -31,11 +35,6 @@ Item {
     property int coverHeight: Sizing.pctH(45)
     property int coverSpacing: Sizing.pctH(35)
 
-    // Width of the per-tile fade band on each edge. A tile whose center
-    // is fadeWidth away from the carousel edge is fully visible; at the
-    // edge itself it's fully transparent. Linear ramp in between.
-    property int edgeFadeWidth: Sizing.pctW(8)
-
     Repeater {
         id: itemRepeater
 
@@ -53,14 +52,22 @@ Item {
             // procedural fallback when no PNG matches.
             required property string coverKey
 
-            // Flat finite line: no modulo wrap. The leftmost item sits at
-            // a negative offset, the rightmost at a positive one, and
-            // each tile self-fades as it approaches the carousel edge.
+            // Flat finite line: no modulo wrap. The leftmost item sits
+            // at a negative offset, the rightmost at a positive one.
             property int offset: index - root.currentIndex
             property bool isSelected: offset === 0
-            // +1 slot of padding past the visible band so a tile sliding
-            // out has room to ramp its alpha to 0 before being culled.
-            // Without the slack, exiting tiles would hard-cut.
+            // One slot of slack past the visible band so a tile entering
+            // the band already has `visible: true` at its pre-slide x.
+            // Without the slack, an entering tile is painted at its
+            // OLD (out-of-band) x for one frame as `visible` flips
+            // true, then Behavior on x animates inward — the user
+            // sees the card briefly clipped against the screen edge
+            // and pop into place. With the slack, the slide starts
+            // from the off-screen edge and reads as a smooth slot-in.
+            // Tiles past band+1 are still hard-cut (no opacity ramp,
+            // since translucent overlays force bg repaint per frame
+            // — the original justification for this slack was the
+            // edge-fade that's since been removed).
             property bool isVisible:
                 Math.abs(offset) <= Math.floor(Sizing.visibleCovers / 2) + 1
 
@@ -69,19 +76,7 @@ Item {
             x: root.width / 2 - width / 2 + offset * root.coverSpacing
             y: 0
             z: 10 - Math.abs(offset)
-            // Per-tile alpha fade. Reads the live `x` so the binding
-            // re-evaluates every frame as the Behavior animates the tile
-            // across the band — exiting tiles dissolve smoothly instead
-            // of relying on a solid overlay.
-            opacity: {
-                if (!isVisible)
-                    return 0
-                if (root.edgeFadeWidth <= 0)
-                    return 1
-                const cx = x + width / 2
-                const dist = Math.min(cx, root.width - cx)
-                return Math.max(0, Math.min(1, dist / root.edgeFadeWidth))
-            }
+            opacity: isVisible ? 1.0 : 0.0
             visible: isVisible
             // Carousel owns the de-emphasis of unselected neighbours;
             // the unified Tile applies its own selected-bump internally.

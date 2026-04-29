@@ -57,6 +57,13 @@ ApplicationWindow {
     property bool cardWriteModalVisible: false
     property bool cardWriteFailed: false
 
+    // Forward-transition state owned by Main.qml. "" while idle;
+    // "systems" or "games" while waiting on a model fill before
+    // flipping `activeScreen`. Declared here so the source-screen
+    // content-hiding bindings (carousel/grid `visible`) resolve
+    // statically in qmllint.
+    property string pendingTransition: ""
+
     // Per-screen state derivation. Shape mirrors ScreenStateOverlay's
     // `state` ternary so the help bar and the in-screen overlay agree
     // on what state each screen is in. Hub has no Loading row —
@@ -176,12 +183,14 @@ ApplicationWindow {
             id: hubScreen
             anchors.fill: parent
             visible: root.activeScreen === root.screenHub
+            transitioning: root.pendingTransition !== ""
         }
 
         SystemsScreen {
             id: systemsScreen
             anchors.fill: parent
             visible: root.activeScreen === root.screenSystems
+            transitioning: root.pendingTransition !== ""
         }
 
         GamesScreen {

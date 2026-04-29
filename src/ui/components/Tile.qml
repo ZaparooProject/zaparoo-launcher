@@ -163,17 +163,15 @@ Item {
         smooth: true
         asynchronous: true
         opacity: root._hasCover ? 1.0 : 0.0
-
-        Behavior on opacity {
-            NumberAnimation {
-                duration: 150
-            }
-        }
     }
 
     // Procedural fallback. Sits at the same geometry as the cover and
-    // fades out as the curated logo becomes ready, so the cell never
-    // flashes between states.
+    // snaps to the cover the moment Image.status hits Ready; the brief
+    // Loading window shows the fallback text rather than crossfading.
+    // Cache hits skip Loading entirely and snap directly. The 150 ms
+    // crossfade was readable as a per-tile "fade pop in" on the destination
+    // screen after a deferred-flip — the user sees a sea of fallback text
+    // settling into covers — so the swap is now instant.
     Text {
         anchors.fill: cover
         text: root.delegateName
@@ -185,12 +183,6 @@ Item {
         verticalAlignment: Text.AlignVCenter
         renderType: Text.NativeRendering
         opacity: root._hasCover ? 0.0 : 1.0
-
-        Behavior on opacity {
-            NumberAnimation {
-                duration: 150
-            }
-        }
     }
 
     // Label. Always visible. The procedural fallback briefly shows the

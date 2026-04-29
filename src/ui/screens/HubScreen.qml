@@ -15,17 +15,19 @@ import Zaparoo.Browse as Browse
 // category file-wide.
 // qmllint disable compiler
 
-// Hub screen — categories carousel only. Owns the categories action
-// dispatch; emits `requestSystemsScreen` on Accept/Down so Main.qml can
-// drive the cross-screen transition. The systems grid lives in
-// `SystemsScreen.qml` as a peer screen.
+// Hub screen — categories carousel only. Pure input dispatcher: emits
+// `requestAccept(category)` on Accept and `requestQuit` on Escape.
+// All cross-screen orchestration (model fills, deferred set_category,
+// cover prefetch, transition overlay, screen flip) lives in Main.qml.
+// `transitioning` is written by the router so the carousel hides
+// during the loading wait.
 Item {
     id: hub
 
     property alias categoriesCarousel: categoriesCarousel
+    property bool transitioning: false
 
-    signal requestSystemsScreen()
-    signal requestGamesScreen()
+    signal requestAccept(category: string)
     signal requestQuit()
 
     // Restore the hub from the persisted `Browse.HubState.category`
@@ -77,17 +79,17 @@ Item {
         return true
     }
 
-    // Side-effect of every carousel commit: persist HubState and
-    // ask SystemsModel to filter to the new category. The set_category
-    // call doubles as a prefetch trigger — by the time the user drills
-    // in with Accept, the systems and their cover pixmaps are already
-    // loaded, so SystemsScreen paints its first frame from QPixmapCache
-    // instead of cycling through procedural fallbacks. Repeat calls
-    // short-circuit inside SystemsModel when the model is already on
-    // the requested category.
+    // Side-effect of every carousel commit: persist HubState. We do
+    // NOT call SystemsModel.set_category here — that one's reserved
+    // for Accept (and the router orchestrates it). Calling it on every
+    // left/right press fires two model resets (synchronous clear +
+    // async tokio fill) per press, and each reset destroys-and-recreates
+    // 99 Tile delegates in SystemsScreen's bound Repeater on the UI
+    // thread — choppy on MiSTer, even though SystemsScreen is
+    // `visible: false`. See `bfa0629 perf: drop the eager system-cover
+    // prefetcher` for the prior round of this lesson.
     function _commitCategory(category: string): void {
         Browse.HubState.category = category
-        Browse.SystemsModel.set_category(category)
     }
 
     function handleAction(action: string): void {
@@ -100,38 +102,12 @@ Item {
                 hub._commitCategory(
                     Browse.CategoriesModel.category_at(hub.categoriesCarousel.currentIndex))
         } else if (action === "accept") {
-            // Accept drills into the systems screen. set_category is
-            // async (Step 4a) so this returns immediately; the systems
-            // load proceeds in parallel with the cross-screen flip
-            // Main.qml fires off the signal. Almost always a no-op
-            // here because left/right already committed the category;
-            // kept for the case where the user hits Accept without
-            // ever moving the carousel.
-            if (hub.categoriesCarousel.itemCount <= 0) {
-                hub.requestSystemsScreen()
-                return
-            }
-            const chosen = Browse.CategoriesModel.category_at(hub.categoriesCarousel.currentIndex)
-            hub._commitCategory(chosen)
-            // MiSTer-only: the Arcade category contains exactly one system,
-            // so the second navigate would be redundant. When _commitCategory
-            // has already populated SystemsModel synchronously (the common
-            // case — left/right earlier prefetched it), drill straight to
-            // games. On a cold-restore Accept where SystemsModel hasn't
-            // populated yet (count === 0), fall through to the normal
-            // systems-screen flow; the user can then hit Accept again.
-            if (Browse.Runtime.is_mister
-                && chosen === "Arcade"
-                && Browse.SystemsModel.current_category === chosen
-                && Browse.SystemsModel.count === 1) {
-                const systemId = Browse.SystemsModel.system_id_at(0)
-                Browse.SystemsState.system_id = systemId
-                Browse.GamesState.system_id = systemId
-                Browse.GamesModel.set_system(systemId)
-                hub.requestGamesScreen()
-                return
-            }
-            hub.requestSystemsScreen()
+            // Empty carousel sends "" — router treats that as the
+            // committed "Enter on empty hub goes to Systems" passthrough.
+            const chosen = hub.categoriesCarousel.itemCount <= 0
+                ? ""
+                : Browse.CategoriesModel.category_at(hub.categoriesCarousel.currentIndex)
+            hub.requestAccept(chosen)
         } else if (action === "cancel") {
             hub.requestQuit()
         }
@@ -167,6 +143,11 @@ Item {
         coverHeight: _coverHeight
         coverSpacing: _coverSpacing
 
+        // Hide the tiles while the router holds us here on a forward
+        // transition so the centred "Loading…" cue (painted from
+        // Main.qml) reads alone in the cleared band.
+        visible: !hub.transitioning
+
         model: Browse.CategoriesModel
         delegate: Tile {}
     }
@@ -179,6 +160,7 @@ Item {
         anchors.centerIn: categoriesCarousel
         width: categoriesCarousel.width
         height: categoriesCarousel.height
+        loading: false
         errorMessage: Browse.CategoriesModel.error_message ?? ""
         count: Browse.CategoriesModel.count
         emptyText: qsTr("No categories")
