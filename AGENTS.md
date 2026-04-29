@@ -44,7 +44,7 @@ raw cargo as the default path; the justfile carries the expected environment.
 - Keep comments and docs in American English.
 - After editing C++, Rust, or QML, run `just lint`. Run `just test` when the
   change can affect runtime behavior.
-- Keep user-visible state persistent. Selected screen, carousel positions,
+- Keep user-visible state persistent. Selected screen, row/grid positions,
   focus, settings, and similar state must be serialized to disk and restored
   before the first frame. MiSTer's wrapper can kill and relaunch the process at
   any time.
@@ -61,6 +61,9 @@ raw cargo as the default path; the justfile carries the expected environment.
   the migration/reset behavior.
 - Before adding dependencies, changing CI, or touching license/trademark text,
   confirm the intended policy.
+- Before changing forward screen routing (`Main.qml` ↔ screens), see the
+  "Screens and routing" rules below. Cross-screen Connections and
+  per-screen pending flags are how this module bit us last time.
 
 ## Never
 
@@ -69,6 +72,16 @@ raw cargo as the default path; the justfile carries the expected environment.
   `Qt5Compat.GraphicalEffects`, Qt Quick Studio shapes, or custom shaders.
   Stick to software-rendering-safe types such as `Rectangle`, `Image`, `Text`,
   `Repeater`, `Item`, `NumberAnimation`, and `ColorAnimation`.
+- Do not animate properties that force a large dirty rectangle on busy content:
+  no translucent (`opacity < 1`) overlays over a grid, no fading or scaling of
+  a parent that contains many delegates, no slide-translation of a band of
+  tiles. Qt Software-adaptation cost is dominated by *painted pixels per frame
+  × per-pixel cost*, not by the animated property — a fading rectangle over 15
+  tiles repaints all 15 tiles per frame, because translucent nodes do not
+  subtract from the renderer's obscured region. Pick animations whose dirty
+  rect is small (page-dot pulse, focus-ring blink, single-tile move) and let
+  the rest of the scene stay static. See `docs/qml-gotchas.md` →
+  "Software-renderer animation costs".
 - Do not hardcode pixel sizes or fixed element counts in UI. Use
   `Sizing.pctH()`, `Sizing.pctW()`, `Sizing.fontSize()`, and
   `Sizing.visibleCovers`.
@@ -85,28 +98,76 @@ raw cargo as the default path; the justfile carries the expected environment.
   `let next = { let cur = tx.borrow(); fsm.step(&cur) };`.
 - Do not leave lint warnings, failing tests, or untranslated user-facing text
   behind.
+- Do not put cross-screen `Connections` (e.g. `target: Browse.GamesModel` from
+  `SystemsScreen.qml`) or pending-transition flags into screen files. Forward
+  routing is owned by `Main.qml` — see "Screens and routing".
+- Do not paint a full-screen background or a translucent overlay over a screen
+  body. Source-screen content hides via `transitioning: true`; the global
+  "Loading…" overlay is a transparent `Item` with one `Text` child.
 
 ## Project Map
 
 | Path | Purpose |
 |---|---|
 | `src/app/main.cpp` | Thin Qt entry point, translator install, QML engine, Qt log bridge |
-| `src/ui/app/Main.qml` | Runtime router: input, persistence orchestration, screen transitions |
-| `src/ui/app/MainLayout.qml` | Designer-editable visual tree |
-| `src/ui/screens/` | `Zaparoo.Screens`: `ScreenManager`, `HubScreen`, `GamesScreen` |
-| `src/ui/components/` | `Zaparoo.Ui`: carousel, delegates, FPS counter |
+| `src/ui/app/Main.qml` | Runtime router: input, persistence, forward-transition orchestration, global "Loading…" overlay, system-cover prefetch |
+| `src/ui/app/MainLayout.qml` | Designer-editable visual tree, `pendingTransition` property, screen-state derivations, modal mounts |
+| `src/ui/screens/` | `Zaparoo.Screens`: `ScreenManager`, `HubScreen`, `SystemsScreen`, `GamesScreen` |
+| `src/ui/components/` | `Zaparoo.Ui`: `Tile`, `TileLoader`, `PagedGrid`, `Modal`, `ScreenStateOverlay`, `FpsCounter` |
 | `src/ui/theme/` | `Zaparoo.Theme`: `Theme`, `Sizing` singletons |
-| `rust/launcher/src/models/` | `Zaparoo.Browse` cxx-qt singletons and models |
+| `rust/launcher/src/models/` | `Zaparoo.Browse` cxx-qt singletons: `AppStatus`, `CategoriesModel`, `SystemsModel`, `GamesModel`, `AppState`, `HubState`, `SystemsState`, `GamesState`, `Input`, `Runtime` |
 | `rust/launcher/src/bind.rs` | Endpoint-to-QML binding macro with synchronous seed |
 | `rust/zaparoo-core/src/client.rs` | WebSocket JSON-RPC client for Zaparoo Core |
 | `rust/zaparoo-core/src/store/` | Endpoint cache, tags, mutations, invalidation |
-| `rust/zaparoo-core/src/persist.rs` | Atomic persisted UI state |
+| `rust/zaparoo-core/src/persist.rs` | Atomic persisted UI state (`HubState`, `SystemsState`, `GamesState`, `AppState`) |
 | `rust/zaparoo-core/src/platform_paths.rs` | Config, log, and state paths per runtime |
 
 QML module URIs are `Zaparoo.App`, `Zaparoo.Screens`, `Zaparoo.Ui`,
 `Zaparoo.Theme`, and `Zaparoo.Browse`. Resources are embedded under
 `qrc:/qt/qml/Zaparoo/App/resources/...`. `compile_commands.json` is generated
 in `build/` by default.
+
+## Screens and routing
+
+The launcher has three peer root screens — `Hub`, `Systems`, `Games` — plus a
+modal stack. Screens are **pure input dispatchers**: `handleAction` translates
+a key/button to a single `requestAccept(payload)` (forward) or a back signal
+(`requestHubScreen`, `requestSystemsScreen`, `requestQuit`). All forward
+orchestration lives in `Main.qml`.
+
+When adding a new screen or routing path, follow this contract:
+
+1. **Forward = signal + payload, router decides destination.** Screens emit
+   `requestAccept(<id-or-empty>)`. The router reads its own state to decide
+   what comes next. Empty payload = "the press was on Empty/Error" or
+   "row/grid was empty" — keep the existing convention, don't overload it
+   for new meanings.
+2. **Back = simple signal.** `requestHubScreen` / `requestSystemsScreen` /
+   `requestQuit`. The router owns any peer-up logic (e.g. the
+   `_gamesEnteredFromHub` Arcade-bypass back-routing flag).
+3. **No cross-screen `Connections` in screens.** A screen must not listen to
+   another screen's model. The router has one Connections block per model
+   that needs a `loadingChanged` waiter, and uses a single-shot callback slot
+   pattern (`_categoryReadyCallback`, `_systemReadyCallback`) — set the
+   callback, fire it on the next non-loading edge, clear it.
+4. **Source-screen content hiding goes through `transitioning`.** Each screen
+   exposes `property bool transitioning: false`; `MainLayout.qml` binds it to
+   `root.pendingTransition !== ""`. Bind the row/grid `visible:
+   !screen.transitioning` so the live tiles hide while the global "Loading…"
+   cue paints alone.
+5. **Gate new input during a transition.** `Main.qml`'s `handleAction`
+   early-returns when `root.pendingTransition !== "" && !ScreenManager.hasModal`.
+   Don't add a second input gate elsewhere.
+6. **Persisted state is per-screen, not bundled on `HubState`.** New screen
+   selection state goes in its own `Browse.<Screen>State` singleton (cf.
+   `HubState` / `SystemsState` / `GamesState`). The router orchestrates
+   model fills (`set_category`, `set_system`); screens write their own state
+   on directional moves.
+
+The class of bug that this layout prevents: a stale pending flag on screen A
+firing during model B's `loadingChanged` and clearing the router's
+back-routing flag while screen A isn't even visible. There is no cross-screen
+state to go stale because there is no cross-screen state.
 
 ## Runtime Notes
 

@@ -24,7 +24,6 @@ TestCase {
 
     function test_initial_state() {
         compare(mainWindow.activeScreen, "hub")
-        compare(mainWindow.hubFocus, "categories")
     }
 
     function test_system_status_properties_exist() {

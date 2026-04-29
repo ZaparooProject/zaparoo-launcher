@@ -21,8 +21,8 @@ const PATH_ROLE: i32 = 256 + 2;
 const ZAP_SCRIPT_ROLE: i32 = 256 + 3;
 const SYSTEM_ID_ROLE: i32 = 256 + 4;
 // Until per-game cover art lands, game tiles reuse the parent system
-// logo. The shared carousel delegate looks up `coverKey`, so expose
-// the same value under that role name.
+// logo. The shared Tile delegate looks up `coverKey`, so expose the
+// same value under that role name.
 const COVER_KEY_ROLE: i32 = 256 + 5;
 
 #[derive(Default)]
@@ -176,7 +176,7 @@ impl ffi::GamesModel {
         // User-visible reset happens synchronously so QML sees fresh
         // state immediately, before the resource has even spun up.
         // Crucially, drop the prior system's rows here too — otherwise
-        // the carousel keeps painting (and accepting input on) games
+        // the games grid keeps painting (and accepting input on) games
         // from the system the user just navigated away from until the
         // new system's fetch resolves.
         self.as_mut().set_current_system_id(system_id);

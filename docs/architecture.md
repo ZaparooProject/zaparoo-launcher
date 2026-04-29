@@ -25,8 +25,8 @@ src/app/main.cpp
     │     │
     │     ├── src/models/  [Zaparoo.Browse QML module via cxx-qt 0.8]
     │     │     AppStatus, CategoriesModel, SystemsModel, GamesModel,
-    │     │     AppState, HubState, GamesState, Input, BrowseModel.
-    │     │     All registered via build.rs QmlModule.
+    │     │     AppState, HubState, SystemsState, GamesState, Input, Runtime,
+    │     │     BrowseModel. All registered via build.rs QmlModule.
     │     │
     │
     ├── rust/zaparoo-core/  [non-Qt Rust crate]
@@ -45,15 +45,18 @@ src/app/main.cpp
     │     media_types.rs      — file-extension → media-type lookup
     │
     └── src/ui/app/  [Zaparoo.App QML module]
-          Main.qml          — runtime router: input, persistence, transitions
-          MainLayout.qml    — designer-editable visual tree
+          Main.qml          — runtime router: input, persistence, transitions,
+                              "Loading…" overlay, system-cover prefetch
+          MainLayout.qml    — designer-editable visual tree, pendingTransition
+                              property, screen-state derivations, modal mounts
           │
           ├── src/ui/screens/  [Zaparoo.Screens QML module]
-          │     ScreenManager.qml, HubScreen.qml, GamesScreen.qml
+          │     ScreenManager.qml, HubScreen.qml, SystemsScreen.qml,
+          │     GamesScreen.qml
           │
           ├── src/ui/components/  [Zaparoo.Ui QML module]
-          │     Carousel.qml, CoverDelegate.qml, TextTileDelegate.qml,
-          │     FpsCounter.qml
+          │     Tile.qml, TileLoader.qml, PagedGrid.qml,
+          │     Modal.qml, ScreenStateOverlay.qml, FpsCounter.qml
           │
           └── src/ui/theme/  [Zaparoo.Theme QML module]
                 Sizing.qml  — pctH/pctW/fontSize singletons
@@ -182,13 +185,14 @@ tracing registry as Rust logs. Both end up in stderr and `launcher.log`.
 ### Navigation state
 
 `Main.qml` extends `MainLayout.qml`. The layout owns the visual tree; `Main.qml`
-owns the runtime wiring: key translation, screen transitions, and persistence.
-Screens live under `Zaparoo.Screens` so they can be tested without embedding the
-whole application shell.
+owns the runtime wiring: key translation, forward-transition orchestration, and
+persistence. Screens live under `Zaparoo.Screens` so they can be tested without
+embedding the whole application shell.
 
 ```
-ScreenManager.activeScreen: "hub" | "games"
-HubScreen.section:          "categories" | "systems"
+ScreenManager.activeScreen:    "hub" | "systems" | "games"
+ScreenManager.modalStack:      list<string>      // top-of-stack receives input
+MainLayout.pendingTransition:  "" | "systems" | "games"   // owned by Main.qml
 ```
 
 Persisted state is split across Rust-backed QML singletons:
@@ -196,24 +200,70 @@ Persisted state is split across Rust-backed QML singletons:
 | Singleton | Stored fields | Owner |
 |---|---|---|
 | `Browse.AppState` | `active_screen` | cross-screen route |
-| `Browse.HubState` | `focus`, `category`, `system_id` | hub screen selection |
-| `Browse.GamesState` | `system_id`, `game_path` | games screen selection |
+| `Browse.HubState` | `category` | hub-screen row selection |
+| `Browse.SystemsState` | `system_id` | systems-screen grid selection |
+| `Browse.GamesState` | `system_id`, `game_path` | games-screen grid selection |
 
 State is loaded before the first QML frame and written through on user actions.
 That is deliberate: MiSTer's parent process can kill and relaunch the launcher
-without warning.
+without warning. Each screen writes its own `*State` singleton on directional
+moves; the router writes `AppState.active_screen` when the screen flips.
 
-- **hub + categories**: `HubScreen` shows the categories carousel. Left/Right
-  cycles categories; Enter calls `SystemsModel.set_category()` and switches
-  `HubScreen.section` to `"systems"`; Escape quits.
-- **hub + systems**: the categories carousel moves to the top and systems fade
-  in below. Enter calls `GamesModel.set_system()` and requests the games screen;
-  Escape returns to categories.
-- **games**: `GamesScreen` shows the games carousel. Enter calls
-  `GamesModel.launch_at()`; Escape requests the hub screen, preserving hub
-  focus.
+#### Screen flow
 
-Model reset handlers in `Main.qml` restore saved carousel indices as catalog
-data arrives. Missing IDs fall back to index 0 without erasing the saved value
-from disk, so a temporary catalog gap does not destroy the user's last
-selection.
+- **Hub** (`HubScreen.qml`) — static centered row of category tiles.
+  Left/Right cycles categories and writes `HubState.category`. Accept emits
+  `requestAccept(category)`; Escape emits `requestQuit`.
+- **Systems** (`SystemsScreen.qml`) — paged grid of systems for the active
+  category. Directional moves write `SystemsState.system_id`. Accept on a
+  Ready system emits `requestAccept(systemId)`; Accept on Empty/Error emits
+  `requestAccept("")` so the router can re-fire `set_category` as a retry.
+  Escape emits `requestHubScreen`. Tab on a tile emits
+  `requestSystemCardWrite(index)`.
+- **Games** (`GamesScreen.qml`) — paged grid of games for the active system.
+  Accept on Ready calls `GamesModel.launch_at(index)`; Accept on Empty/Error
+  re-fires `set_system` against the cached `current_system_id` as the retry.
+  Escape emits `requestSystemsScreen` (the router decides whether to land on
+  Hub or Systems via `_gamesEnteredFromHub`). Tab on a tile emits
+  `requestGameCardWrite(index)`.
+
+#### Forward-transition orchestration
+
+`Main.qml` is the single owner of forward routing. Screens are pure input
+dispatchers and never call `set_category` / `set_system` themselves. The
+router's flow on a Hub Accept:
+
+1. Set `pendingTransition = "systems"` (tentative). The screen's
+   `transitioning` binding flips true and the source row/grid hides.
+2. `_ensureCategory(category, cb)` short-circuits when the model is already
+   on that category with `count > 0`; otherwise it parks `cb` in the
+   `_categoryReadyCallback` slot, restarts a 50 ms `deferredCategorySetTimer`,
+   and that Timer calls `SystemsModel.set_category(...)`. The defer is
+   essential: `set_category` runs synchronously on the GUI thread and tears
+   down `SystemsScreen`'s tile delegates, which freezes the frame budget if
+   the "Loading…" cue hasn't painted yet.
+3. The router's `Connections { target: Browse.SystemsModel }` fires
+   `onLoadingChanged`. When `loading` flips false, the router pulls the
+   stored callback, clears the slot, and runs it.
+4. Inside that callback the router decides: Arcade-bypass on MiSTer (one
+   system, drill straight to Games) or normal Hub→Systems. Arcade-bypass
+   re-uses the same machinery via `_ensureSystem(systemId, cb)` against
+   `GamesModel`. Hub→Systems calls `_prefetchSystemCovers(cb)` to warm the
+   `QPixmapCache` so the destination grid paints with logos in place.
+5. `_completeTransition(screen)` clears `pendingTransition` and calls
+   `_goto(screen)` which writes `AppState.active_screen`.
+
+Input is gated during the wait: `handleAction` early-returns when
+`pendingTransition !== "" && !ScreenManager.hasModal` so a user mashing keys
+during the load can't queue a second transition.
+
+There are exactly two `loadingChanged` listeners — one per browse model —
+both on the router. There is no cross-screen `Connections` block. There is
+no per-screen pending flag. The class of routing bug where a stale
+per-screen flag fires while its owning screen isn't even visible cannot
+exist when there is no cross-screen state.
+
+Model reset handlers in `Main.qml` restore saved row/grid indices as
+catalog data arrives. Missing IDs fall back to index 0 without erasing the
+saved value from disk, so a temporary catalog gap does not destroy the
+user's last selection.

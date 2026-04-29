@@ -9,6 +9,7 @@
 #include <QFontDatabase>
 #include <QGuiApplication>
 #include <QLocale>
+#include <QPixmapCache>
 #include <QQmlApplicationEngine>
 #include <QQuickStyle>
 #include <QString>
@@ -17,6 +18,16 @@
 #include <QtQml/qqmlextensionplugin.h>
 #include <cstddef>
 #include <cstdint>
+
+// Default QPixmapCache cap is 10 MiB. With ~100 system PNGs decoded at
+// 256 px sourceSize the working set straddles that limit, so navigating
+// through every category evicts earlier system covers and re-decodes
+// them on the next visit. Bumping to 50 MiB keeps the entire system-
+// cover set resident across category swaps for the cost of a one-time
+// allocation — a worthwhile trade on MiSTer's 1 GiB DDR3 since
+// pixmap decode on the UI thread is the visible "pop in" the user
+// flagged.
+constexpr int kPixmapCacheLimitKiB = 50 * 1024;
 
 extern "C" int zaparoo_rust_init();
 extern "C" void zaparoo_rust_post_qt_start();
@@ -71,6 +82,7 @@ int main(int argc, char* argv[])
     qInstallMessageHandler(qtMessageHandler);
 
     QGuiApplication app(argc, argv);
+    QPixmapCache::setCacheLimit(kPixmapCacheLimitKiB);
     // addApplicationFont returns -1 on failure (broken qrc path,
     // unreadable file). Logging the failure mode keeps a refactor that
     // breaks the resource alias from silently degrading to the default

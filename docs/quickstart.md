@@ -95,8 +95,8 @@ starts fullscreen.
 ## 5. Check the result
 
 - The launcher window opens.
-- A **categories** carousel fills with "Favorites", "Arcade",
-  "Consoles", "Handhelds". Left/Right cycles between them.
+- A static **categories row** of tiles fills with "Favorites",
+  "Arcade", "Consoles", "Handhelds". Left/Right cycles between them.
   ("Favorites" is a placeholder until a real Favorites endpoint
   lands in Core; selecting it shows an empty systems grid.)
 - Pressing Enter drops you into the **paged systems grid** for that

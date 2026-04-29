@@ -4,13 +4,12 @@
 
 use crate::models::{global_runtime, global_store};
 use cxx_qt::{CxxQtType, Threading};
-use cxx_qt_lib::{
-    QByteArray, QHash, QHashPair_i32_QByteArray, QModelIndex, QString, QStringList, QVariant,
-};
+use cxx_qt_lib::{QByteArray, QHash, QHashPair_i32_QByteArray, QModelIndex, QString, QVariant};
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use tracing::warn;
+use tokio::task::JoinHandle;
+use tracing::{trace, warn};
 use zaparoo_core::endpoints::catalog::CatalogEndpoint;
 use zaparoo_core::endpoints::readers_write::ReadersWriteMutation;
 use zaparoo_core::media_types::ReadersWriteParams;
@@ -20,7 +19,7 @@ use zaparoo_core::systems_catalog::CatalogData;
 // `coverKey` rather than `id`: bracket-access via `model["id"]` from a
 // QML delegate trips over `id`'s reserved-keyword status, leaving the
 // role unreachable. Renaming sidesteps the reservation entirely and
-// matches the generic carousel cover-key contract used by all models.
+// matches the generic Tile cover-key contract used by all models.
 const COVER_KEY_ROLE: i32 = 256 + 1;
 const NAME_ROLE: i32 = 256 + 2;
 const CATEGORY_ROLE: i32 = 256 + 3;
@@ -35,6 +34,7 @@ pub struct SystemInfo {
 pub struct SystemsModelRust {
     systems: Vec<SystemInfo>,
     count: i32,
+    loading: bool,
     current_category: QString,
     error_message: QString,
     card_write_pending: bool,
@@ -43,15 +43,24 @@ pub struct SystemsModelRust {
     // Last-known-good catalog. Updated by `apply_state` on every
     // `Ready`; never cleared on `Loading`/`Errored`. Lets
     // `set_category` keep populating rows during a transient refetch
-    // instead of wiping the carousel until the catalog returns to
+    // instead of wiping the grid until the catalog returns to
     // `Ready`.
     last_ready: Option<CatalogData>,
-    // Cover-key list mirroring `last_ready`. Exposed as a qproperty so
-    // the QML side can bind a prefetch Repeater directly. Updated
-    // *after* `last_ready` inside `apply_state`, so the property's
-    // notify signal is the only racy-safe trigger for "catalog cover
-    // keys are stable now."
-    cover_keys: QStringList,
+    // Cancellation handle for the in-flight `set_category` filter.
+    // The filter itself is short (microseconds on ARM); spawning is
+    // what enables the loading→ready four-state UI on the systems
+    // grid and aborts a queued result when the user has already
+    // moved on.
+    pending_task: Option<JoinHandle<()>>,
+    // Monotonic ticket bumped on each `set_category`, and again by
+    // `apply_state` whenever a fresh catalog supersedes whatever
+    // the in-flight worker is computing. The worker's queued
+    // closure captures the ticket value at spawn time and bails
+    // when `seq` has advanced — closing the window where a stale
+    // filter result lands on top of newer rows. Distinct from
+    // `card_write_seq` — different concerns, must not share a
+    // counter.
+    seq: Arc<AtomicU64>,
 }
 
 #[cxx_qt::bridge]
@@ -67,7 +76,6 @@ pub mod ffi {
         type QHash_i32_QByteArray = cxx_qt_lib::QHash<cxx_qt_lib::QHashPair_i32_QByteArray>;
         type QByteArray = cxx_qt_lib::QByteArray;
         type QString = cxx_qt_lib::QString;
-        type QStringList = cxx_qt_lib::QStringList;
     }
 
     unsafe extern "RustQt" {
@@ -76,11 +84,11 @@ pub mod ffi {
         #[qml_element]
         #[qml_singleton]
         #[qproperty(i32, count)]
+        #[qproperty(bool, loading)]
         #[qproperty(QString, current_category)]
         #[qproperty(QString, error_message)]
         #[qproperty(bool, card_write_pending)]
         #[qproperty(QString, card_write_error)]
-        #[qproperty(QStringList, cover_keys)]
         type SystemsModel = super::SystemsModelRust;
 
         #[qinvokable]
@@ -139,23 +147,9 @@ fn project(status: &ResourceStatus<CatalogData>) -> (Option<CatalogData>, String
     }
 }
 
-/// Every system cover key in `catalog`, in source order. Returns empty
-/// when `catalog` is `None`. Pulled out so the `all_cover_keys`
-/// qinvokable has a unit-testable seam. Keys are returned as
-/// `systems/<id>` — the relative path under `resources/images/` so the
-/// QML side can resolve the PNG without hardcoding the subdirectory.
-fn cover_keys(catalog: Option<&CatalogData>) -> Vec<String> {
-    catalog.map_or_else(Vec::new, |c| {
-        c.systems
-            .iter()
-            .map(|s| format!("systems/{}", s.id))
-            .collect()
-    })
-}
-
 /// Find `needle` in `systems` with case-sensitive id equality. Returns
 /// position as i32, or -1 if not found / empty needle. The
-/// case-sensitive contract is deliberate: `HubState.system_id` is
+/// case-sensitive contract is deliberate: `SystemsState.system_id` is
 /// persisted as the exact ID Core surfaced, and the artwork bundled
 /// under `resources/images/systems/<id>.png` matches that exact case
 /// (Linux qrc lookups are case-sensitive). A case-insensitive lookup
@@ -191,6 +185,16 @@ fn apply_state(mut model: Pin<&mut ffi::SystemsModel>, (data, err): (Option<Cata
     if let Some(data) = data {
         let cat = model.rust().current_category.to_string();
         if !cat.is_empty() {
+            // Invalidate any in-flight `set_category` worker so its
+            // queued result — computed against the pre-update catalog
+            // — doesn't land on top of the fresher rows we're about
+            // to write. The Qt event loop is single-threaded, so the
+            // bump and the worker callback's `seq.load` are serialized:
+            // any callback that runs after this point sees a mismatch
+            // and bails. Without this bump the worker becomes the
+            // authoritative writer for the moment, and stale rows
+            // win.
+            model.rust().seq.fetch_add(1, Ordering::SeqCst);
             let rows = rows_for_category(Some(&data), &cat);
             let count = rows.len() as i32;
             model.as_mut().begin_reset_model();
@@ -198,25 +202,29 @@ fn apply_state(mut model: Pin<&mut ffi::SystemsModel>, (data, err): (Option<Cata
             model.as_mut().rust_mut().count = count;
             model.as_mut().end_reset_model();
             model.as_mut().count_changed();
+            // A fresh catalog arrival is the authoritative resolver
+            // for `loading`: any worker spawned by an earlier
+            // `set_category` has just been invalidated above and its
+            // queued callback will bail rather than clear `loading`.
+            if model.loading {
+                model.as_mut().set_loading(false);
+            }
         }
-        let new_keys = cover_keys(Some(&data));
         model.as_mut().rust_mut().last_ready = Some(data);
-        // Set `cover_keys` *after* `last_ready` so anything observing
-        // the property's notify signal sees a fully-populated model.
-        // The setter only fires `cover_keys_changed` when the list
-        // actually differs, so duplicate `Ready` events won't churn
-        // the prefetch Repeater.
-        let mut qlist = QStringList::default();
-        for k in new_keys {
-            qlist.append(QString::from(k.as_str()));
-        }
-        if model.cover_keys != qlist {
-            model.as_mut().set_cover_keys(qlist);
-        }
     }
     let qerr = QString::from(err.as_str());
     if model.error_message != qerr {
         model.as_mut().set_error_message(qerr);
+    }
+    // An error is a terminal state for the in-flight load — any
+    // worker spawned by an earlier `set_category` is invalidated by
+    // the seq bump above (or never ran because there was no fresh
+    // catalog), so this is the authoritative loading clear for the
+    // error path. Without it the spinner sticks on after the catalog
+    // surfaces an error mid-flight. Idle/Loading projects to
+    // `(None, "")`, so leave `loading` alone there.
+    if !err.is_empty() && model.loading {
+        model.as_mut().set_loading(false);
     }
 }
 
@@ -262,23 +270,90 @@ impl ffi::SystemsModel {
         // re-call recover from a stale-but-empty model — e.g. the
         // catalog refetched and the previously-current category now
         // has no systems, and a caller wants to retry the same value.
-        if self.rust().current_category == category && !self.rust().systems.is_empty() {
+        // The `error_message.is_empty()` guard is the [OK] RETRY path:
+        // when the catalog errored after a successful fill, `systems`
+        // is non-empty (apply_state's error branch leaves prior rows
+        // alone), so without this clause the retry would short-circuit
+        // and the surfaced error would never clear.
+        if self.rust().current_category == category
+            && !self.rust().systems.is_empty()
+            && self.rust().error_message.is_empty()
+        {
             return;
         }
         let cat = category.to_string();
-        // Read from `last_ready` rather than the live `ResourceStatus`
-        // so a transient `Loading` (a refetch in flight) doesn't wipe
-        // the carousel between the user's category change and the
-        // refetch completing.
-        let rows = rows_for_category(self.rust().last_ready.as_ref(), &cat);
-        let count = rows.len() as i32;
-        self.as_mut().begin_reset_model();
-        self.as_mut().rust_mut().systems = rows;
-        self.as_mut().rust_mut().count = count;
-        self.as_mut().rust_mut().current_category = category;
-        self.as_mut().end_reset_model();
-        self.as_mut().count_changed();
-        self.as_mut().current_category_changed();
+
+        // User-visible reset happens synchronously so QML sees fresh
+        // state immediately, before the worker has even scheduled.
+        // Drop the prior category's rows here too — otherwise the
+        // grid would keep painting (and accepting input on) the
+        // outgoing category until the worker resolves.
+        self.as_mut().set_current_category(category);
+        if !self.loading {
+            self.as_mut().set_loading(true);
+        }
+        if !self.error_message.is_empty() {
+            self.as_mut().set_error_message(QString::default());
+        }
+        if !self.systems.is_empty() {
+            self.as_mut().begin_reset_model();
+            self.as_mut().rust_mut().systems.clear();
+            self.as_mut().rust_mut().count = 0;
+            self.as_mut().end_reset_model();
+            self.as_mut().count_changed();
+        }
+
+        // Abort the prior task so it stops enqueuing further callbacks.
+        // Any callback already on the Qt event loop is still pending —
+        // the `seq` ticket below is what discards those stale ones.
+        if let Some(handle) = self.as_mut().rust_mut().pending_task.take() {
+            handle.abort();
+        }
+
+        // Bump the ticket *before* spawning. The new worker captures
+        // this value; any earlier-worker callback still in the Qt
+        // queue captured the previous ticket and will bail when it
+        // sees the mismatch. `apply_state` also bumps this ticket
+        // when a fresh catalog arrives mid-flight.
+        let seq = self.rust().seq.clone();
+        let ticket = seq.fetch_add(1, Ordering::SeqCst) + 1;
+
+        // Snapshot the catalog for the worker. Reading from
+        // `last_ready` rather than the live `ResourceStatus` means a
+        // transient `Loading` (a refetch in flight) doesn't wipe the
+        // grid between the user's category change and the refetch
+        // completing. The clone is small (~hundreds of `SystemInfo`
+        // rows, microseconds on ARM) and unavoidable without
+        // Arc-wrapping `last_ready`, which is out of scope.
+        let catalog = self.rust().last_ready.clone();
+
+        let qt_thread = self.qt_thread();
+        let handle = global_runtime().spawn(async move {
+            let rows = rows_for_category(catalog.as_ref(), &cat);
+            let count = rows.len() as i32;
+            let cat_for_log = cat.clone();
+            let _ = qt_thread.queue(move |mut model| {
+                let current = seq.load(Ordering::SeqCst);
+                if current != ticket {
+                    trace!(
+                        category = %cat_for_log,
+                        ticket,
+                        current,
+                        "discarding stale set_category callback"
+                    );
+                    return;
+                }
+                model.as_mut().begin_reset_model();
+                model.as_mut().rust_mut().systems = rows;
+                model.as_mut().rust_mut().count = count;
+                model.as_mut().end_reset_model();
+                model.as_mut().count_changed();
+                if model.loading {
+                    model.as_mut().set_loading(false);
+                }
+            });
+        });
+        self.as_mut().rust_mut().pending_task = Some(handle);
     }
 
     fn system_id_at(&self, index: i32) -> QString {
@@ -365,7 +440,7 @@ mod tests {
         reason = "tests should fail-fast on unexpected errors"
     )]
 
-    use super::{cover_keys, position_of_system_id, project, rows_for_category, SystemInfo};
+    use super::{position_of_system_id, project, rows_for_category, SystemInfo};
     use zaparoo_core::media_types::SystemInfo as MediaSystemInfo;
     use zaparoo_core::remote_resource::ResourceStatus;
     use zaparoo_core::systems_catalog::CatalogData;
@@ -458,28 +533,6 @@ mod tests {
         assert!(rows.is_empty());
     }
 
-    #[test]
-    fn cover_keys_none_returns_empty() {
-        assert!(cover_keys(None).is_empty());
-    }
-
-    #[test]
-    fn cover_keys_returns_every_id_across_categories() {
-        let catalog = catalog_with(vec![
-            sys("smb", "Super Mario Bros", "Consoles"),
-            sys("snk", "SNK Heroes", "Arcade"),
-            sys("zelda", "Zelda", "Consoles"),
-        ]);
-        let keys = cover_keys(Some(&catalog));
-        assert_eq!(keys, vec!["systems/smb", "systems/snk", "systems/zelda"]);
-    }
-
-    #[test]
-    fn cover_keys_empty_catalog_returns_empty() {
-        let catalog = catalog_with(vec![]);
-        assert!(cover_keys(Some(&catalog)).is_empty());
-    }
-
     fn local_sys(id: &str) -> SystemInfo {
         SystemInfo {
             id: id.into(),
@@ -497,7 +550,7 @@ mod tests {
     #[test]
     fn position_of_system_id_is_case_sensitive() {
         let systems = vec![local_sys("NES"), local_sys("SNES")];
-        // HubState.system_id is persisted exact and the bundled
+        // SystemsState.system_id is persisted exact and the bundled
         // artwork (`resources/images/systems/<id>.png`) matches that
         // exact case — case-insensitive lookup would silently mask a
         // Core case-drift bug.

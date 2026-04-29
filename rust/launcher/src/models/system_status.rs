@@ -16,7 +16,7 @@ use std::thread;
 use std::time::Duration;
 use tracing::warn;
 use zaparoo_core::endpoints::readers::ReadersEndpoint;
-use zaparoo_core::media_types::ReadersResult;
+use zaparoo_core::media_types::{ReaderInfo, ReadersResult};
 use zaparoo_core::remote_resource::ResourceStatus;
 
 const LOCAL_PROBE_INTERVAL: Duration = Duration::from_secs(30);
@@ -24,6 +24,10 @@ const NFC_REFETCH_INTERVAL: Duration = Duration::from_secs(30);
 const INTERNET_TIMEOUT: Duration = Duration::from_millis(800);
 
 #[derive(Default)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "each field is an independent qproperty exposed to QML; folding them into a bitset would change the SystemStatus singleton's QML surface"
+)]
 pub struct SystemStatusRust {
     has_nfc: bool,
     has_wifi_internet: bool,
@@ -91,12 +95,12 @@ fn bind_local_readers(mut model: Pin<&mut ffi::SystemStatus>) {
     let store = crate::models::global_store();
     let resource = store.subscribe::<ReadersEndpoint>(());
     let mut rx = resource.subscribe();
-    apply_has_nfc(model.as_mut(), project_readers(&*rx.borrow_and_update()));
+    apply_has_nfc(model.as_mut(), project_readers(&rx.borrow_and_update()));
 
     let qt_thread = model.qt_thread();
     crate::models::global_runtime().spawn(async move {
         while rx.changed().await.is_ok() {
-            let has_nfc = project_readers(&*rx.borrow_and_update());
+            let has_nfc = project_readers(&rx.borrow_and_update());
             let _ = qt_thread.queue(move |m| apply_has_nfc(m, has_nfc));
         }
     });
@@ -134,7 +138,7 @@ fn bind_local_readers(mut model: Pin<&mut ffi::SystemStatus>) {
 
 fn project_readers(status: &ResourceStatus<ReadersResult>) -> bool {
     match status {
-        ResourceStatus::Ready(result) => result.readers.iter().any(|reader| reader.is_nfc_reader()),
+        ResourceStatus::Ready(result) => result.readers.iter().any(ReaderInfo::is_nfc_reader),
         ResourceStatus::Idle | ResourceStatus::Loading | ResourceStatus::Errored { .. } => false,
     }
 }
@@ -296,9 +300,11 @@ eth0\t00A8C0A8\t00000000\t0001\t0\t0\t0\t00FFFFFF\t0\t0\t0\n";
 
     #[test]
     fn readers_error_projects_to_hidden() {
-        assert!(!project_readers(&ResourceStatus::<ReadersResult>::Errored {
-            message: "unsupported".into(),
-            retrying: true,
-        }));
+        assert!(!project_readers(
+            &ResourceStatus::<ReadersResult>::Errored {
+                message: "unsupported".into(),
+                retrying: true,
+            }
+        ));
     }
 }

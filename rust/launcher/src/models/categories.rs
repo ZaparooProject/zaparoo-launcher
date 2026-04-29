@@ -12,11 +12,11 @@ use zaparoo_core::systems_catalog::CatalogData;
 const NAME_ROLE: i32 = 256 + 1; // Qt::UserRole + 1
 const COVER_KEY_ROLE: i32 = 256 + 2;
 
-// Placeholder entry shown at the top of the categories carousel until a
+// Placeholder entry shown at the start of the categories row until a
 // real Favorites pipeline lands in Core. Selecting it filters the
-// systems carousel by an unmatched category — the user sees an empty
-// grid, which is the correct fallback for a feature that doesn't exist
-// yet. Tracked in #20.
+// systems grid by an unmatched category — the user sees an empty grid,
+// which is the correct fallback for a feature that doesn't exist yet.
+// Tracked in #20.
 const FAVORITES_CATEGORY: &str = "Favorites";
 
 // Categories Core surfaces but the launcher doesn't expose. `Other` is
@@ -104,8 +104,8 @@ fn project(status: &ResourceStatus<CatalogData>) -> (Option<Vec<String>>, String
 /// Find `needle` in `haystack` with case-sensitive equality. Returns
 /// the position as i32, or -1 if not found / empty needle. The
 /// case-sensitive contract is deliberate: `HubState.category` is
-/// persisted to disk and the launcher re-derives the carousel index
-/// from that string. A case-insensitive lookup would silently coerce
+/// persisted to disk and the launcher re-derives the row index from
+/// that string. A case-insensitive lookup would silently coerce
 /// "consoles" into "Consoles" if Core ever returned mixed case,
 /// hiding a real upstream bug. Pulled out of `index_for_category`
 /// so the contract is unit-testable without a `QObject` instance.

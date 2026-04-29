@@ -15,6 +15,7 @@ QtObject {
 
     // Screen name constants. Re-exported by MainLayout for test back-compat.
     readonly property string screenHub: "hub"
+    readonly property string screenSystems: "systems"
     readonly property string screenGames: "games"
 
     // Currently-focused root screen. Persistence lives in

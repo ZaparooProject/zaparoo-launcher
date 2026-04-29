@@ -81,3 +81,18 @@ lto           = "thin"
 codegen-units = 1
 strip         = true
 # `panic = "abort"` intentionally not set — tokio/tracing rely on unwinding.
+
+[profile.dev]
+# Line tables only: keeps backtraces and panic locations useful but skips
+# generating full DWARF type info. Cuts ~10-15% off compile time and
+# shrinks `target/` materially. Stable since Rust 1.71.
+debug = "line-tables-only"
+
+[profile.dev.build-override]
+# Build scripts and proc macros run *during* compilation; cxx-qt 0.8 emits
+# a lot of generated code through proc macros (Q_PROPERTY, qinvokable,
+# bridge modules). Compiling those macros at -O3 makes them dramatically
+# faster to execute, which speeds up every incremental build that touches
+# a bridge module. The first cold compile of build scripts takes a few
+# extra seconds; everything after that is faster.
+opt-level = 3

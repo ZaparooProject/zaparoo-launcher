@@ -12,9 +12,9 @@ import Zaparoo.Browse as Browse
 
 // cxx-qt 0.8 patches `isFinal: true` on singleton properties but the
 // qmltypes schema has no `isFinal` slot for Method, so every qinvokable
-// call on a Zaparoo.Browse singleton (all_cover_keys, etc.) still trips
-// qmllint's "Member can be shadowed" check. Until the schema grows
-// method-level finality, suppress the compiler category file-wide.
+// call on a Zaparoo.Browse singleton still trips qmllint's "Member can
+// be shadowed" check. Until the schema grows method-level finality,
+// suppress the compiler category file-wide.
 // qmllint disable compiler
 
 // Visual tree. Edit this file in Qt Design Studio; the state machine
@@ -25,22 +25,17 @@ import Zaparoo.Browse as Browse
 ApplicationWindow {
     id: root
 
-    // Screen/focus constants re-exported from the manager + HubScreen so
-    // tests and Main.qml can reference them without importing both.
+    // Screen constants re-exported from the manager so tests and
+    // Main.qml can reference them without importing Zaparoo.Screens.
     readonly property string screenHub: ScreenManager.screenHub
+    readonly property string screenSystems: ScreenManager.screenSystems
     readonly property string screenGames: ScreenManager.screenGames
-    readonly property string focusCategories: hubScreen.focusCategories
-    readonly property string focusSystems: hubScreen.focusSystems
 
     // Runtime state. `activeScreen` mirrors ScreenManager's property
     // (two-way synced below so direct assignment from tests still
-    // works). `hubFocus` aliases HubScreen's internal focus.
+    // works).
     property bool fullScreen: false
     property string activeScreen: ScreenManager.activeScreen
-    property alias hubFocus: hubScreen.section
-
-    // Drives the hub↔games slide transition. 0 = hub centred; width = games centred.
-    property real screenOffset: root.activeScreen === root.screenGames ? root.width : 0
 
     // Defaults keep the design canvas at a sensible aspect for Design
     // Studio. Main.qml overrides these at runtime with Screen.width /
@@ -52,23 +47,44 @@ ApplicationWindow {
     title: qsTr("Zaparoo Launcher")
 
     // Screen plumbing exposed for Main.qml's orchestration. Anything
-    // inside the screens (categories carousel, systems/games grids) is
-    // reached via root.hubScreen.* / root.gamesScreen.* — no per-widget
-    // aliases here.
+    // inside the screens (categories row, systems/games grids) is
+    // reached via root.hubScreen.* / root.systemsScreen.* /
+    // root.gamesScreen.* — no per-widget aliases here.
     property alias hubScreen: hubScreen
+    property alias systemsScreen: systemsScreen
     property alias gamesScreen: gamesScreen
 
     property bool cardWriteModalVisible: false
     property bool cardWriteFailed: false
 
-    signal cancelCardWriteRequested()
+    // Forward-transition state owned by Main.qml. "" while idle;
+    // "systems" or "games" while waiting on a model fill before
+    // flipping `activeScreen`. Declared here so the source-screen
+    // content-hiding bindings (row/grid `visible`) resolve statically
+    // in qmllint.
+    property string pendingTransition: ""
 
-    Behavior on screenOffset {
-        NumberAnimation {
-            duration: 220
-            easing.type: Easing.OutCubic
-        }
-    }
+    // Per-screen state derivation. Shape mirrors ScreenStateOverlay's
+    // `state` ternary so the help bar and the in-screen overlay agree
+    // on what state each screen is in. Hub has no Loading row —
+    // CategoriesModel binds eagerly via bind_to_endpoint! and exposes
+    // no `loading` qproperty, so a count-of-zero collapses straight
+    // into Empty (matching the overlay's existing behavior on Hub).
+    readonly property string systemsScreenState:
+        Browse.SystemsModel.loading ? "loading"
+        : ((Browse.SystemsModel.error_message ?? "") !== "" ? "error"
+        : (Browse.SystemsModel.count === 0 ? "empty" : "ready"))
+
+    readonly property string gamesScreenState:
+        Browse.GamesModel.loading ? "loading"
+        : ((Browse.GamesModel.error_message ?? "") !== "" ? "error"
+        : (Browse.GamesModel.count === 0 ? "empty" : "ready"))
+
+    readonly property string hubScreenState:
+        (Browse.CategoriesModel.error_message ?? "") !== "" ? "error"
+        : (Browse.CategoriesModel.count === 0 ? "empty" : "ready")
+
+    signal cancelCardWriteRequested()
 
     // Two-way sync between root.activeScreen and ScreenManager.activeScreen.
     // Binding-breaking assignments (tests setting root.activeScreen = "games")
@@ -116,44 +132,6 @@ ApplicationWindow {
         asynchronous: false
     }
 
-    // ── System logo prefetch ─────────────────────────────────────────────────
-    //
-    // Hidden Repeater that loads every system PNG once the catalog
-    // arrives, priming Qt's pixmap cache. Without this, the *first*
-    // category switch pays the PNG decode for that category's logos —
-    // a visible stutter the user noticed. Subsequent visits are free.
-    //
-    // Bound directly to SystemsModel.cover_keys: the property is set
-    // *after* the model's internal `last_ready` snapshot inside
-    // `apply_state`, so the changed-signal can only fire once the keys
-    // are real. No cross-model coupling, no Component.onCompleted seed.
-
-    Item {
-        id: coverPrefetch
-        visible: false
-
-        Repeater {
-            model: Browse.SystemsModel.cover_keys
-
-            Image {
-                required property string modelData
-
-                // `coverKey` carries the subdirectory (e.g. `systems/SNES`).
-                // Resources.coverUrl is the same builder Tile.qml uses, so
-                // this prefetch and the visible Image hit the same
-                // QPixmapCache slot — see Resources.qml.
-                source: Resources.coverUrl(modelData)
-                // Match Tile.qml's sourceSize so the prefetch and the
-                // visible Image share a QPixmapCache entry. A different
-                // sourceSize would key a separate cache slot and the
-                // prefetch wouldn't help.
-                sourceSize.width: 256
-                asynchronous: true
-                cache: true
-            }
-        }
-    }
-
     // ── Logo ──────────────────────────────────────────────────────────────────
 
     Image {
@@ -168,83 +146,72 @@ ApplicationWindow {
 
     // ── Screen containers ─────────────────────────────────────────────────────
 
-    HubScreen {
-        id: hubScreen
-        x: -root.screenOffset
-        width: parent.width
-        height: parent.height
-    }
+    // Stacked container — only the active screen paints. Hub →
+    // Systems → Games drill-downs (and Esc back) are instant cuts:
+    // bind `visible` directly on the live `activeScreen` and let
+    // Qt's scene graph swap which screen paints in one frame.
+    //
+    // Earlier iterations tried a horizontal slide, then a direct
+    // opacity fade on the screen container, then an overlay-rectangle
+    // fade. All three were structurally too expensive for Qt Quick's
+    // Software adaptation when the destination screen is a dense
+    // grid. Translucent overlays don't subtract from the renderer's
+    // dirty region, so every cell underneath re-rasterises per frame
+    // throughout the fade — text labels, cover images, card bodies.
+    // Instant cuts paint the new screen exactly once. See
+    // docs/qml-gotchas.md → "Software-renderer animation costs"
+    // for the full reasoning.
+    //
+    // No additional cue on screen change: the help-bar text changes
+    // instantly, the screen body swaps, and the user just pressed
+    // OK or Esc — the action is deliberate and the feedback is
+    // immediate. The page-dot pulse inside `PagedGrid` is the only
+    // animated transition cue in the launcher.
+    //
+    // The wrapper `Item` stays for grouping clarity; with no fade
+    // machinery it carries no buffered state. Model bindings stay
+    // live across deactivations so Esc back to systems doesn't
+    // re-instantiate the whole delegate tree — Items with
+    // `visible: false` skip painting but keep their scene graph
+    // alive and their decoded covers warm.
+    Item {
+        id: stackedScreens
 
-    GamesScreen {
-        id: gamesScreen
-        x: parent.width - root.screenOffset
-        width: parent.width
-        height: parent.height
-        active: root.activeScreen === root.screenGames
+        anchors.fill: parent
+
+        HubScreen {
+            id: hubScreen
+            anchors.fill: parent
+            visible: root.activeScreen === root.screenHub
+            transitioning: root.pendingTransition !== ""
+        }
+
+        SystemsScreen {
+            id: systemsScreen
+            anchors.fill: parent
+            visible: root.activeScreen === root.screenSystems
+            transitioning: root.pendingTransition !== ""
+        }
+
+        GamesScreen {
+            id: gamesScreen
+            anchors.fill: parent
+            visible: root.activeScreen === root.screenGames
+        }
     }
 
     // ── Card writer modal ────────────────────────────────────────────────────
 
-    Rectangle {
-        id: cardWriteScrim
+    Modal {
+        id: cardWriteModal
 
-        anchors.fill: parent
-        visible: root.cardWriteModalVisible
-        color: "#99000000"
-        z: 300
-
-        Rectangle {
-            anchors.centerIn: parent
-            width: Math.min(parent.width * 0.78, Sizing.pctH(82))
-            height: Sizing.pctH(34)
-            color: Theme.bgPanel
-            border.width: 2
-            border.color: root.cardWriteFailed ? Theme.textPrimary : Theme.accent
-
-            Text {
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.top: parent.top
-                anchors.topMargin: Sizing.pctH(7)
-                anchors.leftMargin: Sizing.pctW(5)
-                anchors.rightMargin: Sizing.pctW(5)
-                text: root.cardWriteFailed
-                      ? qsTr("Writing failed")
-                      : qsTr("Put a writable card near the reader")
-                font.family: Theme.fontRetro
-                font.pixelSize: Sizing.fontSize(3)
-                color: Theme.textPrimary
-                wrapMode: Text.WordWrap
-                horizontalAlignment: Text.AlignHCenter
-                renderType: Text.NativeRendering
-            }
-
-            Rectangle {
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.bottom: parent.bottom
-                anchors.bottomMargin: Sizing.pctH(5)
-                width: Sizing.pctW(22)
-                height: Sizing.pctH(7)
-                color: Theme.bgBar
-                border.width: 1
-                border.color: Theme.borderMid
-                visible: !root.cardWriteFailed
-
-                Text {
-                    anchors.centerIn: parent
-                    text: qsTr("Cancel")
-                    font.family: Theme.fontRetro
-                    font.pixelSize: Sizing.fontSize(2.4)
-                    color: Theme.textPrimary
-                    renderType: Text.NativeRendering
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-                    onClicked: root.cancelCardWriteRequested()
-                }
-            }
-        }
+        open: root.cardWriteModalVisible
+        kind: "transient"
+        failed: root.cardWriteFailed
+        title: root.cardWriteFailed
+               ? qsTr("Writing failed")
+               : qsTr("Put a writable card near the reader")
+        onCancelRequested: root.cancelCardWriteRequested()
     }
 
     // ── Top-right HUD ─────────────────────────────────────────────────────────
@@ -385,11 +352,46 @@ ApplicationWindow {
 
         Text {
             anchors.centerIn: parent
-            text: root.activeScreen === root.screenGames
-                  ? qsTr("[<>] GAME [OK] PLAY [TAB] FLASH CARD [ESC]")
-                  : (root.hubFocus === root.focusSystems
-                     ? qsTr("[<>] SYS [OK] GAMES [TAB] FLASH CARD [ESC]")
-                     : qsTr("[<>] CATEGORY  [OK] SELECT  [ESC] QUIT"))
+            // (activeScreen, screenState, modal?)-keyed lookup. The modal
+            // row wins outright; otherwise per-screen text varies with
+            // the screen's data-state (Loading / Error / Empty / Ready).
+            // Error and Empty share the retry-or-back row on Systems and
+            // Games (both wire `accept` to re-fire `set_category` /
+            // `set_system` in non-Ready state). Hub has no retry handler
+            // — CategoriesModel binds eagerly via bind_to_endpoint! and
+            // recovers automatically — so its non-Ready row drops [OK]
+            // RETRY rather than promising behavior the screen doesn't
+            // implement.
+            //
+            // During a forward transition (`pendingTransition !== ""`)
+            // the router's input gate swallows every press — including
+            // cancel — so the bar blanks rather than advertising
+            // buttons that won't respond. Modals still win outright;
+            // they run on top of the input gate.
+            text: {
+                if (root.cardWriteModalVisible)
+                    return qsTr("[ESC] CANCEL");
+                if (root.pendingTransition !== "")
+                    return "";
+                if (root.activeScreen === root.screenHub) {
+                    if (root.hubScreenState === "ready")
+                        return qsTr("[<>] CATEGORY  [OK] SELECT  [ESC] QUIT");
+                    return qsTr("[ESC] QUIT");
+                }
+                if (root.activeScreen === root.screenSystems) {
+                    if (root.systemsScreenState === "loading")
+                        return qsTr("[ESC] BACK");
+                    if (root.systemsScreenState === "ready")
+                        return qsTr("[<>] SYSTEM  [OK] GAMES  [TAB] FLASH CARD  [ESC] BACK");
+                    return qsTr("[OK] RETRY  [ESC] BACK");
+                }
+                // games
+                if (root.gamesScreenState === "loading")
+                    return qsTr("[ESC] BACK");
+                if (root.gamesScreenState === "ready")
+                    return qsTr("[<>] GAME  [OK] PLAY  [TAB] FLASH CARD  [ESC] BACK");
+                return qsTr("[OK] RETRY  [ESC] BACK");
+            }
             font.family: Theme.fontUi
             font.pixelSize: Sizing.fontSize(2.5)
             color: Theme.textDim

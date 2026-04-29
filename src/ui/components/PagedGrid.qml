@@ -13,12 +13,22 @@ import QtQuick
 import Zaparoo.Theme
 
 // Paged grid of tiles. Items flow row-major within a page; reaching the
-// rightmost column on a non-last page slides the whole grid one screen
-// across as a single x-translation animation, and crossing past the last
-// page wraps back to page 0 (mirror for left). Selection is `currentIndex`
-// over the source model; (page, row, col) are derived. Cells size
-// themselves to the available container minus reserved chrome — callers
-// pass a model and delegate, the grid handles layout.
+// rightmost column on a non-last page swaps in the next page instantly,
+// crossing past the last page wraps back to page 0 (mirror for left).
+// Selection is `currentIndex` over the source model; (page, row, col)
+// are derived. Cells size themselves to the available container minus
+// reserved chrome — callers pass a model and delegate, the grid
+// handles layout.
+//
+// Page changes are instant cuts (no fade, no slide). On Qt Quick's
+// Software adaptation the renderer cannot keep up with a per-frame
+// alpha ramp over a busy grid — translucent overlays don't subtract
+// from the dirty region, so every cell underneath re-rasterizes per
+// frame (text labels, cover images, card bodies). The only animated
+// cue on a page change is a brief scale pulse on the page-dot for
+// the new page: small element, small dirty rect, partial-update
+// friendly. See docs/qml-gotchas.md → "Software-renderer animation
+// costs" for the full reasoning.
 Item {
     id: root
 
@@ -30,9 +40,9 @@ Item {
 
     // Whether this section currently owns user focus. Tile uses this to
     // gate the selection card so only one section shows the focus cue
-    // at a time when the hub has both a carousel and a grid on screen.
-    // Defaults to true so call sites that don't care (games screen)
-    // keep working untouched.
+    // at a time on screens that host more than one tile section.
+    // Defaults to true so call sites that don't care keep working
+    // untouched.
     property bool focused: true
 
     readonly property int columns: Sizing.gridColumns
@@ -70,16 +80,8 @@ Item {
                  Math.floor((root._availableHeight - (root.rows - 1) * root.cellSpacingY)
                             / root.rows))
 
-    // Set when the page-snap is a programmatic seed (e.g. category switch
-    // resetting the model and re-binding currentIndex). Disables the
-    // track-x Behavior for one assignment so the new page renders in
-    // place instead of sliding from the previous selection.
-    property bool _suspendPageAnim: false
-
     function setCurrentIndexImmediate(idx: int): void {
-        root._suspendPageAnim = true
         root.currentIndex = idx
-        root._suspendPageAnim = false
     }
 
     // Step the selection by (dCol, dRow). Returns true if the index
@@ -89,19 +91,19 @@ Item {
     //   On page 0 this wraps to (lastPage, currentRow, lastCol).
     // - dCol > 0 at last column: snap to column 0 of the next page. On
     //   the last page this wraps to (page 0, currentRow, 0).
-    // - dRow off the row grid: refuse (no row wrap). The screen layer
-    //   uses that "false" as the trigger to escape upward — see HubScreen
-    //   flipping back to the categories carousel when the user presses
-    //   Up on the top row.
+    // - dRow < 0 at row 0: snap to last row of the same page (column
+    //   preserved). Same-page cycle so Down/Up on a single screen
+    //   stays predictable; Esc is the cross-screen back path.
+    // - dRow > 0 at last row: snap to row 0 of the same page.
     // - Crossing a page boundary into a partial target page: clamp to
     //   the last existing item on that page (NOT necessarily on
     //   currentRow) so right at a page edge always advances rather
     //   than refusing on a hole.
+    // - Wrapping vertically onto a hole on a partial last page (e.g.
+    //   Down on the only filled row of a 1-row last page): clamp to
+    //   the last existing item on the same page rather than refusing.
     function moveSelection(dCol: int, dRow: int): bool {
         if (root.itemCount <= 0)
-            return false
-        const newRow = root.currentRow + dRow
-        if (newRow < 0 || newRow >= root.rows)
             return false
         const newColAbs = root.currentColumn + dCol
         let newPage = root.currentPage
@@ -121,6 +123,12 @@ Item {
                       : root.currentPage + 1
             newCol = 0
         }
+        const newRowAbs = root.currentRow + dRow
+        let newRow = newRowAbs
+        if (newRowAbs < 0)
+            newRow = root.rows - 1
+        else if (newRowAbs >= root.rows)
+            newRow = 0
         let newIndex = newPage * root.pageSize + newRow * root.columns + newCol
         if (newIndex < 0)
             return false
@@ -142,6 +150,16 @@ Item {
                 // Single-page partial row: left-wrap from col 0 lands
                 // out of bounds on the same page. Wrap to last item.
                 newIndex = root.itemCount - 1
+            } else if (dRow !== 0) {
+                // Row wrap on a partial last page that doesn't have a
+                // slot at this column. Clamp to the page's last
+                // existing item so the user still moves rather than
+                // sticking on a hole.
+                const lastIdxOnPage =
+                    Math.min((newPage + 1) * root.pageSize, root.itemCount) - 1
+                if (lastIdxOnPage < 0)
+                    return false
+                newIndex = lastIdxOnPage
             } else {
                 return false
             }
@@ -155,33 +173,10 @@ Item {
     // Defensive clamp: if the model shrinks below the saved index, keep
     // us in-bounds. The screens' onModelReset handlers re-seed
     // currentIndex immediately afterwards via setCurrentIndexImmediate,
-    // but we shouldn't render with a stale index in the gap. Suspend
-    // the page-snap Behavior the same way setCurrentIndexImmediate
-    // does, otherwise a clamp that crosses a page boundary (e.g. 50→3
-    // items with currentIndex on the last page) animates a ghost slide
-    // before the screen-layer reseed lands. Qt.callLater defers the
-    // clear past the binding ripple so currentPage settles first.
+    // but we shouldn't render with a stale index in the gap.
     onItemCountChanged: {
-        if (root.currentIndex >= root.itemCount) {
-            root._suspendPageAnim = true
+        if (root.currentIndex >= root.itemCount)
             root.currentIndex = Math.max(0, root.itemCount - 1)
-            Qt.callLater(() => { root._suspendPageAnim = false })
-        }
-    }
-
-    // Resolution-boundary changes (window resize across the 300/600 px
-    // height thresholds in Sizing.qml) reshuffle pageSize and therefore
-    // currentPage. Without suppression, track.x's Behavior runs a ghost
-    // slide animation the user never asked for. Defer clearing the
-    // flag with Qt.callLater so it survives the dependent binding
-    // updates triggered by the columns/rows change.
-    onColumnsChanged: {
-        root._suspendPageAnim = true
-        Qt.callLater(() => { root._suspendPageAnim = false })
-    }
-    onRowsChanged: {
-        root._suspendPageAnim = true
-        Qt.callLater(() => { root._suspendPageAnim = false })
     }
 
     clip: true
@@ -189,17 +184,9 @@ Item {
     Item {
         id: track
 
-        width: root.pageCount * root.width
-        height: root.height
-        x: -root.currentPage * root.width
-
-        Behavior on x {
-            enabled: !root._suspendPageAnim
-            NumberAnimation {
-                duration: 120
-                easing.type: Easing.OutCubic
-            }
-        }
+        // One page wide. Cells whose `cellPage !== root.currentPage`
+        // gate themselves invisible; nothing slides or scales.
+        anchors.fill: parent
 
         Repeater {
             id: itemRepeater
@@ -226,14 +213,14 @@ Item {
 
                 width: root.cellWidth
                 height: root.cellHeight
-                x: cellPage * root.width
-                   + root.sideInset
+                x: root.sideInset
                    + cellCol * (root.cellWidth + root.cellSpacingX)
                 y: root.topInset
                    + cellRow * (root.cellHeight + root.cellSpacingY)
                 // Selected tile draws on top so its scale-up tween isn't
                 // clipped by neighbours below/right of it.
                 z: isSelected ? 1 : 0
+                visible: cellPage === root.currentPage
 
                 TileLoader {
                     anchors.fill: parent
@@ -247,9 +234,11 @@ Item {
         }
     }
 
-    // Page indicator dots — a minimal cue without per-frame work. Hidden
-    // for a single-page model; the band height is still reserved above so
-    // hiding the row doesn't reflow cells.
+    // Page indicator dots. The dot for the current page brightens AND
+    // briefly pulses larger, drawing the eye to the new position after
+    // an instant cell swap. Hidden for a single-page model; the band
+    // height is still reserved above so hiding the row doesn't reflow
+    // cells.
     Row {
         anchors.bottom: parent.bottom
         anchors.bottomMargin: Sizing.pctH(0.5)
@@ -261,14 +250,42 @@ Item {
             model: root.pageCount
 
             Rectangle {
+                id: dot
+
                 required property int index
+
+                readonly property bool isCurrent: index === root.currentPage
 
                 width: Sizing.pctH(1.8)
                 height: width
                 radius: width / 2
-                color: index === root.currentPage
-                       ? Theme.textPrimary
-                       : Theme.textDim
+                color: dot.isCurrent ? Theme.textPrimary : Theme.textDim
+                scale: 1
+
+                // Pulse on the dot that just became current. Small
+                // element, small dirty rect — partial-update friendly
+                // even when the cell area was busy with a fresh layout
+                // this frame. `running: dot.isCurrent` retriggers the
+                // animation each time a new dot becomes current.
+                // `alwaysRunToEnd: true` lets the previous-current
+                // dot's pulse complete its cycle back to scale 1 when
+                // the user mashes through pages, instead of being cut
+                // off mid-bounce and leaving the dot at an
+                // intermediate size.
+                SequentialAnimation on scale {
+                    running: dot.isCurrent
+                    alwaysRunToEnd: true
+                    NumberAnimation {
+                        from: 1; to: 1.4
+                        duration: 80
+                        easing.type: Easing.OutQuad
+                    }
+                    NumberAnimation {
+                        from: 1.4; to: 1
+                        duration: 120
+                        easing.type: Easing.InQuad
+                    }
+                }
             }
         }
     }

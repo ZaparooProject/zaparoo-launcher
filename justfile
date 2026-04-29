@@ -1,6 +1,13 @@
 # Zaparoo Launcher dev commands.
 # `just --list` for the full menu.
 
+# Use sccache as the rustc wrapper when it's installed. sccache caches
+# compiled crates across `target/` directories — biggest win when round-
+# tripping between desktop and arm32 targets, but also speeds up CI and
+# any clean build. Falls back to no wrapper if sccache isn't on PATH so
+# contributors who haven't installed it still get working builds.
+export RUSTC_WRAPPER := `command -v sccache || true`
+
 default:
     @just --list
 
