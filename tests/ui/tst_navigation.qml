@@ -56,8 +56,8 @@ TestCase {
         compare(main.activeScreen, main.screenSystems)
     }
 
-    // Down on hub is a no-op — the categories carousel is horizontal
-    // so there's nothing visually below it. Accept (Enter) is the only
+    // Down on hub is a no-op — the categories row is horizontal so
+    // there's nothing visually below it. Accept (Enter) is the only
     // way to drill into systems.
     function test_down_on_hub_does_not_route_to_systems(): void {
         main.handleKey(Qt.Key_Down)

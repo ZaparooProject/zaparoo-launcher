@@ -13,7 +13,7 @@ QtObject {
     readonly property color bgMid: "#252550"
     readonly property color bgPanel: "#1a1a35"
     readonly property color bgBar: "#0a0a15"
-    // Card surface used for tile bodies in carousels/grids. Sits a step
+    // Card surface used for tile bodies in rows/grids. Sits a step
     // above bgPanel so a solid white icon+label silhouette has clear
     // contrast — the page bg pattern stays visible in the gaps between
     // tiles, and each tile reads as a self-contained chip.
@@ -39,11 +39,4 @@ QtObject {
     readonly property string fontUi: "Atkinson Hyperlegible"
     readonly property string fontMono: "monospace"
 
-    // Section-flip duration in ms. Carousel y-slide and the systems-reveal
-    // wrapper Transition are coupled — the wrapper PauseAnimation must
-    // last at least as long as the carousel slide, otherwise the systems
-    // grid fades in while the carousel is still travelling and the user
-    // sees a freeze-mid-animation. Bumping one without the other reopens
-    // that bug. Read both off this single source of truth.
-    readonly property int transitionDuration: 250
 }

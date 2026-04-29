@@ -68,11 +68,12 @@ MainLayout {
             root.hubScreen.restoreFromCategoriesReset()
     }
 
-    // Seed carousel indices from persisted state when models deliver new data.
-    // A miss (category renamed, ROM deleted) falls back to index 0 and leaves
-    // the saved identifier untouched on disk — so the user's intent survives
-    // a transient catalog gap. State writes only happen in each screen's
-    // handleAction (user navigation); these programmatic seeds are inert.
+    // Seed row/grid indices from persisted state when models deliver new
+    // data. A miss (category renamed, ROM deleted) falls back to index 0
+    // and leaves the saved identifier untouched on disk — so the user's
+    // intent survives a transient catalog gap. State writes only happen
+    // in each screen's handleAction (user navigation); these programmatic
+    // seeds are inert.
     //
     // Always cascade into set_category (even on a miss or first-launch empty
     // HubState.category): SystemsModel is the only way to drive the next
@@ -88,7 +89,7 @@ MainLayout {
         target: Browse.SystemsModel
         // On a games-screen restore, GamesState.system_id is authoritative;
         // fall back to SystemsState.system_id only if it's empty (edge case:
-        // user pressed Enter on an empty systems carousel and we flipped the
+        // user pressed Enter on an empty systems grid and we flipped the
         // screen without ever committing a system). On a hub or systems
         // restore, SystemsState.system_id is authoritative — don't peek at
         // GamesState, or we'd override the user's position with a stale
@@ -151,9 +152,9 @@ MainLayout {
     // listeners below. Only one transition is in flight at a time
     // (input gate guarantees this), so two scalars are enough.
     // `pendingTransition` itself lives in MainLayout — the source
-    // screen's content-hiding bindings (carousel/grid `visible`)
-    // resolve there, so the property has to be declared at that
-    // level for qmllint to be happy.
+    // screen's content-hiding bindings (row/grid `visible`) resolve
+    // there, so the property has to be declared at that level for
+    // qmllint to be happy.
     property var _categoryReadyCallback: null
     property var _systemReadyCallback: null
 
@@ -230,8 +231,8 @@ MainLayout {
         Browse.GamesModel.set_system(systemId)
     }
 
-    // Hub Accept routing. Empty-carousel passthrough preserves the
-    // committed "Enter on empty hub goes to Systems" behaviour and
+    // Hub Accept routing. Empty-row passthrough preserves the committed
+    // "Enter on empty hub goes to Systems" behaviour and
     // keeps the navigation test synchronous. Otherwise: tentatively
     // pin the destination to Systems, fill the chosen category, then
     // either bypass to Games (MiSTer Arcade singleton) or fall

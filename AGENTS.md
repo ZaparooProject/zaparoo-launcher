@@ -44,7 +44,7 @@ raw cargo as the default path; the justfile carries the expected environment.
 - Keep comments and docs in American English.
 - After editing C++, Rust, or QML, run `just lint`. Run `just test` when the
   change can affect runtime behavior.
-- Keep user-visible state persistent. Selected screen, carousel positions,
+- Keep user-visible state persistent. Selected screen, row/grid positions,
   focus, settings, and similar state must be serialized to disk and restored
   before the first frame. MiSTer's wrapper can kill and relaunch the process at
   any time.
@@ -113,7 +113,7 @@ raw cargo as the default path; the justfile carries the expected environment.
 | `src/ui/app/Main.qml` | Runtime router: input, persistence, forward-transition orchestration, global "Loading…" overlay, system-cover prefetch |
 | `src/ui/app/MainLayout.qml` | Designer-editable visual tree, `pendingTransition` property, screen-state derivations, modal mounts |
 | `src/ui/screens/` | `Zaparoo.Screens`: `ScreenManager`, `HubScreen`, `SystemsScreen`, `GamesScreen` |
-| `src/ui/components/` | `Zaparoo.Ui`: `Carousel`, `Tile`, `TileLoader`, `PagedGrid`, `Modal`, `ScreenStateOverlay`, `FpsCounter` |
+| `src/ui/components/` | `Zaparoo.Ui`: `Tile`, `TileLoader`, `PagedGrid`, `Modal`, `ScreenStateOverlay`, `FpsCounter` |
 | `src/ui/theme/` | `Zaparoo.Theme`: `Theme`, `Sizing` singletons |
 | `rust/launcher/src/models/` | `Zaparoo.Browse` cxx-qt singletons: `AppStatus`, `CategoriesModel`, `SystemsModel`, `GamesModel`, `AppState`, `HubState`, `SystemsState`, `GamesState`, `Input`, `Runtime` |
 | `rust/launcher/src/bind.rs` | Endpoint-to-QML binding macro with synchronous seed |
@@ -140,7 +140,7 @@ When adding a new screen or routing path, follow this contract:
 1. **Forward = signal + payload, router decides destination.** Screens emit
    `requestAccept(<id-or-empty>)`. The router reads its own state to decide
    what comes next. Empty payload = "the press was on Empty/Error" or
-   "carousel/grid was empty" — keep the existing convention, don't overload it
+   "row/grid was empty" — keep the existing convention, don't overload it
    for new meanings.
 2. **Back = simple signal.** `requestHubScreen` / `requestSystemsScreen` /
    `requestQuit`. The router owns any peer-up logic (e.g. the
@@ -152,7 +152,7 @@ When adding a new screen or routing path, follow this contract:
    callback, fire it on the next non-loading edge, clear it.
 4. **Source-screen content hiding goes through `transitioning`.** Each screen
    exposes `property bool transitioning: false`; `MainLayout.qml` binds it to
-   `root.pendingTransition !== ""`. Bind the carousel/grid `visible:
+   `root.pendingTransition !== ""`. Bind the row/grid `visible:
    !screen.transitioning` so the live tiles hide while the global "Loading…"
    cue paints alone.
 5. **Gate new input during a transition.** `Main.qml`'s `handleAction`

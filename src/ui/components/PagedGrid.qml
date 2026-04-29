@@ -40,9 +40,9 @@ Item {
 
     // Whether this section currently owns user focus. Tile uses this to
     // gate the selection card so only one section shows the focus cue
-    // at a time when the hub has both a carousel and a grid on screen.
-    // Defaults to true so call sites that don't care (games screen)
-    // keep working untouched.
+    // at a time on screens that host more than one tile section.
+    // Defaults to true so call sites that don't care keep working
+    // untouched.
     property bool focused: true
 
     readonly property int columns: Sizing.gridColumns

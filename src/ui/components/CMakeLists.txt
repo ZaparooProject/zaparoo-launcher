@@ -9,7 +9,6 @@ qt_add_qml_module(
     URI Zaparoo.Ui
     VERSION 1.0
     QML_FILES
-        Carousel.qml
         FpsCounter.qml
         Modal.qml
         PagedGrid.qml

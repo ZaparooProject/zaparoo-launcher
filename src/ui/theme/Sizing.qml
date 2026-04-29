@@ -15,7 +15,7 @@ QtObject {
     property real screenWidth: 640
     property real screenHeight: 480
 
-    // Visible carousel covers: fewer at very low resolution to avoid crowding.
+    // Visible tile-row covers: fewer at very low resolution to avoid crowding.
     readonly property int visibleCovers: screenHeight < 300 ? 3 : 5
 
     // Paged grid shape: chosen by screen height so the same grid reads

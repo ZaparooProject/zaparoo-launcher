@@ -26,9 +26,10 @@ for design-time previews.
    design/launcher.qmlproject
    ```
 
-   The 2D view should render `MainPreview.qml` at 1280×720 with populated
-   categories and systems carousels from the mock singletons. If the carousels
-   are empty, rebuild the launcher and reopen the project.
+   The 2D view should render `MainPreview.qml` at 1280×720 with the
+   populated categories row and systems grid driven by the mock
+   singletons. If they are empty, rebuild the launcher and reopen the
+   project.
 
 ## Editable files
 
@@ -36,7 +37,7 @@ for design-time previews.
 | ------------------------------- | ---------------------------------------------------------- |
 | `src/ui/theme/Theme.qml`        | Yes — colour and font constants.                           |
 | `src/ui/theme/Sizing.qml`       | Logic tweaks only; ask first.                              |
-| `src/ui/components/*.qml`       | Yes — delegates, carousel, FPS counter.                    |
+| `src/ui/components/*.qml`       | Yes — tile delegates, paged grid, FPS counter.             |
 | `src/ui/app/MainLayout.qml`     | Yes — screen layout, backgrounds, anchors.                 |
 | `src/ui/app/Main.qml`           | **No.** Engineer-owned state machine. Ask before editing.  |
 | `design/mocks/**`               | No. Design-time stubs; edit only if engineering asks.      |
@@ -73,7 +74,7 @@ element counts:
 - `Sizing.pctH(n)` — `n` percent of screen height.
 - `Sizing.pctW(n)` — `n` percent of screen width.
 - `Sizing.fontSize(n)` — percent-of-height font size, floored at 8 px.
-- `Sizing.visibleCovers` — element count for carousels and similar
+- `Sizing.visibleCovers` — element count for tile rows and similar
   repeaters; drops at very low resolutions to avoid crowding.
 
 On the 1280×720 designer canvas, `Sizing.pctH(10)` previews as 72 px.
@@ -97,8 +98,9 @@ not Creator.
   stale. Rerun `just build`.
 - **Red error banners on `Zaparoo.Ui` / `Zaparoo.Theme`** — same cause;
   `just build` populates those too.
-- **Carousel is empty** — the mock ListModels seed four entries. If every
-  carousel is empty, `mocks/` is not being resolved. Check that `importPaths`
-  in `launcher.qmlproject` still lists `mocks` first.
+- **Tile row/grid is empty** — the mock ListModels seed four entries. If
+  the categories row or the systems/games grid renders empty, `mocks/`
+  is not being resolved. Check that `importPaths` in `launcher.qmlproject`
+  still lists `mocks` first.
 - **"Cannot find type XYZ"** — probably a Qt Quick Studio Component. Do not
   use it; see the banned list above.

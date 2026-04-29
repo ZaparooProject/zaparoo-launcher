@@ -16,7 +16,7 @@ import Zaparoo.Browse as Browse
 // qmllint disable compiler
 
 // Regression tests for the kill/relaunch persistence flow. The failure
-// these guard against: during restore the carousels seed their
+// these guard against: during restore the row/grid seeds its
 // currentIndex *programmatically*; prior revisions wrote that seeded
 // value back to disk via onCurrentIndexChanged, silently overwriting
 // the user's saved identifier with a fallback. These tests exercise
@@ -49,15 +49,15 @@ TestCase {
     }
 
     // CategoriesModel is empty in this test harness (no live Core).
-    // Left/Right must not call _navigateCarousel → _at(0) → "" on an
-    // empty model, because that would wipe the saved category from
+    // Left/Right must not call _navigate → _at(0) → "" on an empty
+    // model, because that would wipe the saved category from
     // persisted state.
     function test_empty_categories_navigation_preserves_hub_state(): void {
         Browse.HubState.category = "persistence-probe-category"
         main.handleKey(Qt.Key_Left)
         main.handleKey(Qt.Key_Right)
         compare(Browse.HubState.category, "persistence-probe-category",
-                "navigating an empty categories carousel must not overwrite HubState.category")
+                "navigating an empty categories row must not overwrite HubState.category")
     }
 
     function test_empty_systems_navigation_preserves_systems_state(): void {
@@ -89,12 +89,12 @@ TestCase {
     // they should persist even when the underlying model is empty (so
     // the launcher resumes on the right screen next boot). Systems and
     // Games own a [OK] RETRY contract on non-Ready accept, so Enter on
-    // an empty Systems carousel re-fires the current load instead of
+    // an empty Systems grid re-fires the current load instead of
     // flipping forward — the screen-flip-on-empty rule is Hub-only.
     function test_screen_flip_on_empty_categories_persists_active_screen(): void {
         main.handleKey(Qt.Key_Return)
         compare(Browse.AppState.active_screen, main.screenSystems,
-                "Enter must flip active_screen to systems even on an empty categories carousel")
+                "Enter must flip active_screen to systems even on an empty categories row")
     }
 
     // Symmetric to the Hub test above: that one proves the flip *does*
@@ -108,19 +108,18 @@ TestCase {
         main.activeScreen = main.screenSystems
         main.handleKey(Qt.Key_Return)
         compare(Browse.AppState.active_screen, "persistence-probe-screen",
-                "Enter on an empty systems carousel must retry, not flip — AppState.active_screen must not be overwritten")
+                "Enter on an empty systems grid must retry, not flip — AppState.active_screen must not be overwritten")
     }
 
     // Enter commits the highlighted selection into HubState so first-launch
     // users who never press Left/Right still get a restorable identifier on
-    // disk. The write is guarded by itemCount > 0 — on an empty carousel
-    // (this harness) the guard must skip the write, leaving prior state
-    // intact.
+    // disk. The write is guarded by count > 0 — on an empty row (this
+    // harness) the guard must skip the write, leaving prior state intact.
     function test_enter_on_empty_categories_preserves_hub_state(): void {
         Browse.HubState.category = "persistence-probe-category"
         main.handleKey(Qt.Key_Return)
         compare(Browse.HubState.category, "persistence-probe-category",
-                "Enter on an empty categories carousel must not overwrite HubState.category")
+                "Enter on an empty categories row must not overwrite HubState.category")
     }
 
     function test_enter_on_empty_systems_preserves_systems_state(): void {
@@ -128,7 +127,7 @@ TestCase {
         main.activeScreen = main.screenSystems
         main.handleKey(Qt.Key_Return)
         compare(Browse.SystemsState.system_id, "persistence-probe-system",
-                "Enter on an empty systems carousel must not overwrite SystemsState.system_id")
+                "Enter on an empty systems grid must not overwrite SystemsState.system_id")
     }
 
     function test_enter_on_empty_games_preserves_games_state(): void {
@@ -136,6 +135,6 @@ TestCase {
         main.activeScreen = main.screenGames
         main.handleKey(Qt.Key_Return)
         compare(Browse.GamesState.game_path, "persistence-probe-path",
-                "Enter on an empty games carousel must not overwrite GamesState.game_path")
+                "Enter on an empty games grid must not overwrite GamesState.game_path")
     }
 }

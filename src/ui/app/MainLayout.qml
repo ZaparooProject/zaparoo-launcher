@@ -47,7 +47,7 @@ ApplicationWindow {
     title: qsTr("Zaparoo Launcher")
 
     // Screen plumbing exposed for Main.qml's orchestration. Anything
-    // inside the screens (categories carousel, systems/games grids) is
+    // inside the screens (categories row, systems/games grids) is
     // reached via root.hubScreen.* / root.systemsScreen.* /
     // root.gamesScreen.* — no per-widget aliases here.
     property alias hubScreen: hubScreen
@@ -60,8 +60,8 @@ ApplicationWindow {
     // Forward-transition state owned by Main.qml. "" while idle;
     // "systems" or "games" while waiting on a model fill before
     // flipping `activeScreen`. Declared here so the source-screen
-    // content-hiding bindings (carousel/grid `visible`) resolve
-    // statically in qmllint.
+    // content-hiding bindings (row/grid `visible`) resolve statically
+    // in qmllint.
     property string pendingTransition: ""
 
     // Per-screen state derivation. Shape mirrors ScreenStateOverlay's
@@ -340,9 +340,17 @@ ApplicationWindow {
             // recovers automatically — so its non-Ready row drops [OK]
             // RETRY rather than promising behavior the screen doesn't
             // implement.
+            //
+            // During a forward transition (`pendingTransition !== ""`)
+            // the router's input gate swallows every press — including
+            // cancel — so the bar blanks rather than advertising
+            // buttons that won't respond. Modals still win outright;
+            // they run on top of the input gate.
             text: {
                 if (root.cardWriteModalVisible)
                     return qsTr("[ESC] CANCEL");
+                if (root.pendingTransition !== "")
+                    return "";
                 if (root.activeScreen === root.screenHub) {
                     if (root.hubScreenState === "ready")
                         return qsTr("[<>] CATEGORY  [OK] SELECT  [ESC] QUIT");

@@ -7,9 +7,9 @@ import Zaparoo.Theme
 
 // Unified grid tile. Solid card with a centered icon area on top, an
 // always-visible label below, and a white outline ring around the card
-// when this tile is the focused selection. Used by every grid in the
-// launcher — categories carousel, systems grid, games grid — so the
-// vocabulary is identical across screens.
+// when this tile is the focused selection. Used by every tile surface
+// in the launcher — hub categories row, systems grid, games grid —
+// so the vocabulary is identical across screens.
 //
 // Parent contract — Tile must be loaded inside a host that exposes:
 //   - isSelected: bool   — true when this tile is the focused selection
@@ -18,11 +18,12 @@ import Zaparoo.Theme
 //                          procedural fallback)
 //   - coverKey:   string — relative path under resources/images/ (no extension)
 //
-// Carousel.qml and PagedGrid.qml both wrap their Tile delegate in a
-// TileLoader that defines exactly these four properties; QML's late-
-// binding model means a caller that forgets one fails silently at
-// runtime rather than at build time, so the Component.onCompleted
-// check below converts that footgun into a loud warning.
+// PagedGrid.qml and HubScreen's static category row both wrap their
+// Tile delegate in a TileLoader that defines exactly these four
+// properties; QML's late-binding model means a caller that forgets
+// one fails silently at runtime rather than at build time, so the
+// Component.onCompleted check below converts that footgun into a
+// loud warning.
 Item {
     id: root
 
@@ -93,9 +94,11 @@ Item {
     // Selected tile bumps up a hair so the user can see at a glance
     // which one is current. PagedGrid bumps cellItem.z for the
     // selected slot, so the scaled tile draws on top of its
-    // right/bottom neighbours.
+    // right/bottom neighbours. Gated on `_focusedSelection` so a tile
+    // in an unfocused section doesn't compete for the eye with the
+    // focused section's selection cue.
     transformOrigin: Item.Center
-    scale: root.delegateIsSelected ? 1.06 : 1.0
+    scale: root._focusedSelection ? 1.06 : 1.0
 
     Behavior on scale {
         NumberAnimation {
@@ -119,11 +122,11 @@ Item {
     // it. Keeps the ring out of PagedGrid's clip rect at the row edges
     // and means callers don't have to reserve bleed room for it. Gated
     // on `_focusedSelection` so only the focused tile in the focused
-    // section lights up — keeps two grids on screen (carousel + grid)
-    // from competing for the eye. Drawn after the card so the border
-    // sits on top; the icon/label padding (`_padding = pctH(3)`) is far
-    // larger than the inset (`_outlineGap = pctH(0.4)`), so the ring
-    // never overlaps content.
+    // section lights up — keeps multiple tile sections on screen from
+    // competing for the eye. Drawn after the card so the border sits on
+    // top; the icon/label padding (`_padding = pctH(3)`) is far larger
+    // than the inset (`_outlineGap = pctH(0.4)`), so the ring never
+    // overlaps content.
     Rectangle {
         anchors.fill: parent
         anchors.margins: root._outlineGap
@@ -177,7 +180,7 @@ Item {
         text: root.delegateName
         font.family: Theme.fontUi
         font.pixelSize: Sizing.fontSize(2.4)
-        color: root.delegateIsSelected ? Theme.textPrimary : Theme.textLabel
+        color: root._focusedSelection ? Theme.textPrimary : Theme.textLabel
         wrapMode: Text.WordWrap
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
@@ -190,13 +193,11 @@ Item {
     // `Image.Status.Loading` (which Qt enters even on QPixmapCache
     // hits when `source` changes), so the strip and the fallback show
     // the same text for a frame or two — that's fine. Gating the
-    // label's visibility or height on `_hasCover` would force a
-    // layout shift and an opacity Behavior on every carousel
-    // navigation, which compounds with the 150 ms `Behavior on x`
-    // slide and turns into visible chop on Qt Quick's Software
-    // adaptation. Selection cue is color + weight only — no scale,
-    // no underline — so labels line up at a uniform baseline across
-    // the row.
+    // label's visibility or height on `_hasCover` would force a layout
+    // shift and an opacity Behavior on every navigation, which on busy
+    // grids turns into visible chop on Qt Quick's Software adaptation.
+    // Selection cue is color + weight only — no scale, no underline —
+    // so labels line up at a uniform baseline across the row.
     Text {
         id: label
 

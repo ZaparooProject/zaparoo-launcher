@@ -19,7 +19,7 @@ use zaparoo_core::systems_catalog::CatalogData;
 // `coverKey` rather than `id`: bracket-access via `model["id"]` from a
 // QML delegate trips over `id`'s reserved-keyword status, leaving the
 // role unreachable. Renaming sidesteps the reservation entirely and
-// matches the generic carousel cover-key contract used by all models.
+// matches the generic Tile cover-key contract used by all models.
 const COVER_KEY_ROLE: i32 = 256 + 1;
 const NAME_ROLE: i32 = 256 + 2;
 const CATEGORY_ROLE: i32 = 256 + 3;
@@ -43,7 +43,7 @@ pub struct SystemsModelRust {
     // Last-known-good catalog. Updated by `apply_state` on every
     // `Ready`; never cleared on `Loading`/`Errored`. Lets
     // `set_category` keep populating rows during a transient refetch
-    // instead of wiping the carousel until the catalog returns to
+    // instead of wiping the grid until the catalog returns to
     // `Ready`.
     last_ready: Option<CatalogData>,
     // Cancellation handle for the in-flight `set_category` filter.
@@ -270,7 +270,15 @@ impl ffi::SystemsModel {
         // re-call recover from a stale-but-empty model — e.g. the
         // catalog refetched and the previously-current category now
         // has no systems, and a caller wants to retry the same value.
-        if self.rust().current_category == category && !self.rust().systems.is_empty() {
+        // The `error_message.is_empty()` guard is the [OK] RETRY path:
+        // when the catalog errored after a successful fill, `systems`
+        // is non-empty (apply_state's error branch leaves prior rows
+        // alone), so without this clause the retry would short-circuit
+        // and the surfaced error would never clear.
+        if self.rust().current_category == category
+            && !self.rust().systems.is_empty()
+            && self.rust().error_message.is_empty()
+        {
             return;
         }
         let cat = category.to_string();
@@ -313,7 +321,7 @@ impl ffi::SystemsModel {
         // Snapshot the catalog for the worker. Reading from
         // `last_ready` rather than the live `ResourceStatus` means a
         // transient `Loading` (a refetch in flight) doesn't wipe the
-        // carousel between the user's category change and the refetch
+        // grid between the user's category change and the refetch
         // completing. The clone is small (~hundreds of `SystemInfo`
         // rows, microseconds on ARM) and unavoidable without
         // Arc-wrapping `last_ready`, which is out of scope.

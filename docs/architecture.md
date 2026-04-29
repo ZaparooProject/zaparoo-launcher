@@ -55,7 +55,7 @@ src/app/main.cpp
           │     GamesScreen.qml
           │
           ├── src/ui/components/  [Zaparoo.Ui QML module]
-          │     Carousel.qml, Tile.qml, TileLoader.qml, PagedGrid.qml,
+          │     Tile.qml, TileLoader.qml, PagedGrid.qml,
           │     Modal.qml, ScreenStateOverlay.qml, FpsCounter.qml
           │
           └── src/ui/theme/  [Zaparoo.Theme QML module]
@@ -200,7 +200,7 @@ Persisted state is split across Rust-backed QML singletons:
 | Singleton | Stored fields | Owner |
 |---|---|---|
 | `Browse.AppState` | `active_screen` | cross-screen route |
-| `Browse.HubState` | `category` | hub-screen carousel selection |
+| `Browse.HubState` | `category` | hub-screen row selection |
 | `Browse.SystemsState` | `system_id` | systems-screen grid selection |
 | `Browse.GamesState` | `system_id`, `game_path` | games-screen grid selection |
 
@@ -211,8 +211,8 @@ moves; the router writes `AppState.active_screen` when the screen flips.
 
 #### Screen flow
 
-- **Hub** (`HubScreen.qml`) — categories carousel only. Left/Right cycles
-  categories and writes `HubState.category`. Accept emits
+- **Hub** (`HubScreen.qml`) — static centered row of category tiles.
+  Left/Right cycles categories and writes `HubState.category`. Accept emits
   `requestAccept(category)`; Escape emits `requestQuit`.
 - **Systems** (`SystemsScreen.qml`) — paged grid of systems for the active
   category. Directional moves write `SystemsState.system_id`. Accept on a
@@ -234,7 +234,7 @@ dispatchers and never call `set_category` / `set_system` themselves. The
 router's flow on a Hub Accept:
 
 1. Set `pendingTransition = "systems"` (tentative). The screen's
-   `transitioning` binding flips true and the source carousel hides.
+   `transitioning` binding flips true and the source row/grid hides.
 2. `_ensureCategory(category, cb)` short-circuits when the model is already
    on that category with `count > 0`; otherwise it parks `cb` in the
    `_categoryReadyCallback` slot, restarts a 50 ms `deferredCategorySetTimer`,
@@ -263,7 +263,7 @@ no per-screen pending flag. The class of routing bug where a stale
 per-screen flag fires while its owning screen isn't even visible cannot
 exist when there is no cross-screen state.
 
-Model reset handlers in `Main.qml` restore saved carousel/grid indices as
+Model reset handlers in `Main.qml` restore saved row/grid indices as
 catalog data arrives. Missing IDs fall back to index 0 without erasing the
 saved value from disk, so a temporary catalog gap does not destroy the
 user's last selection.
