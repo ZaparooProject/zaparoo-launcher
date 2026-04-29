@@ -388,8 +388,14 @@ ApplicationWindow {
                 // games
                 if (root.gamesScreenState === "loading")
                     return qsTr("[ESC] BACK");
-                if (root.gamesScreenState === "ready")
-                    return qsTr("[<>] GAME  [OK] PLAY  [TAB] FLASH CARD  [ESC] BACK");
+                if (root.gamesScreenState === "ready") {
+                    // Drop the FLASH CARD cue on directory/root rows —
+                    // write_card no-ops there, so advertising the bind
+                    // would mislead.
+                    if (root.gamesScreen.currentEntryWritable)
+                        return qsTr("[<>] GAME  [OK] PLAY  [TAB] FLASH CARD  [ESC] BACK");
+                    return qsTr("[<>] GAME  [OK] PLAY  [ESC] BACK");
+                }
                 return qsTr("[OK] RETRY  [ESC] BACK");
             }
             font.family: Theme.fontUi

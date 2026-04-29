@@ -12,6 +12,7 @@ qt_add_qml_module(
         FpsCounter.qml
         Modal.qml
         PagedGrid.qml
+        PaginationStatus.qml
         ScreenStateOverlay.qml
         StatusIcon.qml
         Tile.qml

@@ -7,6 +7,13 @@ import QtTest
 import Zaparoo.App
 import Zaparoo.Browse as Browse
 
+// cxx-qt 0.8 patches `isFinal: true` on singleton properties but the
+// qmltypes schema has no `isFinal` slot for plain reads either, so any
+// `Browse.<Singleton>.<prop>` access trips the "Member can be shadowed"
+// check. Suppress at file level the same way every other QML file in
+// the tree does.
+// qmllint disable compiler
+
 TestCase {
     name: "UiWindow"
     when: windowShown

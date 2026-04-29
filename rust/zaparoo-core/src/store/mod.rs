@@ -97,6 +97,18 @@ impl Store {
         self.client.subscribe_notifications()
     }
 
+    /// Direct access to the underlying `Client` for callers that need
+    /// one-shot, cursor-driven calls that don't fit the cached
+    /// `subscribe::<E>` pattern. The store does not cache the result —
+    /// that's the whole point of the bypass — so callers must accept
+    /// that mutation invalidation does not reach this call. Used by
+    /// `GamesModel::fetch_more` to advance pagination cursors that
+    /// would otherwise pollute the endpoint cache key with one entry
+    /// per page.
+    pub fn client(&self) -> Arc<Client> {
+        self.client.clone()
+    }
+
     /// Get (or create) the shared `RemoteResource` for endpoint `E`
     /// with `args`. Subsequent calls with equal args return the same
     /// `Arc`, so multiple QML singletons binding the same endpoint

@@ -181,11 +181,15 @@ Item {
         font.family: Theme.fontUi
         font.pixelSize: Sizing.fontSize(2.4)
         color: root._focusedSelection ? Theme.textPrimary : Theme.textLabel
-        wrapMode: Text.WordWrap
+        // Wrap (not WordWrap): an unbreakable identifier like
+        // `_LongCollectionName_Definitive_Cut.smc` would otherwise
+        // render past `width` and bleed out of the tile.
+        wrapMode: Text.Wrap
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
         renderType: Text.NativeRendering
         opacity: root._hasCover ? 0.0 : 1.0
+        clip: true
     }
 
     // Label. Always visible. The procedural fallback briefly shows the
@@ -213,13 +217,18 @@ Item {
         font.pixelSize: Sizing.fontSize(2.6)
         font.weight: root._focusedSelection ? Font.Medium : Font.Normal
         color: root._focusedSelection ? Theme.textPrimary : Theme.textLabel
-        // WordWrap (not Wrap) to avoid mid-word breaks like "Nint-endo".
-        // Two lines max — anything longer elides on the second line.
-        wrapMode: Text.WordWrap
+        // Wrap (not WordWrap): a long no-spaces filename like
+        // `Final_Fantasy_VI_Pixel_Remaster_Definitive_Cut.smc` is one
+        // unbreakable "word" to WordWrap and renders past the width
+        // bound. Wrap breaks at a character boundary when no word
+        // boundary fits, then elides on the second line if it still
+        // overflows. Two lines max — anything longer elides.
+        wrapMode: Text.Wrap
         maximumLineCount: 2
         elide: Text.ElideRight
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
         renderType: Text.NativeRendering
+        clip: true
     }
 }

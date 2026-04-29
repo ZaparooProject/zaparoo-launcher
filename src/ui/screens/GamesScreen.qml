@@ -28,14 +28,23 @@ Item {
     signal requestSystemsScreen()
     signal requestGameCardWrite(int index)
 
-    // Move selection by (dx, dy) and commit the new game path on
+    // Emitted when the user accepts a directory or root entry — Main.qml
+    // pushes the level onto GamesState and drives the model into the new
+    // path. Stays inside the games screen (no peer flip).
+    signal requestNavigateIntoFolder(string path)
+
+    // Emitted when the user cancels from a deeper folder level — Main.qml
+    // pops one level off the stack and rebrowses the parent.
+    signal requestNavigateOutOfFolder()
+
+    // Move selection by (dx, dy) and commit the new selection on
     // success. Unlike HubScreen's _handleSystems, none of the games-grid
     // directions have a row-edge escape branch, so all four cardinal
     // actions share this exact body.
     function _performMove(dx: int, dy: int): void {
         if (games.gamesGrid.moveSelection(dx, dy))
-            Browse.GamesState.game_path =
-                Browse.GamesModel.path_at(games.gamesGrid.currentIndex)
+            Browse.GamesState.set_selected_at_top(
+                Browse.GamesModel.path_at(games.gamesGrid.currentIndex))
     }
 
     // Mirrors ScreenStateOverlay's `state` ternary so accept routing and
@@ -48,6 +57,22 @@ Item {
         if (Browse.GamesModel.count === 0)
             return "empty"
         return "ready"
+    }
+
+    // True when we're inside a navigated folder (path_stack length > 1).
+    // Drives folder-aware cancel routing.
+    function _atFolderLevel(): bool {
+        return Browse.GamesState.path_stack.length > 1
+    }
+
+    // True when the highlighted row is launchable (not a directory or
+    // root). Read by MainLayout to suppress the [TAB] FLASH CARD cue
+    // while a folder is highlighted, since `write_card` no-ops there.
+    readonly property bool currentEntryWritable: {
+        if (gamesGrid.itemCount === 0)
+            return false
+        const t = Browse.GamesModel.entry_type_at(gamesGrid.currentIndex)
+        return t !== "directory" && t !== "root"
     }
 
     function handleAction(action: string): void {
@@ -64,36 +89,57 @@ Item {
             // the help bar vocabulary in MainLayout.qml. Loading swallows
             // the press (load is in flight); Error/Empty re-fires the
             // current load (the [OK] RETRY behavior the help bar
-            // promises); Ready launches the highlighted game. The retry
-            // is gated on a non-empty current_system_id so an Accept on a
-            // first-launch screen with no system set doesn't flush the
-            // model.
+            // promises); Ready launches the highlighted game OR drills
+            // into a directory/root entry. The retry path picks
+            // set_path vs set_system based on whether we're at a deeper
+            // level, so retrying inside a folder doesn't kick the user
+            // back to the system root.
             const state = games._state()
             if (state === "loading")
                 return
             if (state === "error" || state === "empty") {
-                const sid = Browse.GamesModel.current_system_id
-                if (sid !== "")
-                    Browse.GamesModel.set_system(sid)
+                if (games._atFolderLevel()) {
+                    const stack = Browse.GamesState.path_stack
+                    const top = stack[stack.length - 1]
+                    Browse.GamesModel.set_path(top)
+                } else {
+                    const sid = Browse.GamesModel.current_system_id
+                    if (sid !== "")
+                        Browse.GamesModel.set_system(sid)
+                }
+                return
+            }
+            const idx = games.gamesGrid.currentIndex
+            const entryType = Browse.GamesModel.entry_type_at(idx)
+            if (entryType === "directory" || entryType === "root") {
+                games.requestNavigateIntoFolder(Browse.GamesModel.path_at(idx))
                 return
             }
             // Persist before handing control away. Directional moves
-            // already write game_path on every step, but the user may
-            // press Accept on the first highlighted game without
-            // navigating, leaving game_path stale from a prior system.
-            // Writing here makes the commit explicit so a kill during
-            // launch resumes on the correct game.
-            Browse.GamesState.game_path =
-                Browse.GamesModel.path_at(games.gamesGrid.currentIndex)
-            Browse.GamesModel.launch_at(games.gamesGrid.currentIndex)
+            // already update the saved selection on every step, but the
+            // user may press Accept on the first highlighted entry
+            // without navigating, leaving the saved selection stale
+            // from a prior system. Writing here makes the commit
+            // explicit so a kill during launch resumes on the correct
+            // entry.
+            Browse.GamesState.set_selected_at_top(
+                Browse.GamesModel.path_at(idx))
+            Browse.GamesModel.launch_at(idx)
         } else if (action === "write_card") {
             if (games.gamesGrid.itemCount > 0) {
-                Browse.GamesState.game_path =
-                    Browse.GamesModel.path_at(games.gamesGrid.currentIndex)
-                games.requestGameCardWrite(games.gamesGrid.currentIndex)
+                const idx = games.gamesGrid.currentIndex
+                const entryType = Browse.GamesModel.entry_type_at(idx)
+                if (entryType !== "directory" && entryType !== "root") {
+                    Browse.GamesState.set_selected_at_top(
+                        Browse.GamesModel.path_at(idx))
+                    games.requestGameCardWrite(idx)
+                }
             }
         } else if (action === "cancel") {
-            games.requestSystemsScreen()
+            if (games._atFolderLevel())
+                games.requestNavigateOutOfFolder()
+            else
+                games.requestSystemsScreen()
         }
     }
 
@@ -141,6 +187,32 @@ Item {
         anchors.bottomMargin: Sizing.pctH(8)
         model: Browse.GamesModel
         delegate: Tile {}
+        // Cover-art tiles run taller than systems logos, so a 5x3
+        // layout starves vertical space. Games gets its own
+        // gamesGridColumns/Rows in Sizing — 5x2 on desktop, narrower
+        // branches at low resolutions match the systems grid logic.
+        columnsOverride: Sizing.gamesGridColumns
+        rowsOverride: Sizing.gamesGridRows
+        onLoadMoreRequested: Browse.GamesModel.fetch_more()
+    }
+
+    // Bottom-of-grid status band — total is exact: Core's media.browse
+    // returns directories only on page 1 and always before files, so
+    // dir_count + total_files is the precise entry count for the path.
+    // No "+" suffix, no estimate.
+    PaginationStatus {
+        anchors.left: gamesGrid.left
+        anchors.right: gamesGrid.right
+        anchors.bottom: gamesGrid.bottom
+        height: gamesGrid.bottomBandHeight
+        currentPage: gamesGrid.currentPage
+        totalPages: Math.max(1,
+            Math.ceil((Browse.GamesModel.dir_count
+                       + Browse.GamesModel.total_files) / gamesGrid.pageSize))
+        loadingMore: Browse.GamesModel.loading_more
+        totalText: Browse.GamesModel.total_files > 0
+                   ? qsTr("%1 files").arg(Browse.GamesModel.total_files)
+                   : ""
     }
 
     ScreenStateOverlay {

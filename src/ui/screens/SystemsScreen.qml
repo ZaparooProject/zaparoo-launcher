@@ -142,6 +142,25 @@ Item {
         visible: !systems.transitioning
     }
 
+    // Bottom-of-grid status band — `SystemsModel.count` is the
+    // filter-applied count for the current category, so the "%1 systems"
+    // badge reads "12 systems in this category" rather than the catalog
+    // total. SystemsModel is non-paginated (every row is loaded eagerly
+    // on category switch) so `loadingMore` is never true here.
+    PaginationStatus {
+        anchors.left: systemsGrid.left
+        anchors.right: systemsGrid.right
+        anchors.bottom: systemsGrid.bottom
+        height: systemsGrid.bottomBandHeight
+        visible: !systems.transitioning
+        currentPage: systemsGrid.currentPage
+        totalPages: Math.max(1,
+            Math.ceil(Browse.SystemsModel.count / systemsGrid.pageSize))
+        totalText: Browse.SystemsModel.count > 0
+                   ? qsTr("%1 systems").arg(Browse.SystemsModel.count)
+                   : ""
+    }
+
     ScreenStateOverlay {
         anchors.centerIn: systemsGrid
         width: systemsGrid.width

@@ -459,11 +459,7 @@ impl Client {
         &self,
         params: MediaBrowseParams,
     ) -> Result<MediaBrowseResult, ClientError> {
-        #[derive(Serialize)]
-        struct P {
-            path: String,
-        }
-        let val = self.call("media.browse", &P { path: params.path }).await?;
+        let val = self.call("media.browse", &params).await?;
         serde_json::from_value(val).map_err(|e| ClientError {
             message: e.to_string(),
         })
