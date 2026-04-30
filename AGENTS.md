@@ -113,7 +113,7 @@ raw cargo as the default path; the justfile carries the expected environment.
 | `src/ui/app/Main.qml` | Runtime router: input, persistence, forward-transition orchestration, global "Loading…" overlay, system-cover prefetch |
 | `src/ui/app/MainLayout.qml` | Designer-editable visual tree, `pendingTransition` property, screen-state derivations, modal mounts |
 | `src/ui/screens/` | `Zaparoo.Screens`: `ScreenManager`, `HubScreen`, `SystemsScreen`, `GamesScreen` |
-| `src/ui/components/` | `Zaparoo.Ui`: `Tile`, `TileLoader`, `PagedGrid`, `Modal`, `ScreenStateOverlay`, `FpsCounter` |
+| `src/ui/components/` | `Zaparoo.Ui`: `Tile`, `TileLoader`, `PagedGrid`, `ActiveLabel`, `LoadingIndicator`, `StatusIcon`, `TopStatusStrip`, `Modal`, `ScreenStateOverlay` |
 | `src/ui/theme/` | `Zaparoo.Theme`: `Theme`, `Sizing` singletons |
 | `rust/launcher/src/models/` | `Zaparoo.Browse` cxx-qt singletons: `AppStatus`, `CategoriesModel`, `SystemsModel`, `GamesModel`, `AppState`, `HubState`, `SystemsState`, `GamesState`, `Input`, `Runtime` |
 | `rust/launcher/src/bind.rs` | Endpoint-to-QML binding macro with synchronous seed |

@@ -6,6 +6,7 @@ import QtQuick
 import QtQuick.Window
 import Zaparoo.Theme
 import Zaparoo.Screens
+import Zaparoo.Ui
 import Zaparoo.Browse as Browse
 
 // cxx-qt 0.8 patches `isFinal: true` on singleton properties but the
@@ -548,80 +549,15 @@ MainLayout {
     // source screen's primary content is hidden by `transitioning`
     // bindings so the centred "Loading…" reads alone in the cleared
     // band. Sized to the full window so anchors.centerIn parks
-    // the text in the geometric centre regardless of which screen
+    // the row in the geometric centre regardless of which screen
     // is the source.
     Item {
         anchors.fill: parent
         visible: root.pendingTransition !== ""
         z: 100
 
-        Column {
+        LoadingIndicator {
             anchors.centerIn: parent
-            spacing: Sizing.pctH(2)
-
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: qsTr("Loading…")
-                font.family: Theme.fontUi
-                font.pixelSize: Sizing.fontSize(3)
-                color: Theme.textDim
-                renderType: Text.NativeRendering
-            }
-
-            // Test spinner — three small dots pulsing in sequence.
-            // Each dot's dirty rect is just its own ~16px square, no
-            // rotation, no opacity over busy content. The animation
-            // is a viability probe: if it stutters or freezes mid-
-            // cycle while the transition is in flight, the heavy
-            // work (set_category teardown, set_system cold fetch)
-            // is blocking the GUI thread and we need to either move
-            // that work off-thread or keep transition cues static.
-            Row {
-                anchors.horizontalCenter: parent.horizontalCenter
-                spacing: Sizing.pctW(1.5)
-
-                Rectangle {
-                    width: Sizing.pctH(1.6)
-                    height: width
-                    radius: width / 2
-                    color: Theme.textDim
-                    SequentialAnimation on scale {
-                        loops: Animation.Infinite
-                        running: true
-                        NumberAnimation { from: 1; to: 1.6; duration: 300; easing.type: Easing.OutQuad }
-                        NumberAnimation { from: 1.6; to: 1; duration: 300; easing.type: Easing.InQuad }
-                        PauseAnimation { duration: 600 }
-                    }
-                }
-                Rectangle {
-                    width: Sizing.pctH(1.6)
-                    height: width
-                    radius: width / 2
-                    color: Theme.textDim
-                    SequentialAnimation on scale {
-                        loops: Animation.Infinite
-                        running: true
-                        PauseAnimation { duration: 200 }
-                        NumberAnimation { from: 1; to: 1.6; duration: 300; easing.type: Easing.OutQuad }
-                        NumberAnimation { from: 1.6; to: 1; duration: 300; easing.type: Easing.InQuad }
-                        PauseAnimation { duration: 400 }
-                    }
-                }
-                Rectangle {
-                    width: Sizing.pctH(1.6)
-                    height: width
-                    radius: width / 2
-                    color: Theme.textDim
-                    SequentialAnimation on scale {
-                        loops: Animation.Infinite
-                        running: true
-                        PauseAnimation { duration: 400 }
-                        NumberAnimation { from: 1; to: 1.6; duration: 300; easing.type: Easing.OutQuad }
-                        NumberAnimation { from: 1.6; to: 1; duration: 300; easing.type: Easing.InQuad }
-                        PauseAnimation { duration: 200 }
-                    }
-                }
-            }
         }
     }
 

@@ -47,6 +47,15 @@ Item {
                 Browse.GamesModel.path_at(games.gamesGrid.currentIndex))
     }
 
+    // Page jump (L/R shoulder buttons). Wraps in both directions; same
+    // post-move state-commit path as _performMove so the saved entry
+    // tracks whichever item the user lands on.
+    function _performPage(delta: int): void {
+        if (games.gamesGrid.pageBy(delta))
+            Browse.GamesState.set_selected_at_top(
+                Browse.GamesModel.path_at(games.gamesGrid.currentIndex))
+    }
+
     // Mirrors ScreenStateOverlay's `state` ternary so accept routing and
     // the in-screen overlay agree on which state we're in.
     function _state(): string {
@@ -84,6 +93,15 @@ Item {
             games._performMove(0, -1)
         } else if (action === "down") {
             games._performMove(0, 1)
+        } else if (action === "page_prev") {
+            // L shoulder. Ignored on non-Ready states — there's no
+            // data to page through.
+            if (games._state() === "ready")
+                games._performPage(-1)
+        } else if (action === "page_next") {
+            // R shoulder.
+            if (games._state() === "ready")
+                games._performPage(1)
         } else if (action === "accept") {
             // Accept routing depends on the screen's data state, matching
             // the help bar vocabulary in MainLayout.qml. Loading swallows
@@ -145,46 +163,56 @@ Item {
 
     // ── Visual tree ───────────────────────────────────────────────────────────
 
-    // Top label — active system name. Composed via SystemsModel because
-    // GamesModel only carries `current_system_id`, not the human name.
-    // The id-fallback covers the brief navigate window before
-    // SystemsModel sees the new id and the test harness case where
-    // SystemsModel is empty; the user sees the id rather than nothing.
+    // Top status strip — page counter (left), system title (center),
+    // total-files badge (right). System title is composed via
+    // SystemsModel because GamesModel only carries `current_system_id`,
+    // not the human name. The id-fallback covers the brief navigate
+    // window before SystemsModel sees the new id and the test harness
+    // case where SystemsModel is empty; the user sees the id rather
+    // than nothing.
     //
-    // The screen Item fills the whole window, so the label has to clear
-    // the MainLayout logo (topMargin pctH(2) + height pctH(7) — bottom
-    // edge at pctH(9)) with a pctH(2) gap.
-    Text {
-        id: topLabel
-        anchors.horizontalCenter: parent.horizontalCenter
+    // The screen Item fills the whole window, so the strip has to
+    // clear the MainLayout logo (topMargin pctH(2) + height pctH(7) —
+    // bottom edge at pctH(9)) with a pctH(2) gap. Total is exact:
+    // Core's media.browse returns directories only on page 1 and
+    // always before files, so dir_count + total_files is the precise
+    // entry count for the path.
+    TopStatusStrip {
+        id: topStrip
+        anchors.left: parent.left
+        anchors.right: parent.right
         anchors.top: parent.top
-        anchors.topMargin: Sizing.pctH(11)
-        text: {
+        anchors.topMargin: Sizing.pctH(9)
+        height: Sizing.pctH(7)
+        title: {
             const sid = Browse.GamesModel.current_system_id
             if (sid === "")
                 return ""
             const idx = Browse.SystemsModel.index_for_system_id(sid)
             return idx >= 0 ? Browse.SystemsModel.system_name_at(idx) : sid
         }
-        font.family: Theme.fontUi
-        font.pixelSize: Sizing.fontSize(4)
-        font.weight: Font.Medium
-        color: Theme.textPrimary
-        renderType: Text.NativeRendering
+        currentPage: gamesGrid.currentPage
+        totalPages: Math.max(1,
+            Math.ceil((Browse.GamesModel.dir_count
+                       + Browse.GamesModel.total_files) / gamesGrid.pageSize))
+        totalText: Browse.GamesModel.total_files > 0
+                   ? qsTr("%1 files").arg(Browse.GamesModel.total_files)
+                   : ""
     }
 
-    // Grid fills the safe zone between the top label and the help bar.
-    // bottomMargin = MainLayout's instructionsBar height (pctH(6)) +
-    // pctH(2) gap. If you change the help-bar height, update this too.
+    // Grid fills the safe zone between the top strip and the active
+    // label. bottomMargin = MainLayout's instructionsBar height
+    // (pctH(6)) + pctH(2) gap + the active label's pctH(7). If you
+    // change the help-bar height or the label height, update this too.
     PagedGrid {
         id: gamesGrid
 
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.top: topLabel.bottom
+        anchors.top: topStrip.bottom
         anchors.topMargin: Sizing.pctH(2)
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: Sizing.pctH(8)
+        anchors.bottomMargin: Sizing.pctH(15)
         model: Browse.GamesModel
         delegate: Tile {}
         // Cover-art tiles run taller than systems logos, so a 5x3
@@ -196,23 +224,32 @@ Item {
         onLoadMoreRequested: Browse.GamesModel.fetch_more()
     }
 
-    // Bottom-of-grid status band — total is exact: Core's media.browse
-    // returns directories only on page 1 and always before files, so
-    // dir_count + total_files is the precise entry count for the path.
-    // No "+" suffix, no estimate.
-    PaginationStatus {
-        anchors.left: gamesGrid.left
-        anchors.right: gamesGrid.right
-        anchors.bottom: gamesGrid.bottom
-        height: gamesGrid.bottomBandHeight
-        currentPage: gamesGrid.currentPage
-        totalPages: Math.max(1,
-            Math.ceil((Browse.GamesModel.dir_count
-                       + Browse.GamesModel.total_files) / gamesGrid.pageSize))
-        loadingMore: Browse.GamesModel.loading_more
-        totalText: Browse.GamesModel.total_files > 0
-                   ? qsTr("%1 files").arg(Browse.GamesModel.total_files)
-                   : ""
+    // Active game caption — single big line just under the grid. Same
+    // typography as the top strip's title slot so the two big captions
+    // read as a matched pair (top = system context, bottom = focused-
+    // tile selection).
+    ActiveLabel {
+        id: activeLabel
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: gamesGrid.bottom
+        anchors.topMargin: Sizing.pctH(1)
+        height: Sizing.pctH(7)
+        text: gamesGrid.itemCount > 0
+              ? Browse.GamesModel.name_at(gamesGrid.currentIndex)
+              : ""
+    }
+
+    // "Loading more…" cue, parked on the left edge of the active-label
+    // band so the focused-entry name and the pagination cue read as a
+    // single bottom strip. Hidden until a fetch is in flight.
+    LoadingIndicator {
+        anchors.left: parent.left
+        anchors.leftMargin: Sizing.pctW(5)
+        anchors.verticalCenter: activeLabel.verticalCenter
+        visible: Browse.GamesModel.loading_more
+        z: 1
+        text: qsTr("Loading more…")
     }
 
     ScreenStateOverlay {

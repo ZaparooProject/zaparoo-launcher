@@ -24,14 +24,8 @@ import Zaparoo.Theme
 // Software adaptation the renderer cannot keep up with a per-frame
 // alpha ramp over a busy grid — translucent overlays don't subtract
 // from the dirty region, so every cell underneath re-rasterizes per
-// frame (text labels, cover images, card bodies). See
-// docs/qml-gotchas.md → "Software-renderer animation costs" for the
-// full reasoning.
-//
-// The reserved bottom band (`bottomBandHeight`) is left free for
-// callers to stack a status row in — see `PaginationStatus`. Cell
-// metrics include the band reservation either way so the grid
-// doesn't reflow when the band content appears or disappears.
+// frame (cover images, card bodies). See docs/qml-gotchas.md →
+// "Software-renderer animation costs" for the full reasoning.
 Item {
     id: root
 
@@ -72,15 +66,9 @@ Item {
     readonly property int currentColumn: (currentIndex % pageSize) % columns
     readonly property int currentRow: Math.floor((currentIndex % pageSize) / columns)
 
-    // Reserved chrome around the cell area. The bottom band is reserved
-    // even when no status content is mounted so cell metrics stay stable
-    // when the model is swapped for one with a different pageCount —
-    // e.g. switching between systems whose game counts straddle
-    // pageSize. Without the reservation, cellWidth/cellHeight would
-    // jump as the band content appears or disappears.
+    // Reserved chrome around the cell area.
     readonly property int sideInset: Sizing.pctW(5)
     readonly property int topInset: Sizing.pctH(1)
-    readonly property int bottomBandHeight: Sizing.pctH(4)
     readonly property int cellSpacingX: Sizing.pctW(3)
     readonly property int cellSpacingY: Sizing.pctH(4)
 
@@ -88,7 +76,7 @@ Item {
     // gridColumns × gridRows. Callers don't override.
     readonly property int _availableWidth: Math.max(0, width - 2 * sideInset)
     readonly property int _availableHeight:
-        Math.max(0, height - bottomBandHeight - topInset)
+        Math.max(0, height - topInset)
     readonly property int cellWidth:
         Math.max(0,
                  Math.floor((root._availableWidth - (root.columns - 1) * root.cellSpacingX)
@@ -100,6 +88,42 @@ Item {
 
     function setCurrentIndexImmediate(idx: int): void {
         root.currentIndex = idx
+    }
+
+    // Jump the selection by `delta` whole pages. Wraps in both
+    // directions to mirror moveSelection's column-edge behavior:
+    // - delta > 0 past the last page wraps to page 0
+    // - delta < 0 from page 0 wraps to the last page
+    // The target lands on (targetPage, currentRow, currentColumn) when
+    // that slot exists; on a partial last page it clamps to the last
+    // existing item on that page so the user always moves rather than
+    // sticking on a hole. Returns true if the index actually changed.
+    // No-op (returns false) on a single-page dataset since wrap on
+    // page 0 ↔ page 0 wouldn't move anything.
+    function pageBy(delta: int): bool {
+        if (root.itemCount <= 0 || root.pageCount <= 1 || delta === 0)
+            return false
+        const total = root.pageCount
+        // JS `%` keeps sign on negatives — normalise into [0, total).
+        const targetPage = ((root.currentPage + delta) % total + total) % total
+        const targetSlot =
+            targetPage * root.pageSize
+            + root.currentRow * root.columns
+            + root.currentColumn
+        const lastIdxOnPage =
+            Math.min((targetPage + 1) * root.pageSize, root.itemCount) - 1
+        if (lastIdxOnPage < 0)
+            return false
+        const newIndex = Math.min(targetSlot, lastIdxOnPage)
+        if (newIndex === root.currentIndex)
+            return false
+        root.currentIndex = newIndex
+        // Mirror moveSelection's pre-fetch: when we cross into the
+        // second-to-last loaded page, kick a fetch so the next page
+        // boundary lands on freshly loaded rows.
+        if (root.currentPage >= root.pageCount - 2)
+            root.loadMoreRequested()
+        return true
     }
 
     // Step the selection by (dCol, dRow). Returns true if the index

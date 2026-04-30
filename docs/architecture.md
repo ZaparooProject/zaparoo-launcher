@@ -56,7 +56,8 @@ src/app/main.cpp
           │
           ├── src/ui/components/  [Zaparoo.Ui QML module]
           │     Tile.qml, TileLoader.qml, PagedGrid.qml,
-          │     Modal.qml, ScreenStateOverlay.qml, FpsCounter.qml
+          │     ActiveLabel.qml, LoadingIndicator.qml, StatusIcon.qml,
+          │     TopStatusStrip.qml, Modal.qml, ScreenStateOverlay.qml
           │
           └── src/ui/theme/  [Zaparoo.Theme QML module]
                 Sizing.qml  — pctH/pctW/fontSize singletons

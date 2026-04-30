@@ -52,9 +52,9 @@ const NAME_ROLE: i32 = 256 + 1;
 const PATH_ROLE: i32 = 256 + 2;
 const ZAP_SCRIPT_ROLE: i32 = 256 + 3;
 const SYSTEM_ID_ROLE: i32 = 256 + 4;
-// Until per-game cover art lands, media tiles reuse the parent system
-// logo; folder tiles fall through to Tile's procedural fallback because
-// "folder" doesn't match any embedded PNG.
+// Until per-game cover art lands, every media tile uses the generic
+// `icons/File` glyph and folder tiles use `icons/Folder`. Resources.qml
+// resolves both to SVGs under resources/images/icons/.
 const COVER_KEY_ROLE: i32 = 256 + 5;
 const ENTRY_TYPE_ROLE: i32 = 256 + 6;
 const FILE_COUNT_ROLE: i32 = 256 + 7;
@@ -544,20 +544,13 @@ fn entry_system_id(entry: &BrowseEntry) -> String {
 }
 
 fn cover_key_for(entry: &BrowseEntry) -> String {
+    // Generic folder/file glyphs. Resources.coverUrl() picks the .svg
+    // extension for anything outside `systems/`, so these resolve to
+    // resources/images/icons/{Folder,File}.svg.
     if entry.is_folder() {
-        // Folder placeholder. Tile's procedural fallback renders the
-        // entry name large when no embedded PNG matches; "folder"
-        // simply gets that fallback. A dedicated folder icon is out of
-        // scope for this round.
-        return "folder".to_string();
+        return "icons/Folder".to_string();
     }
-    let sid = entry_system_id(entry);
-    if sid.is_empty() {
-        // Unattributed media — empty cover key falls through to the
-        // procedural fallback rather than a 404 image fetch.
-        return String::new();
-    }
-    format!("systems/{sid}")
+    "icons/File".to_string()
 }
 
 /// Find `needle` in `entries` with case-sensitive path equality.
@@ -1138,24 +1131,24 @@ mod tests {
     }
 
     #[test]
-    fn cover_key_for_folder_returns_folder_placeholder() {
+    fn cover_key_for_folder_returns_folder_icon() {
         let entry = folder("Games", "/x");
-        assert_eq!(cover_key_for(&entry), "folder");
+        assert_eq!(cover_key_for(&entry), "icons/Folder");
     }
 
     #[test]
-    fn cover_key_for_media_returns_systems_prefix() {
+    fn cover_key_for_media_returns_file_icon() {
         let entry = media("smb", "/p/smb", "NES");
-        assert_eq!(cover_key_for(&entry), "systems/NES");
+        assert_eq!(cover_key_for(&entry), "icons/File");
     }
 
     #[test]
-    fn cover_key_for_unattributed_media_returns_empty() {
+    fn cover_key_for_unattributed_media_returns_file_icon() {
         let entry = BrowseEntry {
             entry_type: "media".into(),
             ..BrowseEntry::default()
         };
-        assert_eq!(cover_key_for(&entry), "");
+        assert_eq!(cover_key_for(&entry), "icons/File");
     }
 
     #[test]

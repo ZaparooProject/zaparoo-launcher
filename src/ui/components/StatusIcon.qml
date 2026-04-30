@@ -22,7 +22,7 @@ Item {
         fillMode: Image.PreserveAspectFit
         sourceSize.width: root.width
         sourceSize.height: root.height
-        smooth: false
+        smooth: true
         cache: true
     }
 }

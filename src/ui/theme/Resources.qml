@@ -17,17 +17,38 @@ QtObject {
 
     // Build a cover image URL from a `coverKey` (relative path under
     // `resources/images/` without extension, e.g. `systems/SNES`,
-    // `categories/Consoles`). Empty key returns an empty URL so the
-    // caller can use it as a "no cover" sentinel.
+    // `categories/Console`, `folder`). Empty key returns an empty URL
+    // so the caller can use it as a "no cover" sentinel.
+    //
+    // Extension is chosen by directory: system tile logos are the
+    // 144-asset curated PNG set under resources/images/systems/ and
+    // stay PNG; everything else (categories, top-level placeholders
+    // like `folder`) ships as SVG. QtSvg rasterizes the source on
+    // first load and the result lands in QPixmapCache, so paint cost
+    // matches PNG after the one-shot decode.
     function coverUrl(key: string): url {
         if (key === "")
             return ""
-        return baseUrl + "images/" + key + ".png"
+        const ext = key.startsWith("systems/") ? "png" : "svg"
+        return baseUrl + "images/" + key + "." + ext
     }
 
+    // Top-right HUD host-status icons (NFC/Wi-Fi/LAN/Bluetooth).
     function statusIconUrl(name: string): url {
         if (name === "")
             return ""
-        return baseUrl + "images/status/" + name + ".xpm"
+        return baseUrl + "images/status/" + name + ".svg"
+    }
+
+    // General-purpose UI glyphs (folder, file, loading spinner, settings,
+    // nav arrows, …) under resources/images/icons/. Most are SVG; the
+    // gamepad button glyphs (ButtonA/B/X/Y/L/R, Dpad) ship as PNG so the
+    // antialiased button-face shading survives intact. Pick the extension
+    // by name prefix — keep the rule centralized so callers don't care.
+    function iconUrl(name: string): url {
+        if (name === "")
+            return ""
+        const ext = (name.startsWith("Button") || name === "Dpad") ? "png" : "svg"
+        return baseUrl + "images/icons/" + name + "." + ext
     }
 }

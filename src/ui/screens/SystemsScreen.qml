@@ -46,6 +46,18 @@ Item {
         return false
     }
 
+    // Page jump (L/R shoulder buttons). Wraps in both directions; same
+    // post-move state-commit path as _performMove so the saved system
+    // tracks whichever entry the user lands on.
+    function _performPage(delta: int): bool {
+        if (systems.systemsGrid.pageBy(delta)) {
+            Browse.SystemsState.system_id =
+                Browse.SystemsModel.system_id_at(systems.systemsGrid.currentIndex)
+            return true
+        }
+        return false
+    }
+
     // Mirrors ScreenStateOverlay's `state` ternary so accept routing and
     // the in-screen overlay agree on which state we're in.
     function _state(): string {
@@ -70,6 +82,15 @@ Item {
             // to the bottom row of the same page. Use Escape to back
             // out to the hub.
             systems._performMove(0, -1)
+        } else if (action === "page_prev") {
+            // L shoulder. Ignored on non-Ready states — there's no
+            // data to page through.
+            if (systems._state() === "ready")
+                systems._performPage(-1)
+        } else if (action === "page_next") {
+            // R shoulder.
+            if (systems._state() === "ready")
+                systems._performPage(1)
         } else if (action === "accept") {
             // Accept routing depends on the screen's data state, matching
             // the help bar vocabulary in MainLayout.qml. Loading swallows
@@ -100,39 +121,51 @@ Item {
 
     // ── Visual tree ───────────────────────────────────────────────────────────
 
-    // Top label — active category. Replaces the pre-Step-8 below-grid
-    // focused-system caption; the unified Tile labels each system itself,
-    // so the on-screen context the caption was carrying (which category
-    // the user drilled into) moves up here.
+    // Top status strip — page counter (left), category title (center),
+    // total-systems badge (right). Replaces the standalone top label
+    // and the old bottom-of-grid PaginationStatus band so the screen's
+    // "where am I" context all sits at the top in one row.
     //
-    // The screen Item fills the whole window, so the label has to clear
-    // the MainLayout logo (topMargin pctH(2) + height pctH(7) — bottom
-    // edge at pctH(9)) with a pctH(2) gap.
-    Text {
-        id: topLabel
-        anchors.horizontalCenter: parent.horizontalCenter
+    // The screen Item fills the whole window, so the strip has to
+    // clear the MainLayout logo (topMargin pctH(2) + height pctH(7) —
+    // bottom edge at pctH(9)) with a pctH(2) gap.
+    //
+    // SystemsModel is non-paginated (every row loads eagerly on
+    // category switch) — the page counter still reads off
+    // systemsGrid.currentPage / pageCount because PagedGrid pages
+    // through whatever count it sees. The "%1 systems" badge is the
+    // filter-applied count for the current category, not the catalog
+    // total.
+    TopStatusStrip {
+        id: topStrip
+        anchors.left: parent.left
+        anchors.right: parent.right
         anchors.top: parent.top
-        anchors.topMargin: Sizing.pctH(11)
-        text: Browse.SystemsModel.current_category
-        font.family: Theme.fontUi
-        font.pixelSize: Sizing.fontSize(4)
-        font.weight: Font.Medium
-        color: Theme.textPrimary
-        renderType: Text.NativeRendering
+        anchors.topMargin: Sizing.pctH(9)
+        height: Sizing.pctH(7)
+        title: Browse.SystemsModel.current_category
+        currentPage: systemsGrid.currentPage
+        totalPages: Math.max(1,
+            Math.ceil(Browse.SystemsModel.count / systemsGrid.pageSize))
+        totalText: Browse.SystemsModel.count > 0
+                   ? qsTr("%1 systems").arg(Browse.SystemsModel.count)
+                   : ""
+        visible: !systems.transitioning
     }
 
-    // Grid fills the safe zone between the top label and the help bar.
-    // bottomMargin = MainLayout's instructionsBar height (pctH(6)) +
-    // pctH(2) gap. If you change the help-bar height, update this too.
+    // Grid fills the safe zone between the top strip and the active
+    // label. bottomMargin = MainLayout's instructionsBar height
+    // (pctH(6)) + pctH(2) gap + the active label's pctH(7). If you
+    // change the help-bar height or the label height, update this too.
     PagedGrid {
         id: systemsGrid
 
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.top: topLabel.bottom
+        anchors.top: topStrip.bottom
         anchors.topMargin: Sizing.pctH(2)
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: Sizing.pctH(8)
+        anchors.bottomMargin: Sizing.pctH(15)
         model: Browse.SystemsModel
         delegate: Tile {}
 
@@ -142,23 +175,21 @@ Item {
         visible: !systems.transitioning
     }
 
-    // Bottom-of-grid status band — `SystemsModel.count` is the
-    // filter-applied count for the current category, so the "%1 systems"
-    // badge reads "12 systems in this category" rather than the catalog
-    // total. SystemsModel is non-paginated (every row is loaded eagerly
-    // on category switch) so `loadingMore` is never true here.
-    PaginationStatus {
-        anchors.left: systemsGrid.left
-        anchors.right: systemsGrid.right
-        anchors.bottom: systemsGrid.bottom
-        height: systemsGrid.bottomBandHeight
+    // Active system caption — single big line just under the grid.
+    // Same typography as the top strip's title slot so the two big
+    // captions read as a matched pair (top = category context, bottom
+    // = focused-tile selection).
+    ActiveLabel {
+        id: activeLabel
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: systemsGrid.bottom
+        anchors.topMargin: Sizing.pctH(1)
+        height: Sizing.pctH(7)
+        text: systemsGrid.itemCount > 0
+              ? Browse.SystemsModel.system_name_at(systemsGrid.currentIndex)
+              : ""
         visible: !systems.transitioning
-        currentPage: systemsGrid.currentPage
-        totalPages: Math.max(1,
-            Math.ceil(Browse.SystemsModel.count / systemsGrid.pageSize))
-        totalText: Browse.SystemsModel.count > 0
-                   ? qsTr("%1 systems").arg(Browse.SystemsModel.count)
-                   : ""
     }
 
     ScreenStateOverlay {

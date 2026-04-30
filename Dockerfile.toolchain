@@ -85,7 +85,8 @@ RUN git clone --depth 1 --branch v${QT_VERSION} https://github.com/qt/qtbase.git
     git clone --depth 1 --branch v${QT_VERSION} https://github.com/qt/qtshadertools.git && \
     git clone --depth 1 --branch v${QT_VERSION} https://github.com/qt/qtdeclarative.git && \
     git clone --depth 1 --branch v${QT_VERSION} https://github.com/qt/qttools.git && \
-    git clone --depth 1 --branch v${QT_VERSION} https://github.com/qt/qtwebsockets.git
+    git clone --depth 1 --branch v${QT_VERSION} https://github.com/qt/qtwebsockets.git && \
+    git clone --depth 1 --branch v${QT_VERSION} https://github.com/qt/qtsvg.git
 
 # Stage 1: Qt6 host build (provides native tools: moc, rcc, qmllint, etc.)
 # PrintSupport is intentionally enabled here even though the launcher itself
@@ -150,6 +151,14 @@ RUN mkdir qttools-host-build && cd qttools-host-build && \
 
 RUN mkdir qtwebsockets-host-build && cd qtwebsockets-host-build && \
     /opt/qt6-host/bin/qt-configure-module ../qtwebsockets \
+    && cmake --build . --parallel $(nproc) \
+    && cmake --install .
+
+# qtsvg (host build): mirrors the qtshadertools/qtdeclarative pattern. The
+# cross-built ARM32 qtsvg (below) needs a host counterpart at the same Qt
+# version so qt-configure-module's prefix probe finds matching host tools.
+RUN mkdir qtsvg-host-build && cd qtsvg-host-build && \
+    /opt/qt6-host/bin/qt-configure-module ../qtsvg \
     && cmake --build . --parallel $(nproc) \
     && cmake --install .
 
@@ -220,6 +229,14 @@ RUN mkdir qtdeclarative-arm-build && cd qtdeclarative-arm-build && \
 
 RUN mkdir qtwebsockets-arm-build && cd qtwebsockets-arm-build && \
     /opt/qt6-arm32/bin/qt-configure-module ../qtwebsockets \
+    && cmake --build . --parallel $(nproc) \
+    && cmake --install .
+
+# qtsvg (ARM32 cross-build): provides Qt6Svg + the QSvgPlugin image-format
+# plugin that QImageReader uses to load `.svg` Image sources. Static-linked
+# into the launcher via Qt6::QSvgPlugin in cmake/ZaparooRust.cmake.
+RUN mkdir qtsvg-arm-build && cd qtsvg-arm-build && \
+    /opt/qt6-arm32/bin/qt-configure-module ../qtsvg \
     && cmake --build . --parallel $(nproc) \
     && cmake --install .
 

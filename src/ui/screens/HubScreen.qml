@@ -127,12 +127,10 @@ Item {
     Item {
         id: categoriesRow
 
-        // Cell layout. The image area is a square equal to coverWidth;
-        // the label sits inside the cell below it. `cellHeight` mirrors
-        // Tile's internal `_labelHeight = 2 lines × FontMetrics.height
-        // + pctH(0.4)` formula so long category names like "Handheld
-        // Consoles" can wrap onto a second line inside the Tile. If
-        // you change either side, change the other.
+        // Cell layout. Tiles are icon-only (no label inside), so the
+        // cell is a roughly-square image area. The category name for
+        // the focused tile renders below the row in `activeLabel`,
+        // not inside the tile.
         readonly property int spacing: Sizing.pctW(3)
         readonly property int sideInset: Sizing.pctW(5)
         readonly property int maxCellWidth: Sizing.pctH(22)
@@ -142,9 +140,9 @@ Item {
                 ? Math.floor((width - 2 * sideInset - (n - 1) * spacing) / n)
                 : 0
         readonly property int cellWidth: Math.min(maxCellWidth, rawCellWidth)
-        readonly property int cellHeight:
-            Sizing.pctH(22) + Sizing.pctH(1)
-            + Math.ceil(2 * rowLabelFm.height) + Sizing.pctH(0.4)
+        // Square cell with a hair of breathing room top and bottom
+        // for the focused tile's 1.06× scale bleed.
+        readonly property int cellHeight: Sizing.pctH(22) + Sizing.pctH(2)
         readonly property int totalRowWidth:
             n > 0 ? n * cellWidth + (n - 1) * spacing : 0
         readonly property int rowOriginX: (width - totalRowWidth) / 2
@@ -159,18 +157,15 @@ Item {
         anchors.horizontalCenter: parent.horizontalCenter
         width: parent.width
         height: cellHeight + 2 * verticalPadding
-        y: Sizing.pctH(33)
+        // Sits higher than the old centered placement (was pctH(33))
+        // so the active-category label below the row stays clear of
+        // the help bar at the bottom.
+        y: Sizing.pctH(22)
 
         // Hide the tiles while the router holds us here on a forward
         // transition so the centred "Loading…" cue (painted from
         // Main.qml) reads alone.
         visible: !hub.transitioning
-
-        FontMetrics {
-            id: rowLabelFm
-            font.family: Theme.fontUi
-            font.pixelSize: Sizing.fontSize(2.6)
-        }
 
         Component {
             id: tileDelegate
@@ -210,6 +205,22 @@ Item {
                 }
             }
         }
+    }
+
+    // Active category caption — single big line directly under the
+    // row, swaps text on every left/right move. Hidden while the
+    // router holds us in a forward transition, mirroring the row.
+    ActiveLabel {
+        id: activeLabel
+        anchors.top: categoriesRow.bottom
+        anchors.topMargin: Sizing.pctH(4)
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: Sizing.pctH(7)
+        text: Browse.CategoriesModel.count > 0
+              ? Browse.CategoriesModel.category_at(hub.currentIndex)
+              : ""
+        visible: !hub.transitioning
     }
 
     // CategoriesModel has no `loading` qproperty — the catalog is
