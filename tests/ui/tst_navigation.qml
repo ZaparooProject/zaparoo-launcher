@@ -24,6 +24,10 @@ TestCase {
 
     function init(): void {
         main.activeScreen = main.screenHub
+        // Hub focus is two rows now (categories + actions); reset both
+        // axes so a prior test's row-jump doesn't leak into the next.
+        main.hubScreen.currentRow = 0
+        main.hubScreen.currentIndex = 0
     }
 
     function test_initial_state_is_hub(): void {
@@ -56,9 +60,10 @@ TestCase {
         compare(main.activeScreen, main.screenSystems)
     }
 
-    // Down on hub is a no-op — the categories row is horizontal so
-    // there's nothing visually below it. Accept (Enter) is the only
-    // way to drill into systems.
+    // Down on hub moves focus between the categories row and the
+    // actions row (Recently Played / Favorites / Settings); it must
+    // never flip off-screen to systems. Accept is the only path that
+    // drills into another screen.
     function test_down_on_hub_does_not_route_to_systems(): void {
         main.handleKey(Qt.Key_Down)
         compare(main.activeScreen, main.screenHub,

@@ -14,8 +14,9 @@
 // instead of disappearing into a queue.
 
 use crate::media_types::{
-    MediaBrowseParams, MediaBrowseResult, MediaSearchParams, MediaSearchResult, ReadersResult,
-    ReadersWriteParams, RunParams, SystemsParams, SystemsResult, VersionResult,
+    MediaBrowseParams, MediaBrowseResult, MediaHistoryParams, MediaHistoryResult,
+    MediaSearchParams, MediaSearchResult, ReadersResult, ReadersWriteParams, RunParams,
+    SystemsParams, SystemsResult, VersionResult,
 };
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
@@ -460,6 +461,28 @@ impl Client {
         params: MediaBrowseParams,
     ) -> Result<MediaBrowseResult, ClientError> {
         let val = self.call("media.browse", &params).await?;
+        serde_json::from_value(val).map_err(|e| ClientError {
+            message: e.to_string(),
+        })
+    }
+
+    pub async fn media_history(
+        &self,
+        params: MediaHistoryParams,
+    ) -> Result<MediaHistoryResult, ClientError> {
+        debug!(
+            limit = ?params.limit,
+            systems = ?params.systems,
+            cursor_set = params.cursor.is_some(),
+            fuzzy_system = ?params.fuzzy_system,
+            "media.history request",
+        );
+        let val = self.call("media.history", &params).await?;
+        let entries_len = val
+            .get("entries")
+            .and_then(Value::as_array)
+            .map_or(0, Vec::len);
+        debug!(entries_len, "media.history response");
         serde_json::from_value(val).map_err(|e| ClientError {
             message: e.to_string(),
         })

@@ -87,6 +87,51 @@ pub fn media_browse_response(params: &Value) -> Value {
     })
 }
 
+pub fn media_history_response(params: &Value) -> Value {
+    let systems = params
+        .get("systems")
+        .and_then(Value::as_array)
+        .map(|a| a.iter().filter_map(Value::as_str).collect::<Vec<_>>())
+        .unwrap_or_default();
+    let limit = params
+        .get("limit")
+        .and_then(Value::as_u64)
+        .unwrap_or(25)
+        .min(100) as usize;
+
+    // Synthesize a history list from the first ten games in `ALL_GAMES`,
+    // newest first. Real Core sorts by `endedAt` descending; the mock
+    // just walks the array and stamps backward-counting timestamps so
+    // the order is stable across runs.
+    let entries: Vec<Value> = ALL_GAMES
+        .iter()
+        .filter(|(_, _, system)| systems.is_empty() || systems.contains(system))
+        .take(limit)
+        .enumerate()
+        .map(|(i, (name, file, system))| {
+            let started = format!("2026-04-29T{:02}:00:00Z", 23 - i.min(23));
+            let ended = format!("2026-04-29T{:02}:30:00Z", 23 - i.min(23));
+            json!({
+                "systemId": system,
+                "systemName": system,
+                "mediaName": name,
+                "mediaPath": format!("/mock/{system}/{file}"),
+                "launcherId": system,
+                "startedAt": started,
+                "endedAt": ended,
+                "playTime": 1800,
+            })
+        })
+        .collect();
+    json!({
+        "entries": entries,
+        "pagination": {
+            "hasNextPage": false,
+            "pageSize": limit,
+        },
+    })
+}
+
 fn games_for_systems<'a>(systems: &'a [&'a str]) -> impl Iterator<Item = Value> + 'a {
     ALL_GAMES.iter().filter_map(move |(name, file, system)| {
         if !systems.is_empty() && !systems.contains(system) {

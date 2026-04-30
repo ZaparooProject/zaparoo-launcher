@@ -35,7 +35,9 @@ fn main() {
         "src/models/games_state.rs",
         "src/models/input.rs",
         "src/models/platform.rs",
+        "src/models/recents.rs",
         "src/models/runtime.rs",
+        "src/models/settings.rs",
         "src/models/system_status.rs",
     ]);
 

@@ -60,6 +60,7 @@ pub fn dispatch(text: &str) -> String {
         "systems" => Some(fixtures::systems_response()),
         "media.search" => Some(fixtures::media_search_response(&req.params)),
         "media.browse" => Some(fixtures::media_browse_response(&req.params)),
+        "media.history" => Some(fixtures::media_history_response(&req.params)),
         "run" => {
             let zap_script = req.params.get("text").and_then(Value::as_str).unwrap_or("");
             info!(%zap_script, "run");

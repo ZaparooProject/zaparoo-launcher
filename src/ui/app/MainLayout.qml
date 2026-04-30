@@ -30,6 +30,8 @@ ApplicationWindow {
     readonly property string screenHub: ScreenManager.screenHub
     readonly property string screenSystems: ScreenManager.screenSystems
     readonly property string screenGames: ScreenManager.screenGames
+    readonly property string screenRecents: ScreenManager.screenRecents
+    readonly property string screenSettings: ScreenManager.screenSettings
 
     // Runtime state. `activeScreen` mirrors ScreenManager's property
     // (two-way synced below so direct assignment from tests still
@@ -53,6 +55,8 @@ ApplicationWindow {
     property alias hubScreen: hubScreen
     property alias systemsScreen: systemsScreen
     property alias gamesScreen: gamesScreen
+    property alias recentsScreen: recentsScreen
+    property alias settingsScreen: settingsScreen
 
     property bool cardWriteModalVisible: false
     property bool cardWriteFailed: false
@@ -83,6 +87,11 @@ ApplicationWindow {
     readonly property string hubScreenState:
         (Browse.CategoriesModel.error_message ?? "") !== "" ? "error"
         : (Browse.CategoriesModel.count === 0 ? "empty" : "ready")
+
+    readonly property string recentsScreenState:
+        Browse.RecentsModel.loading ? "loading"
+        : ((Browse.RecentsModel.error_message ?? "") !== "" ? "error"
+        : (Browse.RecentsModel.count === 0 ? "empty" : "ready"))
 
     signal cancelCardWriteRequested()
 
@@ -197,6 +206,18 @@ ApplicationWindow {
             id: gamesScreen
             anchors.fill: parent
             visible: root.activeScreen === root.screenGames
+        }
+
+        RecentsScreen {
+            id: recentsScreen
+            anchors.fill: parent
+            visible: root.activeScreen === root.screenRecents
+        }
+
+        SettingsScreen {
+            id: settingsScreen
+            anchors.fill: parent
+            visible: root.activeScreen === root.screenSettings
         }
     }
 
@@ -420,6 +441,29 @@ ApplicationWindow {
                     { button: "ButtonA", label: qsTr("Retry") },
                     { button: "ButtonB", label: qsTr("Back") }
                 ];
+            }
+            if (root.activeScreen === root.screenRecents) {
+                if (root.recentsScreenState === "loading")
+                    return [{ button: "ButtonB", label: qsTr("Back") }];
+                if (root.recentsScreenState === "ready") {
+                    const pages = root.recentsScreen.recentsGrid.pageCount;
+                    let row = [
+                        { button: "Dpad", label: qsTr("Move") }
+                    ];
+                    if (pages > 1)
+                        row.push({ button: "ButtonL", label: qsTr("Prev page") },
+                                 { button: "ButtonR", label: qsTr("Next page") });
+                    row.push({ button: "ButtonA", label: qsTr("Open") },
+                             { button: "ButtonB", label: qsTr("Back") });
+                    return row;
+                }
+                return [
+                    { button: "ButtonA", label: qsTr("Retry") },
+                    { button: "ButtonB", label: qsTr("Back") }
+                ];
+            }
+            if (root.activeScreen === root.screenSettings) {
+                return [{ button: "ButtonB", label: qsTr("Back") }];
             }
             // games
             if (root.gamesScreenState === "loading")

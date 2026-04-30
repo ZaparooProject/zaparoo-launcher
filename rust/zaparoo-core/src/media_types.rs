@@ -137,6 +137,75 @@ impl MediaBrowseResult {
     }
 }
 
+/// Parameters for `media.history`. Cursor-driven pagination shares the
+/// same shape as `media.browse`/`media.search`; fields are optional and
+/// `skip_serializing_if` keeps the on-the-wire object minimal.
+///
+/// `fuzzy_system` mirrors zaparoo-mcp's history call, which always sets
+/// it to `true`. Core only consults the flag when `systems` is non-empty
+/// (it routes a fuzzy match through `resolveSystems`), so it's a no-op
+/// when filtering is off — but matching the working reference shape
+/// removes one variable when diagnosing live-system bugs.
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MediaHistoryParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cursor: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub systems: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fuzzy_system: Option<bool>,
+}
+
+/// One entry in `media.history`. Field shapes mirror Core's docs; we
+/// don't need `started_at`/`ended_at`/`play_time` for the launch UI yet
+/// but keep them deserialised so future "most-played" / "last-played"
+/// captions don't need a re-roundtrip.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MediaHistoryEntry {
+    #[serde(default)]
+    pub system_id: String,
+    #[serde(default)]
+    pub system_name: String,
+    #[serde(default)]
+    pub media_name: String,
+    #[serde(default)]
+    pub media_path: String,
+    #[serde(default)]
+    pub launcher_id: String,
+    #[serde(default)]
+    pub started_at: String,
+    #[serde(default)]
+    pub ended_at: String,
+    #[serde(default)]
+    pub play_time: u64,
+}
+
+/// Response envelope for `media.history`. Pagination is "only present
+/// when entries are returned" per Core's docs, so wrap it in `Option`
+/// the same way `MediaBrowseResult` does.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MediaHistoryResult {
+    #[serde(default)]
+    pub entries: Vec<MediaHistoryEntry>,
+    #[serde(default)]
+    pub pagination: Option<Pagination>,
+}
+
+impl MediaHistoryResult {
+    pub fn has_next_page(&self) -> bool {
+        self.pagination.as_ref().is_some_and(|p| p.has_next_page)
+    }
+
+    pub fn next_cursor(&self) -> Option<String> {
+        self.pagination.as_ref().and_then(|p| p.next_cursor.clone())
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct RunParams {
     pub text: String,
@@ -217,8 +286,8 @@ mod tests {
     )]
 
     use super::{
-        BrowseEntry, MediaBrowseParams, MediaBrowseResult, MediaSearchResult, ReaderInfo,
-        ReadersResult, SystemsResult, VersionResult,
+        BrowseEntry, MediaBrowseParams, MediaBrowseResult, MediaHistoryParams, MediaHistoryResult,
+        MediaSearchResult, ReaderInfo, ReadersResult, SystemsResult, VersionResult,
     };
 
     #[test]
@@ -454,6 +523,83 @@ mod tests {
         assert_eq!(result.path, "");
         assert_eq!(result.total_files, 0);
         assert!(result.entries[0].is_folder());
+    }
+
+    #[test]
+    fn media_history_result_parses_documented_payload() {
+        let json = r#"{
+            "entries": [
+                {
+                    "systemId": "SNES",
+                    "systemName": "Super Nintendo Entertainment System",
+                    "mediaName": "Super Mario World",
+                    "mediaPath": "/roms/snes/Super Mario World (USA).sfc",
+                    "launcherId": "SNES",
+                    "startedAt": "2025-01-22T14:30:00Z",
+                    "endedAt": "2025-01-22T15:15:30Z",
+                    "playTime": 2730
+                }
+            ],
+            "pagination": {"hasNextPage": false, "pageSize": 10}
+        }"#;
+        let result: MediaHistoryResult = serde_json::from_str(json).expect("parse");
+        assert_eq!(result.entries.len(), 1);
+        let entry = &result.entries[0];
+        assert_eq!(entry.system_id, "SNES");
+        assert_eq!(entry.media_name, "Super Mario World");
+        assert_eq!(entry.media_path, "/roms/snes/Super Mario World (USA).sfc");
+        assert_eq!(entry.launcher_id, "SNES");
+        assert_eq!(entry.play_time, 2730);
+        assert!(!result.has_next_page());
+        assert!(result.next_cursor().is_none());
+    }
+
+    #[test]
+    fn media_history_result_handles_empty_envelope() {
+        let result: MediaHistoryResult = serde_json::from_str("{}").expect("parse");
+        assert!(result.entries.is_empty());
+        assert!(result.pagination.is_none());
+    }
+
+    #[test]
+    fn media_history_params_omits_unset_fields() {
+        let params = MediaHistoryParams::default();
+        let json = serde_json::to_value(&params).expect("serialise");
+        let object = json.as_object().expect("object");
+        assert!(object.is_empty());
+    }
+
+    #[test]
+    fn media_history_params_serialises_cursor_and_systems() {
+        let params = MediaHistoryParams {
+            limit: Some(50),
+            cursor: Some("opaque".into()),
+            systems: vec!["SNES".into()],
+            fuzzy_system: Some(true),
+        };
+        let json = serde_json::to_value(&params).expect("serialise");
+        let object = json.as_object().expect("object");
+        assert_eq!(
+            object.get("limit").and_then(serde_json::Value::as_u64),
+            Some(50)
+        );
+        assert_eq!(
+            object.get("cursor").and_then(|v| v.as_str()),
+            Some("opaque")
+        );
+        assert_eq!(
+            object
+                .get("systems")
+                .and_then(|v| v.as_array())
+                .map(Vec::len),
+            Some(1)
+        );
+        assert_eq!(
+            object
+                .get("fuzzySystem")
+                .and_then(serde_json::Value::as_bool),
+            Some(true)
+        );
     }
 
     #[test]
