@@ -42,17 +42,27 @@ Item {
         anchors.centerIn: parent
         spacing: Sizing.pctH(0.6)
 
+        // Loading state shares the LoadingIndicator with the global
+        // forward-transition overlay and the GamesScreen pagination
+        // cue — single component, single visual vocabulary for "in
+        // flight". Error/Empty stay as plain text since they are
+        // terminal states, not in-flight ones.
+        LoadingIndicator {
+            anchors.horizontalCenter: parent.horizontalCenter
+            visible: overlay.viewState === "loading"
+        }
+
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
+            visible: overlay.viewState === "error" || overlay.viewState === "empty"
             text: {
-                if (overlay.viewState === "loading") return qsTr("Loading…")
-                if (overlay.viewState === "error")   return qsTr("Failed to load")
-                if (overlay.viewState === "empty")   return overlay.emptyText
+                if (overlay.viewState === "error") return qsTr("Failed to load")
+                if (overlay.viewState === "empty") return overlay.emptyText
                 return ""
             }
             font.family: Theme.fontUi
             font.pixelSize: Sizing.fontSize(3)
-            color: Theme.textDim
+            color: Theme.textPrimary
             horizontalAlignment: Text.AlignHCenter
             renderType: Text.NativeRendering
         }
@@ -63,7 +73,7 @@ Item {
             text: overlay.errorMessage
             font.family: Theme.fontUi
             font.pixelSize: Sizing.fontSize(2.4)
-            color: Theme.textMuted
+            color: Theme.textPrimary
             wrapMode: Text.WordWrap
             horizontalAlignment: Text.AlignHCenter
             width: overlay.width * 0.7

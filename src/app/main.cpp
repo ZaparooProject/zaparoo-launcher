@@ -54,6 +54,7 @@ Q_IMPORT_QML_PLUGIN(QtQuickControls2ImplPlugin)
 Q_IMPORT_QML_PLUGIN(QtQuickTemplates2Plugin)
 Q_IMPORT_QML_PLUGIN(QtQuick_WindowPlugin)
 Q_IMPORT_PLUGIN(QLinuxFbIntegrationPlugin)
+Q_IMPORT_PLUGIN(QSvgPlugin)
 #endif
 
 // Forward all Qt log messages to the Rust tracing registry (same sinks as

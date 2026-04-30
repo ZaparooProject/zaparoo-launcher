@@ -5,17 +5,21 @@
 import QtQuick
 import Zaparoo.Theme
 
-// Unified grid tile. Solid card with a centered icon area on top, an
-// always-visible label below, and a white outline ring around the card
-// when this tile is the focused selection. Used by every tile surface
-// in the launcher — hub categories row, systems grid, games grid —
-// so the vocabulary is identical across screens.
+// Unified grid tile. Solid card with a centered icon area filling the
+// card body, plus a white outline ring around the card when this tile
+// is the focused selection. The focused tile's display name renders
+// below the grid via ActiveLabel.qml — no label inside the tile —
+// because per-tile labels duplicate identity already carried by the
+// curated logo and force long names to wrap/elide inside cramped
+// cells. Used by every tile surface in the launcher — hub categories
+// row, systems grid, games grid — so the vocabulary is identical
+// across screens.
 //
 // Parent contract — Tile must be loaded inside a host that exposes:
 //   - isSelected: bool   — true when this tile is the focused selection
 //   - isFocused:  bool   — true when the section owning this tile has user focus
-//   - name:       string — model display name (drives the label and the
-//                          procedural fallback)
+//   - name:       string — model display name (used by the procedural
+//                          fallback while the cover PNG decodes)
 //   - coverKey:   string — relative path under resources/images/ (no extension)
 //
 // PagedGrid.qml and HubScreen's static category row both wrap their
@@ -54,31 +58,9 @@ Item {
         // qmllint enable missing-property compiler
     }
 
-    readonly property int _gap: Sizing.pctH(1)
     readonly property int _padding: Sizing.pctH(3)
-    // Sized for two lines of label text — long system names like
-    // "Super Nintendo Entertainment System" wrap rather than truncate
-    // on a single line. Hub categories are short and just leave the
-    // second line empty (the icon area shrinks slightly to compensate;
-    // pctH(22) cover stays comfortable).
-    //
-    // Driven off FontMetrics.height (= ascent + descent + leading) for
-    // the actual rendered line height instead of the glyph pixel size.
-    // The earlier `2 * Sizing.fontSize(2.6)` formula only allocated 2×
-    // the pixel size, which is ~1.66× a rendered line — so two-line
-    // wrapping silently collapsed to one line + ellipsis. The
-    // `Math.ceil` guards against a fractional value truncating one
-    // pixel shy of fitting the second line.
-    readonly property int _labelHeight:
-        Math.ceil(2 * labelFm.height) + Sizing.pctH(0.4)
     readonly property int _outlineGap: Sizing.pctH(0.4)
     readonly property int _outlineWidth: Sizing.pctH(0.6)
-
-    FontMetrics {
-        id: labelFm
-        font.family: Theme.fontUi
-        font.pixelSize: Sizing.fontSize(2.6)
-    }
 
     readonly property bool _focusedSelection:
         root.delegateIsSelected && root.delegateIsFocused
@@ -107,9 +89,9 @@ Item {
         }
     }
 
-    // Tile body. Solid card so the white icon + label have a high-
-    // contrast surface. Always visible — no opacity gating — which is
-    // the unified-Tile contract: every grid renders the same shape.
+    // Tile body. Solid card so the white icon has a high-contrast
+    // surface. Always visible — no opacity gating — which is the
+    // unified-Tile contract: every grid renders the same shape.
     Rectangle {
         anchors.fill: parent
         radius: Sizing.pctH(1.2)
@@ -124,9 +106,9 @@ Item {
     // on `_focusedSelection` so only the focused tile in the focused
     // section lights up — keeps multiple tile sections on screen from
     // competing for the eye. Drawn after the card so the border sits on
-    // top; the icon/label padding (`_padding = pctH(3)`) is far larger
-    // than the inset (`_outlineGap = pctH(0.4)`), so the ring never
-    // overlaps content.
+    // top; the icon padding (`_padding = pctH(3)`) is far larger than
+    // the inset (`_outlineGap = pctH(0.4)`), so the ring never overlaps
+    // content.
     Rectangle {
         anchors.fill: parent
         anchors.margins: root._outlineGap
@@ -139,18 +121,18 @@ Item {
         visible: root._focusedSelection
     }
 
-    // Icon area. Spans from the top padding down to just above the
-    // label, centered horizontally. PreserveAspectFit lets curated
-    // logos render at their native aspect inside whichever dimension
-    // is the tighter constraint.
+    // Icon area. Fills the card minus padding on every side, centered
+    // horizontally. PreserveAspectFit lets curated logos render at
+    // their native aspect inside whichever dimension is the tighter
+    // constraint.
     Image {
         id: cover
 
         anchors {
             top: parent.top
             topMargin: root._padding
-            bottom: label.top
-            bottomMargin: root._gap
+            bottom: parent.bottom
+            bottomMargin: root._padding
             horizontalCenter: parent.horizontalCenter
         }
         width: parent.width - 2 * root._padding
@@ -171,55 +153,21 @@ Item {
     // Procedural fallback. Sits at the same geometry as the cover and
     // snaps to the cover the moment Image.status hits Ready; the brief
     // Loading window shows the fallback text rather than crossfading.
-    // Cache hits skip Loading entirely and snap directly. The 150 ms
-    // crossfade was readable as a per-tile "fade pop in" on the destination
-    // screen after a deferred-flip — the user sees a sea of fallback text
-    // settling into covers — so the swap is now instant.
+    // Cache hits skip Loading entirely and snap directly.
     Text {
         anchors.fill: cover
         text: root.delegateName
         font.family: Theme.fontUi
         font.pixelSize: Sizing.fontSize(2.4)
         color: root._focusedSelection ? Theme.textPrimary : Theme.textLabel
-        wrapMode: Text.WordWrap
+        // Wrap (not WordWrap): an unbreakable identifier like
+        // `_LongCollectionName_Definitive_Cut.smc` would otherwise
+        // render past `width` and bleed out of the tile.
+        wrapMode: Text.Wrap
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
         renderType: Text.NativeRendering
         opacity: root._hasCover ? 0.0 : 1.0
-    }
-
-    // Label. Always visible. The procedural fallback briefly shows the
-    // same name on top of the cover area while the curated PNG is in
-    // `Image.Status.Loading` (which Qt enters even on QPixmapCache
-    // hits when `source` changes), so the strip and the fallback show
-    // the same text for a frame or two — that's fine. Gating the
-    // label's visibility or height on `_hasCover` would force a layout
-    // shift and an opacity Behavior on every navigation, which on busy
-    // grids turns into visible chop on Qt Quick's Software adaptation.
-    // Selection cue is color + weight only — no scale, no underline —
-    // so labels line up at a uniform baseline across the row.
-    Text {
-        id: label
-
-        anchors {
-            bottom: parent.bottom
-            bottomMargin: root._padding
-            horizontalCenter: parent.horizontalCenter
-        }
-        width: parent.width - 2 * root._padding
-        height: root._labelHeight
-        text: root.delegateName
-        font.family: Theme.fontUi
-        font.pixelSize: Sizing.fontSize(2.6)
-        font.weight: root._focusedSelection ? Font.Medium : Font.Normal
-        color: root._focusedSelection ? Theme.textPrimary : Theme.textLabel
-        // WordWrap (not Wrap) to avoid mid-word breaks like "Nint-endo".
-        // Two lines max — anything longer elides on the second line.
-        wrapMode: Text.WordWrap
-        maximumLineCount: 2
-        elide: Text.ElideRight
-        horizontalAlignment: Text.AlignHCenter
-        verticalAlignment: Text.AlignVCenter
-        renderType: Text.NativeRendering
+        clip: true
     }
 }

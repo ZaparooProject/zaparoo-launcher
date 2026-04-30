@@ -24,11 +24,8 @@ import Zaparoo.Theme
 // Software adaptation the renderer cannot keep up with a per-frame
 // alpha ramp over a busy grid — translucent overlays don't subtract
 // from the dirty region, so every cell underneath re-rasterizes per
-// frame (text labels, cover images, card bodies). The only animated
-// cue on a page change is a brief scale pulse on the page-dot for
-// the new page: small element, small dirty rect, partial-update
-// friendly. See docs/qml-gotchas.md → "Software-renderer animation
-// costs" for the full reasoning.
+// frame (cover images, card bodies). See docs/qml-gotchas.md →
+// "Software-renderer animation costs" for the full reasoning.
 Item {
     id: root
 
@@ -45,24 +42,33 @@ Item {
     // untouched.
     property bool focused: true
 
-    readonly property int columns: Sizing.gridColumns
-    readonly property int rows: Sizing.gridRows
+    // Emitted when the user is sitting on the last loaded page after a
+    // selection move. Models with more data fetch the next page in
+    // response; models without ignore it. The grid does not know
+    // whether the model has more data — that is a model concern, kept
+    // out of this component so it stays generic.
+    signal loadMoreRequested()
+
+    // Per-instance shape overrides. -1 means "use the global Sizing
+    // default" — Systems screen leaves these alone so the systems grid
+    // stays at gridColumns × gridRows; Games screen wires them to
+    // gamesGridColumns × gamesGridRows so its taller cover art gets the
+    // vertical room a 3-row layout would starve.
+    property int columnsOverride: -1
+    property int rowsOverride: -1
+    readonly property int columns:
+        columnsOverride > 0 ? columnsOverride : Sizing.gridColumns
+    readonly property int rows:
+        rowsOverride > 0 ? rowsOverride : Sizing.gridRows
     readonly property int pageSize: columns * rows
     readonly property int pageCount: Math.max(1, Math.ceil(itemCount / pageSize))
     readonly property int currentPage: Math.floor(currentIndex / pageSize)
     readonly property int currentColumn: (currentIndex % pageSize) % columns
     readonly property int currentRow: Math.floor((currentIndex % pageSize) / columns)
 
-    // Reserved chrome around the cell area. The dot band is reserved even
-    // when pageCount === 1 so cell metrics stay stable when the model is
-    // swapped for one with a different pageCount — e.g. switching from a
-    // single-page category like "Arcade" to a multi-page one like
-    // "Consoles", or between systems whose game counts straddle pageSize.
-    // Without the reservation, cellWidth/cellHeight would jump as the dot
-    // band appears or disappears.
+    // Reserved chrome around the cell area.
     readonly property int sideInset: Sizing.pctW(5)
     readonly property int topInset: Sizing.pctH(1)
-    readonly property int dotsBandHeight: Sizing.pctH(4)
     readonly property int cellSpacingX: Sizing.pctW(3)
     readonly property int cellSpacingY: Sizing.pctH(4)
 
@@ -70,7 +76,7 @@ Item {
     // gridColumns × gridRows. Callers don't override.
     readonly property int _availableWidth: Math.max(0, width - 2 * sideInset)
     readonly property int _availableHeight:
-        Math.max(0, height - dotsBandHeight - topInset)
+        Math.max(0, height - topInset)
     readonly property int cellWidth:
         Math.max(0,
                  Math.floor((root._availableWidth - (root.columns - 1) * root.cellSpacingX)
@@ -82,6 +88,42 @@ Item {
 
     function setCurrentIndexImmediate(idx: int): void {
         root.currentIndex = idx
+    }
+
+    // Jump the selection by `delta` whole pages. Wraps in both
+    // directions to mirror moveSelection's column-edge behavior:
+    // - delta > 0 past the last page wraps to page 0
+    // - delta < 0 from page 0 wraps to the last page
+    // The target lands on (targetPage, currentRow, currentColumn) when
+    // that slot exists; on a partial last page it clamps to the last
+    // existing item on that page so the user always moves rather than
+    // sticking on a hole. Returns true if the index actually changed.
+    // No-op (returns false) on a single-page dataset since wrap on
+    // page 0 ↔ page 0 wouldn't move anything.
+    function pageBy(delta: int): bool {
+        if (root.itemCount <= 0 || root.pageCount <= 1 || delta === 0)
+            return false
+        const total = root.pageCount
+        // JS `%` keeps sign on negatives — normalise into [0, total).
+        const targetPage = ((root.currentPage + delta) % total + total) % total
+        const targetSlot =
+            targetPage * root.pageSize
+            + root.currentRow * root.columns
+            + root.currentColumn
+        const lastIdxOnPage =
+            Math.min((targetPage + 1) * root.pageSize, root.itemCount) - 1
+        if (lastIdxOnPage < 0)
+            return false
+        const newIndex = Math.min(targetSlot, lastIdxOnPage)
+        if (newIndex === root.currentIndex)
+            return false
+        root.currentIndex = newIndex
+        // Mirror moveSelection's pre-fetch: when we cross into the
+        // second-to-last loaded page, kick a fetch so the next page
+        // boundary lands on freshly loaded rows.
+        if (root.currentPage >= root.pageCount - 2)
+            root.loadMoreRequested()
+        return true
     }
 
     // Step the selection by (dCol, dRow). Returns true if the index
@@ -164,19 +206,39 @@ Item {
                 return false
             }
         }
-        if (newIndex === root.currentIndex)
+        if (newIndex === root.currentIndex) {
+            // Selection didn't move because the user is at an edge with
+            // no data beyond it on this side. If they're at or past the
+            // penultimate loaded page, ask the model to fetch more so a
+            // subsequent press can land on freshly-loaded rows.
+            if (root.currentPage >= root.pageCount - 2)
+                root.loadMoreRequested()
             return false
+        }
         root.currentIndex = newIndex
+        // Pre-fetch one page early — when the user enters the
+        // second-to-last loaded page, kick off the next fetch so the
+        // network round-trip overlaps with a full page of cell
+        // traversal and the new page lands before they cross the
+        // boundary. The model's own debounce (loading_more guard)
+        // collapses repeated emissions while a fetch is in flight.
+        if (root.currentPage >= root.pageCount - 2)
+            root.loadMoreRequested()
         return true
     }
 
-    // Defensive clamp: if the model shrinks below the saved index, keep
-    // us in-bounds. The screens' onModelReset handlers re-seed
-    // currentIndex immediately afterwards via setCurrentIndexImmediate,
-    // but we shouldn't render with a stale index in the gap.
+    // Defensive clamp on shrinkage only: if the model shed rows below
+    // the saved index, keep us in-bounds. Don't clamp on growth — page
+    // appends from cumulative pagination must leave the user's
+    // currentIndex untouched.
+    property int _previousItemCount: 0
+
     onItemCountChanged: {
-        if (root.currentIndex >= root.itemCount)
+        if (root.itemCount < root._previousItemCount &&
+            root.currentIndex >= root.itemCount) {
             root.currentIndex = Math.max(0, root.itemCount - 1)
+        }
+        root._previousItemCount = root.itemCount
     }
 
     clip: true
@@ -229,62 +291,6 @@ Item {
                     isFocused: root.focused
                     name: cellItem.name
                     coverKey: cellItem.coverKey
-                }
-            }
-        }
-    }
-
-    // Page indicator dots. The dot for the current page brightens AND
-    // briefly pulses larger, drawing the eye to the new position after
-    // an instant cell swap. Hidden for a single-page model; the band
-    // height is still reserved above so hiding the row doesn't reflow
-    // cells.
-    Row {
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: Sizing.pctH(0.5)
-        anchors.horizontalCenter: parent.horizontalCenter
-        spacing: Sizing.pctW(1)
-        visible: root.pageCount > 1
-
-        Repeater {
-            model: root.pageCount
-
-            Rectangle {
-                id: dot
-
-                required property int index
-
-                readonly property bool isCurrent: index === root.currentPage
-
-                width: Sizing.pctH(1.8)
-                height: width
-                radius: width / 2
-                color: dot.isCurrent ? Theme.textPrimary : Theme.textDim
-                scale: 1
-
-                // Pulse on the dot that just became current. Small
-                // element, small dirty rect — partial-update friendly
-                // even when the cell area was busy with a fresh layout
-                // this frame. `running: dot.isCurrent` retriggers the
-                // animation each time a new dot becomes current.
-                // `alwaysRunToEnd: true` lets the previous-current
-                // dot's pulse complete its cycle back to scale 1 when
-                // the user mashes through pages, instead of being cut
-                // off mid-bounce and leaving the dot at an
-                // intermediate size.
-                SequentialAnimation on scale {
-                    running: dot.isCurrent
-                    alwaysRunToEnd: true
-                    NumberAnimation {
-                        from: 1; to: 1.4
-                        duration: 80
-                        easing.type: Easing.OutQuad
-                    }
-                    NumberAnimation {
-                        from: 1.4; to: 1
-                        duration: 120
-                        easing.type: Easing.InQuad
-                    }
                 }
             }
         }

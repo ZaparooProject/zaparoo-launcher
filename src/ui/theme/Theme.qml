@@ -28,8 +28,6 @@ QtObject {
 
     // Text
     readonly property color textPrimary: "#ffffff"
-    readonly property color textMuted: "#666666"
-    readonly property color textDim: "#555555"
     readonly property color textLabel: "#888888"
 
     // Accent — static warm amber used for selection highlights.

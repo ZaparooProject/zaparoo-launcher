@@ -126,12 +126,21 @@ qt_import_qml_plugins(launcher)
 
 # For static Qt (ARM32): the Controls chain _init OBJECT targets carry the
 # Q_IMPORT_QML_PLUGIN static-init factories. Not propagated automatically
-# from a cross-compiled Qt toolchain, so link them explicitly.
+# from a cross-compiled Qt toolchain, so link them explicitly. The
+# QSvgPlugin entry registers the SVG image format with QImageReader so
+# `Image { source: "...svg" }` works in the static build (the shared
+# desktop build picks the plugin up automatically from the Qt install).
 if(_rs_qt6_core_type STREQUAL "STATIC_LIBRARY")
     if(TARGET Qt6::QLinuxFbIntegrationPlugin)
         target_link_libraries(launcher PRIVATE
             Qt6::QLinuxFbIntegrationPlugin
             Qt6::QLinuxFbIntegrationPlugin_init
+        )
+    endif()
+    if(TARGET Qt6::QSvgPlugin)
+        target_link_libraries(launcher PRIVATE
+            Qt6::QSvgPlugin
+            Qt6::QSvgPlugin_init
         )
     endif()
     foreach(_rs_qml_plugin IN ITEMS

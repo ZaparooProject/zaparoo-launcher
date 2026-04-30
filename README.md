@@ -48,6 +48,21 @@ Third-party components:
   are available on request at
   [legal@zaparoo.org](mailto:legal@zaparoo.org).
   See [`src/LICENSES/`](src/LICENSES/).
-- **Press Start 2P** font: SIL Open Font License 1.1, © 2012 The Press Start 2P
-  Project Authors. See [`src/LICENSES/OFL.txt`](src/LICENSES/OFL.txt) and
-  [`src/LICENSES/PressStart2P-ATTRIBUTION.txt`](src/LICENSES/PressStart2P-ATTRIBUTION.txt).
+- **Atkinson Hyperlegible** font: SIL Open Font License 1.1, © 2020 Braille
+  Institute of America, Inc. See
+  [`src/LICENSES/AtkinsonHyperlegible-OFL.txt`](src/LICENSES/AtkinsonHyperlegible-OFL.txt)
+  and
+  [`src/LICENSES/AtkinsonHyperlegible-ATTRIBUTION.txt`](src/LICENSES/AtkinsonHyperlegible-ATTRIBUTION.txt).
+- **Iconoir** UI icons: MIT License, © Luca Burgio and contributors.
+  See [`src/LICENSES/Iconoir-ATTRIBUTION.txt`](src/LICENSES/Iconoir-ATTRIBUTION.txt).
+- **Lucide** UI icons: ISC License, © 2024 Lucide Contributors (fork of Feather
+  Icons by Cole Bemis). See
+  [`src/LICENSES/Lucide-ATTRIBUTION.txt`](src/LICENSES/Lucide-ATTRIBUTION.txt).
+- **Streamline** Core line icon (Handheld category): © Webalys LLC, used
+  under the Streamline Free License — <https://streamlinehq.com>. See
+  [`src/LICENSES/Streamline-ATTRIBUTION.txt`](src/LICENSES/Streamline-ATTRIBUTION.txt).
+- **Controller Input Icons** by ElDuderino, released into the public domain.
+  See [`src/LICENSES/controller-icons-ATTRIBUTION.txt`](src/LICENSES/controller-icons-ATTRIBUTION.txt).
+- **Console logos** redrawn by Dan Patrick (MIT-licensed compilation; platform
+  marks remain trademarks of their respective owners). See
+  [`src/LICENSES/console-logos-ATTRIBUTION.txt`](src/LICENSES/console-logos-ATTRIBUTION.txt).

@@ -73,8 +73,16 @@ impl MediaSearchResult {
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MediaBrowseParams {
+    #[serde(skip_serializing_if = "String::is_empty")]
     pub path: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub systems: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_results: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cursor: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -88,6 +96,8 @@ pub struct BrowseEntry {
     pub file_count: u32,
     #[serde(default)]
     pub system_id: String,
+    #[serde(default)]
+    pub system_ids: Vec<String>,
     #[serde(default)]
     pub zap_script: String,
     #[serde(default)]
@@ -115,6 +125,16 @@ pub struct MediaBrowseResult {
     pub total_files: u32,
     #[serde(default)]
     pub pagination: Option<Pagination>,
+}
+
+impl MediaBrowseResult {
+    pub fn has_next_page(&self) -> bool {
+        self.pagination.as_ref().is_some_and(|p| p.has_next_page)
+    }
+
+    pub fn next_cursor(&self) -> Option<String> {
+        self.pagination.as_ref().and_then(|p| p.next_cursor.clone())
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
@@ -197,8 +217,8 @@ mod tests {
     )]
 
     use super::{
-        BrowseEntry, MediaBrowseResult, MediaSearchResult, ReaderInfo, ReadersResult,
-        SystemsResult, VersionResult,
+        BrowseEntry, MediaBrowseParams, MediaBrowseResult, MediaSearchResult, ReaderInfo,
+        ReadersResult, SystemsResult, VersionResult,
     };
 
     #[test]
@@ -348,6 +368,82 @@ mod tests {
         let pagination = result.pagination.expect("pagination present");
         assert!(pagination.has_next_page);
         assert_eq!(pagination.next_cursor.as_deref(), Some("x"));
+    }
+
+    #[test]
+    fn media_browse_params_systems_only_omits_path_and_cursor() {
+        let params = MediaBrowseParams {
+            systems: vec!["SNES".into()],
+            max_results: Some(100),
+            ..MediaBrowseParams::default()
+        };
+        let json = serde_json::to_value(&params).expect("serialise");
+        let object = json.as_object().expect("object");
+        assert!(!object.contains_key("path"));
+        assert!(!object.contains_key("cursor"));
+        assert_eq!(
+            object
+                .get("systems")
+                .and_then(|v| v.as_array())
+                .map(Vec::len),
+            Some(1)
+        );
+        assert_eq!(
+            object.get("maxResults").and_then(serde_json::Value::as_u64),
+            Some(100)
+        );
+    }
+
+    #[test]
+    fn media_browse_params_path_systems_cursor_round_trip() {
+        let params = MediaBrowseParams {
+            path: "/roms/SNES".into(),
+            systems: vec!["SNES".into()],
+            max_results: Some(100),
+            cursor: Some("opaque".into()),
+        };
+        let json = serde_json::to_value(&params).expect("serialise");
+        let object = json.as_object().expect("object");
+        assert_eq!(
+            object.get("path").and_then(|v| v.as_str()),
+            Some("/roms/SNES")
+        );
+        assert_eq!(
+            object.get("cursor").and_then(|v| v.as_str()),
+            Some("opaque")
+        );
+        assert_eq!(
+            object
+                .get("systems")
+                .and_then(|v| v.as_array())
+                .map(Vec::len),
+            Some(1)
+        );
+    }
+
+    #[test]
+    fn browse_entry_parses_system_id_and_system_ids() {
+        let json = r#"{
+            "name":"SNES","path":"/roms/SNES","type":"root","fileCount":12,
+            "systemId":"SNES","systemIds":["SNES"]
+        }"#;
+        let entry: BrowseEntry = serde_json::from_str(json).expect("parse");
+        assert_eq!(entry.system_id, "SNES");
+        assert_eq!(entry.system_ids, vec!["SNES".to_string()]);
+    }
+
+    #[test]
+    fn browse_entry_parses_system_ids_only_for_multi_system_route() {
+        let json = r#"{
+            "name":"shared","path":"/roms/shared","type":"root","fileCount":42,
+            "systemIds":["SNES","NES"]
+        }"#;
+        let entry: BrowseEntry = serde_json::from_str(json).expect("parse");
+        assert_eq!(entry.system_id, "");
+        assert_eq!(
+            entry.system_ids,
+            vec!["SNES".to_string(), "NES".to_string()]
+        );
     }
 
     #[test]

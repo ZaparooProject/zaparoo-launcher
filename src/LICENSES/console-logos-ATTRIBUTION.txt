@@ -2,16 +2,14 @@ Console Logos Attribution
 =========================
 
 This software bundles a curated subset of platform logos under
-resources/images/systems/ and category logos under
-resources/images/categories/ derived from:
+resources/images/systems/ derived from:
 
   Console Logos Professionally Redrawn + Official Versions
   by Dan Patrick
   https://archive.org/details/console-logos-professionally-redrawn-plus-official-versions
 
 The bundled system PNGs are downscaled (256 px on the longest edge) versions
-of the "Light - Color" recommended set, and the category PNGs come from the
-"Matching Word Options" Set 5 directory, both from the GitHub mirror:
+of the "Light - Color" recommended set from the GitHub mirror:
 
   https://github.com/PRO100BYTE/console-logos
   Mirror copyright (c) 2023 #TheDayG0ne and PRO100BYTE Team

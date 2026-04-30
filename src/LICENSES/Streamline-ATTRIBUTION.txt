@@ -1,0 +1,20 @@
+Streamline Attribution
+======================
+
+This software bundles a single UI glyph derived from the free Streamline
+Core line-icon set:
+
+  resources/images/categories/Handheld.svg  (Streamline Core "Gameboy")
+
+  Streamline
+  https://streamlinehq.com/
+
+Streamline assets are © Webalys LLC. The bundled icon is used under the
+Streamline Free License, which permits use in open-source projects with
+attribution and a link to https://streamlinehq.com.
+
+The Streamline Free License is summarised at:
+  https://help.streamlinehq.com/en/articles/5354376-streamline-free-license
+
+The icon remains the property of Webalys LLC and is licensed for use only
+in the context of this open-source project.

@@ -26,6 +26,15 @@ QtObject {
                                        : 5
     readonly property int gridRows: screenHeight < 300 ? 2 : 3
 
+    // Games grid shape — taller per-tile cover art than systems logos
+    // means a 5x3 layout starves vertical space, so games use 5x2 on
+    // desktop. The 240p MiSTer branch keeps a 3x2 layout for parity
+    // with the other rows on a small screen.
+    readonly property int gamesGridColumns: screenHeight < 300 ? 3
+                                            : screenHeight < 600 ? 4
+                                            : 5
+    readonly property int gamesGridRows: 2
+
     function pctH(percent: real): int {
         return Math.round(screenHeight * percent / 100)
     }

@@ -9,13 +9,15 @@ qt_add_qml_module(
     URI Zaparoo.Ui
     VERSION 1.0
     QML_FILES
-        FpsCounter.qml
+        ActiveLabel.qml
+        LoadingIndicator.qml
         Modal.qml
         PagedGrid.qml
         ScreenStateOverlay.qml
         StatusIcon.qml
         Tile.qml
         TileLoader.qml
+        TopStatusStrip.qml
 )
 
 target_link_libraries(

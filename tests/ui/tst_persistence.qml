@@ -44,8 +44,15 @@ TestCase {
         Browse.AppState.active_screen = ""
         Browse.HubState.category = ""
         Browse.SystemsState.system_id = ""
+        // set_system_id resets path_stack/selected_at_level to [""], [""]
+        // internally, but only on an actual transition — the setter
+        // early-returns when the new value equals the old. Tests that
+        // mutate path_stack/selected via set_selected_at_top while
+        // system_id was already empty would leave dirty stack state for
+        // the next test if we just assigned `= ""`. Force a transition
+        // through a sentinel to guarantee the reset fires.
+        Browse.GamesState.system_id = "_cleanup_sentinel"
         Browse.GamesState.system_id = ""
-        Browse.GamesState.game_path = ""
     }
 
     // CategoriesModel is empty in this test harness (no live Core).
@@ -75,14 +82,18 @@ TestCase {
     }
 
     function test_empty_games_navigation_preserves_games_state(): void {
-        Browse.GamesState.game_path = "persistence-probe-path"
+        // Seed selected_at_level[0] via the stack API. set_selected_at_top
+        // mutates the deepest level only, and at this point the stack is
+        // at its minimum — index 0 is the deepest.
+        Browse.GamesState.set_selected_at_top("persistence-probe-path")
         main.activeScreen = main.screenGames
         main.handleKey(Qt.Key_Left)
         main.handleKey(Qt.Key_Right)
         main.handleKey(Qt.Key_Up)
         main.handleKey(Qt.Key_Down)
-        compare(Browse.GamesState.game_path, "persistence-probe-path",
-                "navigating an empty games grid must not overwrite GamesState.game_path")
+        const sels = Browse.GamesState.selected_at_level
+        compare(sels[sels.length - 1], "persistence-probe-path",
+                "navigating an empty games grid must not overwrite GamesState selection")
     }
 
     // Screen flips are user-visible intent, not selection state. On Hub
@@ -131,10 +142,11 @@ TestCase {
     }
 
     function test_enter_on_empty_games_preserves_games_state(): void {
-        Browse.GamesState.game_path = "persistence-probe-path"
+        Browse.GamesState.set_selected_at_top("persistence-probe-path")
         main.activeScreen = main.screenGames
         main.handleKey(Qt.Key_Return)
-        compare(Browse.GamesState.game_path, "persistence-probe-path",
-                "Enter on an empty games grid must not overwrite GamesState.game_path")
+        const sels = Browse.GamesState.selected_at_level
+        compare(sels[sels.length - 1], "persistence-probe-path",
+                "Enter on an empty games grid must not overwrite GamesState selection")
     }
 }

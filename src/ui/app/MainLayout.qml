@@ -228,28 +228,39 @@ ApplicationWindow {
         anchors.rightMargin: Sizing.pctW(2)
         spacing: Sizing.pctW(1)
         z: 200
+        // Explicit row height matches StatusIcon's square size so every
+        // child can verticalCenter against the row and the icons + clock
+        // sit on a single line. Without this Row height tracks the
+        // tallest child, which is the Text element (font ascender +
+        // descender) — that pushes icons up and out of alignment.
+        readonly property real _iconSize: Sizing.fontSize(2.4)
+        height: topHud._iconSize
 
         StatusIcon {
+            anchors.verticalCenter: parent.verticalCenter
             visible: Browse.SystemStatus.has_nfc
-            source: Resources.statusIconUrl("nfc")
+            source: Resources.statusIconUrl("NFC")
             name: "NFC"
         }
 
         StatusIcon {
+            anchors.verticalCenter: parent.verticalCenter
             visible: Browse.SystemStatus.has_wifi_internet
-            source: Resources.statusIconUrl("wifi")
+            source: Resources.statusIconUrl("WiFi")
             name: "Wi-Fi"
         }
 
         StatusIcon {
+            anchors.verticalCenter: parent.verticalCenter
             visible: Browse.SystemStatus.has_lan_internet
-            source: Resources.statusIconUrl("lan")
+            source: Resources.statusIconUrl("WiredNetwork")
             name: "LAN"
         }
 
         StatusIcon {
+            anchors.verticalCenter: parent.verticalCenter
             visible: Browse.SystemStatus.has_bluetooth
-            source: Resources.statusIconUrl("bt")
+            source: Resources.statusIconUrl("Bluetooth")
             name: "Bluetooth"
         }
 
@@ -258,11 +269,18 @@ ApplicationWindow {
 
             // 30s tick keeps the displayed minute fresh without per-second
             // wakeups; minutes-only display means we never need finer.
+            // Fixed width avoids reflow on the minute boundary because
+            // proportional digits make "11:11" narrower than "10:00".
             property string currentTime: Qt.formatDateTime(new Date(), "HH:mm")
 
+            anchors.verticalCenter: parent.verticalCenter
+            height: parent.height
+            width: topHud._iconSize * 3
+            verticalAlignment: Text.AlignVCenter
+            horizontalAlignment: Text.AlignRight
             text: clockLabel.currentTime
             font.family: Theme.fontUi
-            font.pixelSize: Sizing.fontSize(2.5)
+            font.pixelSize: topHud._iconSize
             color: Theme.textPrimary
             renderType: Text.NativeRendering
 
@@ -275,19 +293,6 @@ ApplicationWindow {
                     Qt.formatDateTime(new Date(), "HH:mm")
             }
         }
-    }
-
-    // ── FPS counter ───────────────────────────────────────────────────────────
-    //
-    // Sits in the bottom-right corner above the (conditional) status strip
-    // so it never overlaps the top HUD or the bottom bars.
-
-    FpsCounter {
-        anchors.bottom: statusStrip.top
-        anchors.right: parent.right
-        anchors.bottomMargin: Sizing.pctH(1)
-        anchors.rightMargin: Sizing.pctW(1)
-        z: 200
     }
 
     // ── Connection status strip ───────────────────────────────────────────────
@@ -350,52 +355,130 @@ ApplicationWindow {
         border.width: 1
         border.color: Theme.borderSubtle
 
-        Text {
-            anchors.centerIn: parent
-            // (activeScreen, screenState, modal?)-keyed lookup. The modal
-            // row wins outright; otherwise per-screen text varies with
-            // the screen's data-state (Loading / Error / Empty / Ready).
-            // Error and Empty share the retry-or-back row on Systems and
-            // Games (both wire `accept` to re-fire `set_category` /
-            // `set_system` in non-Ready state). Hub has no retry handler
-            // — CategoriesModel binds eagerly via bind_to_endpoint! and
-            // recovers automatically — so its non-Ready row drops [OK]
-            // RETRY rather than promising behavior the screen doesn't
-            // implement.
-            //
-            // During a forward transition (`pendingTransition !== ""`)
-            // the router's input gate swallows every press — including
-            // cancel — so the bar blanks rather than advertising
-            // buttons that won't respond. Modals still win outright;
-            // they run on top of the input gate.
-            text: {
-                if (root.cardWriteModalVisible)
-                    return qsTr("[ESC] CANCEL");
-                if (root.pendingTransition !== "")
-                    return "";
-                if (root.activeScreen === root.screenHub) {
-                    if (root.hubScreenState === "ready")
-                        return qsTr("[<>] CATEGORY  [OK] SELECT  [ESC] QUIT");
-                    return qsTr("[ESC] QUIT");
-                }
-                if (root.activeScreen === root.screenSystems) {
-                    if (root.systemsScreenState === "loading")
-                        return qsTr("[ESC] BACK");
-                    if (root.systemsScreenState === "ready")
-                        return qsTr("[<>] SYSTEM  [OK] GAMES  [TAB] FLASH CARD  [ESC] BACK");
-                    return qsTr("[OK] RETRY  [ESC] BACK");
-                }
-                // games
-                if (root.gamesScreenState === "loading")
-                    return qsTr("[ESC] BACK");
-                if (root.gamesScreenState === "ready")
-                    return qsTr("[<>] GAME  [OK] PLAY  [TAB] FLASH CARD  [ESC] BACK");
-                return qsTr("[OK] RETRY  [ESC] BACK");
+        // (activeScreen, screenState, modal?)-keyed lookup. The modal
+        // row wins outright; otherwise per-screen entries vary with
+        // the screen's data-state (Loading / Error / Empty / Ready).
+        // Error and Empty share the retry-or-back row on Systems and
+        // Games (both wire `accept` to re-fire `set_category` /
+        // `set_system` in non-Ready state). Hub has no retry handler
+        // — CategoriesModel binds eagerly via bind_to_endpoint! and
+        // recovers automatically — so its non-Ready row drops the
+        // Retry entry rather than promising behavior the screen
+        // doesn't implement.
+        //
+        // During a forward transition (`pendingTransition !== ""`)
+        // the router's input gate swallows every press — including
+        // cancel — so the bar blanks rather than advertising
+        // buttons that won't respond. Modals still win outright;
+        // they run on top of the input gate.
+        //
+        // Each entry resolves to a button glyph (Dpad / ButtonA /
+        // ButtonB / ButtonX) plus a label. The button names are the
+        // file basenames under resources/images/icons/ — see
+        // Resources.iconUrl() for the qrc rule.
+        //
+        // Label vocabulary is deliberately minimal: D-pad is always
+        // "Move"; A is "Open" for both drill-downs and launches (the
+        // tile and screen title carry the specific identity, so the
+        // verb doesn't need to repeat that); B is "Back" except on
+        // the Hub root, where it's "Quit". Sentence case throughout.
+        readonly property var helpEntries: {
+            if (root.cardWriteModalVisible)
+                return [{ button: "ButtonB", label: qsTr("Cancel") }];
+            if (root.pendingTransition !== "")
+                return [];
+            if (root.activeScreen === root.screenHub) {
+                if (root.hubScreenState === "ready")
+                    return [
+                        { button: "Dpad",    label: qsTr("Move") },
+                        { button: "ButtonA", label: qsTr("Open") },
+                        { button: "ButtonB", label: qsTr("Quit") }
+                    ];
+                return [{ button: "ButtonB", label: qsTr("Quit") }];
             }
-            font.family: Theme.fontUi
-            font.pixelSize: Sizing.fontSize(2.5)
-            color: Theme.textDim
-            renderType: Text.NativeRendering
+            if (root.activeScreen === root.screenSystems) {
+                if (root.systemsScreenState === "loading")
+                    return [{ button: "ButtonB", label: qsTr("Back") }];
+                if (root.systemsScreenState === "ready") {
+                    // L/R shoulders page jump; only advertise the cue
+                    // when there's a second page to jump to, so we
+                    // don't promise a press that no-ops on a single
+                    // page of systems.
+                    const pages = root.systemsScreen.systemsGrid.pageCount;
+                    let row = [
+                        { button: "Dpad",    label: qsTr("Move") }
+                    ];
+                    if (pages > 1)
+                        row.push({ button: "ButtonL", label: qsTr("Prev page") },
+                                 { button: "ButtonR", label: qsTr("Next page") });
+                    row.push({ button: "ButtonA", label: qsTr("Open") },
+                             { button: "ButtonX", label: qsTr("Flash card") },
+                             { button: "ButtonB", label: qsTr("Back") });
+                    return row;
+                }
+                return [
+                    { button: "ButtonA", label: qsTr("Retry") },
+                    { button: "ButtonB", label: qsTr("Back") }
+                ];
+            }
+            // games
+            if (root.gamesScreenState === "loading")
+                return [{ button: "ButtonB", label: qsTr("Back") }];
+            if (root.gamesScreenState === "ready") {
+                const pages = root.gamesScreen.gamesGrid.pageCount;
+                let row = [
+                    { button: "Dpad",    label: qsTr("Move") }
+                ];
+                if (pages > 1)
+                    row.push({ button: "ButtonL", label: qsTr("Prev page") },
+                             { button: "ButtonR", label: qsTr("Next page") });
+                row.push({ button: "ButtonA", label: qsTr("Open") });
+                // Drop the Flash card cue on directory/root rows —
+                // write_card no-ops there, so advertising the bind
+                // would mislead.
+                if (root.gamesScreen.currentEntryWritable)
+                    row.push({ button: "ButtonX", label: qsTr("Flash card") });
+                row.push({ button: "ButtonB", label: qsTr("Back") });
+                return row;
+            }
+            return [
+                { button: "ButtonA", label: qsTr("Retry") },
+                { button: "ButtonB", label: qsTr("Back") }
+            ];
+        }
+
+        Row {
+            anchors.centerIn: parent
+            spacing: Sizing.pctW(2)
+
+            Repeater {
+                model: instructionsBar.helpEntries
+
+                delegate: Row {
+                    required property var modelData
+                    spacing: Sizing.pctW(0.6)
+
+                    Image {
+                        anchors.verticalCenter: parent.verticalCenter
+                        height: Sizing.pctH(4)
+                        width: height
+                        fillMode: Image.PreserveAspectFit
+                        sourceSize.height: height
+                        sourceSize.width: width
+                        source: Resources.iconUrl(parent.modelData.button)
+                        smooth: true
+                    }
+
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: parent.modelData.label
+                        font.family: Theme.fontUi
+                        font.pixelSize: Sizing.fontSize(2.5)
+                        color: Theme.textPrimary
+                        renderType: Text.NativeRendering
+                    }
+                }
+            }
         }
     }
 }

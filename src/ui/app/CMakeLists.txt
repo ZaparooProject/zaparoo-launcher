@@ -15,24 +15,33 @@ set(_APP_RESOURCES
     # Tiled circuit-trace background. The .png is pre-rendered from the
     # .svg at the pattern's native 304×304 (rsvg-convert / Inkscape /
     # ImageMagick); shipping both keeps the source available for
-    # re-rendering without forcing a runtime QtSvg dependency.
+    # re-rendering. The .png is what `Image.Tile` consumes — tiled SVG
+    # would re-rasterize the source on every paint of the dirty rect.
     "${_RESOURCE_ROOT}/images/bg-circuit.png"
     "${_RESOURCE_ROOT}/images/bg-circuit.svg"
 )
 
-# System and category logos: PNGs dropped into
-# resources/images/systems/<SystemId>.png and
-# resources/images/categories/<CategoryName>.png (curated from
-# PRO100BYTE/console-logos — see src/LICENSES/console-logos-ATTRIBUTION.txt).
-# Globbed so adding/removing a logo doesn't require touching this file; we
-# CONFIGURE_DEPENDS so CMake re-globs on directory changes.
+# System logos stay PNG (curated from PRO100BYTE/console-logos — see
+# src/LICENSES/console-logos-ATTRIBUTION.txt). Categories and status
+# icons accept either PNG or SVG so SVGs can be dropped straight in
+# without a pre-render step; QtSvg rasterizes once on first load and
+# the result is cached in QPixmapCache. Top-level icons (folder, file,
+# loading, settings, navigation arrows, …) under resources/images/icons/
+# are SVG; gamepad button glyphs (ButtonA/B/X/Y/L/R, Dpad) ship as PNG
+# alongside them. Globs use CONFIGURE_DEPENDS so adding/removing a file
+# triggers a re-glob on the next build.
 file(GLOB _SYSTEM_LOGOS CONFIGURE_DEPENDS
     "${_RESOURCE_ROOT}/images/systems/*.png")
 file(GLOB _CATEGORY_LOGOS CONFIGURE_DEPENDS
-    "${_RESOURCE_ROOT}/images/categories/*.png")
+    "${_RESOURCE_ROOT}/images/categories/*.png"
+    "${_RESOURCE_ROOT}/images/categories/*.svg")
 file(GLOB _STATUS_ICONS CONFIGURE_DEPENDS
-    "${_RESOURCE_ROOT}/images/status/*.xpm")
-list(APPEND _APP_RESOURCES ${_SYSTEM_LOGOS} ${_CATEGORY_LOGOS} ${_STATUS_ICONS})
+    "${_RESOURCE_ROOT}/images/status/*.svg")
+file(GLOB _UI_ICONS CONFIGURE_DEPENDS
+    "${_RESOURCE_ROOT}/images/icons/*.png"
+    "${_RESOURCE_ROOT}/images/icons/*.svg")
+list(APPEND _APP_RESOURCES
+    ${_SYSTEM_LOGOS} ${_CATEGORY_LOGOS} ${_STATUS_ICONS} ${_UI_ICONS})
 
 foreach(_res IN LISTS _APP_RESOURCES)
     file(RELATIVE_PATH _alias "${_RESOURCE_ROOT}/.." "${_res}")
@@ -58,6 +67,11 @@ target_link_libraries(
     zaparoo_ui_app
     PUBLIC
         Qt6::Quick
+        # Pulls in libQt6Svg so `Image { source: "...svg" }` resolves
+        # via the QSvgPlugin image format. For shared Qt the plugin is
+        # auto-discovered at runtime; the static MiSTer build wires the
+        # plugin import explicitly in cmake/ZaparooRust.cmake.
+        Qt6::Svg
         zaparoo_ui_componentsplugin
         zaparoo_ui_screensplugin
         zaparoo_ui_themeplugin

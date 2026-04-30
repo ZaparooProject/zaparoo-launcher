@@ -56,7 +56,8 @@ src/app/main.cpp
           │
           ├── src/ui/components/  [Zaparoo.Ui QML module]
           │     Tile.qml, TileLoader.qml, PagedGrid.qml,
-          │     Modal.qml, ScreenStateOverlay.qml, FpsCounter.qml
+          │     ActiveLabel.qml, LoadingIndicator.qml, StatusIcon.qml,
+          │     TopStatusStrip.qml, Modal.qml, ScreenStateOverlay.qml
           │
           └── src/ui/theme/  [Zaparoo.Theme QML module]
                 Sizing.qml  — pctH/pctW/fontSize singletons
@@ -86,9 +87,6 @@ src/app/main.cpp
 - **Resolution-agnostic layout.** The UI runs from 240p CRT output to 1080p.
   Use `Sizing.pctH()`, `Sizing.pctW()`, and `Sizing.fontSize()` for
   dimensions. Do not hardcode pixel values.
-
-- **FPS counter is always on.** When changing visuals, keep it green (≥55 FPS)
-  at 720p+ and above 30 FPS at 240p.
 
 - **Dynamic Qt on desktop, static Qt on MiSTer.** `BUILD_SHARED_LIBS=ON` is
   the default for LGPL-compliant desktop distribution. The ARM32 Docker build

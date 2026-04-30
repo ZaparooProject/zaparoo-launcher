@@ -6,6 +6,7 @@ import QtQuick
 import QtQuick.Window
 import Zaparoo.Theme
 import Zaparoo.Screens
+import Zaparoo.Ui
 import Zaparoo.Browse as Browse
 
 // cxx-qt 0.8 patches `isFinal: true` on singleton properties but the
@@ -38,6 +39,17 @@ MainLayout {
         : root.cardWriteOwner === "games" ? Browse.GamesModel.card_write_error
         : ""
 
+    // Bound here (not in GamesScreen.qml) because `set_system` can fire
+    // from the accept handler before the games screen mounts; binding
+    // inside the screen fires only on `Component.onCompleted`, after the
+    // first fetch has already gone out with the model's default
+    // page_size. That made the first cursor page misaligned with the
+    // visual grid pageSize and produced half-loaded pages on every
+    // subsequent cursor advance.
+    readonly property int _gamesPageSize:
+        Sizing.gamesGridColumns * Sizing.gamesGridRows
+    on_GamesPageSizeChanged: Browse.GamesModel.page_size = root._gamesPageSize
+
     onWidthChanged: {
         Sizing.screenWidth = width
         Sizing.screenHeight = height
@@ -49,6 +61,7 @@ MainLayout {
     Component.onCompleted: {
         Sizing.screenWidth = width
         Sizing.screenHeight = height
+        Browse.GamesModel.page_size = root._gamesPageSize
         // Restore screen synchronously before first paint. The parent
         // process on MiSTer kills the launcher without notice, so we
         // resume exactly where we left off. Selection restore happens
@@ -104,7 +117,23 @@ MainLayout {
             // page's slide-out would just be a distracting swoop.
             root.systemsScreen.systemsGrid.setCurrentIndexImmediate(idx >= 0 ? idx : 0)
             if (idx >= 0) {
+                // Restore at the deepest persisted folder level. Index 0
+                // is the games-screen initial view (model decides
+                // single-root auto-nav); deeper levels are real paths
+                // pushed by `_navigateIntoFolder`. set_system seeds the
+                // model's current_system_id (which set_path needs as a
+                // browse filter); when the user was deep in a folder we
+                // immediately follow up with set_path so the user
+                // resumes inside their last folder. Esc still pops one
+                // level at a time because the persisted path_stack
+                // carries the intermediate levels. The set_system
+                // browse is invalidated by the second seq-bump and its
+                // result is discarded — wasted work but correct.
                 Browse.GamesModel.set_system(savedSystem)
+                const stack = Browse.GamesState.path_stack
+                const top = stack.length > 0 ? stack[stack.length - 1] : ""
+                if (top !== "")
+                    Browse.GamesModel.set_path(top)
             } else if (root.activeScreen === root.screenGames
                        && Browse.SystemsModel.count > 0) {
                 // Games-screen restore where the saved id is missing
@@ -121,7 +150,14 @@ MainLayout {
     Connections {
         target: Browse.GamesModel
         function onModelReset(): void {
-            const savedPath = Browse.GamesState.game_path
+            // Restore selection at the deepest navigated level. Stack
+            // levels share the same ListModel reset signal — the model
+            // doesn't know which level a reset corresponds to — so we
+            // always read the top-of-stack saved entry path; if the
+            // entry is gone (deleted, moved, or this is a different
+            // level than the one persisted) we fall back to row 0.
+            const sels = Browse.GamesState.selected_at_level
+            const savedPath = sels.length > 0 ? sels[sels.length - 1] : ""
             const idx = savedPath === "" ? -1 : Browse.GamesModel.index_for_game_path(savedPath)
             root.gamesScreen.gamesGrid.setCurrentIndexImmediate(idx >= 0 ? idx : 0)
         }
@@ -154,7 +190,7 @@ MainLayout {
     // `pendingTransition` itself lives in MainLayout — the source
     // screen's content-hiding bindings (row/grid `visible`) resolve
     // there, so the property has to be declared at that level for
-    // qmllint to be happy.
+    // the QML lint pass to be happy.
     property var _categoryReadyCallback: null
     property var _systemReadyCallback: null
 
@@ -217,9 +253,12 @@ MainLayout {
     }
 
     // Ensure GamesModel is filled with `systemId`, then call cb().
-    // Set_system early-returns when the system is already current
-    // and populated (re-Accept after Esc-back); no signal fires, so
-    // we flip synchronously on the no-op path.
+    // When the system is already current and populated (re-Accept
+    // after Esc-back), set_system still re-issues start_initial_browse,
+    // but the cached result applies inline through the watcher's seed
+    // — loading flips back to false before set_system returns — so we
+    // can call cb() synchronously on this path. Cold-load goes through
+    // the systemReadyCallback waiter below.
     function _ensureSystem(systemId: string, cb): void {
         if (Browse.GamesModel.current_system_id === systemId
             && Browse.GamesModel.count > 0) {
@@ -247,9 +286,16 @@ MainLayout {
         root.pendingTransition = "systems"
         root._ensureCategory(category, function() {
             const arcadeBypass =
-                Browse.Runtime.is_mister
+                Browse.Platform.is_mister
+                && Browse.Platform.ready
                 && category === "Arcade"
                 && Browse.SystemsModel.count === 1
+            console.log("arcade-bypass eval:",
+                "category=" + JSON.stringify(category),
+                "platform.is_mister=" + Browse.Platform.is_mister,
+                "platform.ready=" + Browse.Platform.ready,
+                "systems.count=" + Browse.SystemsModel.count,
+                "→ bypass=" + arcadeBypass)
             if (arcadeBypass) {
                 const systemId = Browse.SystemsModel.system_id_at(0)
                 Browse.SystemsState.system_id = systemId
@@ -272,12 +318,50 @@ MainLayout {
     // the back path lands on Systems (the normal drill).
     function _navigateFromSystems(systemId: string): void {
         Browse.SystemsState.system_id = systemId
+        // Setting system_id on GamesState resets path_stack/selected_at_level
+        // to root level — the new system's browse always starts at the
+        // initial games-screen view, regardless of where the user was in
+        // a prior system's folder tree.
         Browse.GamesState.system_id = systemId
         root.pendingTransition = "games"
         root._ensureSystem(systemId, function() {
             root._gamesEnteredFromHub = false
             root._completeTransition(root.screenGames)
         })
+    }
+
+    // Folder drill-down inside the games screen. Stays on screenGames
+    // — no pendingTransition flip — so the in-screen ScreenStateOverlay
+    // handles the loading/empty/error cue while the new browse settles.
+    // Pushes the new level onto GamesState before issuing the browse so
+    // a kill mid-load still resumes inside the folder.
+    function _navigateIntoFolder(path: string): void {
+        if (path === "")
+            return
+        Browse.GamesState.push_level(path, "")
+        Browse.GamesModel.set_path(path)
+    }
+
+    // Folder pop-up inside the games screen. Pops the deepest level off
+    // the stack, then drives the model back to the parent path. If we
+    // pop to the root level (path_stack[0] is always "") the call goes
+    // through `set_system` so the model re-runs the
+    // single-root-auto-nav decision rather than browsing the literal
+    // empty path with no system filter.
+    function _navigateOutOfFolder(): void {
+        const stack = Browse.GamesState.path_stack
+        if (stack.length <= 1)
+            return
+        Browse.GamesState.pop_level()
+        const newStack = Browse.GamesState.path_stack
+        const target = newStack[newStack.length - 1]
+        if (target === "") {
+            const sid = Browse.GamesState.system_id
+            if (sid !== "")
+                Browse.GamesModel.set_system(sid)
+        } else {
+            Browse.GamesModel.set_path(target)
+        }
     }
 
     // Clear the pending flag, then flip. Order matters: clearing
@@ -328,6 +412,12 @@ MainLayout {
             } else {
                 root._goto(root.screenSystems)
             }
+        }
+        function onRequestNavigateIntoFolder(path: string): void {
+            root._navigateIntoFolder(path)
+        }
+        function onRequestNavigateOutOfFolder(): void {
+            root._navigateOutOfFolder()
         }
         function onRequestGameCardWrite(index: int): void {
             root.beginCardWrite("games")
@@ -459,20 +549,15 @@ MainLayout {
     // source screen's primary content is hidden by `transitioning`
     // bindings so the centred "Loading…" reads alone in the cleared
     // band. Sized to the full window so anchors.centerIn parks
-    // the text in the geometric centre regardless of which screen
+    // the row in the geometric centre regardless of which screen
     // is the source.
     Item {
         anchors.fill: parent
         visible: root.pendingTransition !== ""
         z: 100
 
-        Text {
+        LoadingIndicator {
             anchors.centerIn: parent
-            text: qsTr("Loading…")
-            font.family: Theme.fontUi
-            font.pixelSize: Sizing.fontSize(3)
-            color: Theme.textDim
-            renderType: Text.NativeRendering
         }
     }
 
