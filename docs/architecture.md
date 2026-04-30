@@ -88,9 +88,6 @@ src/app/main.cpp
   Use `Sizing.pctH()`, `Sizing.pctW()`, and `Sizing.fontSize()` for
   dimensions. Do not hardcode pixel values.
 
-- **FPS counter is always on.** When changing visuals, keep it green (≥55 FPS)
-  at 720p+ and above 30 FPS at 240p.
-
 - **Dynamic Qt on desktop, static Qt on MiSTer.** `BUILD_SHARED_LIBS=ON` is
   the default for LGPL-compliant desktop distribution. The ARM32 Docker build
   passes `-DBUILD_SHARED_LIBS=OFF` through the Qt CMake toolchain.

@@ -485,6 +485,10 @@ impl ffi::GamesModel {
         // Total-files counter resets too — the previous path's
         // denominator would be misleading until the new fetch lands.
         self.as_mut().set_total_files(0);
+        // Same reasoning for dir_count: a stale value from the previous
+        // browse target would misclassify which leading entries are
+        // folders if the new fetch fails or stalls.
+        self.as_mut().set_dir_count(0);
 
         if let Some(handle) = self.as_mut().rust_mut().watcher.take() {
             handle.abort();
