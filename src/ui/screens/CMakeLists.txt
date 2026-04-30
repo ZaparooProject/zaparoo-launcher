@@ -18,6 +18,7 @@ qt_add_qml_module(
         HubScreen.qml
         SystemsScreen.qml
         GamesScreen.qml
+        GameDetailsScreen.qml
     IMPORTS
         Zaparoo.Ui
         Zaparoo.Theme

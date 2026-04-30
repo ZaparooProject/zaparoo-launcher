@@ -30,6 +30,7 @@ ApplicationWindow {
     readonly property string screenHub: ScreenManager.screenHub
     readonly property string screenSystems: ScreenManager.screenSystems
     readonly property string screenGames: ScreenManager.screenGames
+    readonly property string screenGameDetails: ScreenManager.screenGameDetails
 
     // Runtime state. `activeScreen` mirrors ScreenManager's property
     // (two-way synced below so direct assignment from tests still
@@ -53,6 +54,7 @@ ApplicationWindow {
     property alias hubScreen: hubScreen
     property alias systemsScreen: systemsScreen
     property alias gamesScreen: gamesScreen
+    property alias gameDetailsScreen: gameDetailsScreen
 
     property bool cardWriteModalVisible: false
     property bool cardWriteFailed: false
@@ -197,6 +199,13 @@ ApplicationWindow {
             id: gamesScreen
             anchors.fill: parent
             visible: root.activeScreen === root.screenGames
+        }
+
+        GameDetailsScreen {
+            id: gameDetailsScreen
+            anchors.fill: parent
+            visible: root.activeScreen === root.screenGameDetails
+            gameTitle: gamesScreen.selectedGameTitle
         }
     }
 
@@ -387,6 +396,8 @@ ApplicationWindow {
                 return [{ button: "ButtonB", label: qsTr("Cancel") }];
             if (root.pendingTransition !== "")
                 return [];
+            if (root.activeScreen === root.screenGameDetails)
+                return [{ button: "ButtonB", label: qsTr("Back") }];
             if (root.activeScreen === root.screenHub) {
                 if (root.hubScreenState === "ready")
                     return [
@@ -434,10 +445,12 @@ ApplicationWindow {
                              { button: "ButtonR", label: qsTr("Next page") });
                 row.push({ button: "ButtonA", label: qsTr("Open") });
                 // Drop the Flash card cue on directory/root rows —
-                // write_card no-ops there, so advertising the bind
-                // would mislead.
-                if (root.gamesScreen.currentEntryWritable)
+                // write_card/details no-op there, so advertising the
+                // binds would mislead.
+                if (root.gamesScreen.currentEntryWritable) {
+                    row.push({ button: "ButtonY", label: qsTr("Details") });
                     row.push({ button: "ButtonX", label: qsTr("Flash card") });
+                }
                 row.push({ button: "ButtonB", label: qsTr("Back") });
                 return row;
             }

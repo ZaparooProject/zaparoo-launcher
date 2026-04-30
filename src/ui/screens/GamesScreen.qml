@@ -27,6 +27,13 @@ Item {
     // a second Escape from there pops to Hub).
     signal requestSystemsScreen()
     signal requestGameCardWrite(int index)
+    signal requestGameDetails()
+
+    readonly property string selectedGameTitle:
+        gamesGrid.currentIndex >= 0
+        && gamesGrid.currentIndex < Browse.GamesModel.count
+        ? Browse.GamesModel.name_at(gamesGrid.currentIndex)
+        : ""
 
     // Emitted when the user accepts a directory or root entry — Main.qml
     // pushes the level onto GamesState and drives the model into the new
@@ -153,6 +160,16 @@ Item {
                     games.requestGameCardWrite(idx)
                 }
             }
+        } else if (action === "details") {
+            if (games.gamesGrid.itemCount > 0) {
+                const idx = games.gamesGrid.currentIndex
+                const entryType = Browse.GamesModel.entry_type_at(idx)
+                if (entryType !== "directory" && entryType !== "root") {
+                    Browse.GamesState.set_selected_at_top(
+                        Browse.GamesModel.path_at(idx))
+                    games.requestGameDetails()
+                }
+            }
         } else if (action === "cancel") {
             if (games._atFolderLevel())
                 games.requestNavigateOutOfFolder()
@@ -235,9 +252,7 @@ Item {
         anchors.top: gamesGrid.bottom
         anchors.topMargin: Sizing.pctH(1)
         height: Sizing.pctH(7)
-        text: gamesGrid.itemCount > 0
-              ? Browse.GamesModel.name_at(gamesGrid.currentIndex)
-              : ""
+        text: games.selectedGameTitle
     }
 
     // "Loading more…" cue, parked on the left edge of the active-label

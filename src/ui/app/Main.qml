@@ -69,6 +69,7 @@ MainLayout {
         // data arrives.
         const savedScreen = Browse.AppState.active_screen
         if (savedScreen === root.screenGames
+            || savedScreen === root.screenGameDetails
             || savedScreen === root.screenSystems
             || savedScreen === root.screenHub)
             root.activeScreen = savedScreen
@@ -108,7 +109,9 @@ MainLayout {
         // GamesState, or we'd override the user's position with a stale
         // games target from a prior escape-back-up-the-stack.
         function onModelReset(): void {
-            const savedSystem = root.activeScreen === root.screenGames
+            const savedSystem =
+                (root.activeScreen === root.screenGames
+                 || root.activeScreen === root.screenGameDetails)
                 ? (Browse.GamesState.system_id !== "" ? Browse.GamesState.system_id : Browse.SystemsState.system_id)
                 : Browse.SystemsState.system_id
             const idx = savedSystem === "" ? -1 : Browse.SystemsModel.index_for_system_id(savedSystem)
@@ -134,7 +137,8 @@ MainLayout {
                 const top = stack.length > 0 ? stack[stack.length - 1] : ""
                 if (top !== "")
                     Browse.GamesModel.set_path(top)
-            } else if (root.activeScreen === root.screenGames
+            } else if ((root.activeScreen === root.screenGames
+                       || root.activeScreen === root.screenGameDetails)
                        && Browse.SystemsModel.count > 0) {
                 // Games-screen restore where the saved id is missing
                 // (renamed system, ROM deleted): drive GamesModel from
@@ -423,6 +427,15 @@ MainLayout {
             root.beginCardWrite("games")
             Browse.GamesModel.write_card_at(index)
         }
+        function onRequestGameDetails(): void {
+            root._goto(root.screenGameDetails)
+        }
+    }
+    Connections {
+        target: root.gameDetailsScreen
+        function onRequestGamesScreen(): void {
+            root._goto(root.screenGames)
+        }
     }
 
     onActiveCardWritePendingChanged: root.handleCardWriteStatus()
@@ -504,7 +517,9 @@ MainLayout {
             // above rather than leak it to the root screen.
             return
         }
-        if (root.activeScreen === root.screenGames) {
+        if (root.activeScreen === root.screenGameDetails) {
+            root.gameDetailsScreen.handleAction(action)
+        } else if (root.activeScreen === root.screenGames) {
             root.gamesScreen.handleAction(action)
         } else if (root.activeScreen === root.screenSystems) {
             root.systemsScreen.handleAction(action)

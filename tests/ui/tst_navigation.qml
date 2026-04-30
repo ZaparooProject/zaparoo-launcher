@@ -31,6 +31,7 @@ TestCase {
         compare(main.hubScreen.visible, true)
         compare(main.systemsScreen.visible, false)
         compare(main.gamesScreen.visible, false)
+        compare(main.gameDetailsScreen.visible, false)
     }
 
     // Hard-cut peer screens: only the active screen is visible at any
@@ -41,6 +42,7 @@ TestCase {
         compare(main.systemsScreen.visible, true)
         compare(main.hubScreen.visible, false)
         compare(main.gamesScreen.visible, false)
+        compare(main.gameDetailsScreen.visible, false)
     }
 
     function test_activating_games_screen_makes_games_visible(): void {
@@ -48,6 +50,15 @@ TestCase {
         compare(main.gamesScreen.visible, true)
         compare(main.hubScreen.visible, false)
         compare(main.systemsScreen.visible, false)
+        compare(main.gameDetailsScreen.visible, false)
+    }
+
+    function test_activating_game_details_screen_makes_details_visible(): void {
+        main.activeScreen = main.screenGameDetails
+        compare(main.gameDetailsScreen.visible, true)
+        compare(main.hubScreen.visible, false)
+        compare(main.systemsScreen.visible, false)
+        compare(main.gamesScreen.visible, false)
     }
 
     // Enter on hub categories drills into systems screen.
@@ -81,6 +92,22 @@ TestCase {
         main.activeScreen = main.screenGames
         main.handleKey(Qt.Key_Escape)
         compare(main.activeScreen, main.screenSystems)
+    }
+
+    function test_escape_on_game_details_returns_to_games(): void {
+        main.activeScreen = main.screenGameDetails
+        main.handleKey(Qt.Key_Escape)
+        compare(main.activeScreen, main.screenGames)
+    }
+
+    function test_game_details_round_trip_preserves_games_grid_index(): void {
+        main.activeScreen = main.screenGames
+        main.gamesScreen.gamesGrid.currentIndex = 7
+        main.activeScreen = main.screenGameDetails
+        compare(main.gamesScreen.gamesGrid.currentIndex, 7)
+        main.handleKey(Qt.Key_Escape)
+        compare(main.activeScreen, main.screenGames)
+        compare(main.gamesScreen.gamesGrid.currentIndex, 7)
     }
 
     // Escape on systems goes back to hub.

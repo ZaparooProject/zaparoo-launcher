@@ -66,6 +66,7 @@ pub fn default_bindings() -> HashMap<String, Vec<String>> {
         vec!["Escape".into(), "Backspace".into()],
     );
     map.insert(actions::WRITE_CARD.into(), vec!["Tab".into()]);
+    map.insert(actions::DETAILS.into(), vec!["Space".into()]);
     map.insert(actions::PAGE_PREV.into(), vec!["PageUp".into()]);
     map.insert(actions::PAGE_NEXT.into(), vec!["PageDown".into()]);
     map
@@ -140,6 +141,10 @@ mod tests {
         assert_eq!(
             map.get(&qt_key_code("Tab").unwrap()).map(String::as_str),
             Some(actions::WRITE_CARD),
+        );
+        assert_eq!(
+            map.get(&qt_key_code("Space").unwrap()).map(String::as_str),
+            Some(actions::DETAILS),
         );
     }
 
