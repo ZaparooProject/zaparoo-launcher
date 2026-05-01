@@ -41,12 +41,10 @@ Item {
     id: hub
 
     property bool transitioning: false
-    // 0 = categories row, 1 = actions row. `final` so external
-    // consumers (the test harness) don't trip qmllint shadow warnings
-    // accessing through MainLayout's untyped alias.
-    final property int currentRow: 0
+    // 0 = categories row, 1 = actions row.
+    property int currentRow: 0
     // Index within the active row.
-    final property int currentIndex: 0
+    property int currentIndex: 0
 
     signal requestAccept(category: string)
     signal requestQuit()
@@ -69,6 +67,14 @@ Item {
             if (hub.actionEntries[i].id === id)
                 return i
         return 0
+    }
+
+    // Test-harness hook so `tst_navigation.qml` can reset both focus
+    // axes between cases without poking individual properties through
+    // MainLayout's alias.
+    function resetFocus(): void {
+        hub.currentRow = 0
+        hub.currentIndex = 0
     }
 
     // Restore the hub from the persisted `Browse.HubState`. Always

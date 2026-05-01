@@ -26,8 +26,9 @@ TestCase {
         main.activeScreen = main.screenHub
         // Hub focus is two rows now (categories + actions); reset both
         // axes so a prior test's row-jump doesn't leak into the next.
-        main.hubScreen.currentRow = 0
-        main.hubScreen.currentIndex = 0
+        // qmllint disable compiler
+        main.hubScreen.resetFocus()
+        // qmllint enable compiler
     }
 
     function test_initial_state_is_hub(): void {

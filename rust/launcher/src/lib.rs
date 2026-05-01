@@ -240,7 +240,7 @@ fn install_crash_signal_handler() {
         // signal-safe handler. The handler resets to SIG_DFL and
         // re-raises, so this doesn't permanently swallow the signal.
         unsafe {
-            libc::signal(sig, crash_handler as libc::sighandler_t);
+            libc::signal(sig, crash_handler as *const () as libc::sighandler_t);
         }
     }
 }
