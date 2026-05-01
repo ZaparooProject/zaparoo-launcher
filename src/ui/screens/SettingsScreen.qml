@@ -26,6 +26,13 @@ import Zaparoo.Browse as Browse
 Item {
     id: settings
 
+    // Bound by MainLayout to `root.pendingTransition !== ""`. Settings
+    // is a destination, never a source, so this is currently always
+    // false when the screen is visible — kept for parity with the
+    // other screens so the convention holds when a future routing
+    // change adds a Settings-as-source path.
+    property bool transitioning: false
+
     signal requestHubScreen()
 
     // Field registry. Each entry's `id` is read by handleAction to

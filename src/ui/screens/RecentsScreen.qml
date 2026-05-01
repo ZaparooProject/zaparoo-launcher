@@ -27,6 +27,13 @@ Item {
 
     property alias recentsGrid: recentsGrid
 
+    // Bound by MainLayout to `root.pendingTransition !== ""`. Recents is
+    // a destination, never a source, so this is currently always false
+    // when the screen is visible — kept for parity with the other
+    // screens so the convention holds when a future routing change adds
+    // a Recents-as-source path.
+    property bool transitioning: false
+
     signal requestHubScreen()
 
     // Restore the previously focused entry when the model is Ready.
@@ -47,10 +54,16 @@ Item {
 
     // Persist the focused entry's path on every focus move so a
     // kill-resume puts the highlight back. `path_at` returns "" for
-    // out-of-range indices; the setter no-ops on a value-equal write
-    // so the empty-path case during a reload doesn't churn the file.
+    // out-of-range indices; skip writes on those so PagedGrid's
+    // shrinkage clamp (currentIndex → 0 when itemCount drops to 0)
+    // doesn't clobber the saved path with the empty fallback.
     function _persistFocus(): void {
-        const path = Browse.RecentsModel.path_at(recentsGrid.currentIndex)
+        const idx = recentsGrid.currentIndex
+        if (idx < 0)
+            return
+        const path = Browse.RecentsModel.path_at(idx)
+        if (path === "")
+            return
         Browse.RecentsState.selected_path = path
     }
 

@@ -113,7 +113,7 @@ pub fn media_history_response(params: &Value) -> Value {
             let ended = format!("2026-04-29T{:02}:30:00Z", 23 - i.min(23));
             json!({
                 "systemId": system,
-                "systemName": system,
+                "systemName": system_display_for(system),
                 "mediaName": name,
                 "mediaPath": format!("/mock/{system}/{file}"),
                 "launcherId": system,
@@ -123,13 +123,37 @@ pub fn media_history_response(params: &Value) -> Value {
             })
         })
         .collect();
-    json!({
-        "entries": entries,
-        "pagination": {
+    // Core's docs say `pagination` is only present when entries are
+    // returned; mirror that so the launcher's MediaHistoryResult
+    // deserialiser hits the same edges in mock as on real Core.
+    let has_entries = !entries.is_empty();
+    let mut response = json!({ "entries": entries });
+    if has_entries {
+        response["pagination"] = json!({
             "hasNextPage": false,
             "pageSize": limit,
-        },
-    })
+        });
+    }
+    response
+}
+
+// Mirrors the display names in `systems_response`. The history fixture
+// only has the system *id* in scope (via `ALL_GAMES`), so this lookup
+// surfaces the same human-readable label Core would return.
+fn system_display_for(id: &str) -> &str {
+    match id {
+        "NES" => "Nintendo Entertainment System",
+        "SNES" => "Super Nintendo",
+        "Genesis" => "Sega Genesis",
+        "Nintendo64" => "Nintendo 64",
+        "Gameboy" => "Game Boy",
+        "GameboyColor" => "Game Boy Color",
+        "GBA" => "Game Boy Advance",
+        "NDS" => "Nintendo DS",
+        "MAME" => "MAME",
+        "NeoGeo" => "Neo Geo",
+        _ => id,
+    }
 }
 
 fn games_for_systems<'a>(systems: &'a [&'a str]) -> impl Iterator<Item = Value> + 'a {

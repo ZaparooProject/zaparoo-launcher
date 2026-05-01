@@ -205,4 +205,32 @@ mod tests {
         assert_eq!(resp["id"], Value::Null);
         assert_eq!(resp["error"]["code"], -32700);
     }
+
+    #[test]
+    fn media_history_returns_entries_with_pagination() {
+        let req = r#"{"jsonrpc":"2.0","id":"1","method":"media.history","params":{"limit":5}}"#;
+        let resp = parse(&dispatch(req));
+        let entries = resp["result"]["entries"].as_array().expect("array");
+        assert!(!entries.is_empty());
+        for entry in entries {
+            assert!(entry["mediaName"].is_string());
+            assert!(entry["mediaPath"].is_string());
+            assert!(entry["systemId"].is_string());
+            assert!(entry["systemName"].is_string());
+            assert!(entry["launcherId"].is_string());
+        }
+        let pagination = resp["result"]["pagination"]
+            .as_object()
+            .expect("pagination object");
+        assert_eq!(pagination["hasNextPage"], Value::Bool(false));
+    }
+
+    #[test]
+    fn media_history_omits_pagination_when_no_entries() {
+        let req = r#"{"jsonrpc":"2.0","id":"1","method":"media.history","params":{"systems":["DoesNotExist"]}}"#;
+        let resp = parse(&dispatch(req));
+        let entries = resp["result"]["entries"].as_array().expect("array");
+        assert!(entries.is_empty());
+        assert!(resp["result"].get("pagination").is_none());
+    }
 }

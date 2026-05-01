@@ -204,7 +204,11 @@ fn apply_state(
         // Pending (Idle/Loading): show the spinner; don't touch entries.
         // Disarm pagination so a grid scroll during a refetch doesn't
         // fire `fetch_more` against a stale cursor — `has_next_page`
-        // is re-set when Ready lands.
+        // is re-set when Ready lands. Bump `seq` and null `next_cursor`
+        // so an in-flight `fetch_more` queued during the prior Ready
+        // can't slip a stale append in before the next Ready arrives.
+        model.as_mut().rust_mut().seq.fetch_add(1, Ordering::SeqCst);
+        model.as_mut().rust_mut().next_cursor = None;
         if !model.loading {
             model.as_mut().set_loading(true);
         }
@@ -212,6 +216,12 @@ fn apply_state(
             model.as_mut().set_has_next_page(false);
         }
     } else {
+        // Same disarm as the Pending branch — an Errored transition
+        // doesn't reset entries, so a callback queued during the prior
+        // Ready could otherwise append rows that don't belong to the
+        // current chain.
+        model.as_mut().rust_mut().seq.fetch_add(1, Ordering::SeqCst);
+        model.as_mut().rust_mut().next_cursor = None;
         if model.loading {
             model.as_mut().set_loading(false);
         }
