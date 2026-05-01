@@ -81,10 +81,25 @@ pub struct RecentsState {
 /// Per-launcher Settings selections. `resolution` is `"WxH"` (e.g.
 /// `"1920x1080"`); empty means "no Settings override" and the value
 /// from `[mister.video_*]` in `launcher.toml` is left in place.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct SettingsState {
     pub resolution: String,
+    #[serde(default = "default_button_layout")]
+    pub button_layout: String,
+}
+
+impl Default for SettingsState {
+    fn default() -> Self {
+        Self {
+            resolution: String::new(),
+            button_layout: default_button_layout(),
+        }
+    }
+}
+
+fn default_button_layout() -> String {
+    "nintendo".into()
 }
 
 pub fn load() -> PersistedState {
@@ -208,6 +223,7 @@ mod tests {
             },
             settings: SettingsState {
                 resolution: "1920x1080".into(),
+                button_layout: "xbox".into(),
             },
         };
         save_to(&path, &original);
@@ -287,6 +303,16 @@ mod tests {
         assert_eq!(state.games, GamesState::default());
         assert_eq!(state.recents, RecentsState::default());
         assert_eq!(state.settings, SettingsState::default());
+    }
+
+    #[test]
+    fn missing_settings_button_layout_defaults_to_nintendo() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("state.toml");
+        std::fs::write(&path, "[settings]\nresolution = \"1920x1080\"\n").expect("write");
+        let state = load_from(&path);
+        assert_eq!(state.settings.resolution, "1920x1080");
+        assert_eq!(state.settings.button_layout, "nintendo");
     }
 
     #[test]

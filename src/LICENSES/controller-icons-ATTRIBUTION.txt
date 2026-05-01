@@ -2,8 +2,10 @@ Controller Input Icons Attribution
 ==================================
 
 This software bundles controller-button glyphs under
-resources/images/icons/ (ButtonA.png, ButtonB.png, ButtonX.png,
-ButtonY.png, ButtonL.png, ButtonR.png, Dpad.png) derived from:
+resources/images/buttons/nintendo/ (ButtonA.png, ButtonB.png,
+ButtonX.png, ButtonY.png, ButtonL.png, ButtonR.png) and
+resources/images/icons/ (Dpad.png and directional D-pad glyphs)
+derived from:
 
   Controller Input Icons
   by ElDuderino

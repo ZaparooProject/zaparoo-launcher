@@ -56,7 +56,7 @@ Item {
 
     // Right-side value cluster: `<`  value  `>`. The arrow glyphs are
     // plain Text — keeping it dependency-free; the gamepad button glyphs
-    // under resources/images/icons/ are reserved for the help bar.
+    // are reserved for the help bar.
     Row {
         anchors.right: parent.right
         anchors.rightMargin: Sizing.pctW(3)

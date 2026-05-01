@@ -14,6 +14,10 @@ import QtQuick
 QtObject {
     // Base URL for everything under `resources/` in the embedded qrc.
     readonly property string baseUrl: "qrc:/qt/qml/Zaparoo/App/resources/"
+    // Lowercase directory name under resources/images/buttons/. MainLayout
+    // binds this to Browse.Settings.current_button_layout; default keeps
+    // early/default evaluation on the existing Nintendo assets.
+    property string buttonLayout: "nintendo"
 
     // Build a cover image URL from a `coverKey` (relative path under
     // `resources/images/` without extension, e.g. `systems/SNES`,
@@ -41,14 +45,16 @@ QtObject {
     }
 
     // General-purpose UI glyphs (folder, file, loading spinner, settings,
-    // nav arrows, …) under resources/images/icons/. Most are SVG; the
-    // gamepad button glyphs (ButtonA/B/X/Y/L/R, Dpad) ship as PNG so the
-    // antialiased button-face shading survives intact. Pick the extension
-    // by name prefix — keep the rule centralized so callers don't care.
+    // nav arrows, D-pad, ...) under resources/images/icons/. Gamepad
+    // button glyphs (ButtonA/B/X/Y/L/R) live separately under
+    // resources/images/buttons/<layout>/ and ship as PNG so the
+    // antialiased button-face shading survives intact.
     function iconUrl(name: string): url {
         if (name === "")
             return ""
-        const ext = (name.startsWith("Button") || name === "Dpad") ? "png" : "svg"
+        if (name.startsWith("Button"))
+            return baseUrl + "images/buttons/" + buttonLayout + "/" + name + ".png"
+        const ext = name.startsWith("Dpad") ? "png" : "svg"
         return baseUrl + "images/icons/" + name + "." + ext
     }
 }

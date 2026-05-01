@@ -2,11 +2,11 @@
 // Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //
-// `Browse.Settings` — gamepad-accessible settings form. First field is
-// Resolution (MiSTer only). The model is the seam between the QML form
-// and the persistence/runtime side: it owns the curated picker list,
-// remembers what the user picked, and on MiSTer re-runs `vmode` so the
-// framebuffer changes immediately.
+// `Browse.Settings` — gamepad-accessible settings form. The model is the
+// seam between the QML form and the persistence/runtime side: it owns
+// curated picker lists, remembers what the user picked, and on MiSTer
+// re-runs `vmode` when the resolution changes so the framebuffer updates
+// immediately.
 //
 // Field design:
 //   * `is_mister` — CONSTANT. Drives whether MiSTer-only fields render
@@ -17,12 +17,14 @@
 //   * `current_resolution` — READ + NOTIFY, persisted. Empty means "use
 //     `[mister.video_*]` defaults from launcher.toml". The Settings
 //     screen renders that empty value as `qsTr("Default")`.
+//   * `available_button_layouts` — CONSTANT. Lowercase directory names
+//     used to compose resources/images/buttons/<layout>/Button*.png.
+//   * `current_button_layout` — READ + NOTIFY, persisted. Defaults to
+//     "nintendo" so existing state files keep the current asset path.
 //
-// `set_resolution()` is the only mutator. It writes to disk first
-// (so a runtime crash mid-`vmode` still leaves the choice persisted)
-// and then runs `vmode` on MiSTer. On desktop the call is a no-op
-// beyond the persist write — the field shouldn't be reachable from
-// the form, but the call site is safe either way.
+// Setters write to disk first so a runtime crash mid-apply still leaves
+// the choice persisted. Resolution then runs `vmode` on MiSTer; button
+// layout only changes the QML resource path used by help-bar icons.
 
 use crate::mister_runtime;
 use crate::models::{with_persist_mut, with_persist_read};
@@ -41,12 +43,16 @@ use zaparoo_core::runtime;
 /// the form renders it as `qsTr("Default")` so users can cycle back
 /// to no-override after picking a custom value.
 const MISTER_RESOLUTIONS: &[&str] = &["", "1280x720", "1920x1080", "640x480"];
+const BUTTON_LAYOUTS: &[&str] = &["nintendo", "xbox", "sony"];
+const DEFAULT_BUTTON_LAYOUT: &str = "nintendo";
 
 #[derive(Default)]
 pub struct SettingsRust {
     is_mister: bool,
     available_resolutions: QStringList,
     current_resolution: QString,
+    available_button_layouts: QStringList,
+    current_button_layout: QString,
 }
 
 #[cxx_qt::bridge]
@@ -65,10 +71,15 @@ pub mod ffi {
         #[qproperty(bool, is_mister, READ, CONSTANT)]
         #[qproperty(QStringList, available_resolutions, READ, CONSTANT)]
         #[qproperty(QString, current_resolution, READ, WRITE = set_resolution, NOTIFY)]
+        #[qproperty(QStringList, available_button_layouts, READ, CONSTANT)]
+        #[qproperty(QString, current_button_layout, READ, WRITE = set_button_layout, NOTIFY)]
         type Settings = super::SettingsRust;
 
         #[qinvokable]
         fn set_resolution(self: Pin<&mut Settings>, value: QString);
+
+        #[qinvokable]
+        fn set_button_layout(self: Pin<&mut Settings>, value: QString);
     }
 
     impl cxx_qt::Initialize for Settings {}
@@ -85,6 +96,9 @@ impl Initialize for ffi::Settings {
             QStringList::default()
         };
         self.as_mut().rust_mut().current_resolution = QString::from(snapshot.resolution.as_str());
+        self.as_mut().rust_mut().available_button_layouts = button_layouts();
+        self.as_mut().rust_mut().current_button_layout =
+            QString::from(normalize_button_layout(&snapshot.button_layout));
     }
 }
 
@@ -109,6 +123,16 @@ impl ffi::Settings {
         self.as_mut().rust_mut().current_resolution = value;
         self.as_mut().current_resolution_changed();
     }
+
+    fn set_button_layout(mut self: Pin<&mut Self>, value: QString) {
+        let value_str = normalize_button_layout(&value.to_string()).to_string();
+        if self.current_button_layout.to_string() == value_str {
+            return;
+        }
+        persist_settings(|s| s.button_layout.clone_from(&value_str));
+        self.as_mut().rust_mut().current_button_layout = QString::from(value_str.as_str());
+        self.as_mut().current_button_layout_changed();
+    }
 }
 
 fn persist_settings<F: FnOnce(&mut SettingsState)>(mutator: F) {
@@ -127,9 +151,29 @@ fn curated_resolutions() -> QStringList {
     list
 }
 
+fn button_layouts() -> QStringList {
+    let mut list = QStringList::default();
+    for layout in BUTTON_LAYOUTS {
+        list.append(QString::from(*layout));
+    }
+    list
+}
+
+fn normalize_button_layout(value: &str) -> &'static str {
+    let trimmed = value.trim();
+    BUTTON_LAYOUTS
+        .iter()
+        .copied()
+        .find(|layout| *layout == trimmed)
+        .unwrap_or(DEFAULT_BUTTON_LAYOUT)
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{curated_resolutions, MISTER_RESOLUTIONS};
+    use super::{
+        button_layouts, curated_resolutions, normalize_button_layout, BUTTON_LAYOUTS,
+        DEFAULT_BUTTON_LAYOUT, MISTER_RESOLUTIONS,
+    };
 
     #[test]
     fn curated_resolutions_preserves_order() {
@@ -149,5 +193,27 @@ mod tests {
         let collected: Vec<&str> = MISTER_RESOLUTIONS.to_vec();
         assert!(collected.contains(&"1280x720"));
         assert!(collected.contains(&"1920x1080"));
+    }
+
+    #[test]
+    fn button_layouts_preserve_order() {
+        let list = button_layouts();
+        let collected: Vec<String> = list.iter().map(String::from).collect();
+        let expected: Vec<String> = BUTTON_LAYOUTS.iter().map(|s| (*s).to_string()).collect();
+        assert_eq!(collected, expected);
+    }
+
+    #[test]
+    fn button_layout_values_are_lowercase() {
+        for layout in BUTTON_LAYOUTS {
+            assert_eq!(*layout, layout.to_ascii_lowercase());
+        }
+    }
+
+    #[test]
+    fn button_layout_normalization_defaults_to_nintendo() {
+        assert_eq!(normalize_button_layout(""), DEFAULT_BUTTON_LAYOUT);
+        assert_eq!(normalize_button_layout("playstation"), DEFAULT_BUTTON_LAYOUT);
+        assert_eq!(normalize_button_layout("xbox"), "xbox");
     }
 }

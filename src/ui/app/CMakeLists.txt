@@ -26,10 +26,11 @@ set(_APP_RESOURCES
 # icons accept either PNG or SVG so SVGs can be dropped straight in
 # without a pre-render step; QtSvg rasterizes once on first load and
 # the result is cached in QPixmapCache. Top-level icons (folder, file,
-# loading, settings, navigation arrows, …) under resources/images/icons/
-# are SVG; gamepad button glyphs (ButtonA/B/X/Y/L/R, Dpad) ship as PNG
-# alongside them. Globs use CONFIGURE_DEPENDS so adding/removing a file
-# triggers a re-glob on the next build.
+# loading, settings, navigation arrows, D-pad, ...) live under
+# resources/images/icons/. Gamepad button glyphs (ButtonA/B/X/Y/L/R) ship
+# as PNG under resources/images/buttons/<layout>/.
+# Globs use CONFIGURE_DEPENDS so adding/removing a file triggers a re-glob
+# on the next build.
 file(GLOB _SYSTEM_LOGOS CONFIGURE_DEPENDS
     "${_RESOURCE_ROOT}/images/systems/*.png")
 file(GLOB _CATEGORY_LOGOS CONFIGURE_DEPENDS
@@ -40,8 +41,11 @@ file(GLOB _STATUS_ICONS CONFIGURE_DEPENDS
 file(GLOB _UI_ICONS CONFIGURE_DEPENDS
     "${_RESOURCE_ROOT}/images/icons/*.png"
     "${_RESOURCE_ROOT}/images/icons/*.svg")
+file(GLOB _BUTTON_ICONS CONFIGURE_DEPENDS
+    "${_RESOURCE_ROOT}/images/buttons/*/*.png")
 list(APPEND _APP_RESOURCES
-    ${_SYSTEM_LOGOS} ${_CATEGORY_LOGOS} ${_STATUS_ICONS} ${_UI_ICONS})
+    ${_SYSTEM_LOGOS} ${_CATEGORY_LOGOS} ${_STATUS_ICONS} ${_UI_ICONS}
+    ${_BUTTON_ICONS})
 
 foreach(_res IN LISTS _APP_RESOURCES)
     file(RELATIVE_PATH _alias "${_RESOURCE_ROOT}/.." "${_res}")

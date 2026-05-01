@@ -15,11 +15,10 @@ import Zaparoo.Browse as Browse
 // method-level finality, suppress the compiler category file-wide.
 // qmllint disable compiler
 
-// Settings screen — gamepad-driven vertical form. First (and for now
-// only) field is a Resolution picker, which is MiSTer-only — the
-// underlying `vmode` command lives on MiSTer's Linux framebuffer. On
-// other runtimes the form shows a placeholder until something
-// cross-platform exists.
+// Settings screen — gamepad-driven vertical form. Resolution is MiSTer-only
+// because the underlying `vmode` command lives on MiSTer's Linux framebuffer.
+// Button layout is cross-platform and selects the resource directory for
+// help-bar button glyphs.
 //
 // Pure input dispatcher: emits `requestHubScreen()` on Escape; left/
 // right cycle the focused field's value via the model singleton.
@@ -33,10 +32,9 @@ Item {
     // (rather than a Repeater of typed children) makes adding fields
     // a one-line edit and keeps the navigation logic uniform.
     //
-    // `available` is the picker's option list (curated, short — three
-    // entries for resolution); `currentValue` is the binding the field
-    // displays; `onCycle(direction)` advances the picker and writes
-    // through the model setter, which persists + applies at runtime.
+    // Field-specific helpers below provide option lists, display labels,
+    // and model setters. This keeps the Repeater delegate presentational
+    // while handleAction remains a simple input dispatcher.
     readonly property var fields: {
         const out = []
         if (Browse.Settings.is_mister) {
@@ -45,6 +43,10 @@ Item {
                 label: qsTr("Resolution")
             })
         }
+        out.push({
+            id: "buttonLayout",
+            label: qsTr("Button layout")
+        })
         return out
     }
 
@@ -90,12 +92,47 @@ Item {
         Browse.Settings.set_resolution(list[next])
     }
 
+    function _buttonLayoutList(): list<string> {
+        const raw = Browse.Settings.available_button_layouts
+        return raw === undefined || raw === null ? [] : raw
+    }
+
+    function _buttonLayoutDisplay(value: string): string {
+        if (value === "xbox")
+            return qsTr("Xbox")
+        if (value === "sony")
+            return qsTr("Sony")
+        return qsTr("Nintendo")
+    }
+
+    function _currentButtonLayoutIndex(): int {
+        const list = settings._buttonLayoutList()
+        const cur = Browse.Settings.current_button_layout
+        for (let i = 0; i < list.length; i++)
+            if (list[i] === cur)
+                return i
+        return -1
+    }
+
+    function _cycleButtonLayout(direction: int): void {
+        const list = settings._buttonLayoutList()
+        if (list.length === 0)
+            return
+        let idx = settings._currentButtonLayoutIndex()
+        if (idx < 0)
+            idx = direction > 0 ? -1 : 0
+        const next = ((idx + direction) % list.length + list.length) % list.length
+        Browse.Settings.set_button_layout(list[next])
+    }
+
     function _cycleFocused(direction: int): void {
         if (settings.fieldCount === 0)
             return
         const id = settings.fields[settings.currentIndex].id
         if (id === "resolution")
             settings._cycleResolution(direction)
+        else if (id === "buttonLayout")
+            settings._cycleButtonLayout(direction)
     }
 
     function handleAction(action: string): void {
@@ -159,13 +196,19 @@ Item {
                 label: modelData.label
                 value: modelData.id === "resolution"
                        ? settings._resolutionDisplay(Browse.Settings.current_resolution)
+                       : modelData.id === "buttonLayout"
+                       ? settings._buttonLayoutDisplay(Browse.Settings.current_button_layout)
                        : ""
-                // Resolution wraps modulo, so both arrows always apply
-                // when there's at least one curated entry.
-                canCyclePrev: modelData.id === "resolution"
-                              && settings._resolutionList().length > 0
-                canCycleNext: modelData.id === "resolution"
-                              && settings._resolutionList().length > 0
+                // Pickers wrap modulo, so both arrows apply when the
+                // focused field has a populated option list.
+                canCyclePrev: (modelData.id === "resolution"
+                               && settings._resolutionList().length > 0)
+                              || (modelData.id === "buttonLayout"
+                                  && settings._buttonLayoutList().length > 1)
+                canCycleNext: (modelData.id === "resolution"
+                               && settings._resolutionList().length > 0)
+                              || (modelData.id === "buttonLayout"
+                                  && settings._buttonLayoutList().length > 1)
             }
         }
     }

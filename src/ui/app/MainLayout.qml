@@ -48,6 +48,12 @@ ApplicationWindow {
     visibility: root.fullScreen ? Window.FullScreen : Window.Windowed
     title: qsTr("Zaparoo Launcher")
 
+    Binding {
+        target: Resources
+        property: "buttonLayout"
+        value: Browse.Settings.current_button_layout
+    }
+
     // Screen plumbing exposed for Main.qml's orchestration. Anything
     // inside the screens (categories row, systems/games grids) is
     // reached via root.hubScreen.* / root.systemsScreen.* /
@@ -394,9 +400,8 @@ ApplicationWindow {
         // they run on top of the input gate.
         //
         // Each entry resolves to a button glyph (Dpad / ButtonA /
-        // ButtonB / ButtonX) plus a label. The button names are the
-        // file basenames under resources/images/icons/ — see
-        // Resources.iconUrl() for the qrc rule.
+        // ButtonB / ButtonX) plus a label. The button names are routed
+        // through Resources.iconUrl(), which owns the qrc path rules.
         //
         // Label vocabulary is deliberately minimal: D-pad is always
         // "Move"; A is "Open" for both drill-downs and launches (the
