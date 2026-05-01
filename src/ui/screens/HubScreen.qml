@@ -205,6 +205,40 @@ Item {
             hub._commitActionSelection()
     }
 
+    function _focusCategory(index: int): void {
+        if (index < 0 || index >= Browse.CategoriesModel.count)
+            return
+        hub.currentRow = 0
+        hub.currentIndex = index
+        hub._commitCategorySelection()
+    }
+
+    function _focusAction(index: int): void {
+        if (index < 0 || index >= hub.actionEntries.length)
+            return
+        hub.currentRow = 1
+        hub.currentIndex = index
+        hub._commitActionSelection()
+    }
+
+    function _activateCurrent(): void {
+        if (hub.currentRow === 0) {
+            // Empty row sends "" — router treats that as the committed
+            // "Enter on empty hub goes to Systems" passthrough.
+            const chosen = Browse.CategoriesModel.count <= 0
+                ? ""
+                : Browse.CategoriesModel.category_at(hub.currentIndex)
+            hub.requestAccept(chosen)
+            return
+        }
+
+        const id = hub.actionEntries[hub.currentIndex].id
+        if (id === "recents")
+            hub.requestRecentsScreen()
+        else if (id === "settings")
+            hub.requestSettingsScreen()
+    }
+
     function handleAction(action: string): void {
         if (action === "left") {
             if (hub._navigate(-1))
@@ -216,20 +250,7 @@ Item {
             if (hub._crossRow())
                 hub._commitCurrent()
         } else if (action === "accept") {
-            if (hub.currentRow === 0) {
-                // Empty row sends "" — router treats that as the committed
-                // "Enter on empty hub goes to Systems" passthrough.
-                const chosen = Browse.CategoriesModel.count <= 0
-                    ? ""
-                    : Browse.CategoriesModel.category_at(hub.currentIndex)
-                hub.requestAccept(chosen)
-            } else {
-                const id = hub.actionEntries[hub.currentIndex].id
-                if (id === "recents")
-                    hub.requestRecentsScreen()
-                else if (id === "settings")
-                    hub.requestSettingsScreen()
-            }
+            hub._activateCurrent()
         } else if (action === "cancel") {
             hub.requestQuit()
         }
@@ -313,6 +334,18 @@ Item {
                     name: cellItem.name
                     coverKey: cellItem.coverKey
                 }
+
+                MouseArea {
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    acceptedButtons: Qt.LeftButton
+
+                    onEntered: hub._focusCategory(cellItem.index)
+                    onClicked: {
+                        hub._focusCategory(cellItem.index)
+                        hub._activateCurrent()
+                    }
+                }
             }
         }
     }
@@ -382,6 +415,18 @@ Item {
                     isFocused: hub.currentRow === 1
                     name: actionCellItem.modelData.text
                     coverKey: actionCellItem.modelData.coverKey
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    acceptedButtons: Qt.LeftButton
+
+                    onEntered: hub._focusAction(actionCellItem.index)
+                    onClicked: {
+                        hub._focusAction(actionCellItem.index)
+                        hub._activateCurrent()
+                    }
                 }
             }
         }

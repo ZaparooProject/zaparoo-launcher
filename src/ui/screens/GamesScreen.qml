@@ -56,6 +56,14 @@ Item {
                 Browse.GamesModel.path_at(games.gamesGrid.currentIndex))
     }
 
+    function _focusIndex(index: int): void {
+        if (index < 0 || index >= games.gamesGrid.itemCount)
+            return
+        games.gamesGrid.currentIndex = index
+        Browse.GamesState.set_selected_at_top(
+            Browse.GamesModel.path_at(games.gamesGrid.currentIndex))
+    }
+
     // Mirrors ScreenStateOverlay's `state` ternary so accept routing and
     // the in-screen overlay agree on which state we're in.
     function _state(): string {
@@ -222,6 +230,11 @@ Item {
         columnsOverride: Sizing.gamesGridColumns
         rowsOverride: Sizing.gamesGridRows
         onLoadMoreRequested: Browse.GamesModel.fetch_more()
+        onItemHovered: (index) => games._focusIndex(index)
+        onItemClicked: (index) => {
+            games._focusIndex(index)
+            games.handleAction("accept")
+        }
     }
 
     // Active game caption — single big line just under the grid. Same

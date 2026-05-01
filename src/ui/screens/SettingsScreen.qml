@@ -209,6 +209,8 @@ Item {
                                && settings._resolutionList().length > 0)
                               || (modelData.id === "buttonLayout"
                                   && settings._buttonLayoutList().length > 1)
+                onHovered: settings.currentIndex = index
+                onClicked: settings.currentIndex = index
             }
         }
     }

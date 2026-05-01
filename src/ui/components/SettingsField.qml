@@ -29,6 +29,9 @@ Item {
     property bool canCyclePrev: true
     property bool canCycleNext: true
 
+    signal hovered()
+    signal clicked()
+
     implicitHeight: Sizing.pctH(8)
 
     Rectangle {
@@ -91,5 +94,14 @@ Item {
             font.pixelSize: Sizing.fontSize(3.0)
             renderType: Text.NativeRendering
         }
+    }
+
+    MouseArea {
+        anchors.fill: parent
+        hoverEnabled: true
+        acceptedButtons: Qt.LeftButton
+
+        onEntered: root.hovered()
+        onClicked: root.clicked()
     }
 }

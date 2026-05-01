@@ -58,6 +58,14 @@ Item {
         return false
     }
 
+    function _focusIndex(index: int): void {
+        if (index < 0 || index >= systems.systemsGrid.itemCount)
+            return
+        systems.systemsGrid.currentIndex = index
+        Browse.SystemsState.system_id =
+            Browse.SystemsModel.system_id_at(systems.systemsGrid.currentIndex)
+    }
+
     // Mirrors ScreenStateOverlay's `state` ternary so accept routing and
     // the in-screen overlay agree on which state we're in.
     function _state(): string {
@@ -168,6 +176,11 @@ Item {
         anchors.bottomMargin: Sizing.pctH(15)
         model: Browse.SystemsModel
         delegate: Tile {}
+        onItemHovered: (index) => systems._focusIndex(index)
+        onItemClicked: (index) => {
+            systems._focusIndex(index)
+            systems.handleAction("accept")
+        }
 
         // Hide the tiles while the router holds us here on a forward
         // transition (Systems → Games) so the centred "Loading…" cue
