@@ -174,7 +174,9 @@ set_target_properties(launcher PROPERTIES
 # targets land after link-time, producing missing-dependency errors on
 # parallel builds (Corrosion-provided staticlibs are visited out of order).
 qt_add_translations(launcher
-    TS_FILES "${CMAKE_SOURCE_DIR}/src/ui/translations/launcher_en.ts"
+    TS_FILES
+        "${CMAKE_SOURCE_DIR}/src/ui/translations/launcher_en.ts"
+        "${CMAKE_SOURCE_DIR}/src/ui/translations/launcher_it.ts"
     RESOURCE_PREFIX "/i18n"
     IMMEDIATE_CALL
 )
