@@ -40,8 +40,8 @@ pub struct HubState {
     /// (categories), 1 = bottom (action tiles).
     pub selected_row: u32,
     /// The bottom-row action tile that last had focus. One of
-    /// `"recents"`, `"favorites"`, `"settings"`. Empty defaults to
-    /// the leftmost action when restored.
+    /// `"recents"` or `"settings"`. Empty defaults to the leftmost
+    /// action when restored.
     pub selected_action: String,
 }
 
@@ -79,9 +79,8 @@ pub struct RecentsState {
 }
 
 /// Per-launcher Settings selections. `resolution` is `"WxH"` (e.g.
-/// `"1920x1080"`); empty means "use config defaults" — which is the
-/// behavior `mister_runtime::apply_pre_qt_setup` had before the screen
-/// existed.
+/// `"1920x1080"`); empty means "no Settings override" and the value
+/// from `[mister.video_*]` in `launcher.toml` is left in place.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct SettingsState {

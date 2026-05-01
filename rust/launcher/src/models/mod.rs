@@ -33,6 +33,7 @@ pub mod hub_state;
 pub mod input;
 pub mod platform;
 pub mod recents;
+pub mod recents_state;
 pub mod runtime;
 pub mod settings;
 pub mod system_status;

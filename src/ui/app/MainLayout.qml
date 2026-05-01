@@ -463,7 +463,27 @@ ApplicationWindow {
                 ];
             }
             if (root.activeScreen === root.screenSettings) {
-                return [{ button: "ButtonB", label: qsTr("Back") }];
+                let row = [];
+                // Up/Down moves between fields; only useful when there
+                // are 2+ fields. Today MiSTer ships one (Resolution),
+                // so this entry is omitted on the current platform.
+                if (root.settingsScreen.fieldCount > 1) {
+                    row.push({
+                        buttons: ["DpadUp", "DpadDown"],
+                        label: qsTr("Move")
+                    });
+                }
+                // Left/Right cycles the focused field's value. Skip
+                // the cue when there are no fields (desktop has no
+                // settings to change today).
+                if (root.settingsScreen.fieldCount > 0) {
+                    row.push({
+                        buttons: ["DpadLeft", "DpadRight"],
+                        label: qsTr("Change")
+                    });
+                }
+                row.push({ button: "ButtonB", label: qsTr("Back") });
+                return row;
             }
             // games
             if (root.gamesScreenState === "loading")
@@ -498,24 +518,41 @@ ApplicationWindow {
             Repeater {
                 model: instructionsBar.helpEntries
 
+                // Each entry is either a single-glyph cue
+                // (`{ button: "ButtonA", label: "Open" }`) or a
+                // multi-glyph cue rendered as N icons in a row before
+                // the label (`{ buttons: ["DpadLeft", "DpadRight"],
+                // label: "Change" }`). The Settings screen uses the
+                // multi-glyph form to disambiguate "left/right cycles
+                // the value" from "up/down moves between fields".
                 delegate: Row {
+                    id: helpEntry
                     required property var modelData
                     spacing: Sizing.pctW(0.6)
 
-                    Image {
-                        anchors.verticalCenter: parent.verticalCenter
-                        height: Sizing.pctH(4)
-                        width: height
-                        fillMode: Image.PreserveAspectFit
-                        sourceSize.height: height
-                        sourceSize.width: width
-                        source: Resources.iconUrl(parent.modelData.button)
-                        smooth: true
+                    readonly property var buttonList:
+                        helpEntry.modelData.buttons !== undefined
+                            ? helpEntry.modelData.buttons
+                            : [helpEntry.modelData.button]
+
+                    Repeater {
+                        model: helpEntry.buttonList
+                        delegate: Image {
+                            required property string modelData
+                            anchors.verticalCenter: parent.verticalCenter
+                            height: Sizing.pctH(4)
+                            width: height
+                            fillMode: Image.PreserveAspectFit
+                            sourceSize.height: height
+                            sourceSize.width: width
+                            source: Resources.iconUrl(modelData)
+                            smooth: true
+                        }
                     }
 
                     Text {
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: parent.modelData.label
+                        anchors.verticalCenter: helpEntry.verticalCenter
+                        text: helpEntry.modelData.label
                         font.family: Theme.fontUi
                         font.pixelSize: Sizing.fontSize(2.5)
                         color: Theme.textPrimary

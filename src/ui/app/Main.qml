@@ -336,10 +336,12 @@ MainLayout {
     function _navigateToRecents(): void {
         root.pendingTransition = "recents"
         if (!Browse.RecentsModel.loading) {
+            root.recentsScreen.restoreSelection()
             root._completeTransition(root.screenRecents)
             return
         }
         root._recentsReadyCallback = function() {
+            root.recentsScreen.restoreSelection()
             root._completeTransition(root.screenRecents)
         }
     }

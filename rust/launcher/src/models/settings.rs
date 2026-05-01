@@ -36,8 +36,11 @@ use zaparoo_core::runtime;
 /// order in the form. Keep the list short — every entry is a literal
 /// the user can crash a CRT scaler with if it doesn't suit their
 /// monitor — and ASCII-only so the QML side never needs to translate
-/// the strings (they're not user-facing labels, they're keys).
-const MISTER_RESOLUTIONS: &[&str] = &["1280x720", "1920x1080", "640x480"];
+/// the strings (they're not user-facing labels, they're keys). The
+/// empty leading entry is the "use `launcher.toml` defaults" sentinel;
+/// the form renders it as `qsTr("Default")` so users can cycle back
+/// to no-override after picking a custom value.
+const MISTER_RESOLUTIONS: &[&str] = &["", "1280x720", "1920x1080", "640x480"];
 
 #[derive(Default)]
 pub struct SettingsRust {

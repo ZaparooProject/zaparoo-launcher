@@ -29,6 +29,31 @@ Item {
 
     signal requestHubScreen()
 
+    // Restore the previously focused entry when the model is Ready.
+    // Called by the router after the Hub→Recents transition lands;
+    // also runs whenever the model count changes so a freshly-played
+    // game (which prepends to history and resets the model) keeps the
+    // user's previously highlighted row if it's still in the page.
+    function restoreSelection(): void {
+        if (Browse.RecentsModel.count <= 0)
+            return
+        const path = Browse.RecentsState.selected_path
+        if (path === "")
+            return
+        const idx = Browse.RecentsModel.index_for_path(path)
+        if (idx >= 0 && idx !== recentsGrid.currentIndex)
+            recentsGrid.currentIndex = idx
+    }
+
+    // Persist the focused entry's path on every focus move so a
+    // kill-resume puts the highlight back. `path_at` returns "" for
+    // out-of-range indices; the setter no-ops on a value-equal write
+    // so the empty-path case during a reload doesn't churn the file.
+    function _persistFocus(): void {
+        const path = Browse.RecentsModel.path_at(recentsGrid.currentIndex)
+        Browse.RecentsState.selected_path = path
+    }
+
     function _state(): string {
         if (Browse.RecentsModel.loading)
             return "loading"
@@ -110,6 +135,7 @@ Item {
         columnsOverride: Sizing.gamesGridColumns
         rowsOverride: Sizing.gamesGridRows
         onLoadMoreRequested: Browse.RecentsModel.fetch_more()
+        onCurrentIndexChanged: recents._persistFocus()
     }
 
     ActiveLabel {

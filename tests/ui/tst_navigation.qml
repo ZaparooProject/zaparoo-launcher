@@ -61,9 +61,9 @@ TestCase {
     }
 
     // Down on hub moves focus between the categories row and the
-    // actions row (Recently Played / Favorites / Settings); it must
-    // never flip off-screen to systems. Accept is the only path that
-    // drills into another screen.
+    // actions row (Recently Played / Settings); it must never flip
+    // off-screen to systems. Accept is the only path that drills
+    // into another screen.
     function test_down_on_hub_does_not_route_to_systems(): void {
         main.handleKey(Qt.Key_Down)
         compare(main.activeScreen, main.screenHub,

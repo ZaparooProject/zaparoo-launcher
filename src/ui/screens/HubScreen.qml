@@ -20,21 +20,18 @@ import Zaparoo.Browse as Browse
 //
 //   * Top row: dynamic categories from Browse.CategoriesModel (Arcade,
 //     Computer, Console, Handheld). Wraps left/right.
-//   * Bottom row: three fixed actions — Recently Played, Favorites,
-//     Settings. Clamps left/right (no wrap on three items).
+//   * Bottom row: fixed actions — Recently Played and Settings.
+//     Clamps left/right (no wrap on a short row).
 //
 // Cross-row navigation is index-aligned with clamp:
-//   Down top[i] → bottom[min(i, 2)]
+//   Down top[i] → bottom[min(i, count-1)]
 //   Up bottom[i] → top[min(i, count-1)]
-// so the Handheld column collapses onto Settings on the way down and
-// Settings collapses onto Handheld (or whichever is the last category)
-// on the way up.
+// so any column past the bottom row's last entry collapses onto that
+// last entry, and on the way up the same clamp applies to the
+// categories row.
 //
 // Pure input dispatcher: emits one of `requestAccept(category)`,
 // `requestRecentsScreen`, `requestSettingsScreen`, or `requestQuit`.
-// Favorites is intentionally a no-op for now — the tile is on screen
-// so the layout reads as a complete grid, but accept doesn't route
-// anywhere yet.
 //
 // All cross-screen orchestration (model fills, deferred set_category,
 // cover prefetch, transition overlay, screen flip) lives in Main.qml.
@@ -44,10 +41,12 @@ Item {
     id: hub
 
     property bool transitioning: false
-    // 0 = categories row, 1 = actions row.
-    property int currentRow: 0
+    // 0 = categories row, 1 = actions row. `final` so external
+    // consumers (the test harness) don't trip qmllint shadow warnings
+    // accessing through MainLayout's untyped alias.
+    final property int currentRow: 0
     // Index within the active row.
-    property int currentIndex: 0
+    final property int currentIndex: 0
 
     signal requestAccept(category: string)
     signal requestQuit()
@@ -55,13 +54,14 @@ Item {
     signal requestSettingsScreen()
 
     // Static action-row data. Three fixed entries; order matches
-    // left-to-right reading. `nameText` is read at binding time so
-    // qsTr() picks up the locale change handler. Keep this list small —
-    // it's a curated bottom row, not a model.
+    // left-to-right reading. The `qsTr()` calls live directly in this
+    // binding so a `LanguageChange` event re-evaluates `actionEntries`
+    // and rebuilds the array with newly-translated strings — consumers
+    // bound to `actionEntries[i].text` pick up the new values
+    // automatically.
     readonly property var actionEntries: [
-        { id: "recents",   coverKey: "icons/History",        get text() { return qsTr("Recently Played"); } },
-        { id: "favorites", coverKey: "categories/Favorites", get text() { return qsTr("Favorites"); } },
-        { id: "settings",  coverKey: "icons/Settings",       get text() { return qsTr("Settings"); } }
+        { id: "recents",  coverKey: "icons/History",  text: qsTr("Recently Played") },
+        { id: "settings", coverKey: "icons/Settings", text: qsTr("Settings") }
     ]
 
     function _actionIndexForId(id: string): int {
@@ -211,7 +211,6 @@ Item {
                     hub.requestRecentsScreen()
                 else if (id === "settings")
                     hub.requestSettingsScreen()
-                // Favorites is a no-op for now.
             }
         } else if (action === "cancel") {
             hub.requestQuit()

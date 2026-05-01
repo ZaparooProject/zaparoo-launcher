@@ -295,7 +295,7 @@ pub extern "C" fn zaparoo_rust_init() -> c_int {
         }
     };
 
-    mister_runtime::apply_pre_qt_setup(&config);
+    mister_runtime::apply_pre_qt_setup();
 
     let client = Client::new(config.core_endpoint.clone(), &runtime);
     platform::spawn_fetcher(client.clone(), &runtime);

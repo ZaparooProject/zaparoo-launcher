@@ -2,33 +2,23 @@
 // Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 
-use zaparoo_core::config::Config;
-
-/// Sets `QT_QPA_PLATFORM=linuxfb` and `QT_QUICK_BACKEND=software`, then runs
-/// `vmode -r W H rgb32`. Must be called before `QGuiApplication`. No-op on
-/// non-MiSTer builds.
+/// Sets `QT_QPA_PLATFORM=linuxfb` and `QT_QUICK_BACKEND=software`. Must
+/// be called before `QGuiApplication`. No-op on non-MiSTer builds.
 ///
-/// Resolution priority: `SettingsState.resolution` (if a parsable
-/// `WxH` value is on disk) wins over `[mister.video_*]` from
-/// `launcher.toml`. Empty/missing/malformed falls back to config —
-/// matches the pre-Settings behaviour exactly so users who never visit
-/// the Settings screen see no change.
-pub fn apply_pre_qt_setup(config: &Config) {
+/// Resolution is set by `[mister.video_*]` in `launcher.toml` (the
+/// `MiSTer` wrapper applies `vmode` before launching us); the Settings
+/// screen calls `run_vmode` to re-apply at runtime when the user picks
+/// a new value, but startup vmode is intentionally not invoked here.
+pub fn apply_pre_qt_setup() {
     #[cfg(zaparoo_runtime = "mister")]
     {
         std::env::set_var("QT_QPA_PLATFORM", "linuxfb");
         std::env::set_var("QT_QUICK_BACKEND", "software");
-
-        let (width, height) = resolve_startup_resolution(config);
-        run_vmode(width, height);
     }
-    #[cfg(not(zaparoo_runtime = "mister"))]
-    let _ = config;
 }
 
-/// Run `vmode -r W H rgb32`. No-op on non-MiSTer builds. Exposed so the
-/// Settings screen can re-apply a freshly-picked resolution at runtime
-/// without going through the full `apply_pre_qt_setup` env-var dance.
+/// Run `vmode -r W H rgb32`. No-op on non-MiSTer builds. Called by the
+/// Settings screen to apply a freshly-picked resolution at runtime.
 pub fn run_vmode(width: u32, height: u32) {
     #[cfg(zaparoo_runtime = "mister")]
     {
@@ -54,24 +44,9 @@ pub fn run_vmode(width: u32, height: u32) {
     let _ = (width, height);
 }
 
-#[cfg(zaparoo_runtime = "mister")]
-fn resolve_startup_resolution(config: &Config) -> (u32, u32) {
-    // Read the persisted state directly here — `init_globals` hasn't run
-    // yet (we're called from `zaparoo_rust_init` before `persist::load`
-    // is stored in the singleton mutex), so `with_persist_read` would
-    // panic. The state file is tiny (<300 bytes) and lives on tmpfs on
-    // MiSTer, so the extra read is negligible.
-    let saved = zaparoo_core::persist::load().settings.resolution;
-    if let Some((w, h)) = parse_resolution(&saved) {
-        return (w, h);
-    }
-    (config.video_width, config.video_height)
-}
-
 /// Parse a `"WxH"` resolution string like `"1920x1080"` (case-insensitive
 /// `x`) into `(width, height)`. Returns `None` on empty input, missing
-/// separator, non-numeric components, or zero values — the caller falls
-/// back to its config defaults in any of those cases.
+/// separator, non-numeric components, or zero values.
 pub fn parse_resolution(value: &str) -> Option<(u32, u32)> {
     let trimmed = value.trim();
     if trimmed.is_empty() {

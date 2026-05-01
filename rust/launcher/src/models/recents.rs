@@ -194,10 +194,22 @@ fn apply_state(
         if model.loading_more {
             model.as_mut().set_loading_more(false);
         }
+        // Look-ahead prefetch: warm page 2 so the first scroll past the
+        // initial page doesn't surface a "Loading more…" cue. `fetch_more`
+        // is itself guarded by `has_next_page` and `loading_more`.
+        if has_next_page {
+            model.as_mut().fetch_more();
+        }
     } else if err.is_empty() {
         // Pending (Idle/Loading): show the spinner; don't touch entries.
+        // Disarm pagination so a grid scroll during a refetch doesn't
+        // fire `fetch_more` against a stale cursor — `has_next_page`
+        // is re-set when Ready lands.
         if !model.loading {
             model.as_mut().set_loading(true);
+        }
+        if model.has_next_page {
+            model.as_mut().set_has_next_page(false);
         }
     } else {
         if model.loading {
@@ -396,8 +408,9 @@ mod tests {
         reason = "tests should fail-fast on unexpected errors"
     )]
 
-    use super::{cover_key_for, launch_text_for, position_of_path};
-    use zaparoo_core::media_types::MediaHistoryEntry;
+    use super::{cover_key_for, launch_text_for, position_of_path, project};
+    use zaparoo_core::media_types::{MediaHistoryEntry, MediaHistoryResult, Pagination};
+    use zaparoo_core::remote_resource::ResourceStatus;
 
     fn entry(name: &str, path: &str, system_id: &str, launcher_id: &str) -> MediaHistoryEntry {
         MediaHistoryEntry {
@@ -461,5 +474,63 @@ mod tests {
     fn position_of_path_missing_returns_minus_one() {
         let entries = vec![entry("smb", "/p/smb", "NES", "NES")];
         assert_eq!(position_of_path(&entries, "/missing"), -1);
+    }
+
+    #[test]
+    fn project_idle_yields_empty_pending() {
+        let (page, err) = project(&ResourceStatus::Idle);
+        assert!(page.is_none());
+        assert!(err.is_empty());
+    }
+
+    #[test]
+    fn project_loading_yields_empty_pending() {
+        let (page, err) = project(&ResourceStatus::Loading);
+        assert!(page.is_none());
+        assert!(err.is_empty());
+    }
+
+    #[test]
+    fn project_ready_carries_entries_and_pagination() {
+        let result = MediaHistoryResult {
+            entries: vec![entry("smb", "/p/smb", "NES", "NES")],
+            pagination: Some(Pagination {
+                has_next_page: true,
+                page_size: 25,
+                next_cursor: Some("cursor-2".into()),
+            }),
+        };
+        let (page, err) = project(&ResourceStatus::Ready(result));
+        assert!(err.is_empty());
+        let (entries, has_next, cursor) = page.expect("ready snapshot");
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].media_path, "/p/smb");
+        assert!(has_next);
+        assert_eq!(cursor.as_deref(), Some("cursor-2"));
+    }
+
+    #[test]
+    fn project_ready_without_pagination_disarms_next_page() {
+        // Core docs say pagination is omitted when no entries are
+        // returned. The projection must surface that as `has_next_page
+        // = false` so the model disarms `fetch_more` instead of looping
+        // on a stale cursor.
+        let result = MediaHistoryResult::default();
+        let (page, err) = project(&ResourceStatus::Ready(result));
+        assert!(err.is_empty());
+        let (entries, has_next, cursor) = page.expect("ready snapshot");
+        assert!(entries.is_empty());
+        assert!(!has_next);
+        assert!(cursor.is_none());
+    }
+
+    #[test]
+    fn project_errored_carries_message_with_no_snapshot() {
+        let (page, err) = project(&ResourceStatus::Errored {
+            message: "rpc kaboom".into(),
+            retrying: true,
+        });
+        assert!(page.is_none());
+        assert_eq!(err, "rpc kaboom");
     }
 }
