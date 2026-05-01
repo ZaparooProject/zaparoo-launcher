@@ -19,16 +19,22 @@ import Zaparoo.Browse as Browse
 // Hub screen — two centered rows the user navigates as one grid:
 //
 //   * Top row: dynamic categories from Browse.CategoriesModel (Arcade,
-//     Computer, Console, Handheld). Wraps left/right.
+//     Computer, Console, Handheld).
 //   * Bottom row: fixed actions — Recently Played and Settings.
-//     Clamps left/right (no wrap on a short row).
 //
-// Cross-row navigation is index-aligned with clamp:
-//   Down top[i] → bottom[min(i, count-1)]
-//   Up bottom[i] → top[min(i, count-1)]
-// so any column past the bottom row's last entry collapses onto that
-// last entry, and on the way up the same clamp applies to the
-// categories row.
+// Both rows wrap left/right modulo their own count, and Up/Down flip
+// between rows in a closed loop (Up from top wraps to bottom, Down
+// from bottom wraps to top). Both rows share cell width and spacing
+// and the bottom row is horizontally centered under the top, so the
+// cross-row jump is "round to the visually-nearest cell". Measuring
+// positions in cell-widths, every cell's center sits at i + 0.5 and
+// the bottom row is offset left by (topCount − bottomCount) / 2 cells.
+// So for either direction:
+//
+//   destIdx = round(sourceIdx − (sourceCount − destCount) / 2)
+//
+// clamped into the destination row. The formula is symmetric and
+// generalizes for any (topCount, bottomCount); see `_mapCrossRow`.
 //
 // Pure input dispatcher: emits one of `requestAccept(category)`,
 // `requestRecentsScreen`, `requestSettingsScreen`, or `requestQuit`.
@@ -121,47 +127,56 @@ Item {
 
     // Returns true if the focus actually moved. Empty rows leave disk
     // state alone — see tst_persistence.qml for the regression guarded
-    // against. Top row wraps modulo count (3-6 items, far end whips
-    // back); bottom row clamps because three items don't need wrap.
+    // against. Both rows wrap modulo their count so a single Left/Right
+    // press at either end whips around to the far side.
     function _navigate(delta: int): bool {
-        if (hub.currentRow === 0) {
-            const count = Browse.CategoriesModel.count
-            if (count <= 0)
-                return false
-            const next = ((hub.currentIndex + delta) % count + count) % count
-            if (next === hub.currentIndex)
-                return false
-            hub.currentIndex = next
-            return true
-        }
-        const count = hub.actionEntries.length
-        const next = Math.max(0, Math.min(count - 1, hub.currentIndex + delta))
+        const count = hub.currentRow === 0
+            ? Browse.CategoriesModel.count
+            : hub.actionEntries.length
+        if (count <= 0)
+            return false
+        const next = ((hub.currentIndex + delta) % count + count) % count
         if (next === hub.currentIndex)
             return false
         hub.currentIndex = next
         return true
     }
 
-    // Cross-row jump. Returns true when focus moved (always true for a
-    // non-no-op direction; up from top or down from bottom is a no-op).
-    function _crossRow(direction: int): bool {
-        if (direction > 0 && hub.currentRow === 0) {
-            // Down from categories: clamp into actions[0..2].
-            hub.currentRow = 1
-            hub.currentIndex = Math.min(hub.currentIndex,
-                                        hub.actionEntries.length - 1)
-            return true
-        }
-        if (direction < 0 && hub.currentRow === 1) {
-            // Up from actions: clamp into categories[0..count-1].
-            const count = Browse.CategoriesModel.count
-            if (count <= 0)
+    // Pure arithmetic — no model access. Maps an index in a row of
+    // `sourceCount` cells to the visually-nearest index in a centered
+    // row of `destCount` cells (both rows assumed to share cell width
+    // and spacing). Returned index is clamped to [0, destCount-1]; a
+    // degenerate `destCount <= 0` returns 0 — callers must guard
+    // empty destination rows separately, this exists so the mapping
+    // can be unit-tested without populating CategoriesModel.
+    function _mapCrossRow(sourceIdx: int, sourceCount: int, destCount: int): int {
+        if (destCount <= 0)
+            return 0
+        const offset = (sourceCount - destCount) / 2
+        const target = Math.round(sourceIdx - offset)
+        return Math.max(0, Math.min(destCount - 1, target))
+    }
+
+    // Cross-row jump. Up and Down both flip to the *other* row at the
+    // visually-nearest cell — there is no "off the top" or "off the
+    // bottom" since the two rows form a closed two-row loop. Returns
+    // false only when the destination row is empty (no categories
+    // loaded yet, etc.).
+    function _crossRow(): bool {
+        const topCount = Browse.CategoriesModel.count
+        const bottomCount = hub.actionEntries.length
+        if (hub.currentRow === 0) {
+            if (bottomCount <= 0)
                 return false
-            hub.currentRow = 0
-            hub.currentIndex = Math.min(hub.currentIndex, count - 1)
+            hub.currentRow = 1
+            hub.currentIndex = hub._mapCrossRow(hub.currentIndex, topCount, bottomCount)
             return true
         }
-        return false
+        if (topCount <= 0)
+            return false
+        hub.currentRow = 0
+        hub.currentIndex = hub._mapCrossRow(hub.currentIndex, bottomCount, topCount)
+        return true
     }
 
     // Side-effect of every focus move: persist HubState. We do NOT call
@@ -197,11 +212,8 @@ Item {
         } else if (action === "right") {
             if (hub._navigate(1))
                 hub._commitCurrent()
-        } else if (action === "down") {
-            if (hub._crossRow(1))
-                hub._commitCurrent()
-        } else if (action === "up") {
-            if (hub._crossRow(-1))
+        } else if (action === "down" || action === "up") {
+            if (hub._crossRow())
                 hub._commitCurrent()
         } else if (action === "accept") {
             if (hub.currentRow === 0) {

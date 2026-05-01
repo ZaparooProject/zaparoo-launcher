@@ -112,4 +112,85 @@ TestCase {
         main.handleKey(Qt.Key_Backspace)
         compare(main.activeScreen, main.screenSystems)
     }
+
+    // Cross-row mapping. The test harness has no live CategoriesModel
+    // so we can't drive the full handleAction("down") flow with real
+    // categories — instead we unit-test the pure arithmetic helper
+    // that owns the math. The shape verifies the user-stated
+    // 4-over-2-centered mapping (a→e, b→e, c→f, d→f and e→b, f→c)
+    // and a couple of degenerate cases.
+    // qmllint disable compiler
+    function test_cross_row_4_over_2_down(): void {
+        const map = main.hubScreen._mapCrossRow
+        compare(map(0, 4, 2), 0, "Down from top[0] (a) → bottom[0] (e)")
+        compare(map(1, 4, 2), 0, "Down from top[1] (b) → bottom[0] (e)")
+        compare(map(2, 4, 2), 1, "Down from top[2] (c) → bottom[1] (f)")
+        compare(map(3, 4, 2), 1, "Down from top[3] (d) → bottom[1] (f)")
+    }
+
+    function test_cross_row_4_over_2_up(): void {
+        const map = main.hubScreen._mapCrossRow
+        compare(map(0, 2, 4), 1, "Up from bottom[0] (e) → top[1] (b)")
+        compare(map(1, 2, 4), 2, "Up from bottom[1] (f) → top[2] (c)")
+    }
+
+    // 4-over-3 (the previous Favorites layout) — the offset is 0.5,
+    // so Math.round's half-toward-+∞ rounds the boundary cells right.
+    function test_cross_row_4_over_3(): void {
+        const map = main.hubScreen._mapCrossRow
+        compare(map(0, 4, 3), 0)
+        compare(map(1, 4, 3), 1)
+        compare(map(2, 4, 3), 2)
+        compare(map(3, 4, 3), 2, "Rightmost top clamps onto rightmost bottom")
+    }
+
+    function test_cross_row_equal_counts_is_identity(): void {
+        const map = main.hubScreen._mapCrossRow
+        compare(map(0, 3, 3), 0)
+        compare(map(1, 3, 3), 1)
+        compare(map(2, 3, 3), 2)
+    }
+
+    function test_cross_row_empty_destination_returns_zero(): void {
+        const map = main.hubScreen._mapCrossRow
+        compare(map(2, 4, 0), 0,
+                "Degenerate destCount=0 returns 0 — caller guards the no-op")
+    }
+
+    // Up on the top row wraps onto the bottom row (the two rows form a
+    // closed loop). Test harness has no live categories, so we start
+    // at top[0] and just verify currentRow flipped — the destination
+    // index is verified by the _mapCrossRow tests above.
+    function test_up_on_top_row_wraps_to_bottom_row(): void {
+        // resetFocus() in init() leaves us on top[0].
+        main.handleKey(Qt.Key_Up)
+        compare(main.hubScreen.currentRow, 1,
+                "Up from top should wrap to bottom row")
+    }
+
+    // Bottom row wraps left/right. Use Down from top[0] to drop into
+    // the bottom row first; bottomCount=2 so a single Right at the
+    // last index must wrap to 0.
+    function test_bottom_row_right_wraps_to_first(): void {
+        main.handleKey(Qt.Key_Down)
+        // _mapCrossRow(0, topCount=0, 2) lands us at bottom[1].
+        compare(main.hubScreen.currentRow, 1)
+        compare(main.hubScreen.currentIndex, 1,
+                "Centered map of top[0] with empty top lands at bottom[1]")
+        main.handleKey(Qt.Key_Right)
+        compare(main.hubScreen.currentIndex, 0,
+                "Right at last bottom-row index wraps to first")
+    }
+
+    function test_bottom_row_left_wraps_to_last(): void {
+        main.handleKey(Qt.Key_Down)
+        compare(main.hubScreen.currentRow, 1)
+        // Drive Left twice: bottom[1] → bottom[0] → wrap to bottom[1].
+        main.handleKey(Qt.Key_Left)
+        compare(main.hubScreen.currentIndex, 0)
+        main.handleKey(Qt.Key_Left)
+        compare(main.hubScreen.currentIndex, 1,
+                "Left at first bottom-row index wraps to last")
+    }
+    // qmllint enable compiler
 }
