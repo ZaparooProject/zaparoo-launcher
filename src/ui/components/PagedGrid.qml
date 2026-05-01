@@ -95,6 +95,19 @@ Item {
         root.currentIndex = idx
     }
 
+    function currentCellRectIn(target: Item): rect {
+        if (root.itemCount <= 0)
+            return Qt.rect(0, 0, 0, 0)
+        const local = root.currentIndex % root.pageSize
+        const row = Math.floor(local / root.columns)
+        const col = local % root.columns
+        const p = root.mapToItem(
+            target,
+            root.sideInset + col * (root.cellWidth + root.cellSpacingX),
+            root.topInset + row * (root.cellHeight + root.cellSpacingY))
+        return Qt.rect(p.x, p.y, root.cellWidth, root.cellHeight)
+    }
+
     // Jump the selection by `delta` whole pages. Wraps in both
     // directions to mirror moveSelection's column-edge behavior:
     // - delta > 0 past the last page wraps to page 0

@@ -29,6 +29,7 @@ MainLayout {
     height: Screen.height
 
     readonly property string modalCardWrite: "card_write"
+    readonly property string modalContextMenu: "context_menu"
     property string cardWriteOwner: ""
     readonly property bool activeCardWritePending:
         root.cardWriteOwner === "systems" ? Browse.SystemsModel.card_write_pending
@@ -427,6 +428,9 @@ MainLayout {
     Connections {
         target: root.recentsScreen
         function onRequestHubScreen(): void { root._goto(root.screenHub) }
+        function onRequestContextMenu(anchorRect): void {
+            root.openContextMenu(anchorRect)
+        }
     }
     Connections {
         target: root.settingsScreen
@@ -453,6 +457,9 @@ MainLayout {
             root.beginCardWrite("systems")
             Browse.SystemsModel.write_card_at(index)
         }
+        function onRequestContextMenu(anchorRect): void {
+            root.openContextMenu(anchorRect)
+        }
     }
     Connections {
         target: root.gamesScreen
@@ -474,11 +481,29 @@ MainLayout {
             root.beginCardWrite("games")
             Browse.GamesModel.write_card_at(index)
         }
+        function onRequestContextMenu(anchorRect): void {
+            root.openContextMenu(anchorRect)
+        }
     }
 
     onActiveCardWritePendingChanged: root.handleCardWriteStatus()
     onActiveCardWriteErrorChanged: root.handleCardWriteStatus()
     onCancelCardWriteRequested: root.cancelCardWrite()
+    onContextMenuCloseRequested: root.closeContextMenu()
+    onContextMenuAccepted: root.closeContextMenu()
+
+    function openContextMenu(anchorRect): void {
+        root.contextMenuAnchor = anchorRect
+        root.contextMenuVisible = true
+        if (ScreenManager.topModal !== root.modalContextMenu)
+            ScreenManager.pushModal(root.modalContextMenu)
+    }
+
+    function closeContextMenu(): void {
+        root.contextMenuVisible = false
+        if (ScreenManager.topModal === root.modalContextMenu)
+            ScreenManager.popModal()
+    }
 
     function beginCardWrite(owner: string): void {
         if (owner === "systems")
@@ -550,6 +575,8 @@ MainLayout {
             if (ScreenManager.topModal === root.modalCardWrite
                     && action === "cancel") {
                 root.cancelCardWrite()
+            } else if (ScreenManager.topModal === root.modalContextMenu) {
+                root.contextMenu.handleAction(action)
             }
             // While a modal owns input, swallow everything not handled
             // above rather than leak it to the root screen.

@@ -18,7 +18,7 @@ import Zaparoo.Browse as Browse
 // Systems screen — paged grid driven by `Browse.SystemsModel`. Pure
 // input dispatcher: emits `requestAccept(systemId)` on Accept (with
 // "" payload to signal Empty/Error retry intent),
-// `requestSystemCardWrite(index)` on the card-write action, and
+// `requestContextMenu(anchorRect)` on the context-menu action, and
 // `requestHubScreen()` on Escape. Cross-screen orchestration (model
 // fills, transition overlay, screen flip) lives in Main.qml;
 // `transitioning` is written by the router so the grid hides during
@@ -32,6 +32,7 @@ Item {
     signal requestAccept(systemId: string)
     signal requestHubScreen()
     signal requestSystemCardWrite(int index)
+    signal requestContextMenu(var anchorRect)
 
     // Move selection by (dx, dy) and commit the new system id on
     // success. Returns the moveSelection result; row/column moves wrap
@@ -120,7 +121,7 @@ Item {
             if (systems.systemsGrid.itemCount > 0) {
                 Browse.SystemsState.system_id =
                     Browse.SystemsModel.system_id_at(systems.systemsGrid.currentIndex)
-                systems.requestSystemCardWrite(systems.systemsGrid.currentIndex)
+                systems.requestContextMenu(systems.systemsGrid.currentCellRectIn(systems))
             }
         } else if (action === "cancel") {
             systems.requestHubScreen()

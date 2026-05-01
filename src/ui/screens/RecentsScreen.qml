@@ -28,6 +28,7 @@ Item {
     property alias recentsGrid: recentsGrid
 
     signal requestHubScreen()
+    signal requestContextMenu(var anchorRect)
 
     // Restore the previously focused entry when the model is Ready.
     // Called by the router after the Hub→Recents transition lands;
@@ -99,6 +100,11 @@ Item {
                 return
             }
             Browse.RecentsModel.launch_at(recents.recentsGrid.currentIndex)
+        } else if (action === "write_card") {
+            if (recents.recentsGrid.itemCount > 0) {
+                recents._persistFocus()
+                recents.requestContextMenu(recents.recentsGrid.currentCellRectIn(recents))
+            }
         } else if (action === "cancel") {
             recents.requestHubScreen()
         }

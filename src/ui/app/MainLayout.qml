@@ -63,9 +63,21 @@ ApplicationWindow {
     property alias gamesScreen: gamesScreen
     property alias recentsScreen: recentsScreen
     property alias settingsScreen: settingsScreen
+    property alias contextMenu: contextMenu
 
     property bool cardWriteModalVisible: false
     property bool cardWriteFailed: false
+    property bool contextMenuVisible: false
+    property rect contextMenuAnchor: Qt.rect(0, 0, 0, 0)
+    readonly property var contextMenuEntries: [
+        qsTr("Set as favorite"),
+        qsTr("Write to NFC token"),
+        qsTr("QR code to NFC"),
+        qsTr("Launch")
+    ]
+
+    signal contextMenuAccepted(int index)
+    signal contextMenuCloseRequested()
 
     // Forward-transition state owned by Main.qml. "" while idle;
     // "systems" or "games" while waiting on a model fill before
@@ -241,6 +253,16 @@ ApplicationWindow {
         onCancelRequested: root.cancelCardWriteRequested()
     }
 
+    ContextMenu {
+        id: contextMenu
+
+        open: root.contextMenuVisible
+        anchorRect: root.contextMenuAnchor
+        entries: root.contextMenuEntries
+        onAccepted: index => root.contextMenuAccepted(index)
+        onCloseRequested: root.contextMenuCloseRequested()
+    }
+
     // ── Top-right HUD ─────────────────────────────────────────────────────────
     //
     // Host status icons plus clock. The Row is right-anchored so icons
@@ -409,6 +431,11 @@ ApplicationWindow {
         // verb doesn't need to repeat that); B is "Back" except on
         // the Hub root, where it's "Quit". Sentence case throughout.
         readonly property var helpEntries: {
+            if (root.contextMenuVisible)
+                return [
+                    { button: "ButtonA", label: qsTr("Select") },
+                    { button: "ButtonB", label: qsTr("Close") }
+                ];
             if (root.cardWriteModalVisible)
                 return [{ button: "ButtonB", label: qsTr("Cancel") }];
             if (root.pendingTransition !== "")
@@ -438,7 +465,7 @@ ApplicationWindow {
                         row.push({ button: "ButtonL", label: qsTr("Prev page") },
                                  { button: "ButtonR", label: qsTr("Next page") });
                     row.push({ button: "ButtonA", label: qsTr("Open") },
-                             { button: "ButtonX", label: qsTr("Flash card") },
+                             { button: "ButtonX", label: qsTr("Menu") },
                              { button: "ButtonB", label: qsTr("Back") });
                     return row;
                 }
@@ -459,6 +486,7 @@ ApplicationWindow {
                         row.push({ button: "ButtonL", label: qsTr("Prev page") },
                                  { button: "ButtonR", label: qsTr("Next page") });
                     row.push({ button: "ButtonA", label: qsTr("Open") },
+                             { button: "ButtonX", label: qsTr("Menu") },
                              { button: "ButtonB", label: qsTr("Back") });
                     return row;
                 }
@@ -501,12 +529,8 @@ ApplicationWindow {
                 if (pages > 1)
                     row.push({ button: "ButtonL", label: qsTr("Prev page") },
                              { button: "ButtonR", label: qsTr("Next page") });
-                row.push({ button: "ButtonA", label: qsTr("Open") });
-                // Drop the Flash card cue on directory/root rows —
-                // write_card no-ops there, so advertising the bind
-                // would mislead.
-                if (root.gamesScreen.currentEntryWritable)
-                    row.push({ button: "ButtonX", label: qsTr("Flash card") });
+                row.push({ button: "ButtonA", label: qsTr("Open") },
+                         { button: "ButtonX", label: qsTr("Menu") });
                 row.push({ button: "ButtonB", label: qsTr("Back") });
                 return row;
             }

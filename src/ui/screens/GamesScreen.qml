@@ -27,6 +27,7 @@ Item {
     // a second Escape from there pops to Hub).
     signal requestSystemsScreen()
     signal requestGameCardWrite(int index)
+    signal requestContextMenu(var anchorRect)
 
     // Emitted when the user accepts a directory or root entry — Main.qml
     // pushes the level onto GamesState and drives the model into the new
@@ -154,12 +155,9 @@ Item {
         } else if (action === "write_card") {
             if (games.gamesGrid.itemCount > 0) {
                 const idx = games.gamesGrid.currentIndex
-                const entryType = Browse.GamesModel.entry_type_at(idx)
-                if (entryType !== "directory" && entryType !== "root") {
-                    Browse.GamesState.set_selected_at_top(
-                        Browse.GamesModel.path_at(idx))
-                    games.requestGameCardWrite(idx)
-                }
+                Browse.GamesState.set_selected_at_top(
+                    Browse.GamesModel.path_at(idx))
+                games.requestContextMenu(games.gamesGrid.currentCellRectIn(games))
             }
         } else if (action === "cancel") {
             if (games._atFolderLevel())
