@@ -67,6 +67,7 @@ ApplicationWindow {
 
     property bool cardWriteModalVisible: false
     property bool cardWriteFailed: false
+    property bool qrCodeModalVisible: false
     property bool contextMenuVisible: false
     property rect contextMenuAnchor: Qt.rect(0, 0, 0, 0)
     readonly property var contextMenuEntries: [
@@ -112,6 +113,7 @@ ApplicationWindow {
         : (Browse.RecentsModel.count === 0 ? "empty" : "ready"))
 
     signal cancelCardWriteRequested()
+    signal closeQrCodeRequested()
 
     // Two-way sync between root.activeScreen and ScreenManager.activeScreen.
     // Binding-breaking assignments (tests setting root.activeScreen = "games")
@@ -261,6 +263,13 @@ ApplicationWindow {
         entries: root.contextMenuEntries
         onAccepted: index => root.contextMenuAccepted(index)
         onCloseRequested: root.contextMenuCloseRequested()
+    }
+
+    QrCodeModal {
+        id: qrCodeModal
+
+        anchors.fill: parent
+        open: root.qrCodeModalVisible
     }
 
     // ── Top-right HUD ─────────────────────────────────────────────────────────
@@ -438,6 +447,8 @@ ApplicationWindow {
                 ];
             if (root.cardWriteModalVisible)
                 return [{ button: "ButtonB", label: qsTr("Cancel") }];
+            if (root.qrCodeModalVisible)
+                return [{ button: "ButtonB", label: qsTr("Close") }];
             if (root.pendingTransition !== "")
                 return [];
             if (root.activeScreen === root.screenHub) {
@@ -486,7 +497,6 @@ ApplicationWindow {
                         row.push({ button: "ButtonL", label: qsTr("Prev page") },
                                  { button: "ButtonR", label: qsTr("Next page") });
                     row.push({ button: "ButtonA", label: qsTr("Open") },
-                             { button: "ButtonX", label: qsTr("Menu") },
                              { button: "ButtonB", label: qsTr("Back") });
                     return row;
                 }

@@ -26,8 +26,7 @@ Item {
     // active screen back to SystemsScreen (one peer up the back-stack;
     // a second Escape from there pops to Hub).
     signal requestSystemsScreen()
-    signal requestGameCardWrite(int index)
-    signal requestContextMenu(var anchorRect)
+    signal requestContextMenu(int index, var anchorRect)
 
     // Emitted when the user accepts a directory or root entry — Main.qml
     // pushes the level onto GamesState and drives the model into the new
@@ -81,16 +80,6 @@ Item {
     // Drives folder-aware cancel routing.
     function _atFolderLevel(): bool {
         return Browse.GamesState.path_stack.length > 1
-    }
-
-    // True when the highlighted row is launchable (not a directory or
-    // root). Read by MainLayout to suppress the [TAB] FLASH CARD cue
-    // while a folder is highlighted, since `write_card` no-ops there.
-    readonly property bool currentEntryWritable: {
-        if (gamesGrid.itemCount === 0)
-            return false
-        const t = Browse.GamesModel.entry_type_at(gamesGrid.currentIndex)
-        return t !== "directory" && t !== "root"
     }
 
     function handleAction(action: string): void {
@@ -157,7 +146,8 @@ Item {
                 const idx = games.gamesGrid.currentIndex
                 Browse.GamesState.set_selected_at_top(
                     Browse.GamesModel.path_at(idx))
-                games.requestContextMenu(games.gamesGrid.currentCellRectIn(games))
+                games.requestContextMenu(
+                    idx, games.gamesGrid.currentCellRectIn(games))
             }
         } else if (action === "cancel") {
             if (games._atFolderLevel())

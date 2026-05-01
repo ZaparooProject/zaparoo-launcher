@@ -760,6 +760,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "qrcode"
+version = "0.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d68782463e408eb1e668cf6152704bd856c78c5b6417adaee3203d8f4c1fc9ec"
+
+[[package]]
 name = "qt-build-utils"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1649,6 +1655,7 @@ dependencies = [
  "cxx-qt-build",
  "cxx-qt-lib",
  "libc",
+ "qrcode",
  "time",
  "tokio",
  "tracing",

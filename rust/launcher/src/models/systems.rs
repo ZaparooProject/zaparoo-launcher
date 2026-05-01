@@ -12,7 +12,8 @@ use tokio::task::JoinHandle;
 use tracing::{trace, warn};
 use zaparoo_core::endpoints::catalog::CatalogEndpoint;
 use zaparoo_core::endpoints::readers_write::ReadersWriteMutation;
-use zaparoo_core::media_types::ReadersWriteParams;
+use zaparoo_core::endpoints::run::RunMutation;
+use zaparoo_core::media_types::{ReadersWriteParams, RunParams};
 use zaparoo_core::remote_resource::ResourceStatus;
 use zaparoo_core::systems_catalog::CatalogData;
 
@@ -102,6 +103,12 @@ pub mod ffi {
 
         #[qinvokable]
         fn write_card_at(self: Pin<&mut SystemsModel>, index: i32);
+
+        #[qinvokable]
+        fn launch_at(self: Pin<&mut SystemsModel>, index: i32);
+
+        #[qinvokable]
+        fn launch_text_at(self: &SystemsModel, index: i32) -> QString;
 
         #[qinvokable]
         fn cancel_card_write(self: Pin<&mut SystemsModel>);
@@ -370,6 +377,17 @@ impl ffi::SystemsModel {
         QString::from(self.systems[index as usize].name.as_str())
     }
 
+    fn launch_text_at(&self, index: i32) -> QString {
+        if index < 0 || index >= self.count {
+            return QString::default();
+        }
+        let system = &self.systems[index as usize];
+        if system.id.is_empty() {
+            return QString::default();
+        }
+        QString::from(format!("**launch.system:{}", system.id).as_str())
+    }
+
     fn write_card_at(mut self: Pin<&mut Self>, index: i32) {
         if index < 0 || index >= self.count {
             self.as_mut()
@@ -410,6 +428,24 @@ impl ffi::SystemsModel {
                 model.as_mut().set_card_write_error(error);
                 model.as_mut().set_card_write_pending(false);
             });
+        });
+    }
+
+    fn launch_at(self: Pin<&mut Self>, index: i32) {
+        if index < 0 || index >= self.count {
+            return;
+        }
+        let system = &self.systems[index as usize];
+        if system.id.is_empty() {
+            return;
+        }
+        let text = format!("**launch.system:{}", system.id);
+        let name = system.name.clone();
+        let store = global_store();
+        global_runtime().spawn(async move {
+            if let Err(e) = store.run_mutation::<RunMutation>(RunParams { text }).await {
+                warn!("run failed for {name}: {}", e.message);
+            }
         });
     }
 

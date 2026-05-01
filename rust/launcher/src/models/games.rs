@@ -188,6 +188,9 @@ pub mod ffi {
         fn launch_at(self: Pin<&mut GamesModel>, index: i32);
 
         #[qinvokable]
+        fn launch_text_at(self: &GamesModel, index: i32) -> QString;
+
+        #[qinvokable]
         fn write_card_at(self: Pin<&mut GamesModel>, index: i32);
 
         #[qinvokable]
@@ -369,6 +372,13 @@ impl ffi::GamesModel {
                 warn!("run failed for {name}: {}", e.message);
             }
         });
+    }
+
+    fn launch_text_at(&self, index: i32) -> QString {
+        if index < 0 || index >= self.count {
+            return QString::default();
+        }
+        QString::from(self.entries[index as usize].zap_script.as_str())
     }
 
     fn write_card_at(mut self: Pin<&mut Self>, index: i32) {

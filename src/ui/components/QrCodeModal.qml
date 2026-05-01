@@ -1,0 +1,75 @@
+// Zaparoo Launcher
+// Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+
+import QtQuick
+import Zaparoo.Theme
+import Zaparoo.Browse as Browse
+
+Item {
+    id: root
+
+    property bool open: false
+    property int quietZone: 4
+
+    readonly property int matrixSize: Browse.QrCode.size
+    readonly property real maxQrPixels: Math.min(Sizing.pctW(42), Sizing.pctH(68))
+    readonly property real moduleSize: matrixSize > 0
+        ? Math.max(1, Math.floor(maxQrPixels / (matrixSize + quietZone * 2)))
+        : 1
+    readonly property real qrPixels: moduleSize * (matrixSize + quietZone * 2)
+
+    visible: root.open
+    z: 300
+
+    Rectangle {
+        anchors.centerIn: parent
+        width: root.qrPixels
+        height: root.qrPixels
+        color: "white"
+        border.width: Math.max(1, Math.round(root.moduleSize * 0.18))
+        border.color: Theme.borderSubtle
+
+        Item {
+            id: matrix
+
+            anchors.centerIn: parent
+            width: root.moduleSize * root.matrixSize
+            height: root.moduleSize * root.matrixSize
+            visible: root.matrixSize > 0
+
+            Repeater {
+                model: root.matrixSize
+
+                delegate: Item {
+                    id: rowDelegate
+
+                    required property int index
+
+                    readonly property int row: index
+                    readonly property string bits: Browse.QrCode.row_at(row)
+
+                    x: 0
+                    y: row * root.moduleSize
+                    width: matrix.width
+                    height: root.moduleSize
+
+                    Repeater {
+                        model: root.matrixSize
+
+                        delegate: Rectangle {
+                            required property int index
+
+                            x: index * root.moduleSize
+                            y: 0
+                            width: root.moduleSize
+                            height: root.moduleSize
+                            color: "black"
+                            visible: rowDelegate.bits.charAt(index) === "1"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

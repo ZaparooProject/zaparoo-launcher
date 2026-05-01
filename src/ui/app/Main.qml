@@ -30,7 +30,10 @@ MainLayout {
 
     readonly property string modalCardWrite: "card_write"
     readonly property string modalContextMenu: "context_menu"
+    readonly property string modalQrCode: "qr_code"
     property string cardWriteOwner: ""
+    property string contextMenuOwner: ""
+    property int contextMenuIndex: -1
     readonly property bool activeCardWritePending:
         root.cardWriteOwner === "systems" ? Browse.SystemsModel.card_write_pending
         : root.cardWriteOwner === "games" ? Browse.GamesModel.card_write_pending
@@ -428,9 +431,6 @@ MainLayout {
     Connections {
         target: root.recentsScreen
         function onRequestHubScreen(): void { root._goto(root.screenHub) }
-        function onRequestContextMenu(anchorRect): void {
-            root.openContextMenu(anchorRect)
-        }
     }
     Connections {
         target: root.settingsScreen
@@ -453,12 +453,8 @@ MainLayout {
             root._navigateFromSystems(systemId)
         }
         function onRequestHubScreen(): void { root._goto(root.screenHub) }
-        function onRequestSystemCardWrite(index: int): void {
-            root.beginCardWrite("systems")
-            Browse.SystemsModel.write_card_at(index)
-        }
-        function onRequestContextMenu(anchorRect): void {
-            root.openContextMenu(anchorRect)
+        function onRequestContextMenu(index: int, anchorRect): void {
+            root.openContextMenu("systems", index, anchorRect)
         }
     }
     Connections {
@@ -477,22 +473,21 @@ MainLayout {
         function onRequestNavigateOutOfFolder(): void {
             root._navigateOutOfFolder()
         }
-        function onRequestGameCardWrite(index: int): void {
-            root.beginCardWrite("games")
-            Browse.GamesModel.write_card_at(index)
-        }
-        function onRequestContextMenu(anchorRect): void {
-            root.openContextMenu(anchorRect)
+        function onRequestContextMenu(index: int, anchorRect): void {
+            root.openContextMenu("games", index, anchorRect)
         }
     }
 
     onActiveCardWritePendingChanged: root.handleCardWriteStatus()
     onActiveCardWriteErrorChanged: root.handleCardWriteStatus()
     onCancelCardWriteRequested: root.cancelCardWrite()
+    onCloseQrCodeRequested: root.closeQrCodeModal()
     onContextMenuCloseRequested: root.closeContextMenu()
-    onContextMenuAccepted: root.closeContextMenu()
+    onContextMenuAccepted: index => root.handleContextMenuAccepted(index)
 
-    function openContextMenu(anchorRect): void {
+    function openContextMenu(owner: string, index: int, anchorRect): void {
+        root.contextMenuOwner = owner
+        root.contextMenuIndex = index
         root.contextMenuAnchor = anchorRect
         root.contextMenuVisible = true
         if (ScreenManager.topModal !== root.modalContextMenu)
@@ -501,7 +496,56 @@ MainLayout {
 
     function closeContextMenu(): void {
         root.contextMenuVisible = false
+        root.contextMenuOwner = ""
+        root.contextMenuIndex = -1
         if (ScreenManager.topModal === root.modalContextMenu)
+            ScreenManager.popModal()
+    }
+
+    function handleContextMenuAccepted(index: int): void {
+        const owner = root.contextMenuOwner
+        const targetIndex = root.contextMenuIndex
+        root.closeContextMenu()
+        if (targetIndex < 0)
+            return
+
+        if (index === 0) {
+            return
+        } else if (index === 2) {
+            const text = owner === "systems"
+                ? Browse.SystemsModel.launch_text_at(targetIndex)
+                : owner === "games"
+                    ? Browse.GamesModel.launch_text_at(targetIndex)
+                    : ""
+            if (text !== "") {
+                Browse.QrCode.generate(text)
+                root.openQrCodeModal()
+            }
+        } else if (index === 1) {
+            if (owner === "systems") {
+                root.beginCardWrite("systems")
+                Browse.SystemsModel.write_card_at(targetIndex)
+            } else if (owner === "games") {
+                root.beginCardWrite("games")
+                Browse.GamesModel.write_card_at(targetIndex)
+            }
+        } else if (index === 3) {
+            if (owner === "systems")
+                Browse.SystemsModel.launch_at(targetIndex)
+            else if (owner === "games")
+                Browse.GamesModel.launch_at(targetIndex)
+        }
+    }
+
+    function openQrCodeModal(): void {
+        root.qrCodeModalVisible = true
+        if (ScreenManager.topModal !== root.modalQrCode)
+            ScreenManager.pushModal(root.modalQrCode)
+    }
+
+    function closeQrCodeModal(): void {
+        root.qrCodeModalVisible = false
+        if (ScreenManager.topModal === root.modalQrCode)
             ScreenManager.popModal()
     }
 
@@ -575,6 +619,9 @@ MainLayout {
             if (ScreenManager.topModal === root.modalCardWrite
                     && action === "cancel") {
                 root.cancelCardWrite()
+            } else if (ScreenManager.topModal === root.modalQrCode
+                    && action === "cancel") {
+                root.closeQrCodeModal()
             } else if (ScreenManager.topModal === root.modalContextMenu) {
                 root.contextMenu.handleAction(action)
             }

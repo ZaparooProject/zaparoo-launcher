@@ -14,6 +14,7 @@ qt_add_qml_module(
         LoadingIndicator.qml
         Modal.qml
         PagedGrid.qml
+        QrCodeModal.qml
         ScreenStateOverlay.qml
         SettingsField.qml
         StatusIcon.qml

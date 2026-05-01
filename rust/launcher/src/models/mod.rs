@@ -32,6 +32,7 @@ pub mod games_state;
 pub mod hub_state;
 pub mod input;
 pub mod platform;
+pub mod qr_code;
 pub mod recents;
 pub mod recents_state;
 pub mod runtime;
