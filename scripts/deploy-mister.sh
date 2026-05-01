@@ -81,5 +81,7 @@ ssh "root@${MISTER_IP}" "
     killall launcher 2>/dev/null && echo 'Killed running launcher' || true
     killall MiSTer_Zaparoo 2>/dev/null && echo 'Killed running MiSTer_Zaparoo' || true
     rm -f /tmp/zaparoo/launcher.log
-    nohup /media/fat/MiSTer_Zaparoo >/dev/null 2>&1 &
+    nohup /media/fat/MiSTer_Zaparoo </dev/null >/dev/null 2>&1 &
+    disown
+    echo 'Restarted MiSTer_Zaparoo'
 "
