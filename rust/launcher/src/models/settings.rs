@@ -21,10 +21,13 @@
 //     used to compose resources/images/buttons/<layout>/Button*.png.
 //   * `current_button_layout` — READ + NOTIFY, persisted. Defaults to
 //     "nintendo" so existing state files keep the current asset path.
+//   * `current_mouse_enabled` — READ + NOTIFY, persisted. Defaults to true
+//     so existing installs keep the visible cursor and mouse hit targets.
 //
 // Setters write to disk first so a runtime crash mid-apply still leaves
 // the choice persisted. Resolution then runs `vmode` on MiSTer; button
-// layout only changes the QML resource path used by help-bar icons.
+// layout only changes the QML resource path used by help-bar icons, and
+// mouse support drives the QML cursor/input blocker.
 
 use crate::mister_runtime;
 use crate::models::{with_persist_mut, with_persist_read};
@@ -42,7 +45,7 @@ use zaparoo_core::runtime;
 /// empty leading entry is the "use `launcher.toml` defaults" sentinel;
 /// the form renders it as `qsTr("Default")` so users can cycle back
 /// to no-override after picking a custom value.
-const MISTER_RESOLUTIONS: &[&str] = &["", "1280x720", "1920x1080", "640x480"];
+const MISTER_RESOLUTIONS: &[&str] = &["", "1280x720", "1920x1080", "640x480", "1920x1440"];
 const BUTTON_LAYOUTS: &[&str] = &["nintendo", "xbox", "sony"];
 const DEFAULT_BUTTON_LAYOUT: &str = "nintendo";
 
@@ -53,6 +56,7 @@ pub struct SettingsRust {
     current_resolution: QString,
     available_button_layouts: QStringList,
     current_button_layout: QString,
+    current_mouse_enabled: bool,
 }
 
 #[cxx_qt::bridge]
@@ -73,6 +77,7 @@ pub mod ffi {
         #[qproperty(QString, current_resolution, READ, WRITE = set_resolution, NOTIFY)]
         #[qproperty(QStringList, available_button_layouts, READ, CONSTANT)]
         #[qproperty(QString, current_button_layout, READ, WRITE = set_button_layout, NOTIFY)]
+        #[qproperty(bool, current_mouse_enabled, READ, WRITE = set_mouse_enabled, NOTIFY)]
         type Settings = super::SettingsRust;
 
         #[qinvokable]
@@ -80,6 +85,9 @@ pub mod ffi {
 
         #[qinvokable]
         fn set_button_layout(self: Pin<&mut Settings>, value: QString);
+
+        #[qinvokable]
+        fn set_mouse_enabled(self: Pin<&mut Settings>, value: bool);
     }
 
     impl cxx_qt::Initialize for Settings {}
@@ -99,6 +107,7 @@ impl Initialize for ffi::Settings {
         self.as_mut().rust_mut().available_button_layouts = button_layouts();
         self.as_mut().rust_mut().current_button_layout =
             QString::from(normalize_button_layout(&snapshot.button_layout));
+        self.as_mut().rust_mut().current_mouse_enabled = snapshot.mouse_enabled;
     }
 }
 
@@ -132,6 +141,15 @@ impl ffi::Settings {
         persist_settings(|s| s.button_layout.clone_from(&value_str));
         self.as_mut().rust_mut().current_button_layout = QString::from(value_str.as_str());
         self.as_mut().current_button_layout_changed();
+    }
+
+    fn set_mouse_enabled(mut self: Pin<&mut Self>, value: bool) {
+        if self.current_mouse_enabled == value {
+            return;
+        }
+        persist_settings(|s| s.mouse_enabled = value);
+        self.as_mut().rust_mut().current_mouse_enabled = value;
+        self.as_mut().current_mouse_enabled_changed();
     }
 }
 

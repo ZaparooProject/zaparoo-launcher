@@ -87,6 +87,8 @@ pub struct SettingsState {
     pub resolution: String,
     #[serde(default = "default_button_layout")]
     pub button_layout: String,
+    #[serde(default = "default_mouse_enabled")]
+    pub mouse_enabled: bool,
 }
 
 impl Default for SettingsState {
@@ -94,12 +96,17 @@ impl Default for SettingsState {
         Self {
             resolution: String::new(),
             button_layout: default_button_layout(),
+            mouse_enabled: default_mouse_enabled(),
         }
     }
 }
 
 fn default_button_layout() -> String {
     "nintendo".into()
+}
+
+fn default_mouse_enabled() -> bool {
+    true
 }
 
 pub fn load() -> PersistedState {
@@ -224,6 +231,7 @@ mod tests {
             settings: SettingsState {
                 resolution: "1920x1080".into(),
                 button_layout: "xbox".into(),
+                mouse_enabled: false,
             },
         };
         save_to(&path, &original);
@@ -306,13 +314,14 @@ mod tests {
     }
 
     #[test]
-    fn missing_settings_button_layout_defaults_to_nintendo() {
+    fn missing_settings_fields_default_to_current_behavior() {
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("state.toml");
         std::fs::write(&path, "[settings]\nresolution = \"1920x1080\"\n").expect("write");
         let state = load_from(&path);
         assert_eq!(state.settings.resolution, "1920x1080");
         assert_eq!(state.settings.button_layout, "nintendo");
+        assert!(state.settings.mouse_enabled);
     }
 
     #[test]

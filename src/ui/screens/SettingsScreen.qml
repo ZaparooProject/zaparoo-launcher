@@ -18,7 +18,8 @@ import Zaparoo.Browse as Browse
 // Settings screen — gamepad-driven vertical form. Resolution is MiSTer-only
 // because the underlying `vmode` command lives on MiSTer's Linux framebuffer.
 // Button layout is cross-platform and selects the resource directory for
-// help-bar button glyphs.
+// help-bar button glyphs. Mouse support is cross-platform and controls
+// cursor visibility plus mouse hit targets.
 //
 // Pure input dispatcher: emits `requestHubScreen()` on Escape; left/
 // right cycle the focused field's value via the model singleton.
@@ -47,10 +48,16 @@ Item {
             id: "buttonLayout",
             label: qsTr("Button layout")
         })
+        out.push({
+            id: "mouseEnabled",
+            label: qsTr("Mouse support")
+        })
         return out
     }
 
     readonly property int fieldCount: settings.fields.length
+    readonly property bool focusedFieldIsMouse:
+        settings.fieldCount > 0 && settings.fields[settings.currentIndex].id === "mouseEnabled"
 
     property int currentIndex: 0
 
@@ -125,6 +132,14 @@ Item {
         Browse.Settings.set_button_layout(list[next])
     }
 
+    function _setMouseEnabled(direction: int): void {
+        Browse.Settings.set_mouse_enabled(direction > 0)
+    }
+
+    function _toggleMouseEnabled(): void {
+        Browse.Settings.set_mouse_enabled(!Browse.Settings.current_mouse_enabled)
+    }
+
     function _cycleFocused(direction: int): void {
         if (settings.fieldCount === 0)
             return
@@ -133,6 +148,8 @@ Item {
             settings._cycleResolution(direction)
         else if (id === "buttonLayout")
             settings._cycleButtonLayout(direction)
+        else if (id === "mouseEnabled")
+            settings._setMouseEnabled(direction)
     }
 
     function handleAction(action: string): void {
@@ -146,13 +163,13 @@ Item {
             settings._cycleFocused(-1)
         } else if (action === "right") {
             settings._cycleFocused(1)
+        } else if (action === "accept") {
+            if (settings.fieldCount > 0
+                && settings.fields[settings.currentIndex].id === "mouseEnabled")
+                settings._toggleMouseEnabled()
         } else if (action === "cancel") {
             settings.requestHubScreen()
         }
-        // Accept is intentionally a no-op — left/right is the only way
-        // to change a value, matching the rest of the launcher's
-        // gamepad vocabulary (Accept always advances *into* something,
-        // never edits in place).
     }
 
     // ── Visual tree ───────────────────────────────────────────────────────────
@@ -199,18 +216,28 @@ Item {
                        : modelData.id === "buttonLayout"
                        ? settings._buttonLayoutDisplay(Browse.Settings.current_button_layout)
                        : ""
+                control: modelData.id === "mouseEnabled" ? "toggle" : "value"
+                checked: Browse.Settings.current_mouse_enabled
                 // Pickers wrap modulo, so both arrows apply when the
                 // focused field has a populated option list.
                 canCyclePrev: (modelData.id === "resolution"
                                && settings._resolutionList().length > 0)
                               || (modelData.id === "buttonLayout"
                                   && settings._buttonLayoutList().length > 1)
+                              || (modelData.id === "mouseEnabled"
+                                  && Browse.Settings.current_mouse_enabled)
                 canCycleNext: (modelData.id === "resolution"
                                && settings._resolutionList().length > 0)
                               || (modelData.id === "buttonLayout"
                                   && settings._buttonLayoutList().length > 1)
+                              || (modelData.id === "mouseEnabled"
+                                  && !Browse.Settings.current_mouse_enabled)
                 onHovered: settings.currentIndex = index
-                onClicked: settings.currentIndex = index
+                onClicked: {
+                    settings.currentIndex = index
+                    if (modelData.id === "mouseEnabled")
+                        settings._toggleMouseEnabled()
+                }
             }
         }
     }

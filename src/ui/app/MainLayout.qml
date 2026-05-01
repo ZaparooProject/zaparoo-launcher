@@ -470,8 +470,7 @@ ApplicationWindow {
             if (root.activeScreen === root.screenSettings) {
                 let row = [];
                 // Up/Down moves between fields; only useful when there
-                // are 2+ fields. Today MiSTer ships one (Resolution),
-                // so this entry is omitted on the current platform.
+                // are 2+ fields.
                 if (root.settingsScreen.fieldCount > 1) {
                     row.push({
                         buttons: ["DpadUp", "DpadDown"],
@@ -479,14 +478,15 @@ ApplicationWindow {
                     });
                 }
                 // Left/Right cycles the focused field's value. Skip
-                // the cue when there are no fields (desktop has no
-                // settings to change today).
+                // the cue when there are no fields.
                 if (root.settingsScreen.fieldCount > 0) {
                     row.push({
                         buttons: ["DpadLeft", "DpadRight"],
                         label: qsTr("Change")
                     });
                 }
+                if (root.settingsScreen.focusedFieldIsMouse)
+                    row.push({ button: "ButtonA", label: qsTr("Toggle") });
                 row.push({ button: "ButtonB", label: qsTr("Back") });
                 return row;
             }
@@ -566,5 +566,15 @@ ApplicationWindow {
                 }
             }
         }
+    }
+
+    MouseArea {
+        anchors.fill: parent
+        z: 10000
+        visible: !Browse.Settings.current_mouse_enabled
+        enabled: visible
+        hoverEnabled: true
+        acceptedButtons: Qt.AllButtons
+        cursorShape: Qt.BlankCursor
     }
 }
