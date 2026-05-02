@@ -209,7 +209,7 @@ Item {
         anchors.bottom: parent.bottom
         anchors.bottomMargin: Sizing.pctH(15)
         model: Browse.GamesModel
-        delegate: Tile {}
+        delegate: Tile { showCaption: true }
         // Cover-art tiles run taller than systems logos, so a 5x3
         // layout starves vertical space. Games gets its own
         // gamesGridColumns/Rows in Sizing — 5x2 on desktop, narrower

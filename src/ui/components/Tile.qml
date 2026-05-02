@@ -7,13 +7,23 @@ import Zaparoo.Theme
 
 // Unified grid tile. Solid card with a centered icon area filling the
 // card body, plus a white outline ring around the card when this tile
-// is the focused selection. The focused tile's display name renders
-// below the grid via ActiveLabel.qml — no label inside the tile —
-// because per-tile labels duplicate identity already carried by the
-// curated logo and force long names to wrap/elide inside cramped
-// cells. Used by every tile surface in the launcher — hub categories
-// row, systems grid, games grid — so the vocabulary is identical
-// across screens.
+// is the focused selection. Used by every tile surface in the launcher
+// — hub categories row, systems grid, games grid, recents grid — so
+// the vocabulary is identical across screens.
+//
+// Two layout modes, gated by `showCaption`:
+//   - off (default): full-bleed icon, no in-tile label. Used by Hub
+//     and Systems where a curated logo already carries identity.
+//   - on: cover slot shrinks vertically to free a thin band along the
+//     bottom edge for a one-line elided name caption. Used by Games
+//     and Recents because a long shelf of similar boxart needs
+//     per-tile labelling — the focused-tile caption below the grid
+//     (ActiveLabel) only identifies one cell at a time.
+//
+// In caption mode the loading-state fallback is an hourglass glyph,
+// not the wrapping-name text used in non-caption mode — the bottom
+// caption already shows the name, so the centred-text fallback would
+// just read it twice.
 //
 // Parent contract — Tile must be loaded inside a host that exposes:
 //   - isSelected: bool   — true when this tile is the focused selection
@@ -58,9 +68,16 @@ Item {
         // qmllint enable missing-property compiler
     }
 
+    // Opt-in per-tile name caption. Off by default so Hub and Systems
+    // keep their full-bleed logo layout. Cover-art screens (Games,
+    // Recents) flip this on at the delegate template.
+    property bool showCaption: false
+
     readonly property int _padding: Sizing.pctH(3)
     readonly property int _outlineGap: Sizing.pctH(0.4)
     readonly property int _outlineWidth: Sizing.pctH(0.6)
+    readonly property int _captionHeight: Sizing.pctH(3.5)
+    readonly property int _captionGap: Sizing.pctH(0.8)
 
     readonly property bool _focusedSelection:
         root.delegateIsSelected && root.delegateIsFocused
@@ -110,15 +127,36 @@ Item {
     // top; the icon padding (`_padding = pctH(3)`) is far larger than
     // the inset (`_outlineGap = pctH(0.4)`), so the ring never overlaps
     // content.
+    // Focus ring drawn as two stacked *filled* rounded rectangles — an
+    // outer white pill and an inner surfaceCard mask that punches the
+    // centre back, leaving a uniform outline. Equivalent to the older
+    // single-Rectangle `border.color` + `border.width` approach but
+    // significantly smoother on the corners under Qt's software
+    // adaptation: filled rounded rects honour the AA path, while thin
+    // rounded *borders* are tessellated without subpixel coverage and
+    // step visibly at the corners (see QTBUG-123210). Both rectangles
+    // are still inside the card edge by `_outlineGap`, so the ring
+    // never bleeds past the cell bounds.
     Rectangle {
+        id: focusRingOuter
         anchors.fill: parent
         anchors.margins: root._outlineGap
-        color: "transparent"
-        border.color: Theme.textPrimary
-        border.width: root._outlineWidth
-        // Card radius minus the inset margin keeps the ring concentric
-        // with the card corners.
+        color: Theme.textPrimary
         radius: Sizing.cornerRadius - root._outlineGap
+        antialiasing: true
+        visible: root._focusedSelection
+    }
+    Rectangle {
+        anchors.fill: focusRingOuter
+        anchors.margins: root._outlineWidth
+        color: Theme.surfaceCard
+        // Inner radius shrinks to keep the visible ring's outer edge
+        // and inner edge concentric with the card corners. Floor at 0
+        // so very small tiles (where _outlineWidth approaches the
+        // outer radius) collapse to a sharp inner mask rather than
+        // negative-radius garbage.
+        radius: Math.max(0, focusRingOuter.radius - root._outlineWidth)
+        antialiasing: true
         visible: root._focusedSelection
     }
 
@@ -133,7 +171,12 @@ Item {
             top: parent.top
             topMargin: root._padding
             bottom: parent.bottom
-            bottomMargin: root._padding
+            // In caption mode the cover slot shrinks to leave a strip
+            // for the bottom caption; otherwise it fills body-padding.
+            bottomMargin: root.showCaption
+                          ? root._padding + root._captionHeight
+                            + root._captionGap
+                          : root._padding
             horizontalCenter: parent.horizontalCenter
         }
         width: parent.width - 2 * root._padding
@@ -151,10 +194,40 @@ Item {
         opacity: root._hasCover ? 1.0 : 0.0
     }
 
-    // Procedural fallback. Sits at the same geometry as the cover and
-    // snaps to the cover the moment Image.status hits Ready; the brief
-    // Loading window shows the fallback text rather than crossfading.
-    // Cache hits skip Loading entirely and snap directly.
+    // Caption-mode loading cue. Centred hourglass glyph that paints
+    // only during the Image.Loading window — once the cover lands the
+    // glyph hides and the cover paints in. Error/Null cover state
+    // also hides the glyph (a stuck hourglass on a permanently failed
+    // cover would mislead) and the bottom caption still identifies
+    // the tile. Bundled qrc asset, decode is cheap, no animation.
+    Image {
+        id: loadingGlyph
+        anchors.centerIn: cover
+        width: Sizing.pctH(10)
+        height: Sizing.pctH(10)
+        source: Resources.iconUrl("Loading")
+        // Loading.svg has a 24×24 native viewBox; without sourceSize
+        // Qt rasterises at that intrinsic size and bilinear-upscales
+        // to the rendered box, which reads as soft on every screen
+        // taller than ~240 px. Pinning sourceSize to the rendered
+        // dimensions makes the SVG renderer rasterise at target size
+        // — same pattern StatusIcon.qml and LoadingIndicator.qml use.
+        sourceSize.width: width
+        sourceSize.height: height
+        fillMode: Image.PreserveAspectFit
+        smooth: true
+        asynchronous: false
+        visible: root.showCaption && cover.status === Image.Loading
+    }
+
+    // Non-caption procedural fallback. Sits at the same geometry as
+    // the cover and snaps to the cover the moment Image.status hits
+    // Ready; the brief Loading window shows the fallback text rather
+    // than crossfading. Cache hits skip Loading entirely and snap
+    // directly. In caption mode this is suppressed — the bottom
+    // caption already shows the name and the hourglass above signals
+    // load progress, so a wrapping copy of the name in this slot is
+    // redundant.
     Text {
         anchors.fill: cover
         text: root.delegateName
@@ -168,7 +241,33 @@ Item {
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
         renderType: Text.NativeRendering
-        opacity: root._hasCover ? 0.0 : 1.0
+        opacity: (!root.showCaption && !root._hasCover) ? 1.0 : 0.0
         clip: true
+    }
+
+    // Bottom caption strip (caption mode only). Single line, ellipsised
+    // when long. Same focus-tinted colouring as the non-caption
+    // fallback so the focused tile's caption brightens with the rest
+    // of the focus cue.
+    Text {
+        id: caption
+        anchors {
+            left: parent.left
+            right: parent.right
+            bottom: parent.bottom
+            leftMargin: root._padding
+            rightMargin: root._padding
+            bottomMargin: root._padding
+        }
+        height: root._captionHeight
+        visible: root.showCaption
+        text: root.delegateName
+        font.family: Theme.fontUi
+        font.pixelSize: Sizing.fontSize(1.7)
+        color: root._focusedSelection ? Theme.textPrimary : Theme.textLabel
+        elide: Text.ElideRight
+        horizontalAlignment: Text.AlignHCenter
+        verticalAlignment: Text.AlignVCenter
+        renderType: Text.NativeRendering
     }
 }

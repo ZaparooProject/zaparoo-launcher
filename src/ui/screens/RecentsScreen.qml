@@ -148,7 +148,7 @@ Item {
         anchors.bottom: parent.bottom
         anchors.bottomMargin: Sizing.pctH(15)
         model: Browse.RecentsModel
-        delegate: Tile {}
+        delegate: Tile { showCaption: true }
         // Match games-grid layout (taller cover-art tiles); the systems
         // grid's 5x3 starves vertical space on these covers.
         columnsOverride: Sizing.gamesGridColumns
