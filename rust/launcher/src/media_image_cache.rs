@@ -734,10 +734,12 @@ pub fn global_media_image_cache() -> Arc<MediaImageCache> {
 ///
 /// # Safety
 ///
-/// `encoded` must point to `encoded_len` bytes of valid UTF-8 that
-/// remain live for the duration of this call. `callback` is invoked
-/// exactly once before this function returns; the `data` pointer it
-/// receives is valid for the duration of the callback only.
+/// `encoded` must point to `encoded_len` bytes that remain live
+/// for the duration of this call. UTF-8 validity is checked
+/// internally — non-UTF-8 input is reported via the warn log and
+/// returns no bytes. `callback` is invoked exactly once before
+/// this function returns; the `data` pointer it receives is valid
+/// for the duration of the callback only.
 #[no_mangle]
 pub unsafe extern "C" fn zaparoo_media_image_bytes_for(
     encoded: *const c_char,
@@ -749,13 +751,19 @@ pub unsafe extern "C" fn zaparoo_media_image_bytes_for(
         callback(user_data, std::ptr::null(), 0);
         return;
     }
-    // SAFETY: caller guarantees `encoded` points to `encoded_len` bytes
-    // of valid UTF-8 live for this call (Qt passes QString::toUtf8()).
-    let encoded_str = unsafe {
-        std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-            encoded.cast::<u8>(),
+    // SAFETY: caller guarantees `encoded` points to `encoded_len`
+    // bytes live for this call. Qt's `QString::toUtf8()` is documented
+    // to produce valid UTF-8, so `from_utf8` should always succeed —
+    // but validate anyway to keep this FFI seam free of UB if a future
+    // caller or a Qt regression ever sends bad bytes.
+    let encoded_bytes = unsafe { std::slice::from_raw_parts(encoded.cast::<u8>(), encoded_len) };
+    let Ok(encoded_str) = std::str::from_utf8(encoded_bytes) else {
+        warn!(
             encoded_len,
-        ))
+            "media_image_cache: provider id is not valid UTF-8 (Qt invariant violated)"
+        );
+        callback(user_data, std::ptr::null(), 0);
+        return;
     };
     let Some(key) = MediaKey::decode(encoded_str) else {
         warn!(
