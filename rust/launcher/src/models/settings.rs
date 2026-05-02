@@ -17,6 +17,12 @@
 //   * `current_resolution` — READ + NOTIFY, persisted. Empty means "use
 //     `[mister.video_*]` defaults from launcher.toml". The Settings
 //     screen renders that empty value as `qsTr("Default")`.
+//   * `available_languages` — CONSTANT. Curated language tags plus the
+//     `auto` sentinel. The runtime translator is still startup-only, so
+//     this setting applies on the next launch.
+//   * `current_language` — READ + NOTIFY. Mirrors `[general].language`
+//     from launcher.toml and is also recorded in persisted state so the
+//     settings snapshot stays coherent.
 //   * `available_button_layouts` — CONSTANT. Lowercase directory names
 //     used to compose resources/images/buttons/<layout>/Button*.png.
 //   * `current_button_layout` — READ + NOTIFY, persisted. Defaults to
@@ -24,17 +30,25 @@
 //   * `current_mouse_enabled` — READ + NOTIFY, persisted. Defaults to true
 //     so existing installs keep the visible cursor and mouse hit targets.
 //
-// Setters write to disk first so a runtime crash mid-apply still leaves
-// the choice persisted. Resolution then runs `vmode` on MiSTer; button
-// layout only changes the QML resource path used by help-bar icons, and
-// mouse support drives the QML cursor/input blocker.
+// Launcher-owned durable settings are mirrored into both `state.toml`
+// and `launcher.toml`. `state.toml` keeps the in-process snapshot
+// coherent; `launcher.toml` is the durable copy that survives MiSTer's
+// `/tmp` lifecycle. Resolution is intentionally excluded from the config
+// mirror for now and remains state/session-backed only because startup
+// mode switching is not trusted yet. Button layout only changes the QML
+// resource path used by help-bar icons, mouse support drives the QML
+// cursor/input blocker, and language still takes effect on the next
+// launch because Qt installs translators only at startup.
 
 use crate::mister_runtime;
 use crate::models::{with_persist_mut, with_persist_read};
 use cxx_qt::{CxxQtType, Initialize};
 use cxx_qt_lib::{QString, QStringList};
 use std::pin::Pin;
+use tracing::warn;
+use zaparoo_core::config::{load_config, save_settings_mirror, Config};
 use zaparoo_core::persist::{self, SettingsState};
+use zaparoo_core::platform_paths::config_file_path;
 use zaparoo_core::runtime;
 
 /// Curated `MiSTer` resolution choices. Order is the left/right cycle
@@ -46,6 +60,8 @@ use zaparoo_core::runtime;
 /// the form renders it as `qsTr("Default")` so users can cycle back
 /// to no-override after picking a custom value.
 const MISTER_RESOLUTIONS: &[&str] = &["", "1280x720", "1920x1080", "640x480", "1920x1440"];
+const LANGUAGES: &[&str] = &["auto", "en", "it_IT"];
+const DEFAULT_LANGUAGE: &str = "auto";
 const BUTTON_LAYOUTS: &[&str] = &["nintendo", "xbox", "sony"];
 const DEFAULT_BUTTON_LAYOUT: &str = "nintendo";
 
@@ -54,6 +70,8 @@ pub struct SettingsRust {
     is_mister: bool,
     available_resolutions: QStringList,
     current_resolution: QString,
+    available_languages: QStringList,
+    current_language: QString,
     available_button_layouts: QStringList,
     current_button_layout: QString,
     current_mouse_enabled: bool,
@@ -75,6 +93,8 @@ pub mod ffi {
         #[qproperty(bool, is_mister, READ, CONSTANT)]
         #[qproperty(QStringList, available_resolutions, READ, CONSTANT)]
         #[qproperty(QString, current_resolution, READ, WRITE = set_resolution, NOTIFY)]
+        #[qproperty(QStringList, available_languages, READ, CONSTANT)]
+        #[qproperty(QString, current_language, READ, WRITE = set_language, NOTIFY)]
         #[qproperty(QStringList, available_button_layouts, READ, CONSTANT)]
         #[qproperty(QString, current_button_layout, READ, WRITE = set_button_layout, NOTIFY)]
         #[qproperty(bool, current_mouse_enabled, READ, WRITE = set_mouse_enabled, NOTIFY)]
@@ -82,6 +102,9 @@ pub mod ffi {
 
         #[qinvokable]
         fn set_resolution(self: Pin<&mut Settings>, value: QString);
+
+        #[qinvokable]
+        fn set_language(self: Pin<&mut Settings>, value: QString);
 
         #[qinvokable]
         fn set_button_layout(self: Pin<&mut Settings>, value: QString);
@@ -96,18 +119,26 @@ pub mod ffi {
 impl Initialize for ffi::Settings {
     fn initialize(mut self: Pin<&mut Self>) {
         let snapshot: SettingsState = with_persist_read(|s| s.settings.clone());
+        let config_path = config_file_path();
         let is_mister = runtime::current().is_mister();
+        let config = load_config(&config_path);
+        let merged = merge_settings(&snapshot, &config);
+        persist_if_changed(&snapshot, &merged);
+        mirror_settings_to_config(&config_path, &merged);
         self.as_mut().rust_mut().is_mister = is_mister;
         self.as_mut().rust_mut().available_resolutions = if is_mister {
             curated_resolutions()
         } else {
             QStringList::default()
         };
-        self.as_mut().rust_mut().current_resolution = QString::from(snapshot.resolution.as_str());
+        self.as_mut().rust_mut().current_resolution = QString::from(merged.resolution.as_str());
+        self.as_mut().rust_mut().available_languages = languages();
+        self.as_mut().rust_mut().current_language =
+            QString::from(merged.language.as_str());
         self.as_mut().rust_mut().available_button_layouts = button_layouts();
         self.as_mut().rust_mut().current_button_layout =
-            QString::from(normalize_button_layout(&snapshot.button_layout));
-        self.as_mut().rust_mut().current_mouse_enabled = snapshot.mouse_enabled;
+            QString::from(merged.button_layout.as_str());
+        self.as_mut().rust_mut().current_mouse_enabled = merged.mouse_enabled;
     }
 }
 
@@ -117,8 +148,8 @@ impl ffi::Settings {
             return;
         }
         let value_str = value.to_string();
-        // Persist first so a runtime fault mid-`vmode` still leaves the
-        // user's choice on disk for the next launch.
+        // Persist before `vmode` so a runtime fault mid-switch still
+        // leaves the session/state snapshot coherent for the next run.
         persist_settings(|s| s.resolution.clone_from(&value_str));
         // Apply the framebuffer change *before* notifying QML. `vmode`
         // swaps the linuxfb mode in place and leaves stale pixels in
@@ -133,12 +164,24 @@ impl ffi::Settings {
         self.as_mut().current_resolution_changed();
     }
 
+    fn set_language(mut self: Pin<&mut Self>, value: QString) {
+        let value_str = normalize_language(&value.to_string()).to_string();
+        if self.current_language.to_string() == value_str {
+            return;
+        }
+        let snapshot = persist_settings(|s| s.language.clone_from(&value_str));
+        mirror_settings_to_config(&config_file_path(), &snapshot.settings);
+        self.as_mut().rust_mut().current_language = QString::from(value_str.as_str());
+        self.as_mut().current_language_changed();
+    }
+
     fn set_button_layout(mut self: Pin<&mut Self>, value: QString) {
         let value_str = normalize_button_layout(&value.to_string()).to_string();
         if self.current_button_layout.to_string() == value_str {
             return;
         }
-        persist_settings(|s| s.button_layout.clone_from(&value_str));
+        let snapshot = persist_settings(|s| s.button_layout.clone_from(&value_str));
+        mirror_settings_to_config(&config_file_path(), &snapshot.settings);
         self.as_mut().rust_mut().current_button_layout = QString::from(value_str.as_str());
         self.as_mut().current_button_layout_changed();
     }
@@ -147,18 +190,58 @@ impl ffi::Settings {
         if self.current_mouse_enabled == value {
             return;
         }
-        persist_settings(|s| s.mouse_enabled = value);
+        let snapshot = persist_settings(|s| s.mouse_enabled = value);
+        mirror_settings_to_config(&config_file_path(), &snapshot.settings);
         self.as_mut().rust_mut().current_mouse_enabled = value;
         self.as_mut().current_mouse_enabled_changed();
     }
 }
 
-fn persist_settings<F: FnOnce(&mut SettingsState)>(mutator: F) {
+fn persist_settings<F: FnOnce(&mut SettingsState)>(mutator: F) -> persist::PersistedState {
     let snapshot = with_persist_mut(|s| {
         mutator(&mut s.settings);
         s.clone()
     });
     persist::save(&snapshot);
+    snapshot
+}
+
+fn persist_if_changed(current: &SettingsState, merged: &SettingsState) {
+    if current == merged {
+        return;
+    }
+    let snapshot = with_persist_mut(|s| {
+        s.settings = merged.clone();
+        s.clone()
+    });
+    persist::save(&snapshot);
+}
+
+fn mirror_settings_to_config(config_path: &std::path::Path, settings: &SettingsState) {
+    if let Err(e) = save_settings_mirror(
+        config_path,
+        settings.language.as_str(),
+        settings.button_layout.as_str(),
+        settings.mouse_enabled,
+    ) {
+        warn!("could not save settings mirror to {}: {e}", config_path.display());
+    }
+}
+
+fn merge_settings(snapshot: &SettingsState, config: &Config) -> SettingsState {
+    SettingsState {
+        resolution: snapshot.resolution.clone(),
+        language: normalize_language(&config.language).to_string(),
+        button_layout: normalize_button_layout(
+            config
+                .settings
+                .button_layout
+                .as_deref()
+                .unwrap_or(snapshot.button_layout.as_str()),
+        )
+        .to_string(),
+        mouse_enabled: config.settings.mouse_enabled.unwrap_or(snapshot.mouse_enabled),
+    }
 }
 
 fn curated_resolutions() -> QStringList {
@@ -177,6 +260,26 @@ fn button_layouts() -> QStringList {
     list
 }
 
+fn languages() -> QStringList {
+    let mut list = QStringList::default();
+    for language in LANGUAGES {
+        list.append(QString::from(*language));
+    }
+    list
+}
+
+fn normalize_language(value: &str) -> &str {
+    let trimmed = value.trim();
+    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("auto") {
+        return DEFAULT_LANGUAGE;
+    }
+    LANGUAGES
+        .iter()
+        .copied()
+        .find(|language| *language == trimmed)
+        .unwrap_or(DEFAULT_LANGUAGE)
+}
+
 fn normalize_button_layout(value: &str) -> &'static str {
     let trimmed = value.trim();
     BUTTON_LAYOUTS
@@ -189,8 +292,9 @@ fn normalize_button_layout(value: &str) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::{
-        button_layouts, curated_resolutions, normalize_button_layout, BUTTON_LAYOUTS,
-        DEFAULT_BUTTON_LAYOUT, MISTER_RESOLUTIONS,
+        button_layouts, curated_resolutions, languages, normalize_button_layout,
+        normalize_language, BUTTON_LAYOUTS, DEFAULT_BUTTON_LAYOUT, DEFAULT_LANGUAGE, LANGUAGES,
+        MISTER_RESOLUTIONS,
     };
 
     #[test]
@@ -219,6 +323,23 @@ mod tests {
         let collected: Vec<String> = list.iter().map(String::from).collect();
         let expected: Vec<String> = BUTTON_LAYOUTS.iter().map(|s| (*s).to_string()).collect();
         assert_eq!(collected, expected);
+    }
+
+    #[test]
+    fn languages_preserve_order() {
+        let list = languages();
+        let collected: Vec<String> = list.iter().map(String::from).collect();
+        let expected: Vec<String> = LANGUAGES.iter().map(|s| (*s).to_string()).collect();
+        assert_eq!(collected, expected);
+    }
+
+    #[test]
+    fn language_normalization_defaults_to_auto() {
+        assert_eq!(normalize_language(""), DEFAULT_LANGUAGE);
+        assert_eq!(normalize_language("auto"), DEFAULT_LANGUAGE);
+        assert_eq!(normalize_language("AUTO"), DEFAULT_LANGUAGE);
+        assert_eq!(normalize_language("fr"), DEFAULT_LANGUAGE);
+        assert_eq!(normalize_language("it_IT"), "it_IT");
     }
 
     #[test]

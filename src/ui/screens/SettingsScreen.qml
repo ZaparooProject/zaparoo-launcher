@@ -45,6 +45,10 @@ Item {
             })
         }
         out.push({
+            id: "language",
+            label: qsTr("Language")
+        })
+        out.push({
             id: "buttonLayout",
             label: qsTr("Button layout")
         })
@@ -104,6 +108,39 @@ Item {
         return raw === undefined || raw === null ? [] : raw
     }
 
+    function _languageList(): list<string> {
+        const raw = Browse.Settings.available_languages
+        return raw === undefined || raw === null ? [] : raw
+    }
+
+    function _languageDisplay(value: string): string {
+        if (value === "en")
+            return qsTr("English")
+        if (value === "it_IT")
+            return qsTr("Italian")
+        return qsTr("Auto")
+    }
+
+    function _currentLanguageIndex(): int {
+        const list = settings._languageList()
+        const cur = Browse.Settings.current_language
+        for (let i = 0; i < list.length; i++)
+            if (list[i] === cur)
+                return i
+        return -1
+    }
+
+    function _cycleLanguage(direction: int): void {
+        const list = settings._languageList()
+        if (list.length === 0)
+            return
+        let idx = settings._currentLanguageIndex()
+        if (idx < 0)
+            idx = direction > 0 ? -1 : 0
+        const next = ((idx + direction) % list.length + list.length) % list.length
+        Browse.Settings.set_language(list[next])
+    }
+
     function _buttonLayoutDisplay(value: string): string {
         if (value === "xbox")
             return qsTr("Xbox")
@@ -146,6 +183,8 @@ Item {
         const id = settings.fields[settings.currentIndex].id
         if (id === "resolution")
             settings._cycleResolution(direction)
+        else if (id === "language")
+            settings._cycleLanguage(direction)
         else if (id === "buttonLayout")
             settings._cycleButtonLayout(direction)
         else if (id === "mouseEnabled")
@@ -213,6 +252,8 @@ Item {
                 label: modelData.label
                 value: modelData.id === "resolution"
                        ? settings._resolutionDisplay(Browse.Settings.current_resolution)
+                       : modelData.id === "language"
+                       ? settings._languageDisplay(Browse.Settings.current_language)
                        : modelData.id === "buttonLayout"
                        ? settings._buttonLayoutDisplay(Browse.Settings.current_button_layout)
                        : ""
@@ -222,12 +263,16 @@ Item {
                 // focused field has a populated option list.
                 canCyclePrev: (modelData.id === "resolution"
                                && settings._resolutionList().length > 0)
+                              || (modelData.id === "language"
+                                  && settings._languageList().length > 1)
                               || (modelData.id === "buttonLayout"
                                   && settings._buttonLayoutList().length > 1)
                               || (modelData.id === "mouseEnabled"
                                   && Browse.Settings.current_mouse_enabled)
                 canCycleNext: (modelData.id === "resolution"
                                && settings._resolutionList().length > 0)
+                              || (modelData.id === "language"
+                                  && settings._languageList().length > 1)
                               || (modelData.id === "buttonLayout"
                                   && settings._buttonLayoutList().length > 1)
                               || (modelData.id === "mouseEnabled"

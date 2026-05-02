@@ -1658,6 +1658,7 @@ dependencies = [
  "qrcode",
  "time",
  "tokio",
+ "toml",
  "tracing",
  "zaparoo-core",
 ]

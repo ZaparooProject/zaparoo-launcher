@@ -5,6 +5,7 @@
 use crate::input_actions;
 use serde::Deserialize;
 use std::collections::HashMap;
+use std::io::Write;
 use std::path::Path;
 use tracing::warn;
 
@@ -24,6 +25,15 @@ pub struct Config {
     /// `[input.keyboard]` overrides onto `input_actions::default_bindings()`
     /// and inverting.
     pub key_to_action: HashMap<i32, String>,
+    /// Durable mirror of launcher-owned settings. These stay in
+    /// `launcher.toml` so they survive MiSTer's `/tmp` lifecycle.
+    pub settings: SettingsConfig,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SettingsConfig {
+    pub button_layout: Option<String>,
+    pub mouse_enabled: Option<bool>,
 }
 
 impl Default for Config {
@@ -35,6 +45,7 @@ impl Default for Config {
             debug_logging: false,
             language: String::new(),
             key_to_action: input_actions::invert(&input_actions::default_bindings()),
+            settings: SettingsConfig::default(),
         }
     }
 }
@@ -51,6 +62,8 @@ struct RawConfig {
     logging: RawLogging,
     #[serde(default)]
     input: RawInput,
+    #[serde(default)]
+    settings: RawSettings,
 }
 
 #[derive(Deserialize, Default)]
@@ -78,6 +91,12 @@ struct RawLogging {
 struct RawInput {
     #[serde(default)]
     keyboard: HashMap<String, Vec<String>>,
+}
+
+#[derive(Deserialize, Default)]
+struct RawSettings {
+    button_layout: Option<String>,
+    mouse_enabled: Option<bool>,
 }
 
 pub fn load_config(path: &Path) -> Config {
@@ -129,7 +148,104 @@ pub fn load_config(path: &Path) -> Config {
         }
         cfg.key_to_action = input_actions::invert(&merged);
     }
+    cfg.settings = SettingsConfig {
+        button_layout: raw
+            .settings
+            .button_layout
+            .map(|value| value.trim().to_string()),
+        mouse_enabled: raw.settings.mouse_enabled,
+    };
     cfg
+}
+
+pub fn save_settings_mirror(
+    path: &Path,
+    language: &str,
+    button_layout: &str,
+    mouse_enabled: bool,
+) -> Result<(), String> {
+    let mut table = if path.exists() {
+        let src = std::fs::read_to_string(path)
+            .map_err(|e| format!("could not read {}: {e}", path.display()))?;
+        toml::from_str::<toml::Table>(&src)
+            .map_err(|e| format!("config parse error in {}: {e}", path.display()))?
+    } else {
+        toml::Table::new()
+    };
+
+    let general_value = table
+        .entry("general")
+        .or_insert_with(|| toml::Value::Table(toml::Table::new()));
+    let Some(general) = general_value.as_table_mut() else {
+        return Err(format!(
+            "config key [general] in {} is not a table",
+            path.display()
+        ));
+    };
+    general.insert(
+        "language".into(),
+        toml::Value::String(normalize_language_override(language)),
+    );
+
+    let settings_value = table
+        .entry("settings")
+        .or_insert_with(|| toml::Value::Table(toml::Table::new()));
+    let Some(settings) = settings_value.as_table_mut() else {
+        return Err(format!(
+            "config key [settings] in {} is not a table",
+            path.display()
+        ));
+    };
+    settings.insert(
+        "button_layout".into(),
+        toml::Value::String(button_layout.trim().to_string()),
+    );
+    settings.insert("mouse_enabled".into(), toml::Value::Boolean(mouse_enabled));
+
+    let serialized =
+        toml::to_string(&table).map_err(|e| format!("config serialisation failed: {e}"))?;
+    write_atomic(path, serialized.as_bytes())
+        .map_err(|e| format!("could not write {}: {e}", path.display()))
+}
+
+fn normalize_language_override(value: &str) -> String {
+    let trimmed = value.trim();
+    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("auto") {
+        "auto".into()
+    } else {
+        trimmed.into()
+    }
+}
+
+fn write_atomic(path: &Path, contents: &[u8]) -> std::io::Result<()> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let tmp = tmp_sibling(path);
+    let write_result = std::fs::File::create(&tmp).and_then(|mut file| {
+        file.write_all(contents)?;
+        file.sync_all()?;
+        Ok(())
+    });
+    if let Err(e) = write_result {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(e);
+    }
+    if let Err(e) = std::fs::rename(&tmp, path) {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(e);
+    }
+    Ok(())
+}
+
+fn tmp_sibling(path: &Path) -> std::path::PathBuf {
+    let pid = std::process::id();
+    let tid = format!("{:?}", std::thread::current().id());
+    let tid_clean: String = tid.chars().filter(char::is_ascii_alphanumeric).collect();
+    let suffix = format!(".tmp.{pid}.{tid_clean}");
+    let mut buf = path.as_os_str().to_owned();
+    buf.push(&suffix);
+    std::path::PathBuf::from(buf)
 }
 
 #[cfg(test)]
@@ -141,7 +257,7 @@ mod tests {
         reason = "tests should fail-fast on unexpected errors"
     )]
 
-    use super::{load_config, Config};
+    use super::{load_config, save_settings_mirror, Config};
     use std::io::Write;
 
     fn write_tmp(contents: &str) -> tempfile::NamedTempFile {
@@ -158,6 +274,8 @@ mod tests {
         assert_eq!(cfg.video_height, 1080);
         assert!(!cfg.debug_logging);
         assert_eq!(cfg.language, "");
+        assert_eq!(cfg.settings.button_layout, None);
+        assert_eq!(cfg.settings.mouse_enabled, None);
         // Default keyboard bindings populate the map.
         assert!(!cfg.key_to_action.is_empty());
     }
@@ -235,6 +353,9 @@ mod tests {
     #[test]
     fn full_config_overrides_all_fields() {
         let toml = r#"
+            [general]
+            language = "it_IT"
+
             [core]
             endpoint = "ws://example.com/api"
 
@@ -244,13 +365,20 @@ mod tests {
 
             [logging]
             debug = true
+
+            [settings]
+            button_layout = "sony"
+            mouse_enabled = false
         "#;
         let f = write_tmp(toml);
         let cfg = load_config(f.path());
+        assert_eq!(cfg.language, "it_IT");
         assert_eq!(cfg.core_endpoint, "ws://example.com/api");
         assert_eq!(cfg.video_width, 640);
         assert_eq!(cfg.video_height, 480);
         assert!(cfg.debug_logging);
+        assert_eq!(cfg.settings.button_layout.as_deref(), Some("sony"));
+        assert_eq!(cfg.settings.mouse_enabled, Some(false));
     }
 
     #[test]
@@ -258,6 +386,46 @@ mod tests {
         let f = write_tmp("");
         let cfg = load_config(f.path());
         assert_eq!(cfg.video_width, Config::default().video_width);
+    }
+
+    #[test]
+    fn save_settings_mirror_creates_sections() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("launcher.toml");
+        save_settings_mirror(&path, "it_IT", "xbox", false).expect("save");
+        let cfg = load_config(&path);
+        assert_eq!(cfg.language, "it_IT");
+        assert_eq!(cfg.settings.button_layout.as_deref(), Some("xbox"));
+        assert_eq!(cfg.settings.mouse_enabled, Some(false));
+    }
+
+    #[test]
+    fn save_settings_mirror_preserves_other_sections() {
+        let f = write_tmp(
+            "[core]\nendpoint = \"ws://example.com/api\"\n[video]\nwidth = 1280\nheight = 720\n",
+        );
+        save_settings_mirror(f.path(), "en", "nintendo", true).expect("save");
+        let cfg = load_config(f.path());
+        assert_eq!(cfg.language, "en");
+        assert_eq!(cfg.core_endpoint, "ws://example.com/api");
+        assert_eq!(cfg.video_width, 1280);
+        assert_eq!(cfg.video_height, 720);
+        assert_eq!(cfg.settings.button_layout.as_deref(), Some("nintendo"));
+        assert_eq!(cfg.settings.mouse_enabled, Some(true));
+    }
+
+    #[test]
+    fn save_settings_mirror_normalizes_auto() {
+        let f = write_tmp("");
+        save_settings_mirror(f.path(), "", "sony", false).expect("save");
+        let written = std::fs::read_to_string(f.path()).expect("read");
+        assert!(written.contains("language = \"auto\""));
+        assert!(written.contains("button_layout = \"sony\""));
+        assert!(written.contains("mouse_enabled = false"));
+        let cfg = load_config(f.path());
+        assert_eq!(cfg.language, "");
+        assert_eq!(cfg.settings.button_layout.as_deref(), Some("sony"));
+        assert_eq!(cfg.settings.mouse_enabled, Some(false));
     }
 
     // Single test because std::env is process-global; splitting into

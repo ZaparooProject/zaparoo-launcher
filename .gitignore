@@ -3,6 +3,7 @@ build/
 build2/
 build-*/
 cmake-build-*/
+artifacts/
 
 # Qt generated files
 *.moc

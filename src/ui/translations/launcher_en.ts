@@ -251,41 +251,61 @@
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="49"/>
+        <source>Language</source>
+        <translation>Language</translation>
+    </message>
+    <message>
+        <location filename="../screens/SettingsScreen.qml" line="53"/>
         <source>Button layout</source>
         <translation>Button layout</translation>
     </message>
     <message>
-        <location filename="../screens/SettingsScreen.qml" line="53"/>
+        <location filename="../screens/SettingsScreen.qml" line="57"/>
         <source>Mouse support</source>
         <translation>Mouse support</translation>
     </message>
     <message>
-        <location filename="../screens/SettingsScreen.qml" line="74"/>
+        <location filename="../screens/SettingsScreen.qml" line="118"/>
+        <source>English</source>
+        <translation>English</translation>
+    </message>
+    <message>
+        <location filename="../screens/SettingsScreen.qml" line="120"/>
+        <source>Italian</source>
+        <translation>Italian</translation>
+    </message>
+    <message>
+        <location filename="../screens/SettingsScreen.qml" line="121"/>
+        <source>Auto</source>
+        <translation>Auto</translation>
+    </message>
+    <message>
+        <location filename="../screens/SettingsScreen.qml" line="78"/>
         <source>Default</source>
         <translation>Default</translation>
     </message>
     <message>
-        <location filename="../screens/SettingsScreen.qml" line="109"/>
+        <location filename="../screens/SettingsScreen.qml" line="146"/>
         <source>Xbox</source>
         <translation>Xbox</translation>
     </message>
     <message>
-        <location filename="../screens/SettingsScreen.qml" line="111"/>
+        <location filename="../screens/SettingsScreen.qml" line="148"/>
         <source>Sony</source>
         <translation>Sony</translation>
     </message>
     <message>
-        <location filename="../screens/SettingsScreen.qml" line="112"/>
+        <location filename="../screens/SettingsScreen.qml" line="149"/>
         <source>Nintendo</source>
         <translation>Nintendo</translation>
     </message>
     <message>
-        <location filename="../screens/SettingsScreen.qml" line="184"/>
+        <location filename="../screens/SettingsScreen.qml" line="223"/>
         <source>Settings</source>
         <translation>Settings</translation>
     </message>
     <message>
-        <location filename="../screens/SettingsScreen.qml" line="251"/>
+        <location filename="../screens/SettingsScreen.qml" line="296"/>
         <source>No settings available on this platform</source>
         <translation>No settings available on this platform</translation>
     </message>
