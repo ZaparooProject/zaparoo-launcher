@@ -690,11 +690,27 @@ fn cover_key_for_with(entry: &BrowseEntry, key: Option<&MediaKey>, cached: bool)
 /// for already-cached, already-pending, or negatively-memoised keys are
 /// dropped — so spamming this from `apply_initial_page`/
 /// `apply_append_page` is cheap.
+///
+/// Iterates `entries` in reverse so the LIFO fetch queue drains in
+/// visual order: the last entry we push is `entries[0]`, which the
+/// driver then pops first. Forward iteration starves the top of the
+/// page — e.g. for a 10-tile page the driver lands rows 9..6 before
+/// the user advances, leaving rows 0..3 (the most prominent slots)
+/// showing the fallback icon.
+///
+/// Look-ahead prefetch (`apply_initial_page` → `fetch_more`) calls
+/// this exactly the same way as the visible page does. Under Core's
+/// serial `media.image` cadence (~one response per 250–400 ms) the
+/// LIFO drain order ends up servicing page N+1 *between* page N's
+/// first burst and its tail, so by the time the user navigates
+/// forward, page N+1 is warm. See the doc comment on
+/// `MediaImageCache::queue` for the full rationale on why a separate
+/// "low priority" lane for look-ahead is the wrong knob.
 fn enqueue_cover_fetches(entries: &[BrowseEntry]) {
     let cache = global_media_image_cache();
     let mut media_total = 0usize;
     let mut enqueued = 0usize;
-    for entry in entries {
+    for entry in entries.iter().rev() {
         if entry.is_folder() {
             continue;
         }
@@ -944,6 +960,22 @@ fn apply_initial_page(mut model: Pin<&mut ffi::GamesModel>, result: MediaBrowseR
     // so a page advance never triggers a visible "Loading more…" pause.
     // `fetch_more` is itself guarded by `has_next_page` and
     // `loading_more`, so a no-op call is cheap and safe.
+    //
+    // Look-ahead intentionally enqueues onto the same LIFO queue as
+    // the visible page at the same priority. Core serializes
+    // `media.image` responses at ~one per 250–400 ms; with that
+    // cadence, the LIFO drain order (newest-pushed pops first) ends
+    // up servicing page N+1's covers *between* page N's first burst
+    // and its tail. By the time the user navigates forward, page N+1
+    // is warm, while the bottom couple of tiles on page N — which
+    // the user is least likely to dwell on before paginating —
+    // continue to land in the background. Treating look-ahead as a
+    // low-priority lane that drains *after* the visible page strictly
+    // worsens this: page N then consumes the entire serial throughput
+    // before page N+1 begins, which is exactly what shipped briefly
+    // and looked like "covers loading slowly one at a time" with the
+    // next page no longer instant on navigate. See the doc comment on
+    // `MediaImageCache::queue` for the full rationale.
     if has_next_page && !model.loading_more {
         model.as_mut().fetch_more();
     }

@@ -75,6 +75,20 @@ const CACHE_CAP_BYTES: usize = 64 * 1024 * 1024;
 /// memo.
 const MAX_FETCH_ATTEMPTS: u8 = 3;
 
+/// Number of parallel fetch worker tasks pulling from the shared
+/// LIFO queue. The Zaparoo Core WebSocket multiplexes JSON-RPC calls
+/// by id so concurrent `media.image` requests are safe at the wire;
+/// however, Core itself currently serializes its `media.image`
+/// handler at roughly one response per 250–400 ms. Empirically all
+/// four workers spend most of their time parked on `oneshot`
+/// receivers waiting for Core's serial output — so the *immediate*
+/// throughput floor is set by Core, not by us. Four workers is kept
+/// as an upper bound that costs nothing under the current cadence
+/// (idle workers parked on `Notify` are free) and turns into an
+/// instant win the moment Core gains concurrency in its image
+/// handler. Don't drop this back to 1.
+const FETCH_DRIVER_WORKERS: usize = 4;
+
 /// Hard cap on pending enqueues in the LIFO fetch queue. New pushes
 /// spill the **oldest** entry off the front, on the assumption that
 /// whatever the user enqueued ~2 pages ago is no longer interesting
@@ -308,12 +322,29 @@ impl CacheState {
 pub struct MediaImageCache {
     state: Arc<RwLock<CacheState>>,
     /// LIFO queue of pending fetches. `enqueue` pushes to the back,
-    /// the fetch driver pops from the back: newest enqueues (the page
-    /// the user is actively looking at) drain first, while enqueues
-    /// from a page they've already navigated past wait at the front
-    /// rather than blocking the work the user can see. Plain
-    /// `std::sync::Mutex` because every critical section is a single
-    /// `push_back`/`pop_back` with no awaits in between.
+    /// the fetch driver pops from the back: newest enqueues drain
+    /// first, while enqueues from a page the user has already
+    /// navigated past wait at the front rather than blocking the
+    /// work the user can see. Plain `std::sync::Mutex` because every
+    /// critical section is a single `push_back`/`pop_back` with no
+    /// awaits in between.
+    ///
+    /// **Look-ahead intentionally rides the same queue at the same
+    /// priority.** Under Core's current ~250–400 ms serial cadence
+    /// for `media.image`, the LIFO drain order ends up servicing
+    /// page N+1's prefetched covers between page N's first burst
+    /// (the visual top of the page, enqueued in reverse so it pops
+    /// first) and page N's tail (the bottom rows the user is least
+    /// likely to read before paginating). By the time the user
+    /// navigates forward, page N+1 is warm; the few unfilled tiles
+    /// at the bottom of page N continue to land in the background.
+    /// Treating look-ahead as a "low priority" lane that drains
+    /// *after* the visible page strictly worsens the experience: the
+    /// visible page consumes the entire serial throughput in front
+    /// of the user (which reads as "covers loading slowly one at a
+    /// time"), and page N+1 doesn't start until the visible page is
+    /// fully cached, which is well after a fast-moving user has
+    /// already paginated. Don't reintroduce a priority split here.
     queue: Arc<Mutex<VecDeque<MediaKey>>>,
     /// Single-permit signal that wakes the driver when a fresh key
     /// hits the queue. Drained by `notified().await` and rearmed by
@@ -336,10 +367,10 @@ impl MediaImageCache {
         spawn_fetch_driver(
             runtime,
             cap_bytes,
-            state.clone(),
-            updates_tx.clone(),
-            queue.clone(),
-            queue_notify.clone(),
+            &state,
+            &updates_tx,
+            &queue,
+            &queue_notify,
             store_factory,
         );
 
@@ -473,96 +504,113 @@ impl MediaImageCache {
 fn spawn_fetch_driver<F>(
     runtime: &Arc<Runtime>,
     cap_bytes: usize,
-    state: Arc<RwLock<CacheState>>,
-    updates_tx: broadcast::Sender<MediaImageUpdate>,
-    queue: Arc<Mutex<VecDeque<MediaKey>>>,
-    queue_notify: Arc<Notify>,
+    state: &Arc<RwLock<CacheState>>,
+    updates_tx: &broadcast::Sender<MediaImageUpdate>,
+    queue: &Arc<Mutex<VecDeque<MediaKey>>>,
+    queue_notify: &Arc<Notify>,
     store_factory: F,
 ) where
     F: Fn() -> Arc<Store> + Send + Sync + 'static,
 {
-    runtime.spawn(async move {
-        loop {
-            let next_key = {
-                #[allow(clippy::unwrap_used, reason = "Mutex poisoning is unrecoverable")]
-                let mut q = queue.lock().unwrap();
-                q.pop_back()
-            };
-            let Some(key) = next_key else {
-                queue_notify.notified().await;
-                continue;
-            };
-            let store = store_factory();
-            let outcome = fetch_one(&store, &key).await;
-            let is_transient = matches!(outcome, FetchOutcome::Transient);
-            let update = finish_fetch(&state, cap_bytes, &key, outcome);
-            if is_transient {
-                let attempts = {
-                    #[allow(clippy::unwrap_used, reason = "RwLock poisoning is unrecoverable")]
-                    let mut s = state.write().unwrap();
-                    let entry = s.attempts.entry(key.clone()).or_insert(0);
-                    *entry = entry.saturating_add(1);
-                    *entry
+    // One Arc'd factory shared across the worker pool — `F` is only
+    // `Fn`, not `Clone`, so wrapping it once and cloning the Arc gives
+    // every worker a cheap handle into the same underlying closure.
+    let store_factory: Arc<F> = Arc::new(store_factory);
+    for _ in 0..FETCH_DRIVER_WORKERS {
+        let state = state.clone();
+        let updates_tx = updates_tx.clone();
+        let queue = queue.clone();
+        let queue_notify = queue_notify.clone();
+        let store_factory = store_factory.clone();
+        runtime.spawn(async move {
+            loop {
+                let next_key = {
+                    #[allow(clippy::unwrap_used, reason = "Mutex poisoning is unrecoverable")]
+                    let mut q = queue.lock().unwrap();
+                    q.pop_back()
                 };
-                if attempts < MAX_FETCH_ATTEMPTS {
-                    // Re-enter `pending` and re-enqueue at the back.
-                    // Fresh-page enqueues that arrive in the meantime
-                    // still drain ahead because we always pop from
-                    // the back; this retry waits behind anything the
-                    // user is actively looking at.
-                    {
+                let Some(key) = next_key else {
+                    queue_notify.notified().await;
+                    continue;
+                };
+                let store = store_factory();
+                let outcome = fetch_one(&store, &key).await;
+                let is_transient = matches!(outcome, FetchOutcome::Transient);
+                let update = finish_fetch(&state, cap_bytes, &key, outcome);
+                if is_transient {
+                    let attempts = {
                         #[allow(clippy::unwrap_used, reason = "RwLock poisoning is unrecoverable")]
                         let mut s = state.write().unwrap();
-                        s.pending.insert(key.clone());
+                        let entry = s.attempts.entry(key.clone()).or_insert(0);
+                        *entry = entry.saturating_add(1);
+                        *entry
+                    };
+                    if attempts < MAX_FETCH_ATTEMPTS {
+                        // Re-enter `pending` and re-enqueue at the back.
+                        // Fresh-page enqueues that arrive in the meantime
+                        // still drain ahead because we always pop from
+                        // the back; this retry waits behind anything the
+                        // user is actively looking at.
+                        {
+                            #[allow(
+                                clippy::unwrap_used,
+                                reason = "RwLock poisoning is unrecoverable"
+                            )]
+                            let mut s = state.write().unwrap();
+                            s.pending.insert(key.clone());
+                        }
+                        {
+                            #[allow(
+                                clippy::unwrap_used,
+                                reason = "Mutex poisoning is unrecoverable"
+                            )]
+                            let mut q = queue.lock().unwrap();
+                            q.push_back(key);
+                        }
+                        queue_notify.notify_one();
+                    } else {
+                        // Bounded give-up: clear the counter, no negative
+                        // memo. The next user-driven enqueue (page
+                        // revisit) gets a fresh `MAX_FETCH_ATTEMPTS`
+                        // budget via `enqueue`'s `attempts.remove`.
+                        #[allow(clippy::unwrap_used, reason = "RwLock poisoning is unrecoverable")]
+                        state.write().unwrap().attempts.remove(&key);
+                        info!(
+                            system_id = %key.system_id,
+                            path = %key.path,
+                            attempts,
+                            "media_image_cache: giving up after transient failures",
+                        );
                     }
-                    {
-                        #[allow(clippy::unwrap_used, reason = "Mutex poisoning is unrecoverable")]
-                        let mut q = queue.lock().unwrap();
-                        q.push_back(key);
-                    }
-                    queue_notify.notify_one();
-                } else {
-                    // Bounded give-up: clear the counter, no negative
-                    // memo. The next user-driven enqueue (page
-                    // revisit) gets a fresh `MAX_FETCH_ATTEMPTS`
-                    // budget via `enqueue`'s `attempts.remove`.
+                    continue;
+                }
+                // Success or NoImage: clear the attempts counter and
+                // broadcast the resolved state.
+                {
                     #[allow(clippy::unwrap_used, reason = "RwLock poisoning is unrecoverable")]
-                    state.write().unwrap().attempts.remove(&key);
-                    info!(
-                        system_id = %key.system_id,
-                        path = %key.path,
-                        attempts,
-                        "media_image_cache: giving up after transient failures",
-                    );
+                    let mut s = state.write().unwrap();
+                    s.attempts.remove(&key);
                 }
-                continue;
-            }
-            // Success or NoImage: clear the attempts counter and
-            // broadcast the resolved state.
-            {
-                #[allow(clippy::unwrap_used, reason = "RwLock poisoning is unrecoverable")]
-                let mut s = state.write().unwrap();
-                s.attempts.remove(&key);
-            }
-            if let Some(update) = update {
-                if let Some(ext) = update.ext {
-                    info!(
-                        system_id = %key.system_id,
-                        path = %key.path,
-                        ext,
-                        "media_image_cache: cached image",
-                    );
-                } else {
-                    info!(
-                        system_id = %key.system_id,
-                        path = %key.path,
-                        "media_image_cache: no image (negative memo)",
-                    );
+                if let Some(update) = update {
+                    if let Some(ext) = update.ext {
+                        info!(
+                            system_id = %key.system_id,
+                            path = %key.path,
+                            ext,
+                            "media_image_cache: cached image",
+                        );
+                    } else {
+                        info!(
+                            system_id = %key.system_id,
+                            path = %key.path,
+                            "media_image_cache: no image (negative memo)",
+                        );
+                    }
+                    let _ = updates_tx.send(update);
                 }
-                let _ = updates_tx.send(update);
             }
-        }
-    });
+        });
+    }
 }
 
 #[derive(Debug)]
