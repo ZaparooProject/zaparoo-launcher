@@ -95,7 +95,7 @@ Item {
     // unified-Tile contract: every grid renders the same shape.
     Rectangle {
         anchors.fill: parent
-        radius: Sizing.pctH(1.2)
+        radius: Sizing.cornerRadius
         color: Theme.surfaceCard
     }
 
@@ -118,7 +118,7 @@ Item {
         border.width: root._outlineWidth
         // Card radius minus the inset margin keeps the ring concentric
         // with the card corners.
-        radius: Sizing.pctH(0.8)
+        radius: Sizing.cornerRadius - root._outlineGap
         visible: root._focusedSelection
     }
 

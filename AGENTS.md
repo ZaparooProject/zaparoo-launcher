@@ -83,8 +83,9 @@ raw cargo as the default path; the justfile carries the expected environment.
   the rest of the scene stay static. See `docs/qml-gotchas.md` →
   "Software-renderer animation costs".
 - Do not hardcode pixel sizes or fixed element counts in UI. Use
-  `Sizing.pctH()`, `Sizing.pctW()`, `Sizing.fontSize()`, and
-  `Sizing.visibleCovers`.
+  `Sizing.pctH()`, `Sizing.pctW()`, `Sizing.fontSize()`,
+  `Sizing.visibleCovers`, and `Sizing.cornerRadius` (for any rounded-square
+  surface — see `docs/style.md`).
 - Do not add Qt5 compatibility code or `#if QT_VERSION` guards. This project is
   Qt 6.7+ only.
 - Do not change `BUILD_SHARED_LIBS`. Desktop needs `ON`; the ARM32 toolchain
@@ -202,6 +203,7 @@ starts our `launcher`; do not replace that flow with a new wrapper script.
 - `docs/architecture.md` — module graph, data flow, runtime/platform split
 - `docs/building.md` — build matrix, ARM32 toolchain, deploy bundle
 - `docs/qml-gotchas.md` — QML issues qmllint often catches late
+- `docs/style.md` — corner-radius token, tile aspect, pill vs. sharp shapes
 - `docs/cxx-qt-bridge.md` — cxx-qt 0.8 bridge constraints
 - `docs/translations.md` — `qsTr()`/`tr()` pipeline and locale catalogs
 - `design/README.md` — Qt Design Studio workflow and designer boundaries

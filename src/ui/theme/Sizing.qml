@@ -35,6 +35,12 @@ QtObject {
                                             : 5
     readonly property int gamesGridRows: 2
 
+    // Standard corner radius for rounded surfaces — tile cards, focus
+    // rings (computed as `cornerRadius - outlineGap`), settings rows.
+    // Pill controls (toggle track/thumb) use `height/2` instead and
+    // are intentionally a different shape. See docs/style.md.
+    readonly property int cornerRadius: pctH(3.5)
+
     function pctH(percent: real): int {
         return Math.round(screenHeight * percent / 100)
     }

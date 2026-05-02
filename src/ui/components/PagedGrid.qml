@@ -71,9 +71,14 @@ Item {
     readonly property int currentColumn: (currentIndex % pageSize) % columns
     readonly property int currentRow: Math.floor((currentIndex % pageSize) / columns)
 
-    // Reserved chrome around the cell area.
+    // Reserved chrome around the cell area. Vertical insets must be
+    // large enough to contain the focused tile's 1.06× scale bleed
+    // (~3% of cellHeight per side) — without them, top-row and
+    // bottom-row tiles get clipped when focused. Matches the hub's
+    // `verticalPadding` value.
     readonly property int sideInset: Sizing.pctW(5)
-    readonly property int topInset: Sizing.pctH(1)
+    readonly property int topInset: Sizing.pctH(2)
+    readonly property int bottomInset: Sizing.pctH(2)
     readonly property int cellSpacingX: Sizing.pctW(3)
     readonly property int cellSpacingY: Sizing.pctH(4)
 
@@ -81,7 +86,7 @@ Item {
     // gridColumns × gridRows. Callers don't override.
     readonly property int _availableWidth: Math.max(0, width - 2 * sideInset)
     readonly property int _availableHeight:
-        Math.max(0, height - topInset)
+        Math.max(0, height - topInset - bottomInset)
     readonly property int cellWidth:
         Math.max(0,
                  Math.floor((root._availableWidth - (root.columns - 1) * root.cellSpacingX)

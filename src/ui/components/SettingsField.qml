@@ -40,7 +40,7 @@ Item {
         id: surface
 
         anchors.fill: parent
-        radius: Sizing.pctH(1.2)
+        radius: Sizing.cornerRadius
         color: root.isFocused ? Theme.surfaceCard : "transparent"
         border.color: root.isFocused ? Theme.textPrimary : Theme.borderSubtle
         border.width: root.isFocused ? Sizing.pctH(0.4) : 1

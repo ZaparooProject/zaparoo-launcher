@@ -274,9 +274,10 @@ Item {
                 ? Math.floor((width - 2 * sideInset - (n - 1) * spacing) / n)
                 : 0
         readonly property int cellWidth: Math.min(maxCellWidth, rawCellWidth)
-        // Square cell with a hair of breathing room top and bottom
-        // for the focused tile's 1.06× scale bleed.
-        readonly property int cellHeight: Sizing.pctH(22) + Sizing.pctH(2)
+        // Square cells (1:1) for the main menu. The focused tile's
+        // 1.06× scale bleed is absorbed by `verticalPadding` on the
+        // row Item, not by inflating the cell.
+        readonly property int cellHeight: cellWidth
         readonly property int totalRowWidth:
             n > 0 ? n * cellWidth + (n - 1) * spacing : 0
         readonly property int rowOriginX: (width - totalRowWidth) / 2
