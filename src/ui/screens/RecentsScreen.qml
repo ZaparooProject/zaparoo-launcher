@@ -183,7 +183,7 @@ Item {
         anchors.verticalCenter: activeLabel.verticalCenter
         visible: Browse.RecentsModel.loading_more
         z: 1
-        text: qsTr("Loading more…")
+        text: qsTr("Loading more entries…")
     }
 
     ScreenStateOverlay {
@@ -194,5 +194,6 @@ Item {
         errorMessage: Browse.RecentsModel.error_message ?? ""
         count: Browse.RecentsModel.count
         emptyText: qsTr("Nothing played yet")
+        loadingText: qsTr("Loading recently played…")
     }
 }

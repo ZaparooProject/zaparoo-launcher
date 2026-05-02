@@ -26,6 +26,7 @@ Item {
     property string errorMessage: ""
     property int count: 0
     property string emptyText: qsTr("Nothing here")
+    property string loadingText: qsTr("Loading…")
 
     // Named `viewState` rather than `state` — `Item.state` is a
     // built-in slot wired to `states:` / `transitions:`, and shadowing
@@ -50,6 +51,7 @@ Item {
         LoadingIndicator {
             anchors.horizontalCenter: parent.horizontalCenter
             visible: overlay.viewState === "loading"
+            text: overlay.loadingText
         }
 
         Text {

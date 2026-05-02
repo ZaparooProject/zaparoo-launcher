@@ -215,5 +215,6 @@ Item {
         errorMessage: Browse.SystemsModel.error_message ?? ""
         count: Browse.SystemsModel.count
         emptyText: qsTr("No systems in this category")
+        loadingText: qsTr("Loading systems…")
     }
 }

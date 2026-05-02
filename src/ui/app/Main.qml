@@ -702,6 +702,14 @@ MainLayout {
 
         LoadingIndicator {
             anchors.centerIn: parent
+            text: {
+                switch (root.pendingTransition) {
+                case "systems": return qsTr("Loading systems…")
+                case "games":   return qsTr("Loading games…")
+                case "recents": return qsTr("Loading recently played…")
+                default:        return qsTr("Loading…")
+                }
+            }
         }
     }
 

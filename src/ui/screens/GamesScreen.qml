@@ -250,7 +250,7 @@ Item {
         anchors.verticalCenter: activeLabel.verticalCenter
         visible: Browse.GamesModel.loading_more
         z: 1
-        text: qsTr("Loading more…")
+        text: qsTr("Loading more games…")
     }
 
     ScreenStateOverlay {
@@ -261,5 +261,6 @@ Item {
         errorMessage: Browse.GamesModel.error_message ?? ""
         count: Browse.GamesModel.count
         emptyText: qsTr("No games in this system")
+        loadingText: qsTr("Loading games…")
     }
 }
