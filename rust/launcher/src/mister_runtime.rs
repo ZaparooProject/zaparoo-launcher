@@ -5,10 +5,10 @@
 /// Sets `QT_QPA_PLATFORM=linuxfb` and `QT_QUICK_BACKEND=software`. Must
 /// be called before `QGuiApplication`. No-op on non-MiSTer builds.
 ///
-/// Startup mode switching is intentionally not applied here. The
-/// Settings screen still calls `run_vmode` to apply a freshly-picked
-/// value at runtime, but resolution overrides are not persisted in
-/// `launcher.toml` yet.
+/// Resolution is set by `[mister.video_*]` in `launcher.toml` (the
+/// `MiSTer` wrapper applies `vmode` before launching us); the Settings
+/// screen calls `run_vmode` to re-apply at runtime when the user picks
+/// a new value, but startup vmode is intentionally not invoked here.
 pub fn apply_pre_qt_setup() {
     #[cfg(zaparoo_runtime = "mister")]
     {
