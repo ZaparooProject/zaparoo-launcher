@@ -104,6 +104,12 @@ raw cargo as the default path; the justfile carries the expected environment.
 - Do not paint a full-screen background or a translucent overlay over a screen
   body. Source-screen content hides via `transitioning: true`; the global
   "Loading…" overlay is a transparent `Item` with one `Text` child.
+- Do not persist Core metadata (cover art, scraped properties, descriptions,
+  etc.) to disk or any user-visible cache. Zaparoo Core is the canonical store;
+  the launcher caches in process memory only and re-fetches what it needs after
+  a cold start. Any in-memory cache must enforce a strict bytes cap with LRU
+  eviction — MiSTer has under 512 MB of shared system RAM and the launcher
+  competes with Core, the FPGA wrapper, and the active core for it.
 
 ## Project Map
 

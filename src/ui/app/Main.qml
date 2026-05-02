@@ -70,7 +70,9 @@ MainLayout {
         const savedScreen = Browse.AppState.active_screen
         if (savedScreen === root.screenGames
             || savedScreen === root.screenSystems
-            || savedScreen === root.screenHub)
+            || savedScreen === root.screenHub
+            || savedScreen === root.screenRecents
+            || savedScreen === root.screenSettings)
             root.activeScreen = savedScreen
         // If the catalog is already ready, fire the restore here so
         // the cascade (set_category → SystemsModel reset → seed
@@ -79,6 +81,21 @@ MainLayout {
         // Connection below fires it on first delivery.
         if (Browse.CategoriesModel.count > 0)
             root.hubScreen.restoreFromCategoriesReset()
+        // Warm-start into Recents needs the same restore-on-ready
+        // dance _navigateToRecents performs, otherwise the grid lands
+        // on index 0 and ignores the persisted RecentsState.selected_path.
+        // RecentsModel binds eagerly via bind_to_endpoint! so the
+        // synchronous branch is the common path; the async waiter
+        // covers a slow Core link on cold launch.
+        if (savedScreen === root.screenRecents) {
+            if (Browse.RecentsModel.loading) {
+                root._recentsReadyCallback = function() {
+                    root.recentsScreen.restoreSelection()
+                }
+            } else {
+                root.recentsScreen.restoreSelection()
+            }
+        }
     }
 
     // Seed row/grid indices from persisted state when models deliver new
@@ -193,6 +210,7 @@ MainLayout {
     // the QML lint pass to be happy.
     property var _categoryReadyCallback: null
     property var _systemReadyCallback: null
+    property var _recentsReadyCallback: null
 
     // Listen for SystemsModel fills owned by an in-flight transition.
     // `loading` flips true at the start of set_category and false when
@@ -224,6 +242,18 @@ MainLayout {
             if (cb === null)
                 return
             root._systemReadyCallback = null
+            cb()
+        }
+    }
+    Connections {
+        target: Browse.RecentsModel
+        function onLoadingChanged(): void {
+            if (Browse.RecentsModel.loading)
+                return
+            const cb = root._recentsReadyCallback
+            if (cb === null)
+                return
+            root._recentsReadyCallback = null
             cb()
         }
     }
@@ -313,6 +343,32 @@ MainLayout {
         })
     }
 
+    // Hub → Recents transition. RecentsModel binds eagerly via
+    // bind_to_endpoint!, so on a warm launch the resource is already
+    // Ready and the callback fires synchronously. On a cold launch
+    // with a slow Core link we wait on `loadingChanged` so the user
+    // sees the centred "Loading…" cue rather than an empty grid.
+    function _navigateToRecents(): void {
+        root.pendingTransition = "recents"
+        if (!Browse.RecentsModel.loading) {
+            root.recentsScreen.restoreSelection()
+            root._completeTransition(root.screenRecents)
+            return
+        }
+        root._recentsReadyCallback = function() {
+            root.recentsScreen.restoreSelection()
+            root._completeTransition(root.screenRecents)
+        }
+    }
+
+    // Hub → Settings transition. The Settings screen has no async
+    // data — its singleton seeds from persisted state synchronously
+    // in initialize() — so the flip is instant; no pendingTransition,
+    // no waiter.
+    function _navigateToSettings(): void {
+        root._goto(root.screenSettings)
+    }
+
     // Systems Accept routing. Pin destination to Games, fill the
     // chosen system, then flip. Sets _gamesEnteredFromHub=false so
     // the back path lands on Systems (the normal drill).
@@ -380,6 +436,16 @@ MainLayout {
             root._navigateFromHub(category)
         }
         function onRequestQuit(): void { Qt.quit() }
+        function onRequestRecentsScreen(): void { root._navigateToRecents() }
+        function onRequestSettingsScreen(): void { root._navigateToSettings() }
+    }
+    Connections {
+        target: root.recentsScreen
+        function onRequestHubScreen(): void { root._goto(root.screenHub) }
+    }
+    Connections {
+        target: root.settingsScreen
+        function onRequestHubScreen(): void { root._goto(root.screenHub) }
     }
     Connections {
         target: root.systemsScreen
@@ -508,6 +574,10 @@ MainLayout {
             root.gamesScreen.handleAction(action)
         } else if (root.activeScreen === root.screenSystems) {
             root.systemsScreen.handleAction(action)
+        } else if (root.activeScreen === root.screenRecents) {
+            root.recentsScreen.handleAction(action)
+        } else if (root.activeScreen === root.screenSettings) {
+            root.settingsScreen.handleAction(action)
         } else {
             root.hubScreen.handleAction(action)
         }
@@ -558,6 +628,55 @@ MainLayout {
 
         LoadingIndicator {
             anchors.centerIn: parent
+        }
+    }
+
+    // Post-vmode framebuffer scrub. EXCEPTION to the no-full-screen-
+    // background rule: this Rectangle exists solely so a runtime
+    // resolution change can force every pixel to be repainted, and is
+    // visible for exactly one timer tick (~50 ms) — never as part of
+    // normal navigation chrome. `vmode -r W H rgb32` swaps the linuxfb
+    // mode in place; Qt's scene-graph dirty tracker has no way to
+    // notice the framebuffer pixels are now stale, so on the next
+    // render only items whose properties changed get repainted and
+    // the rest of the screen shows garbage from the prior mode. A
+    // full-screen Rectangle that flashes on for one frame marks the
+    // entire window dirty; once the timer hides it the scene re-renders
+    // end-to-end against the new mode and the corruption is gone.
+    // Using `Theme.bgDeep` so even if the timer fires off-cadence the
+    // user sees the same colour as the existing background underneath.
+    Rectangle {
+        id: forceRepaintCover
+        anchors.fill: parent
+        color: Theme.bgDeep
+        visible: false
+        // Above the transition cue Item (z: 100) so the scrub still
+        // covers the whole window if a vmode change ever lands during
+        // a forward transition.
+        z: 9999
+    }
+    Timer {
+        id: forceRepaintTimer
+        interval: 50
+        repeat: false
+        onTriggered: forceRepaintCover.visible = false
+    }
+    function _forceFullRepaint(): void {
+        forceRepaintCover.visible = true
+        forceRepaintTimer.restart()
+    }
+    Connections {
+        target: Browse.Settings
+        // cxx-qt 0.8 preserves the snake_case property name in the
+        // signal — `current_resolution` → `current_resolutionChanged`
+        // (with the trailing `Changed` capitalised).
+        function onCurrent_resolutionChanged(): void {
+            // Desktop's set_resolution is a no-op beyond persisting,
+            // so there's no framebuffer to scrub there. Gate on
+            // is_mister to keep the desktop dev-loop free of cosmetic
+            // flashes when toggling resolutions for testing.
+            if (Browse.Settings.is_mister)
+                root._forceFullRepaint()
         }
     }
 

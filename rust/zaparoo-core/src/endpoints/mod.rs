@@ -8,6 +8,7 @@
 
 pub mod catalog;
 pub mod media_browse;
+pub mod media_history;
 pub mod media_search;
 pub mod readers;
 pub mod readers_write;

@@ -30,14 +30,18 @@
 // match `seq` are dropped — the standard cure for Qt-thread races
 // when the user spams direction-arrow + Accept across a model swap.
 
+use crate::media_image_cache::{global_media_image_cache, MediaImageCache, MediaKey};
 use crate::models::{global_runtime, global_store};
 use cxx_qt::{CxxQtType, Threading};
-use cxx_qt_lib::{QByteArray, QHash, QHashPair_i32_QByteArray, QModelIndex, QString, QVariant};
+use cxx_qt_lib::{
+    QByteArray, QHash, QHashPair_i32_QByteArray, QList, QModelIndex, QString, QVariant,
+};
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use tokio::sync::broadcast::error::RecvError;
 use tokio::task::JoinHandle;
-use tracing::warn;
+use tracing::{info, warn};
 use zaparoo_core::client::ClientError;
 use zaparoo_core::endpoints::media_browse::{BrowseArgs, MediaBrowseEndpoint};
 use zaparoo_core::endpoints::readers_write::ReadersWriteMutation;
@@ -52,9 +56,12 @@ const NAME_ROLE: i32 = 256 + 1;
 const PATH_ROLE: i32 = 256 + 2;
 const ZAP_SCRIPT_ROLE: i32 = 256 + 3;
 const SYSTEM_ID_ROLE: i32 = 256 + 4;
-// Until per-game cover art lands, every media tile uses the generic
-// `icons/File` glyph and folder tiles use `icons/Folder`. Resources.qml
-// resolves both to SVGs under resources/images/icons/.
+// Folder tiles always use `icons/Folder`. Media tiles default to
+// `icons/File` and switch to `media-image/<encoded>` once the in-memory
+// media image cache has bytes for `(systemId, path)`;
+// Resources.coverUrl() rewrites the `media-image/` prefix to
+// `image://media-image/<encoded>` so the QQuickImageProvider serves the
+// bytes from RAM.
 const COVER_KEY_ROLE: i32 = 256 + 5;
 const ENTRY_TYPE_ROLE: i32 = 256 + 6;
 const FILE_COUNT_ROLE: i32 = 256 + 7;
@@ -114,6 +121,11 @@ pub struct GamesModelRust {
     // Invalidates stale card-write completions after the user cancels
     // or starts another write before the previous RPC returns.
     card_write_seq: Arc<AtomicU64>,
+    // Long-lived bridge from `media_image_cache` broadcast updates onto Qt
+    // `dataChanged(coverKey)` emits. Spun up lazily on the first
+    // `start_initial_browse` so the model singleton owns exactly one
+    // subscriber for the whole process lifetime.
+    cover_subscription: Option<JoinHandle<()>>,
 }
 
 impl Default for GamesModelRust {
@@ -137,6 +149,7 @@ impl Default for GamesModelRust {
             seq: Arc::new(AtomicU64::new(0)),
             auto_nav_eligible: false,
             card_write_seq: Arc::new(AtomicU64::new(0)),
+            cover_subscription: None,
         }
     }
 }
@@ -154,6 +167,7 @@ pub mod ffi {
         type QHash_i32_QByteArray = cxx_qt_lib::QHash<cxx_qt_lib::QHashPair_i32_QByteArray>;
         type QByteArray = cxx_qt_lib::QByteArray;
         type QString = cxx_qt_lib::QString;
+        type QList_i32 = cxx_qt_lib::QList<i32>;
     }
 
     unsafe extern "RustQt" {
@@ -226,11 +240,29 @@ pub mod ffi {
         #[cxx_name = "endInsertRows"]
         fn end_insert_rows(self: Pin<&mut GamesModel>);
 
+        // Qt signal bound as a callable so the cover-cache bridge can
+        // invoke it directly from the Qt thread when an async cover
+        // fetch completes for a row that is already on screen.
+        #[inherit]
+        #[cxx_name = "dataChanged"]
+        fn data_changed(
+            self: Pin<&mut GamesModel>,
+            top_left: &QModelIndex,
+            bottom_right: &QModelIndex,
+            roles: &QList_i32,
+        );
+
         #[cxx_name = "rowCount"]
         fn row_count(self: &GamesModel, parent: &QModelIndex) -> i32;
         fn data(self: &GamesModel, index: &QModelIndex, role: i32) -> QVariant;
         #[cxx_name = "roleNames"]
         fn role_names(self: &GamesModel) -> QHash_i32_QByteArray;
+
+        // Materialise a `QModelIndex` for `(row, column)` so the cover-
+        // cache bridge can target individual rows in `dataChanged`.
+        // Forwarded to the QAbstractListModel implementation.
+        #[inherit]
+        fn index(self: &GamesModel, row: i32, column: i32, parent: &QModelIndex) -> QModelIndex;
     }
 
     impl cxx_qt::Threading for GamesModel {}
@@ -342,6 +374,8 @@ impl ffi::GamesModel {
                     systems,
                     max_results: Some(max_results),
                     cursor,
+                    letter: None,
+                    sort: None,
                 })
                 .await;
             let _ = qt_thread.queue(move |model| {
@@ -452,6 +486,37 @@ impl ffi::GamesModel {
         position_of_game_path(&self.entries, &path.to_string())
     }
 
+    /// Spin up the long-lived cover-cache subscriber on first use.
+    /// Subsequent calls are no-ops — the model singleton owns exactly
+    /// one subscriber for the whole process lifetime, decoupled from
+    /// `seq` because cover updates are not tied to a particular browse
+    /// path. Lagged broadcast frames are dropped silently; the
+    /// `dataChanged` we'd otherwise emit is recoverable on the next
+    /// scroll because `data()` re-reads the cache for every visible
+    /// row's `coverKey`.
+    fn ensure_cover_subscription(mut self: Pin<&mut Self>) {
+        if self.cover_subscription.is_some() {
+            return;
+        }
+        let cache = global_media_image_cache();
+        let mut rx = cache.subscribe();
+        let qt_thread = self.qt_thread();
+        let handle = global_runtime().spawn(async move {
+            loop {
+                match rx.recv().await {
+                    Ok(update) => {
+                        let _ = qt_thread.queue(move |model| {
+                            notify_cover_update(model, &update.key);
+                        });
+                    }
+                    Err(RecvError::Lagged(_)) => {}
+                    Err(RecvError::Closed) => break,
+                }
+            }
+        });
+        self.as_mut().rust_mut().cover_subscription = Some(handle);
+    }
+
     /// Issue a fresh `media.browse` for `(path, systems)`. Bumps `seq`,
     /// aborts the prior watcher, clears entries via `beginResetModel`,
     /// subscribes to `MediaBrowseEndpoint`, and spawns a watcher whose
@@ -468,6 +533,13 @@ impl ffi::GamesModel {
         systems: Vec<String>,
         eligible_for_auto_nav: bool,
     ) {
+        info!(
+            ?path,
+            ?systems,
+            eligible_for_auto_nav,
+            "games: start_initial_browse",
+        );
+        self.as_mut().ensure_cover_subscription();
         self.as_mut().set_current_path(QString::from(path.as_str()));
         self.as_mut().set_loading(true);
         self.as_mut().set_error_message(QString::default());
@@ -548,13 +620,111 @@ fn entry_system_id(entry: &BrowseEntry) -> String {
 }
 
 fn cover_key_for(entry: &BrowseEntry) -> String {
-    // Generic folder/file glyphs. Resources.coverUrl() picks the .svg
-    // extension for anything outside `systems/`, so these resolve to
-    // resources/images/icons/{Folder,File}.svg.
     if entry.is_folder() {
         return "icons/Folder".to_string();
     }
-    "icons/File".to_string()
+    let media_key = media_key_for(entry);
+    let cache = global_media_image_cache();
+    let cached = media_key.as_ref().is_some_and(|k| cache.is_cached(k));
+    if !cached {
+        // Miss-driven re-enqueue: when QML asks for the cover URL of
+        // a media entry whose bytes aren't in the cache, kick a fetch
+        // right here. This is the recovery path for entries that fell
+        // out of the cache (LRU eviction, stale-enqueue truncation):
+        // when the user scrolls back to a page whose covers are gone,
+        // every re-bound tile asks for its `coverKey` again, hits this
+        // branch, and re-enqueues. `MediaImageCache::enqueue` is
+        // idempotent — already-pending / already-negative / already-
+        // cached keys short-circuit — so spamming on every role-data
+        // lookup is cheap. The negative-memo check here is a small
+        // optimisation that skips the lock-then-short-circuit dance
+        // for keys we've already learned have nothing to fetch.
+        if let Some(k) = media_key.as_ref() {
+            if !cache.is_negative(k) {
+                cache.enqueue(k.clone());
+            }
+        }
+    }
+    cover_key_for_with(entry, media_key.as_ref(), cached)
+}
+
+/// Build the canonical `(systemId, path)` identifier for a media
+/// entry. Returns `None` for entries the cache cannot key on (folder
+/// roots, unattributed entries, browse roots without a path).
+fn media_key_for(entry: &BrowseEntry) -> Option<MediaKey> {
+    if entry.is_folder() || entry.path.is_empty() {
+        return None;
+    }
+    let system_id = entry_system_id(entry);
+    if system_id.is_empty() {
+        return None;
+    }
+    Some(MediaKey::new(system_id, entry.path.clone()))
+}
+
+/// Pure helper for `cover_key_for`. Split out so tests can drive the
+/// branches (folder, cached, uncached, unattributed) without spinning
+/// up the global cover cache and its tokio runtime.
+fn cover_key_for_with(entry: &BrowseEntry, key: Option<&MediaKey>, cached: bool) -> String {
+    if entry.is_folder() {
+        return "icons/Folder".to_string();
+    }
+    match key {
+        Some(k) if cached => MediaImageCache::image_key_for(k),
+        _ => "icons/File".to_string(),
+    }
+}
+
+/// Schedule a cover fetch for every media entry with a non-empty
+/// `(systemId, path)` pair. `MediaImageCache::enqueue` is idempotent — calls
+/// for already-cached, already-pending, or negatively-memoised keys are
+/// dropped — so spamming this from `apply_initial_page`/
+/// `apply_append_page` is cheap.
+fn enqueue_cover_fetches(entries: &[BrowseEntry]) {
+    let cache = global_media_image_cache();
+    let mut media_total = 0usize;
+    let mut enqueued = 0usize;
+    for entry in entries {
+        if entry.is_folder() {
+            continue;
+        }
+        media_total += 1;
+        if let Some(key) = media_key_for(entry) {
+            enqueued += 1;
+            cache.enqueue(key);
+        }
+    }
+    info!(
+        media_total,
+        enqueued, "media_image_cache: enqueue pass over media entries",
+    );
+}
+
+/// Emit `dataChanged(coverKey)` for every row whose entry's
+/// `(systemId, path)` matches `key`. Cheap walk of the current
+/// `entries` vec — pages top out at a few hundred rows after look-
+/// ahead, and the bridge runs only when the cover-cache fetch driver
+/// delivers a result.
+fn notify_cover_update(mut model: Pin<&mut ffi::GamesModel>, key: &MediaKey) {
+    let rows: Vec<i32> = model
+        .entries
+        .iter()
+        .enumerate()
+        .filter(|(_, e)| {
+            !e.is_folder() && e.path == *key.path && entry_system_id(e) == *key.system_id
+        })
+        .filter_map(|(i, _)| i32::try_from(i).ok())
+        .collect();
+    if rows.is_empty() {
+        return;
+    }
+    let mut roles = QList::<i32>::default();
+    roles.append(COVER_KEY_ROLE);
+    let parent = QModelIndex::default();
+    for row in rows {
+        let idx = model.index(row, 0, &parent);
+        model.as_mut().data_changed(&idx, &idx, &roles);
+    }
 }
 
 /// Find `needle` in `entries` with case-sensitive path equality.
@@ -689,8 +859,16 @@ fn apply_status(mut model: Pin<&mut ffi::GamesModel>, status: ResourceStatus<Med
             model.as_mut().rust_mut().auto_nav_eligible = false;
             let platform = platform::current();
             let current_path = model.current_path.to_string();
+            info!(
+                entries_len = result.entries.len(),
+                total_files = result.total_files,
+                eligible,
+                ?current_path,
+                "media.browse Ready",
+            );
             match decide_initial(&result, eligible, platform.as_ref(), &current_path) {
                 InitialAction::AutoNavigate { path } => {
+                    info!(?path, "media.browse: auto-navigating into single folder");
                     let sid = model.current_system_id.to_string();
                     let systems = if sid.is_empty() {
                         Vec::new()
@@ -709,6 +887,7 @@ fn apply_status(mut model: Pin<&mut ffi::GamesModel>, status: ResourceStatus<Med
             }
         }
         Projection::Errored { message } => {
+            warn!("media.browse errored: {message}");
             let qstr = QString::from(message.as_str());
             if model.error_message != qstr {
                 model.as_mut().set_error_message(qstr);
@@ -731,6 +910,11 @@ fn apply_initial_page(mut model: Pin<&mut ffi::GamesModel>, result: MediaBrowseR
     let entries = transform_entries(result.entries, platform.as_ref());
     let dir_count = leading_dir_count(&entries);
     let count = i32::try_from(entries.len()).unwrap_or(i32::MAX);
+    info!(
+        count,
+        dir_count, total, has_next_page, "games: apply_initial_page"
+    );
+    enqueue_cover_fetches(&entries);
     model.as_mut().begin_reset_model();
     model.as_mut().rust_mut().entries = entries;
     model.as_mut().rust_mut().count = count;
@@ -778,6 +962,7 @@ fn apply_append_page(
             let platform = platform::current();
             let entries = transform_entries(result.entries, platform.as_ref());
             let new_count = i32::try_from(entries.len()).unwrap_or(i32::MAX - model.count);
+            enqueue_cover_fetches(&entries);
             if new_count > 0 {
                 let first = model.count;
                 let last = first.saturating_add(new_count).saturating_sub(1);
@@ -831,9 +1016,11 @@ mod tests {
     )]
 
     use super::{
-        cover_key_for, decide_initial, display_name, entry_system_id, leading_dir_count,
-        position_of_game_path, project_status, transform_entries, InitialAction, Projection,
+        cover_key_for_with, decide_initial, display_name, entry_system_id, leading_dir_count,
+        media_key_for, position_of_game_path, project_status, transform_entries, InitialAction,
+        Projection,
     };
+    use crate::media_image_cache::{MediaImageCache, MediaKey};
     use zaparoo_core::media_types::{BrowseEntry, MediaBrowseResult, Pagination};
     use zaparoo_core::platform::Platform;
     use zaparoo_core::remote_resource::ResourceStatus;
@@ -1137,13 +1324,31 @@ mod tests {
     #[test]
     fn cover_key_for_folder_returns_folder_icon() {
         let entry = folder("Games", "/x");
-        assert_eq!(cover_key_for(&entry), "icons/Folder");
+        assert_eq!(cover_key_for_with(&entry, None, false), "icons/Folder");
+        // Folders never carry a cached cover, but explicit assertion
+        // documents that even if a cache hit somehow surfaced for a
+        // folder key we keep the folder glyph.
+        let stale_key = MediaKey::new("NES", "/x");
+        assert_eq!(
+            cover_key_for_with(&entry, Some(&stale_key), true),
+            "icons/Folder"
+        );
     }
 
     #[test]
-    fn cover_key_for_media_returns_file_icon() {
+    fn cover_key_for_media_without_cache_returns_file_icon() {
         let entry = media("smb", "/p/smb", "NES");
-        assert_eq!(cover_key_for(&entry), "icons/File");
+        let key = media_key_for(&entry).expect("media has key");
+        assert_eq!(cover_key_for_with(&entry, Some(&key), false), "icons/File");
+    }
+
+    #[test]
+    fn cover_key_for_media_with_cache_returns_media_image_key() {
+        let entry = media("smb", "/p/smb", "NES");
+        let key = media_key_for(&entry).expect("media has key");
+        let expected = MediaImageCache::image_key_for(&key);
+        assert_eq!(cover_key_for_with(&entry, Some(&key), true), expected);
+        assert!(expected.starts_with("media-image/"));
     }
 
     #[test]
@@ -1152,7 +1357,30 @@ mod tests {
             entry_type: "media".into(),
             ..BrowseEntry::default()
         };
-        assert_eq!(cover_key_for(&entry), "icons/File");
+        // No system id and no path → no MediaKey.
+        assert!(media_key_for(&entry).is_none());
+        assert_eq!(cover_key_for_with(&entry, None, false), "icons/File");
+    }
+
+    #[test]
+    fn media_key_for_skips_folders_and_unattributed_entries() {
+        assert!(media_key_for(&folder("Games", "/x")).is_none());
+        assert!(media_key_for(&root("NES", "/roms/NES", "NES")).is_none());
+        let unattributed = BrowseEntry {
+            entry_type: "media".into(),
+            path: "/p".into(),
+            ..BrowseEntry::default()
+        };
+        assert!(media_key_for(&unattributed).is_none());
+        let pathless = BrowseEntry {
+            entry_type: "media".into(),
+            system_id: "NES".into(),
+            ..BrowseEntry::default()
+        };
+        assert!(media_key_for(&pathless).is_none());
+        let key = media_key_for(&media("smb", "/p/smb", "NES")).expect("ok");
+        assert_eq!(key.system_id.as_ref(), "NES");
+        assert_eq!(key.path.as_ref(), "/p/smb");
     }
 
     #[test]

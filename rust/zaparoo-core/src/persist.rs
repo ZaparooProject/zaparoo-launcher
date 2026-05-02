@@ -28,12 +28,21 @@ pub struct PersistedState {
     pub hub: HubState,
     pub systems: SystemsState,
     pub games: GamesState,
+    pub recents: RecentsState,
+    pub settings: SettingsState,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct HubState {
     pub category: String,
+    /// Which Hub row had focus on the last persisted move. 0 = top
+    /// (categories), 1 = bottom (action tiles).
+    pub selected_row: u32,
+    /// The bottom-row action tile that last had focus. One of
+    /// `"recents"` or `"settings"`. Empty defaults to the leftmost
+    /// action when restored.
+    pub selected_action: String,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -58,6 +67,24 @@ impl Default for GamesState {
             selected_at_level: vec![String::new()],
         }
     }
+}
+
+/// Recently-played selection state. The list itself is owned by Core
+/// (`media.history`); we just remember which entry the user was on so
+/// a kill-resume keeps focus.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct RecentsState {
+    pub selected_path: String,
+}
+
+/// Per-launcher Settings selections. `resolution` is `"WxH"` (e.g.
+/// `"1920x1080"`); empty means "no Settings override" and the value
+/// from `[mister.video_*]` in `launcher.toml` is left in place.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct SettingsState {
+    pub resolution: String,
 }
 
 pub fn load() -> PersistedState {
@@ -143,7 +170,10 @@ mod tests {
         reason = "tests should fail-fast on unexpected errors"
     )]
 
-    use super::{load_from, save_to, GamesState, HubState, PersistedState, SystemsState};
+    use super::{
+        load_from, save_to, GamesState, HubState, PersistedState, RecentsState, SettingsState,
+        SystemsState,
+    };
     use std::thread;
 
     #[test]
@@ -162,6 +192,8 @@ mod tests {
             active_screen: "games".into(),
             hub: HubState {
                 category: "Consoles".into(),
+                selected_row: 1,
+                selected_action: "settings".into(),
             },
             systems: SystemsState {
                 system_id: "NES".into(),
@@ -170,6 +202,12 @@ mod tests {
                 system_id: "NES".into(),
                 path_stack: vec![String::new(), "/roms/nes/mario".into()],
                 selected_at_level: vec!["/roms/nes/mario".into(), "/roms/nes/mario/smb.nes".into()],
+            },
+            recents: RecentsState {
+                selected_path: "/roms/nes/mario/smb.nes".into(),
+            },
+            settings: SettingsState {
+                resolution: "1920x1080".into(),
             },
         };
         save_to(&path, &original);
@@ -207,6 +245,8 @@ mod tests {
                             active_screen: format!("screen-{i}"),
                             hub: HubState {
                                 category: format!("cat-{i}-{j}"),
+                                selected_row: 0,
+                                selected_action: String::new(),
                             },
                             systems: SystemsState {
                                 system_id: format!("sys-{i}-{j}"),
@@ -216,6 +256,8 @@ mod tests {
                                 path_stack: vec![String::new()],
                                 selected_at_level: vec![format!("/roms/{i}/{j}.rom")],
                             },
+                            recents: RecentsState::default(),
+                            settings: SettingsState::default(),
                         };
                         save_to(&path, &state);
                     }
@@ -243,6 +285,8 @@ mod tests {
         assert_eq!(state.hub, HubState::default());
         assert_eq!(state.systems, SystemsState::default());
         assert_eq!(state.games, GamesState::default());
+        assert_eq!(state.recents, RecentsState::default());
+        assert_eq!(state.settings, SettingsState::default());
     }
 
     #[test]

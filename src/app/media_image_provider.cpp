@@ -1,0 +1,133 @@
+// Zaparoo Launcher
+// Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+
+#include "media_image_provider.h"
+
+#include <QByteArray>
+#include <QImage>
+#include <QImageReader>
+#include <QList>
+#include <QString>
+#include <QStringList>
+#include <cstddef>
+#include <cstdint>
+
+extern "C" void zaparoo_media_image_bytes_for(
+    const char* encoded, std::size_t encoded_len,
+    void (*callback)(void* user_data, const std::uint8_t* data, std::size_t len), void* user_data);
+
+namespace
+{
+// Fixed-arity callback handed to the Rust ABI; it copies the bytes (or
+// nothing, on a cache miss) into the caller-supplied QByteArray. The
+// pointer is valid for the duration of the callback only — no caching,
+// no aliasing, just one memcpy.
+void appendBytesCallback(void* user_data, const std::uint8_t* data, std::size_t len)
+{
+    auto* out = static_cast<QByteArray*>(user_data);
+    if (data == nullptr || len == 0)
+    {
+        return;
+    }
+    // QByteArray::append takes `const char*`; the bytes are an opaque
+    // image payload, not a logical T*-to-T* reinterpretation, so the
+    // cast is the standard Qt idiom for filling a QByteArray.
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+    out->append(reinterpret_cast<const char*>(data), static_cast<qsizetype>(len));
+}
+
+// QML's `sourceSize.width: N` (with no height) arrives here as
+// `QSize(N, 0)`. Handing that straight to `QImage::scaled(KeepAspectRatio)`
+// collapses to a (0, 0) target via `QSize::scale` and returns a null
+// image, so we dispatch on which dimensions are actually positive
+// rather than letting `scaled` see a half-spec'd target.
+QImage scaleForRequestedSize(const QImage& image, const QSize& requestedSize)
+{
+    const int reqW = requestedSize.width();
+    const int reqH = requestedSize.height();
+    if (reqW > 0 && reqH > 0)
+    {
+        return requestedSize == image.size()
+                   ? image
+                   : image.scaled(requestedSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    }
+    if (reqW > 0)
+    {
+        return image.width() == reqW ? image : image.scaledToWidth(reqW, Qt::SmoothTransformation);
+    }
+    if (reqH > 0)
+    {
+        return image.height() == reqH ? image
+                                      : image.scaledToHeight(reqH, Qt::SmoothTransformation);
+    }
+    return image;
+}
+} // namespace
+
+MediaImageProvider::MediaImageProvider() : QQuickImageProvider(QQuickImageProvider::Image) {}
+
+QImage MediaImageProvider::requestImage(const QString& id, QSize* size, const QSize& requestedSize)
+{
+    // QtQuick strips the `image://media-image/` prefix before calling
+    // us, so `id` is the raw encoded key (base64url-no-pad).
+    const QByteArray idUtf8 = id.toUtf8();
+    QByteArray bytes;
+    zaparoo_media_image_bytes_for(idUtf8.constData(), static_cast<std::size_t>(idUtf8.size()),
+                                  &appendBytesCallback, &bytes);
+    qInfo("media-image provider: id=%s bytes=%lld", idUtf8.constData(),
+          static_cast<long long>(bytes.size()));
+    if (bytes.isEmpty())
+    {
+        qWarning("media-image provider: 0 bytes for id=%s (cache miss or empty payload)",
+                 idUtf8.constData());
+        if (size != nullptr)
+        {
+            *size = QSize(0, 0);
+        }
+        return {};
+    }
+    QImage image;
+    if (!image.loadFromData(bytes))
+    {
+        // First 8 bytes pin down the format: PNG = 89 50 4E 47 0D 0A 1A 0A,
+        // JPEG = FF D8 FF, WebP starts "RIFF....WEBP". Pairing the magic
+        // bytes with the registered format list tells us whether Core sent
+        // the wrong payload type or whether Qt simply has no handler for
+        // this format (the static MiSTer Qt build can ship without PNG).
+        const qsizetype prefixLen = bytes.size() < 8 ? bytes.size() : 8;
+        QString prefixHex;
+        prefixHex.reserve(prefixLen * 3);
+        for (qsizetype i = 0; i < prefixLen; ++i)
+        {
+            const auto byteVal = static_cast<std::uint8_t>(bytes.at(i));
+            if (i > 0)
+            {
+                prefixHex.append(QLatin1Char(' '));
+            }
+            prefixHex.append(QStringLiteral("%1").arg(byteVal, 2, 16, QLatin1Char('0')));
+        }
+        QStringList formatNames;
+        const QList<QByteArray> supportedFormats = QImageReader::supportedImageFormats();
+        formatNames.reserve(supportedFormats.size());
+        for (const QByteArray& fmt : supportedFormats)
+        {
+            formatNames << QString::fromLatin1(fmt);
+        }
+        qWarning(
+            "media-image provider: QImage::loadFromData failed for id=%s bytes=%lld prefix=[%s] "
+            "supportedFormats=[%s]",
+            idUtf8.constData(), static_cast<long long>(bytes.size()), qUtf8Printable(prefixHex),
+            qUtf8Printable(formatNames.join(QStringLiteral(", "))));
+        if (size != nullptr)
+        {
+            *size = QSize(0, 0);
+        }
+        return {};
+    }
+    if (size != nullptr)
+    {
+        *size = image.size();
+    }
+    return scaleForRequestedSize(image, requestedSize);
+}

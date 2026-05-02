@@ -41,6 +41,18 @@ jobs:
         working-directory: rust
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Drop flaky Azure apt mirror
+        # Ubicloud's runner image points apt at azure.archive.ubuntu.com
+        # via /etc/apt/apt-mirrors.txt. That mirror intermittently times
+        # out and stalls install-qt-action's apt-get update for several
+        # minutes while apt retries before reaching archive.ubuntu.com.
+        # Rewrite all azure references to the canonical mirror so apt
+        # goes straight there.
+        run: |
+          for f in /etc/apt/apt-mirrors.txt /etc/apt/sources.list \
+                   /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
+            [ -f "$f" ] && sudo sed -i 's|http://azure\.archive\.ubuntu\.com|http://archive.ubuntu.com|g' "$f"
+          done
       - name: Install mold
         uses: awalsh128/cache-apt-pkgs-action@acb598e5ddbc6f68a970c5da0688d2f3a9f04d05 # v1.6.0
         with:
@@ -81,6 +93,18 @@ jobs:
         working-directory: rust
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Drop flaky Azure apt mirror
+        # Ubicloud's runner image points apt at azure.archive.ubuntu.com
+        # via /etc/apt/apt-mirrors.txt. That mirror intermittently times
+        # out and stalls install-qt-action's apt-get update for several
+        # minutes while apt retries before reaching archive.ubuntu.com.
+        # Rewrite all azure references to the canonical mirror so apt
+        # goes straight there.
+        run: |
+          for f in /etc/apt/apt-mirrors.txt /etc/apt/sources.list \
+                   /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
+            [ -f "$f" ] && sudo sed -i 's|http://azure\.archive\.ubuntu\.com|http://archive.ubuntu.com|g' "$f"
+          done
       - name: Install mold
         uses: awalsh128/cache-apt-pkgs-action@acb598e5ddbc6f68a970c5da0688d2f3a9f04d05 # v1.6.0
         with:
@@ -113,6 +137,18 @@ jobs:
     runs-on: ubicloud-standard-8
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Drop flaky Azure apt mirror
+        # Ubicloud's runner image points apt at azure.archive.ubuntu.com
+        # via /etc/apt/apt-mirrors.txt. That mirror intermittently times
+        # out and stalls install-qt-action's apt-get update for several
+        # minutes while apt retries before reaching archive.ubuntu.com.
+        # Rewrite all azure references to the canonical mirror so apt
+        # goes straight there.
+        run: |
+          for f in /etc/apt/apt-mirrors.txt /etc/apt/sources.list \
+                   /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
+            [ -f "$f" ] && sudo sed -i 's|http://azure\.archive\.ubuntu\.com|http://archive.ubuntu.com|g' "$f"
+          done
       - name: Install system deps
         uses: awalsh128/cache-apt-pkgs-action@acb598e5ddbc6f68a970c5da0688d2f3a9f04d05 # v1.6.0
         with:

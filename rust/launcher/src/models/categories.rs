@@ -12,13 +12,6 @@ use zaparoo_core::systems_catalog::CatalogData;
 const NAME_ROLE: i32 = 256 + 1; // Qt::UserRole + 1
 const COVER_KEY_ROLE: i32 = 256 + 2;
 
-// Placeholder entry shown at the start of the categories row until a
-// real Favorites pipeline lands in Core. Selecting it filters the
-// systems grid by an unmatched category — the user sees an empty grid,
-// which is the correct fallback for a feature that doesn't exist yet.
-// Tracked in #20.
-const FAVORITES_CATEGORY: &str = "Favorites";
-
 // Categories Core surfaces but the launcher doesn't expose. `Other` is
 // the synthesized bucket for systems with no upstream category and adds
 // no value in the UI; `Media` is reserved for non-game content the
@@ -120,11 +113,10 @@ fn position_of(haystack: &[String], needle: &str) -> i32 {
 }
 
 /// Apply the launcher-side category presentation rules to the raw list
-/// from Core: drop hidden categories and prepend the Favorites
-/// placeholder. Pulled out of `project` for unit-test coverage.
+/// from Core: drop hidden categories. Pulled out of `project` for
+/// unit-test coverage.
 fn visible_categories(raw: &[String]) -> Vec<String> {
-    let mut out = Vec::with_capacity(raw.len() + 1);
-    out.push(FAVORITES_CATEGORY.to_string());
+    let mut out = Vec::with_capacity(raw.len());
     for c in raw {
         if HIDDEN_CATEGORIES
             .iter()
@@ -243,10 +235,10 @@ mod tests {
     }
 
     #[test]
-    fn favorites_is_prepended_to_visible_list() {
+    fn raw_categories_pass_through_in_order() {
         let raw = vec!["Consoles".to_string(), "Arcade".to_string()];
         let visible = visible_categories(&raw);
-        assert_eq!(visible, vec!["Favorites", "Consoles", "Arcade"]);
+        assert_eq!(visible, vec!["Consoles", "Arcade"]);
     }
 
     #[test]
@@ -258,19 +250,19 @@ mod tests {
             "Consoles".to_string(),
         ];
         let visible = visible_categories(&raw);
-        assert_eq!(visible, vec!["Favorites", "Arcade", "Consoles"]);
+        assert_eq!(visible, vec!["Arcade", "Consoles"]);
     }
 
     #[test]
-    fn empty_raw_still_yields_favorites_only() {
+    fn empty_raw_yields_empty_visible_list() {
         let visible = visible_categories(&[]);
-        assert_eq!(visible, vec!["Favorites"]);
+        assert!(visible.is_empty());
     }
 
     #[test]
     fn original_casing_is_preserved_for_visible_entries() {
         let raw = vec!["arcade".to_string(), "CONSOLES".to_string()];
         let visible = visible_categories(&raw);
-        assert_eq!(visible, vec!["Favorites", "arcade", "CONSOLES"]);
+        assert_eq!(visible, vec!["arcade", "CONSOLES"]);
     }
 }

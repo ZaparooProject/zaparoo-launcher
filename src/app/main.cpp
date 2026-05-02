@@ -6,13 +6,19 @@
 // zaparoo_launcher_rs staticlib; Qt plugin wiring is handled here so that
 // Qt's CMake (qt_import_qml_plugins) can emit the correct link flags.
 
+#include "media_image_provider.h"
+
+#include <QByteArray>
 #include <QFontDatabase>
 #include <QGuiApplication>
+#include <QImageReader>
+#include <QList>
 #include <QLocale>
 #include <QPixmapCache>
 #include <QQmlApplicationEngine>
 #include <QQuickStyle>
 #include <QString>
+#include <QStringList>
 #include <QTranslator>
 #include <QUrl>
 #include <QtQml/qqmlextensionplugin.h>
@@ -124,6 +130,30 @@ int main(int argc, char* argv[])
     }
 
     QQmlApplicationEngine engine;
+    // Engine takes ownership of the provider — it deletes it when the
+    // engine is destroyed at process shutdown. The provider is the
+    // bridge from `image://media-image/<encoded>` URLs to the
+    // Rust-side in-memory media image cache, so it must be installed
+    // before any QML type binds to a `coverKey` (every Tile inside
+    // MainLayout does).
+    // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
+    engine.addImageProvider(QStringLiteral("media-image"), new MediaImageProvider());
+
+    // One-shot diagnostic: a static MiSTer Qt build configured without
+    // `-feature-png` / libpng silently lacks the PNG QImageIOHandler, so
+    // `QImage::loadFromData(<png bytes>)` returns null and every cover
+    // looks "missing" with no other signal. Logging the registered
+    // formats at startup turns that failure mode into one decisive line.
+    QStringList formatNames;
+    const QList<QByteArray> supportedFormats = QImageReader::supportedImageFormats();
+    formatNames.reserve(supportedFormats.size());
+    for (const QByteArray& fmt : supportedFormats)
+    {
+        formatNames << QString::fromLatin1(fmt);
+    }
+    qInfo("QImageReader supportedImageFormats: %s",
+          qUtf8Printable(formatNames.join(QStringLiteral(", "))));
+
 #ifndef ZAPAROO_DEV_BUILD
     engine.setInitialProperties({{"fullScreen", true}});
 #endif

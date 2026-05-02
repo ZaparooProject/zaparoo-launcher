@@ -30,6 +30,8 @@ ApplicationWindow {
     readonly property string screenHub: ScreenManager.screenHub
     readonly property string screenSystems: ScreenManager.screenSystems
     readonly property string screenGames: ScreenManager.screenGames
+    readonly property string screenRecents: ScreenManager.screenRecents
+    readonly property string screenSettings: ScreenManager.screenSettings
 
     // Runtime state. `activeScreen` mirrors ScreenManager's property
     // (two-way synced below so direct assignment from tests still
@@ -53,6 +55,8 @@ ApplicationWindow {
     property alias hubScreen: hubScreen
     property alias systemsScreen: systemsScreen
     property alias gamesScreen: gamesScreen
+    property alias recentsScreen: recentsScreen
+    property alias settingsScreen: settingsScreen
 
     property bool cardWriteModalVisible: false
     property bool cardWriteFailed: false
@@ -83,6 +87,11 @@ ApplicationWindow {
     readonly property string hubScreenState:
         (Browse.CategoriesModel.error_message ?? "") !== "" ? "error"
         : (Browse.CategoriesModel.count === 0 ? "empty" : "ready")
+
+    readonly property string recentsScreenState:
+        Browse.RecentsModel.loading ? "loading"
+        : ((Browse.RecentsModel.error_message ?? "") !== "" ? "error"
+        : (Browse.RecentsModel.count === 0 ? "empty" : "ready"))
 
     signal cancelCardWriteRequested()
 
@@ -197,6 +206,20 @@ ApplicationWindow {
             id: gamesScreen
             anchors.fill: parent
             visible: root.activeScreen === root.screenGames
+        }
+
+        RecentsScreen {
+            id: recentsScreen
+            anchors.fill: parent
+            visible: root.activeScreen === root.screenRecents
+            transitioning: root.pendingTransition !== ""
+        }
+
+        SettingsScreen {
+            id: settingsScreen
+            anchors.fill: parent
+            visible: root.activeScreen === root.screenSettings
+            transitioning: root.pendingTransition !== ""
         }
     }
 
@@ -421,6 +444,49 @@ ApplicationWindow {
                     { button: "ButtonB", label: qsTr("Back") }
                 ];
             }
+            if (root.activeScreen === root.screenRecents) {
+                if (root.recentsScreenState === "loading")
+                    return [{ button: "ButtonB", label: qsTr("Back") }];
+                if (root.recentsScreenState === "ready") {
+                    const pages = root.recentsScreen.recentsGrid.pageCount;
+                    let row = [
+                        { button: "Dpad", label: qsTr("Move") }
+                    ];
+                    if (pages > 1)
+                        row.push({ button: "ButtonL", label: qsTr("Prev page") },
+                                 { button: "ButtonR", label: qsTr("Next page") });
+                    row.push({ button: "ButtonA", label: qsTr("Open") },
+                             { button: "ButtonB", label: qsTr("Back") });
+                    return row;
+                }
+                return [
+                    { button: "ButtonA", label: qsTr("Retry") },
+                    { button: "ButtonB", label: qsTr("Back") }
+                ];
+            }
+            if (root.activeScreen === root.screenSettings) {
+                let row = [];
+                // Up/Down moves between fields; only useful when there
+                // are 2+ fields. Today MiSTer ships one (Resolution),
+                // so this entry is omitted on the current platform.
+                if (root.settingsScreen.fieldCount > 1) {
+                    row.push({
+                        buttons: ["DpadUp", "DpadDown"],
+                        label: qsTr("Move")
+                    });
+                }
+                // Left/Right cycles the focused field's value. Skip
+                // the cue when there are no fields (desktop has no
+                // settings to change today).
+                if (root.settingsScreen.fieldCount > 0) {
+                    row.push({
+                        buttons: ["DpadLeft", "DpadRight"],
+                        label: qsTr("Change")
+                    });
+                }
+                row.push({ button: "ButtonB", label: qsTr("Back") });
+                return row;
+            }
             // games
             if (root.gamesScreenState === "loading")
                 return [{ button: "ButtonB", label: qsTr("Back") }];
@@ -454,24 +520,41 @@ ApplicationWindow {
             Repeater {
                 model: instructionsBar.helpEntries
 
+                // Each entry is either a single-glyph cue
+                // (`{ button: "ButtonA", label: "Open" }`) or a
+                // multi-glyph cue rendered as N icons in a row before
+                // the label (`{ buttons: ["DpadLeft", "DpadRight"],
+                // label: "Change" }`). The Settings screen uses the
+                // multi-glyph form to disambiguate "left/right cycles
+                // the value" from "up/down moves between fields".
                 delegate: Row {
+                    id: helpEntry
                     required property var modelData
                     spacing: Sizing.pctW(0.6)
 
-                    Image {
-                        anchors.verticalCenter: parent.verticalCenter
-                        height: Sizing.pctH(4)
-                        width: height
-                        fillMode: Image.PreserveAspectFit
-                        sourceSize.height: height
-                        sourceSize.width: width
-                        source: Resources.iconUrl(parent.modelData.button)
-                        smooth: true
+                    readonly property var buttonList:
+                        helpEntry.modelData.buttons !== undefined
+                            ? helpEntry.modelData.buttons
+                            : [helpEntry.modelData.button]
+
+                    Repeater {
+                        model: helpEntry.buttonList
+                        delegate: Image {
+                            required property string modelData
+                            anchors.verticalCenter: parent.verticalCenter
+                            height: Sizing.pctH(4)
+                            width: height
+                            fillMode: Image.PreserveAspectFit
+                            sourceSize.height: height
+                            sourceSize.width: width
+                            source: Resources.iconUrl(modelData)
+                            smooth: true
+                        }
                     }
 
                     Text {
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: parent.modelData.label
+                        anchors.verticalCenter: helpEntry.verticalCenter
+                        text: helpEntry.modelData.label
                         font.family: Theme.fontUi
                         font.pixelSize: Sizing.fontSize(2.5)
                         color: Theme.textPrimary

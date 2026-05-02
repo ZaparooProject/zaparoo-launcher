@@ -16,35 +16,78 @@ import Zaparoo.Browse as Browse
 // category file-wide.
 // qmllint disable compiler
 
-// Hub screen — categories row only. Pure input dispatcher: emits
-// `requestAccept(category)` on Accept and `requestQuit` on Escape.
+// Hub screen — two centered rows the user navigates as one grid:
+//
+//   * Top row: dynamic categories from Browse.CategoriesModel (Arcade,
+//     Computer, Console, Handheld).
+//   * Bottom row: fixed actions — Recently Played and Settings.
+//
+// Both rows wrap left/right modulo their own count, and Up/Down flip
+// between rows in a closed loop (Up from top wraps to bottom, Down
+// from bottom wraps to top). Both rows share cell width and spacing
+// and the bottom row is horizontally centered under the top, so the
+// cross-row jump is "round to the visually-nearest cell". Measuring
+// positions in cell-widths, every cell's center sits at i + 0.5 and
+// the bottom row is offset left by (topCount − bottomCount) / 2 cells.
+// So for either direction:
+//
+//   destIdx = round(sourceIdx − (sourceCount − destCount) / 2)
+//
+// clamped into the destination row. The formula is symmetric and
+// generalizes for any (topCount, bottomCount); see `_mapCrossRow`.
+//
+// Pure input dispatcher: emits one of `requestAccept(category)`,
+// `requestRecentsScreen`, `requestSettingsScreen`, or `requestQuit`.
+//
 // All cross-screen orchestration (model fills, deferred set_category,
 // cover prefetch, transition overlay, screen flip) lives in Main.qml.
-// `transitioning` is written by the router so the row hides during
+// `transitioning` is written by the router so both rows hide during
 // the loading wait.
-//
-// The Hub renders as a static, centered row of category tiles — no
-// sliding carousel, no per-press band-slide animation. Categories are
-// 3-6 short top-level labels (`Favorites`, `Consoles`, `Computer`,
-// `Handheld`, `Arcade` on MiSTer); fixed-position cells read more
-// clearly as top-level navigation and stay cheap on Qt's Software
-// adaptation. The earlier Carousel component sat under the same band
-// scaling-up the focused tile mid-slide, which on MiSTer paid the
-// per-frame cost of repainting the bg-circuit texture under a
-// translucent focus-ring rectangle across the full band.
 Item {
     id: hub
 
     property bool transitioning: false
+    // 0 = categories row, 1 = actions row.
+    property int currentRow: 0
+    // Index within the active row.
     property int currentIndex: 0
 
     signal requestAccept(category: string)
     signal requestQuit()
+    signal requestRecentsScreen()
+    signal requestSettingsScreen()
 
-    // Restore the hub from the persisted `Browse.HubState.category`
-    // (or index 0 if the saved value is missing from the model). Always
-    // cascades into `SystemsModel.set_category` so the systems-model
-    // reset handler fires and drives the next step of the restore chain.
+    // Static action-row data. Three fixed entries; order matches
+    // left-to-right reading. The `qsTr()` calls live directly in this
+    // binding so a `LanguageChange` event re-evaluates `actionEntries`
+    // and rebuilds the array with newly-translated strings — consumers
+    // bound to `actionEntries[i].text` pick up the new values
+    // automatically.
+    readonly property var actionEntries: [
+        { id: "recents",  coverKey: "icons/History",  text: qsTr("Recently Played") },
+        { id: "settings", coverKey: "icons/Settings", text: qsTr("Settings") }
+    ]
+
+    function _actionIndexForId(id: string): int {
+        for (let i = 0; i < hub.actionEntries.length; i++)
+            if (hub.actionEntries[i].id === id)
+                return i
+        return 0
+    }
+
+    // Test-harness hook so `tst_navigation.qml` can reset both focus
+    // axes between cases without poking individual properties through
+    // MainLayout's alias.
+    function resetFocus(): void {
+        hub.currentRow = 0
+        hub.currentIndex = 0
+    }
+
+    // Restore the hub from the persisted `Browse.HubState`. Always
+    // cascades into `SystemsModel.set_category` because the cascade
+    // drives the next onModelReset handler that a games-screen restore
+    // depends on; the call is idempotent when the model already holds
+    // the right category.
     //
     // Called from two sites in Main.qml — the Component.onCompleted
     // early-arrival path (catalog already seeded synchronously) and the
@@ -52,21 +95,30 @@ Item {
     // refresh the category list can reorder, so the row index MUST be
     // re-seeded even when SystemsModel is already on the chosen
     // category — otherwise the visible focus drifts off whichever
-    // screen the user is on. Only the expensive set_category call is
-    // gated; the QML-side index assignment is cheap and idempotent.
-    // The `is_empty` clause mirrors Rust's same-named recovery in
-    // SystemsModel::set_category so a stale-but-empty model still gets
-    // a retry shot.
+    // screen the user is on.
     function restoreFromCategoriesReset(): void {
         const savedCategory = Browse.HubState.category
         const idx = savedCategory === ""
                     ? -1
                     : Browse.CategoriesModel.index_for_category(savedCategory)
-        const chosenIndex = idx >= 0 ? idx : 0
+        const chosenCategoryIndex = idx >= 0 ? idx : 0
         const chosenCategory = idx >= 0
                                ? savedCategory
-                               : Browse.CategoriesModel.category_at(chosenIndex)
-        hub.currentIndex = chosenIndex
+                               : Browse.CategoriesModel.category_at(chosenCategoryIndex)
+
+        // Restore which row the user was on, then point currentIndex
+        // at the right slot for that row. Saved row outside [0, 1] is
+        // treated as 0 — same belt-and-braces stance as the category
+        // fallback above.
+        const savedRow = Browse.HubState.selected_row
+        if (savedRow === 1) {
+            hub.currentRow = 1
+            hub.currentIndex = hub._actionIndexForId(Browse.HubState.selected_action)
+        } else {
+            hub.currentRow = 0
+            hub.currentIndex = chosenCategoryIndex
+        }
+
         if (Browse.SystemsModel.current_category === chosenCategory
             && Browse.SystemsModel.count > 0)
             return
@@ -75,11 +127,12 @@ Item {
 
     // Returns true if the focus actually moved. Empty rows leave disk
     // state alone — see tst_persistence.qml for the regression guarded
-    // against. Past either end the index wraps modulo count so
-    // right-at-end whips to 0 and left-at-start whips to count-1; with
-    // no slide animation, the focus simply jumps.
+    // against. Both rows wrap modulo their count so a single Left/Right
+    // press at either end whips around to the far side.
     function _navigate(delta: int): bool {
-        const count = Browse.CategoriesModel.count
+        const count = hub.currentRow === 0
+            ? Browse.CategoriesModel.count
+            : hub.actionEntries.length
         if (count <= 0)
             return false
         const next = ((hub.currentIndex + delta) % count + count) % count
@@ -89,34 +142,94 @@ Item {
         return true
     }
 
+    // Pure arithmetic — no model access. Maps an index in a row of
+    // `sourceCount` cells to the visually-nearest index in a centered
+    // row of `destCount` cells (both rows assumed to share cell width
+    // and spacing). Returned index is clamped to [0, destCount-1]; a
+    // degenerate `destCount <= 0` returns 0 — callers must guard
+    // empty destination rows separately, this exists so the mapping
+    // can be unit-tested without populating CategoriesModel.
+    function _mapCrossRow(sourceIdx: int, sourceCount: int, destCount: int): int {
+        if (destCount <= 0)
+            return 0
+        const offset = (sourceCount - destCount) / 2
+        const target = Math.round(sourceIdx - offset)
+        return Math.max(0, Math.min(destCount - 1, target))
+    }
+
+    // Cross-row jump. Up and Down both flip to the *other* row at the
+    // visually-nearest cell — there is no "off the top" or "off the
+    // bottom" since the two rows form a closed two-row loop. Returns
+    // false only when the destination row is empty (no categories
+    // loaded yet, etc.).
+    function _crossRow(): bool {
+        const topCount = Browse.CategoriesModel.count
+        const bottomCount = hub.actionEntries.length
+        if (hub.currentRow === 0) {
+            if (bottomCount <= 0)
+                return false
+            hub.currentRow = 1
+            hub.currentIndex = hub._mapCrossRow(hub.currentIndex, topCount, bottomCount)
+            return true
+        }
+        if (topCount <= 0)
+            return false
+        hub.currentRow = 0
+        hub.currentIndex = hub._mapCrossRow(hub.currentIndex, bottomCount, topCount)
+        return true
+    }
+
     // Side-effect of every focus move: persist HubState. We do NOT call
     // SystemsModel.set_category here — that one's reserved for Accept
     // (and the router orchestrates it). Calling it on every left/right
-    // press fires two model resets (synchronous clear + async tokio
-    // fill) per press, each destroying-and-recreating SystemsScreen's
-    // bound delegates on the UI thread — choppy on MiSTer even though
-    // SystemsScreen is `visible: false`. See `bfa0629 perf: drop the
-    // eager system-cover prefetcher` for the prior round of this lesson.
-    function _commitCategory(category: string): void {
-        Browse.HubState.category = category
+    // press fires two model resets per press, each destroying-and-
+    // recreating SystemsScreen's bound delegates on the UI thread —
+    // choppy on MiSTer even though SystemsScreen is `visible: false`.
+    function _commitCategorySelection(): void {
+        Browse.HubState.selected_row = 0
+        if (Browse.CategoriesModel.count > 0)
+            Browse.HubState.category =
+                Browse.CategoriesModel.category_at(hub.currentIndex)
+    }
+
+    function _commitActionSelection(): void {
+        Browse.HubState.selected_row = 1
+        Browse.HubState.selected_action =
+            hub.actionEntries[hub.currentIndex].id
+    }
+
+    function _commitCurrent(): void {
+        if (hub.currentRow === 0)
+            hub._commitCategorySelection()
+        else
+            hub._commitActionSelection()
     }
 
     function handleAction(action: string): void {
         if (action === "left") {
             if (hub._navigate(-1))
-                hub._commitCategory(
-                    Browse.CategoriesModel.category_at(hub.currentIndex))
+                hub._commitCurrent()
         } else if (action === "right") {
             if (hub._navigate(1))
-                hub._commitCategory(
-                    Browse.CategoriesModel.category_at(hub.currentIndex))
+                hub._commitCurrent()
+        } else if (action === "down" || action === "up") {
+            if (hub._crossRow())
+                hub._commitCurrent()
         } else if (action === "accept") {
-            // Empty row sends "" — router treats that as the committed
-            // "Enter on empty hub goes to Systems" passthrough.
-            const chosen = Browse.CategoriesModel.count <= 0
-                ? ""
-                : Browse.CategoriesModel.category_at(hub.currentIndex)
-            hub.requestAccept(chosen)
+            if (hub.currentRow === 0) {
+                // Empty row sends "" — router treats that as the committed
+                // "Enter on empty hub goes to Systems" passthrough.
+                const chosen = Browse.CategoriesModel.count <= 0
+                    ? ""
+                    : Browse.CategoriesModel.category_at(hub.currentIndex)
+                hub.requestAccept(chosen)
+            } else {
+                const id = hub.actionEntries[hub.currentIndex].id
+                if (id === "recents")
+                    hub.requestRecentsScreen()
+                else if (id === "settings")
+                    hub.requestSettingsScreen()
+            }
         } else if (action === "cancel") {
             hub.requestQuit()
         }
@@ -129,7 +242,7 @@ Item {
 
         // Cell layout. Tiles are icon-only (no label inside), so the
         // cell is a roughly-square image area. The category name for
-        // the focused tile renders below the row in `activeLabel`,
+        // the focused tile renders below the grid in `activeLabel`,
         // not inside the tile.
         readonly property int spacing: Sizing.pctW(3)
         readonly property int sideInset: Sizing.pctW(5)
@@ -148,19 +261,15 @@ Item {
         readonly property int rowOriginX: (width - totalRowWidth) / 2
 
         // Symmetric padding contains the focused tile's 1.06× scale
-        // bleed inside the row's own bounds. The earlier Carousel
-        // anchored cells at y=0 within a band that only carried slack
-        // at the bottom, so the scale bleed leaked upward into the
-        // bg-circuit area above the band.
+        // bleed inside the row's own bounds.
         readonly property int verticalPadding: Sizing.pctH(2)
 
         anchors.horizontalCenter: parent.horizontalCenter
         width: parent.width
         height: cellHeight + 2 * verticalPadding
-        // Sits higher than the old centered placement (was pctH(33))
-        // so the active-category label below the row stays clear of
-        // the help bar at the bottom.
-        y: Sizing.pctH(22)
+        // Sits high enough that the second row + activeLabel stay
+        // clear of the help bar at the bottom.
+        y: Sizing.pctH(14)
 
         // Hide the tiles while the router holds us here on a forward
         // transition so the centred "Loading…" cue (painted from
@@ -190,7 +299,8 @@ Item {
                 width: categoriesRow.cellWidth
                 height: categoriesRow.cellHeight
 
-                readonly property bool isSelected: index === hub.currentIndex
+                readonly property bool isSelected:
+                    hub.currentRow === 0 && index === hub.currentIndex
                 // Focused tile draws on top so its 1.06× scale-up isn't
                 // clipped by neighbours to the right.
                 z: isSelected ? 1 : 0
@@ -199,7 +309,7 @@ Item {
                     anchors.fill: parent
                     sourceComponent: tileDelegate
                     isSelected: cellItem.isSelected
-                    isFocused: true
+                    isFocused: hub.currentRow === 0
                     name: cellItem.name
                     coverKey: cellItem.coverKey
                 }
@@ -207,19 +317,94 @@ Item {
         }
     }
 
-    // Active category caption — single big line directly under the
-    // row, swaps text on every left/right move. Hidden while the
-    // router holds us in a forward transition, mirroring the row.
+    // Action row. Same cell geometry and centring formula as
+    // categoriesRow so the two rows visually read as one grid; the
+    // only difference is a static three-entry array model and clamp-
+    // not-wrap navigation. Positioned directly below categoriesRow
+    // with a vertical gap equal to categoriesRow.spacing so the
+    // visual gutter between rows matches the gutter between tiles
+    // within a row.
+    Item {
+        id: actionsRow
+
+        // Mirror categoriesRow's cell metrics so both rows line up
+        // pixel-for-pixel.
+        readonly property int spacing: categoriesRow.spacing
+        readonly property int cellWidth: categoriesRow.cellWidth
+        readonly property int cellHeight: categoriesRow.cellHeight
+        readonly property int verticalPadding: categoriesRow.verticalPadding
+        readonly property int n: hub.actionEntries.length
+        readonly property int totalRowWidth:
+            n > 0 ? n * cellWidth + (n - 1) * spacing : 0
+        readonly property int rowOriginX: (width - totalRowWidth) / 2
+
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: categoriesRow.bottom
+        // Visual gap between the bottom edge of a category cell and the
+        // top edge of an action cell must equal the horizontal `spacing`
+        // between tiles within a row. Both rows reserve `verticalPadding`
+        // above and below their cells (to contain the focused tile's
+        // 1.06× scale bleed); without compensating here the visible gap
+        // would be `spacing + 2 × verticalPadding`.
+        anchors.topMargin: categoriesRow.spacing - categoriesRow.verticalPadding - actionsRow.verticalPadding
+        width: parent.width
+        height: cellHeight + 2 * verticalPadding
+        visible: !hub.transitioning
+
+        Component {
+            id: actionTileDelegate
+            Tile {}
+        }
+
+        Repeater {
+            model: hub.actionEntries
+
+            Item {
+                id: actionCellItem
+
+                required property int index
+                required property var modelData
+
+                x: actionsRow.rowOriginX
+                   + index * (actionsRow.cellWidth + actionsRow.spacing)
+                y: actionsRow.verticalPadding
+                width: actionsRow.cellWidth
+                height: actionsRow.cellHeight
+
+                readonly property bool isSelected:
+                    hub.currentRow === 1 && index === hub.currentIndex
+                z: isSelected ? 1 : 0
+
+                TileLoader {
+                    anchors.fill: parent
+                    sourceComponent: actionTileDelegate
+                    isSelected: actionCellItem.isSelected
+                    isFocused: hub.currentRow === 1
+                    name: actionCellItem.modelData.text
+                    coverKey: actionCellItem.modelData.coverKey
+                }
+            }
+        }
+    }
+
+    // Active label — single big line under the bottom row, swaps text
+    // on every move. Reads from whichever row owns focus. Hidden during
+    // a forward transition, mirroring the rows.
     ActiveLabel {
         id: activeLabel
-        anchors.top: categoriesRow.bottom
-        anchors.topMargin: Sizing.pctH(4)
+
+        anchors.top: actionsRow.bottom
+        anchors.topMargin: Sizing.pctH(3)
         anchors.left: parent.left
         anchors.right: parent.right
         height: Sizing.pctH(7)
-        text: Browse.CategoriesModel.count > 0
-              ? Browse.CategoriesModel.category_at(hub.currentIndex)
-              : ""
+        text: {
+            if (hub.currentRow === 1)
+                return hub.actionEntries[hub.currentIndex].text
+            if (Browse.CategoriesModel.count > 0)
+                return Browse.CategoriesModel.category_at(hub.currentIndex)
+            return ""
+        }
         visible: !hub.transitioning
     }
 

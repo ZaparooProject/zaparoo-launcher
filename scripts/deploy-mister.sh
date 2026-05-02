@@ -78,8 +78,11 @@ scp "${BINARY}" "root@${MISTER_IP}:${REMOTE_PATH}"
 echo "Deployed ${BINARY} → root@${MISTER_IP}:${REMOTE_PATH}"
 
 ssh "root@${MISTER_IP}" "
-    killall launcher 2>/dev/null && echo 'Killed running launcher' || true
-    killall MiSTer_Zaparoo 2>/dev/null && echo 'Killed running MiSTer_Zaparoo' || true
     rm -f /tmp/zaparoo/launcher.log
-    nohup /media/fat/MiSTer_Zaparoo >/dev/null 2>&1 &
+    # SIGKILL the running launcher; MiSTer's alt_launcher_poll respawns it
+    # ~1s later with the new binary. SIGTERM here would be misclassified as
+    # an 'escape' and MiSTer would refuse to respawn. Note: counts as a crash
+    # toward the 3-strike give-up limit, so if you deploy 3 times without
+    # cleanly exiting the launcher in between, killall MiSTer_Zaparoo to reset.
+    killall -KILL launcher 2>/dev/null && echo 'Killed running launcher; MiSTer will respawn it' || echo 'No running launcher to kill'
 "

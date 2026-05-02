@@ -32,6 +32,7 @@ uuid            = { version = "1", features = ["v4"] }
 dirs-next       = "2"
 insta           = { version = "1", features = ["yaml"] }
 tempfile        = "3"
+base64          = "0.22"
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn        = "deny"
