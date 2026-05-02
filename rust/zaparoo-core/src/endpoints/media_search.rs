@@ -32,7 +32,8 @@ impl Endpoint for MediaSearchEndpoint {
             client
                 .media_search(MediaSearchParams {
                     systems: vec![system_id],
-                    max_results: 100,
+                    max_results: Some(100),
+                    ..MediaSearchParams::default()
                 })
                 .await
         })

@@ -12,4 +12,5 @@
 #include "cxx-qt-lib/qbytearray.h"
 #include "cxx-qt-lib/qstring.h"
 #include "cxx-qt-lib/qstringlist.h"
+#include "cxx-qt-lib/qlist.h"
 #include <QAbstractListModel>

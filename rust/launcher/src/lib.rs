@@ -4,6 +4,7 @@
 
 #[macro_use]
 mod bind;
+mod media_image_cache;
 mod mister_runtime;
 mod models;
 

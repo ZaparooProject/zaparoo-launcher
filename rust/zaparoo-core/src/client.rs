@@ -15,8 +15,10 @@
 
 use crate::media_types::{
     MediaBrowseParams, MediaBrowseResult, MediaHistoryParams, MediaHistoryResult,
-    MediaSearchParams, MediaSearchResult, ReadersResult, ReadersWriteParams, RunParams,
-    SystemsParams, SystemsResult, VersionResult,
+    MediaHistoryTopParams, MediaHistoryTopResult, MediaImageParams, MediaImageResult,
+    MediaLookupParams, MediaLookupResult, MediaMetaParams, MediaMetaResult, MediaSearchParams,
+    MediaSearchResult, MediaTagsParams, MediaTagsResult, ReadersResult, ReadersWriteParams,
+    RunParams, SystemsParams, SystemsResult, VersionResult,
 };
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
@@ -436,21 +438,7 @@ impl Client {
         &self,
         params: MediaSearchParams,
     ) -> Result<MediaSearchResult, ClientError> {
-        #[derive(Serialize)]
-        struct P {
-            systems: Vec<String>,
-            #[serde(rename = "maxResults")]
-            max_results: u32,
-        }
-        let val = self
-            .call(
-                "media.search",
-                &P {
-                    systems: params.systems,
-                    max_results: params.max_results,
-                },
-            )
-            .await?;
+        let val = self.call("media.search", &params).await?;
         serde_json::from_value(val).map_err(|e| ClientError {
             message: e.to_string(),
         })
@@ -466,6 +454,38 @@ impl Client {
         })
     }
 
+    /// Fetches a single best-match cover image for the given media row.
+    /// Identified by `(system, path)` — `path` is the canonical indexed
+    /// media path returned by `media.search` or `media.browse`. Returns
+    /// the `media.image` payload: content type, file extension (when
+    /// derivable), base64 image bytes, and the resolved property type
+    /// tag.
+    pub async fn media_image(
+        &self,
+        params: MediaImageParams,
+    ) -> Result<MediaImageResult, ClientError> {
+        let val = self.call("media.image", &params).await?;
+        serde_json::from_value(val).map_err(|e| ClientError {
+            message: e.to_string(),
+        })
+    }
+
+    /// Fetches the full metadata graph for a single media row —
+    /// ROM-level + title-level tags and scraped properties. Identified
+    /// by `(system, path)`; the canonical indexed media path from
+    /// `media.search`/`media.browse` is required. Property values
+    /// surface their MIME type and extension when binary-backed, so
+    /// callers can render or cache them without sniffing.
+    pub async fn media_meta(
+        &self,
+        params: MediaMetaParams,
+    ) -> Result<MediaMetaResult, ClientError> {
+        let val = self.call("media.meta", &params).await?;
+        serde_json::from_value(val).map_err(|e| ClientError {
+            message: e.to_string(),
+        })
+    }
+
     pub async fn media_history(
         &self,
         params: MediaHistoryParams,
@@ -474,7 +494,6 @@ impl Client {
             limit = ?params.limit,
             systems = ?params.systems,
             cursor_set = params.cursor.is_some(),
-            fuzzy_system = ?params.fuzzy_system,
             "media.history request",
         );
         let val = self.call("media.history", &params).await?;
@@ -483,6 +502,45 @@ impl Client {
             .and_then(Value::as_array)
             .map_or(0, Vec::len);
         debug!(entries_len, "media.history response");
+        serde_json::from_value(val).map_err(|e| ClientError {
+            message: e.to_string(),
+        })
+    }
+
+    /// Most-played aggregates over the session log. Optionally scoped to
+    /// `systems` and/or windowed by `since` (RFC3339).
+    pub async fn media_history_top(
+        &self,
+        params: MediaHistoryTopParams,
+    ) -> Result<MediaHistoryTopResult, ClientError> {
+        let val = self.call("media.history.top", &params).await?;
+        serde_json::from_value(val).map_err(|e| ClientError {
+            message: e.to_string(),
+        })
+    }
+
+    /// Resolves a `(system, name)` pair to a single best-match media row.
+    /// Core returns `{match: null}` (success, no match) for `ErrNoMatch`
+    /// / `ErrLowConfidence` rather than a JSON-RPC error, so callers
+    /// pattern-match on `result.match_` rather than `Err(...)`.
+    pub async fn media_lookup(
+        &self,
+        params: MediaLookupParams,
+    ) -> Result<MediaLookupResult, ClientError> {
+        let val = self.call("media.lookup", &params).await?;
+        serde_json::from_value(val).map_err(|e| ClientError {
+            message: e.to_string(),
+        })
+    }
+
+    /// Lists the available tag index, optionally scoped to a system
+    /// filter. Useful for any future filter UI; the launcher does not
+    /// currently call this, but the wrapper is here so it's available.
+    pub async fn media_tags(
+        &self,
+        params: MediaTagsParams,
+    ) -> Result<MediaTagsResult, ClientError> {
+        let val = self.call("media.tags", &params).await?;
         serde_json::from_value(val).map_err(|e| ClientError {
             message: e.to_string(),
         })

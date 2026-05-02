@@ -85,6 +85,21 @@ MainLayout {
         // Connection below fires it on first delivery.
         if (Browse.CategoriesModel.count > 0)
             root.hubScreen.restoreFromCategoriesReset()
+        // Warm-start into Recents needs the same restore-on-ready
+        // dance _navigateToRecents performs, otherwise the grid lands
+        // on index 0 and ignores the persisted RecentsState.selected_path.
+        // RecentsModel binds eagerly via bind_to_endpoint! so the
+        // synchronous branch is the common path; the async waiter
+        // covers a slow Core link on cold launch.
+        if (savedScreen === root.screenRecents) {
+            if (Browse.RecentsModel.loading) {
+                root._recentsReadyCallback = function() {
+                    root.recentsScreen.restoreSelection()
+                }
+            } else {
+                root.recentsScreen.restoreSelection()
+            }
+        }
     }
 
     // Seed row/grid indices from persisted state when models deliver new

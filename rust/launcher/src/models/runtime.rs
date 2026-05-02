@@ -35,7 +35,10 @@ pub mod ffi {
         // READ + CONSTANT — the value is decided once during
         // Initialize::initialize and never changes; no setter is
         // exposed to QML, no NOTIFY signal is generated.
-        #[qproperty(bool, is_mister, READ, CONSTANT)]
+        // FINAL silences qmllint's "member can be shadowed" warning
+        // and is correct: Runtime is a singleton with no inheritance
+        // story, so the property cannot meaningfully be overridden.
+        #[qproperty(bool, is_mister, READ, CONSTANT, FINAL)]
         type Runtime = super::RuntimeRust;
     }
 

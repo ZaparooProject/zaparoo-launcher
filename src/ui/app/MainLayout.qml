@@ -232,12 +232,14 @@ ApplicationWindow {
             id: recentsScreen
             anchors.fill: parent
             visible: root.activeScreen === root.screenRecents
+            transitioning: root.pendingTransition !== ""
         }
 
         SettingsScreen {
             id: settingsScreen
             anchors.fill: parent
             visible: root.activeScreen === root.screenSettings
+            transitioning: root.pendingTransition !== ""
         }
     }
 

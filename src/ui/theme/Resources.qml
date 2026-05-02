@@ -19,20 +19,30 @@ QtObject {
     // early/default evaluation on the existing Nintendo assets.
     property string buttonLayout: "nintendo"
 
-    // Build a cover image URL from a `coverKey` (relative path under
-    // `resources/images/` without extension, e.g. `systems/SNES`,
-    // `categories/Console`, `folder`). Empty key returns an empty URL
-    // so the caller can use it as a "no cover" sentinel.
+    // Build a cover image URL from a `coverKey`.
     //
-    // Extension is chosen by directory: system tile logos are the
-    // 144-asset curated PNG set under resources/images/systems/ and
-    // stay PNG; everything else (categories, top-level placeholders
-    // like `folder`) ships as SVG. QtSvg rasterizes the source on
-    // first load and the result lands in QPixmapCache, so paint cost
-    // matches PNG after the one-shot decode.
+    // Extension/scheme is chosen by directory:
+    //   * `systems/<id>` — the 144-asset curated PNG set under
+    //     resources/images/systems/, ships as PNG.
+    //   * `media-image/<encoded>` — media images (boxart, screenshot,
+    //     wheel, titleshot, map, marquee, fanart, generic image)
+    //     cached in process memory by `media_image_cache.rs`, served
+    //     via the `media-image` QQuickImageProvider registered on the
+    //     QML engine. The URL bypasses qrc entirely; QtQuick calls
+    //     `requestImage` with the encoded key, the Rust side decodes
+    //     back to `(systemId, path)` and returns bytes.
+    //   * everything else (categories, icons/Folder, icons/File, …) —
+    //     SVG. QtSvg rasterizes the source on first load and the
+    //     result lands in QPixmapCache, so paint cost matches PNG
+    //     after the one-shot decode.
+    //
+    // Empty key returns an empty URL so the caller can use it as a
+    // "no cover" sentinel.
     function coverUrl(key: string): url {
         if (key === "")
             return ""
+        if (key.startsWith("media-image/"))
+            return "image://media-image/" + key.substring("media-image/".length)
         const ext = key.startsWith("systems/") ? "png" : "svg"
         return baseUrl + "images/" + key + "." + ext
     }

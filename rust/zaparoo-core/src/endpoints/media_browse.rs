@@ -62,6 +62,8 @@ impl Endpoint for MediaBrowseEndpoint {
                     systems: args.systems,
                     max_results: Some(args.max_results),
                     cursor: None,
+                    letter: None,
+                    sort: None,
                 })
                 .await
         })

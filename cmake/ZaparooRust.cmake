@@ -60,7 +60,12 @@ endif()
 # ── C++ executable ───────────────────────────────────────────────────────────
 # Using qt_add_executable (not add_executable) so that Qt's CMake sets up
 # the target with all the properties needed by qt_import_qml_plugins.
-qt_add_executable(launcher "${CMAKE_SOURCE_DIR}/src/app/main.cpp")
+qt_add_executable(launcher
+    "${CMAKE_SOURCE_DIR}/src/app/main.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/media_image_provider.h"
+    "${CMAKE_SOURCE_DIR}/src/app/media_image_provider.cpp"
+)
+target_include_directories(launcher PRIVATE "${CMAKE_SOURCE_DIR}/src/app")
 
 target_compile_definitions(launcher
     PRIVATE ZAPAROO_VERSION="${CMAKE_PROJECT_VERSION}"
