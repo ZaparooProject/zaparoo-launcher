@@ -53,7 +53,6 @@ impl Endpoint for MediaHistoryEndpoint {
                     limit: Some(args.limit),
                     cursor: None,
                     systems: args.systems,
-                    fuzzy_system: Some(true),
                 })
                 .await
         })

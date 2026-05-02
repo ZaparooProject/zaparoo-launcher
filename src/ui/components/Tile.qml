@@ -79,15 +79,16 @@ Item {
     // right/bottom neighbours. Gated on `_focusedSelection` so a tile
     // in an unfocused section doesn't compete for the eye with the
     // focused section's selection cue.
+    //
+    // No `Behavior on scale`: under software rendering, animating
+    // two tiles' scale across 120 ms forces a bilinear resample of
+    // each decoded cover PNG every frame, on both the outgoing and
+    // incoming tile. The focus outline ring is the primary focus
+    // cue; the scale bump is supplementary and looks fine snapping
+    // instantly. See `docs/qml-gotchas.md` → "Software-renderer
+    // animation costs".
     transformOrigin: Item.Center
     scale: root._focusedSelection ? 1.06 : 1.0
-
-    Behavior on scale {
-        NumberAnimation {
-            duration: 120
-            easing.type: Easing.OutQuad
-        }
-    }
 
     // Tile body. Solid card so the white icon has a high-contrast
     // surface. Always visible — no opacity gating — which is the

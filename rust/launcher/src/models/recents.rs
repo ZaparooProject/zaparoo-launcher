@@ -287,7 +287,6 @@ impl ffi::RecentsModel {
                     limit: Some(PAGE_SIZE),
                     cursor,
                     systems: Vec::new(),
-                    fuzzy_system: Some(true),
                 })
                 .await;
             let _ = qt_thread.queue(move |model| {
