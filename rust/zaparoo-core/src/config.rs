@@ -26,7 +26,7 @@ pub struct Config {
     /// and inverting.
     pub key_to_action: HashMap<i32, String>,
     /// Durable mirror of launcher-owned settings. These stay in
-    /// `launcher.toml` so they survive MiSTer's `/tmp` lifecycle.
+    /// `launcher.toml` so they survive `MiSTer`'s `/tmp` lifecycle.
     pub settings: SettingsConfig,
 }
 

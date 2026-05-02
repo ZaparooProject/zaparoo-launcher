@@ -133,8 +133,7 @@ impl Initialize for ffi::Settings {
         };
         self.as_mut().rust_mut().current_resolution = QString::from(merged.resolution.as_str());
         self.as_mut().rust_mut().available_languages = languages();
-        self.as_mut().rust_mut().current_language =
-            QString::from(merged.language.as_str());
+        self.as_mut().rust_mut().current_language = QString::from(merged.language.as_str());
         self.as_mut().rust_mut().available_button_layouts = button_layouts();
         self.as_mut().rust_mut().current_button_layout =
             QString::from(merged.button_layout.as_str());
@@ -164,6 +163,10 @@ impl ffi::Settings {
         self.as_mut().current_resolution_changed();
     }
 
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "cxx-qt qinvokable signature requires QString by value"
+    )]
     fn set_language(mut self: Pin<&mut Self>, value: QString) {
         let value_str = normalize_language(&value.to_string()).to_string();
         if self.current_language.to_string() == value_str {
@@ -175,6 +178,10 @@ impl ffi::Settings {
         self.as_mut().current_language_changed();
     }
 
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "cxx-qt qinvokable signature requires QString by value"
+    )]
     fn set_button_layout(mut self: Pin<&mut Self>, value: QString) {
         let value_str = normalize_button_layout(&value.to_string()).to_string();
         if self.current_button_layout.to_string() == value_str {
@@ -224,7 +231,10 @@ fn mirror_settings_to_config(config_path: &std::path::Path, settings: &SettingsS
         settings.button_layout.as_str(),
         settings.mouse_enabled,
     ) {
-        warn!("could not save settings mirror to {}: {e}", config_path.display());
+        warn!(
+            "could not save settings mirror to {}: {e}",
+            config_path.display()
+        );
     }
 }
 
@@ -240,7 +250,10 @@ fn merge_settings(snapshot: &SettingsState, config: &Config) -> SettingsState {
                 .unwrap_or(snapshot.button_layout.as_str()),
         )
         .to_string(),
-        mouse_enabled: config.settings.mouse_enabled.unwrap_or(snapshot.mouse_enabled),
+        mouse_enabled: config
+            .settings
+            .mouse_enabled
+            .unwrap_or(snapshot.mouse_enabled),
     }
 }
 
@@ -352,7 +365,10 @@ mod tests {
     #[test]
     fn button_layout_normalization_defaults_to_nintendo() {
         assert_eq!(normalize_button_layout(""), DEFAULT_BUTTON_LAYOUT);
-        assert_eq!(normalize_button_layout("playstation"), DEFAULT_BUTTON_LAYOUT);
+        assert_eq!(
+            normalize_button_layout("playstation"),
+            DEFAULT_BUTTON_LAYOUT
+        );
         assert_eq!(normalize_button_layout("xbox"), "xbox");
     }
 }
