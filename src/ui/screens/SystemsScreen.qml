@@ -151,7 +151,7 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
-        anchors.topMargin: Sizing.pctH(9)
+        anchors.topMargin: Sizing.pctH(11)
         height: Sizing.pctH(7)
         title: Browse.SystemsModel.current_category
         currentPage: systemsGrid.currentPage
@@ -173,7 +173,6 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: topStrip.bottom
-        anchors.topMargin: Sizing.pctH(2)
         anchors.bottom: parent.bottom
         anchors.bottomMargin: Sizing.pctH(15)
         model: Browse.SystemsModel
@@ -199,7 +198,6 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: systemsGrid.bottom
-        anchors.topMargin: Sizing.pctH(1)
         height: Sizing.pctH(7)
         text: systemsGrid.itemCount > 0
               ? Browse.SystemsModel.system_name_at(systemsGrid.currentIndex)

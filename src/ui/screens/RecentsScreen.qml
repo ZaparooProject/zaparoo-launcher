@@ -128,7 +128,7 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
-        anchors.topMargin: Sizing.pctH(9)
+        anchors.topMargin: Sizing.pctH(11)
         height: Sizing.pctH(7)
         title: qsTr("Recently Played")
         currentPage: recentsGrid.currentPage
@@ -145,7 +145,6 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: topStrip.bottom
-        anchors.topMargin: Sizing.pctH(2)
         anchors.bottom: parent.bottom
         anchors.bottomMargin: Sizing.pctH(15)
         model: Browse.RecentsModel
@@ -168,22 +167,10 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: recentsGrid.bottom
-        anchors.topMargin: Sizing.pctH(1)
         height: Sizing.pctH(7)
         text: recentsGrid.itemCount > 0
               ? Browse.RecentsModel.name_at(recentsGrid.currentIndex)
               : ""
-    }
-
-    // "Loading more…" cue, parked on the left edge of the active-label
-    // band — same placement as GamesScreen so users see the same pattern.
-    LoadingIndicator {
-        anchors.left: parent.left
-        anchors.leftMargin: Sizing.pctW(5)
-        anchors.verticalCenter: activeLabel.verticalCenter
-        visible: Browse.RecentsModel.loading_more
-        z: 1
-        text: qsTr("Loading more entries…")
     }
 
     ScreenStateOverlay {

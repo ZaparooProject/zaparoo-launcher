@@ -26,6 +26,8 @@ fill="none"):
   resources/images/icons/NavLeft.svg
   resources/images/icons/NavRight.svg
   resources/images/icons/NavUp.svg
+  resources/images/icons/ScrollDown.svg
+  resources/images/icons/ScrollUp.svg
   resources/images/icons/Settings.svg
   resources/images/status/Bluetooth.svg
   resources/images/status/WiFi.svg

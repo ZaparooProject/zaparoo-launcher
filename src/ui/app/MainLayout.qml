@@ -293,8 +293,14 @@ ApplicationWindow {
         // sit on a single line. Without this Row height tracks the
         // tallest child, which is the Text element (font ascender +
         // descender) — that pushes icons up and out of alignment.
+        // Clock pixelSize runs larger than the icon box because a font's
+        // cap-height is ~0.7× pixelSize, so matching pixelSize to icon
+        // height makes glyphs look small next to the square SVGs; bumping
+        // the clock font to ~1.4× the icon size lands their visual weight
+        // on par. Row height takes the max so neither child clips.
         readonly property real _iconSize: Sizing.fontSize(2.4)
-        height: topHud._iconSize
+        readonly property real _clockFontSize: Sizing.fontSize(3.4)
+        height: Math.max(topHud._iconSize, topHud._clockFontSize)
 
         StatusIcon {
             anchors.verticalCenter: parent.verticalCenter
@@ -335,12 +341,12 @@ ApplicationWindow {
 
             anchors.verticalCenter: parent.verticalCenter
             height: parent.height
-            width: topHud._iconSize * 3
+            width: topHud._clockFontSize * 3
             verticalAlignment: Text.AlignVCenter
             horizontalAlignment: Text.AlignRight
             text: clockLabel.currentTime
             font.family: Theme.fontUi
-            font.pixelSize: topHud._iconSize
+            font.pixelSize: topHud._clockFontSize
             color: Theme.textPrimary
             renderType: Text.NativeRendering
 

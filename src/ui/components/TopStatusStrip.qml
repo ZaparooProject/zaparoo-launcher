@@ -13,9 +13,9 @@ import Zaparoo.Theme
 // titles) can't collide on a 240p MiSTer screen.
 //
 // Slots:
-//   left   — "Page N / M" counter (visible when `totalPages > 1`)
+//   left   — total-count badge (visible when `totalText !== ""`)
 //   center — screen title (category / system name)
-//   right  — total-count badge (visible when `totalText !== ""`)
+//   right  — "Page N / M" counter (visible when `totalPages > 1`)
 //
 // Software-rendering safe: only Item + Text, no transforms, no shaders.
 Item {
@@ -35,17 +35,15 @@ Item {
     // chips. Counter/total drop one step in font size so the title
     // stays the visual anchor.
     Text {
-        id: pageCounter
-        visible: status.totalPages > 1
+        id: totalBadge
+        visible: status.totalText !== ""
         anchors.left: parent.left
         anchors.leftMargin: status._slotMargin
         anchors.bottom: titleText.bottom
         width: status._slotWidth - status._slotMargin
         elide: Text.ElideRight
         horizontalAlignment: Text.AlignLeft
-        text: qsTr("Page %1 / %2")
-                .arg(status.currentPage + 1)
-                .arg(status.totalPages)
+        text: status.totalText
         font.family: Theme.fontUi
         font.pixelSize: Sizing.fontSize(3)
         color: Theme.textPrimary
@@ -68,15 +66,17 @@ Item {
     }
 
     Text {
-        id: totalBadge
-        visible: status.totalText !== ""
+        id: pageCounter
+        visible: status.totalPages > 1
         anchors.right: parent.right
         anchors.rightMargin: status._slotMargin
         anchors.bottom: titleText.bottom
         width: status._slotWidth - status._slotMargin
         elide: Text.ElideRight
         horizontalAlignment: Text.AlignRight
-        text: status.totalText
+        text: qsTr("Page %1 / %2")
+                .arg(status.currentPage + 1)
+                .arg(status.totalPages)
         font.family: Theme.fontUi
         font.pixelSize: Sizing.fontSize(3)
         color: Theme.textPrimary
