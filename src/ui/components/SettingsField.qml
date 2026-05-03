@@ -120,8 +120,12 @@ Item {
         anchors.right: parent.right
         anchors.rightMargin: Sizing.pctW(3)
         anchors.verticalCenter: parent.verticalCenter
-        width: Sizing.pctW(8)
+        // Standard pill-toggle proportion: width ≈ 1.85 × height keeps
+        // the handle's travel close to one diameter on either side
+        // without leaving the long rail of empty pill the previous
+        // pctW(8) (~3.7× height on a 16:9 panel) painted.
         height: Sizing.pctH(3.8)
+        width: height * 1.85
 
         Rectangle {
             anchors.fill: parent

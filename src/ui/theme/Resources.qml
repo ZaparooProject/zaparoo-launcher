@@ -14,10 +14,11 @@ import QtQuick
 QtObject {
     // Base URL for everything under `resources/` in the embedded qrc.
     readonly property string baseUrl: "qrc:/qt/qml/Zaparoo/App/resources/"
-    // Lowercase directory name under resources/images/buttons/. MainLayout
-    // binds this to Browse.Settings.current_button_layout; default keeps
-    // early/default evaluation on the existing Nintendo assets.
-    property string buttonLayout: "nintendo"
+    // Single-letter directory under resources/images/buttons/ — "a"/"b"/"c"
+    // back the user-facing "Style A/B/C" picker. MainLayout binds this to
+    // Browse.Settings.current_button_layout; the default keeps early
+    // evaluation on Style A (the legacy Nintendo-style glyph set).
+    property string buttonLayout: "a"
 
     // Build a cover image URL from a `coverKey`.
     //

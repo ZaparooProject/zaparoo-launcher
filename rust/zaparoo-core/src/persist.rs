@@ -106,7 +106,10 @@ impl Default for SettingsState {
 }
 
 fn default_button_layout() -> String {
-    "nintendo".into()
+    // Style A — formerly "nintendo". `models::settings::normalize_button_layout`
+    // migrates legacy persisted values, so this default only applies to
+    // brand-new state files.
+    "a".into()
 }
 
 fn default_mouse_enabled() -> bool {
@@ -235,7 +238,7 @@ mod tests {
             settings: SettingsState {
                 resolution: "1920x1080".into(),
                 language: "it_IT".into(),
-                button_layout: "xbox".into(),
+                button_layout: "b".into(),
                 mouse_enabled: false,
             },
         };
@@ -326,7 +329,7 @@ mod tests {
         let state = load_from(&path);
         assert_eq!(state.settings.resolution, "1920x1080");
         assert_eq!(state.settings.language, "");
-        assert_eq!(state.settings.button_layout, "nintendo");
+        assert_eq!(state.settings.button_layout, "a");
         assert!(state.settings.mouse_enabled);
     }
 

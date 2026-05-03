@@ -127,11 +127,17 @@ Item {
         // Restore which row the user was on, then point currentIndex
         // at the right slot for that row. Saved row outside [0, 1] is
         // treated as 0 — same belt-and-braces stance as the category
-        // fallback above.
+        // fallback above. When the catalog reports 0 categories the
+        // top row has no tiles to focus, so we drop focus onto
+        // Settings — the only meaningful action ("Run Update media
+        // database from Settings") the empty-hub message points at.
         const savedRow = Browse.HubState.selected_row
         if (savedRow === 1) {
             hub.currentRow = 1
             hub.currentIndex = hub._actionIndexForId(Browse.HubState.selected_action)
+        } else if (Browse.CategoriesModel.count === 0) {
+            hub.currentRow = 1
+            hub.currentIndex = hub._actionIndexForId("settings")
         } else {
             hub.currentRow = 0
             hub.currentIndex = chosenCategoryIndex
@@ -287,10 +293,15 @@ Item {
         readonly property int sideInset: Sizing.pctW(5)
         readonly property int maxCellWidth: Sizing.pctH(22)
         readonly property int n: Browse.CategoriesModel.count
+        // n=0 falls back to maxCellWidth so the actions row (which
+        // mirrors `categoriesRow.cellWidth`) still renders at proper
+        // size when the catalog reports 0 systems. Without the
+        // fallback the Settings tile collapses to width=0 and the
+        // user has nothing to navigate to.
         readonly property int rawCellWidth:
             n > 0
                 ? Math.floor((width - 2 * sideInset - (n - 1) * spacing) / n)
-                : 0
+                : maxCellWidth
         readonly property int cellWidth: Math.min(maxCellWidth, rawCellWidth)
         // Square cells (1:1) for the main menu. The focused tile's
         // 1.06× scale bleed is absorbed by `verticalPadding` on the
@@ -484,6 +495,6 @@ Item {
         loading: false
         errorMessage: Browse.CategoriesModel.error_message ?? ""
         count: Browse.CategoriesModel.count
-        emptyText: qsTr("No categories")
+        emptyText: qsTr("No systems available. Run Update media database from Settings.")
     }
 }

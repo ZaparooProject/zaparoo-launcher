@@ -84,13 +84,18 @@ Item {
                 }
             }
         }
+    }
 
-        // If Core acquires a populated mediadb out of band — restart,
-        // manual TUI-driven index in another session, etc. — the
-        // first-run gate has nothing left to defend, so we close.
-        function onExistsChanged(): void {
+    // If the catalog acquires systems out of band — restart, manual
+    // TUI-driven index in another session, a reconnect to a different
+    // Core — the first-run gate has nothing left to defend, so we
+    // close. Catalog count is the authoritative "are there games?"
+    // signal (mirrors the modal's open gate in Main.qml).
+    Connections {
+        target: Browse.CategoriesModel
+        function onCountChanged(): void {
             if (modal.open
-                && Browse.MediaStatus.exists
+                && Browse.CategoriesModel.count > 0
                 && modal.phase !== "completed") {
                 modal.closeRequested()
             }

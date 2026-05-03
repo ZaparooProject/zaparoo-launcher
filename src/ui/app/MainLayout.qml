@@ -72,14 +72,17 @@ ApplicationWindow {
     property bool firstRunIndexModalVisible: false
     property bool contextMenuVisible: false
     property rect contextMenuAnchor: Qt.rect(0, 0, 0, 0)
-    readonly property var contextMenuEntries: [
-        qsTr("Set as favorite"),
-        qsTr("Write to NFC token"),
-        qsTr("QR code to NFC"),
-        qsTr("Launch")
-    ]
+    // Owner-aware. Written by Main.qml at openContextMenu time; each entry
+    // is `{ id: string, label: string }`. The router switches on `id`, not
+    // position, so adding/removing entries can't silently re-map actions.
+    // TODO: `Browse.SystemStatus.has_nfc` (used by Main.qml when building
+    // the games-tile entries) is only updated when Core runs locally
+    // (rust/launcher/src/models/system_status.rs:88). Remote-Core readers
+    // aren't tracked yet — wire a Core-driven reader-status feed before
+    // showing "Write to NFC token" in remote-Core configs.
+    property var contextMenuEntries: []
 
-    signal contextMenuAccepted(int index)
+    signal contextMenuAccepted(string id)
     signal contextMenuCloseRequested()
 
     // Forward-transition state owned by Main.qml. "" while idle;
@@ -480,13 +483,17 @@ ApplicationWindow {
             if (root.pendingTransition !== "")
                 return [];
             if (root.activeScreen === root.screenHub) {
-                if (root.hubScreenState === "ready")
-                    return [
-                        { button: "Dpad",    label: qsTr("Move") },
-                        { button: "ButtonA", label: qsTr("Open") },
-                        { button: "ButtonB", label: qsTr("Quit") }
-                    ];
-                return [{ button: "ButtonB", label: qsTr("Quit") }];
+                // Hub always has the actions row (Recently Played /
+                // Settings), so Move/Open/Quit applies even when the
+                // categories row is empty (0 systems indexed) — the
+                // help bar must reflect that the actions row is
+                // navigable, otherwise the user reads "Quit only"
+                // and misses the Settings tile entirely.
+                return [
+                    { button: "Dpad",    label: qsTr("Move") },
+                    { button: "ButtonA", label: qsTr("Open") },
+                    { button: "ButtonB", label: qsTr("Quit") }
+                ];
             }
             if (root.activeScreen === root.screenSystems) {
                 if (root.systemsScreenState === "loading")
@@ -501,10 +508,9 @@ ApplicationWindow {
                         { button: "Dpad",    label: qsTr("Move") }
                     ];
                     if (pages > 1)
-                        row.push({ button: "ButtonL", label: qsTr("Prev page") },
-                                 { button: "ButtonR", label: qsTr("Next page") });
+                        row.push({ buttons: ["ButtonL", "ButtonR"], label: qsTr("Page") });
                     row.push({ button: "ButtonA", label: qsTr("Open") },
-                             { button: "ButtonX", label: qsTr("Menu") },
+                             { button: "ButtonX", label: qsTr("Options") },
                              { button: "ButtonB", label: qsTr("Back") });
                     return row;
                 }
@@ -522,8 +528,7 @@ ApplicationWindow {
                         { button: "Dpad", label: qsTr("Move") }
                     ];
                     if (pages > 1)
-                        row.push({ button: "ButtonL", label: qsTr("Prev page") },
-                                 { button: "ButtonR", label: qsTr("Next page") });
+                        row.push({ buttons: ["ButtonL", "ButtonR"], label: qsTr("Page") });
                     row.push({ button: "ButtonA", label: qsTr("Open") },
                              { button: "ButtonB", label: qsTr("Back") });
                     return row;
@@ -570,14 +575,21 @@ ApplicationWindow {
                 return [{ button: "ButtonB", label: qsTr("Back") }];
             if (root.gamesScreenState === "ready") {
                 const pages = root.gamesScreen.gamesGrid.pageCount;
+                // Options menu is only meaningful on media leaves —
+                // folder/root entries open via Accept and have no
+                // per-entry actions. Drop the X cue so the bar
+                // doesn't promise a press that no-ops.
+                const idx = root.gamesScreen.gamesGrid.currentIndex;
+                const entryType = Browse.GamesModel.entry_type_at(idx);
+                const isFolder = entryType === "directory" || entryType === "root";
                 let row = [
                     { button: "Dpad",    label: qsTr("Move") }
                 ];
                 if (pages > 1)
-                    row.push({ button: "ButtonL", label: qsTr("Prev page") },
-                             { button: "ButtonR", label: qsTr("Next page") });
-                row.push({ button: "ButtonA", label: qsTr("Open") },
-                         { button: "ButtonX", label: qsTr("Menu") });
+                    row.push({ buttons: ["ButtonL", "ButtonR"], label: qsTr("Page") });
+                row.push({ button: "ButtonA", label: qsTr("Open") });
+                if (!isFolder)
+                    row.push({ button: "ButtonX", label: qsTr("Options") });
                 row.push({ button: "ButtonB", label: qsTr("Back") });
                 return row;
             }

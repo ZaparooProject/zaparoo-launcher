@@ -657,18 +657,23 @@ fn release_cover_gate_after_timeout(mut model: Pin<&mut ffi::RecentsModel>) {
 
 /// Build the `text` payload sent to Core's `run` for a history entry.
 /// History entries don't carry a synthesised `zap_script` (Core surfaces
-/// only the raw fields), so reproduce the canonical
-/// `**launch.system:<launcher>,<path>` shape that browse entries use.
-/// Falls back to the bare `mediaPath` if `launcherId` is missing — Core
-/// can usually still resolve a path-only launch.
+/// only the raw fields), so compose `**launch:<path>` from the row's
+/// `mediaPath`, with `?launcher=<id>` appended when `launcherId` is known
+/// so Core picks the same launcher the entry originally ran under. An
+/// empty path yields an empty string, suppressing the run entirely —
+/// `**launch.system:<id>` would just boot the core without a game.
 fn launch_text_for(entry: &MediaHistoryEntry) -> String {
-    if entry.launcher_id.is_empty() {
-        return entry.media_path.clone();
-    }
     if entry.media_path.is_empty() {
         return String::new();
     }
-    format!("**launch.system:{},{}", entry.launcher_id, entry.media_path)
+    if entry.launcher_id.is_empty() {
+        format!("**launch:{}", entry.media_path)
+    } else {
+        format!(
+            "**launch:{}?launcher={}",
+            entry.media_path, entry.launcher_id
+        )
+    }
 }
 
 fn position_of_path(entries: &[MediaHistoryEntry], needle: &str) -> i32 {
@@ -785,22 +790,22 @@ mod tests {
     }
 
     #[test]
-    fn launch_text_prefers_launch_system_when_launcher_known() {
+    fn launch_text_uses_launch_with_launcher_override_when_known() {
         let e = entry("smb", "/p/smb.nes", "NES", "NES");
-        assert_eq!(launch_text_for(&e), "**launch.system:NES,/p/smb.nes");
+        assert_eq!(launch_text_for(&e), "**launch:/p/smb.nes?launcher=NES");
     }
 
     #[test]
-    fn launch_text_falls_back_to_path_when_launcher_missing() {
+    fn launch_text_falls_back_to_bare_launch_when_launcher_missing() {
         let e = entry("smb", "/p/smb.nes", "NES", "");
-        assert_eq!(launch_text_for(&e), "/p/smb.nes");
+        assert_eq!(launch_text_for(&e), "**launch:/p/smb.nes");
     }
 
     #[test]
     fn launch_text_is_empty_when_path_missing_and_launcher_present() {
         // A history row with a launcher id but no path is malformed —
-        // running an empty path or a `**launch.system:NES,` would just
-        // confuse Core. Empty here suppresses the run entirely.
+        // `**launch:?launcher=NES` would just confuse Core. Empty here
+        // suppresses the run entirely.
         let e = entry("ghost", "", "NES", "NES");
         assert_eq!(launch_text_for(&e), "");
     }

@@ -22,6 +22,14 @@ const HIDDEN_CATEGORIES: &[&str] = &["Other", "Media"];
 pub struct CategoriesModelRust {
     categories: Vec<String>,
     count: i32,
+    // Sticky-true flag: flips to true the first time the catalog
+    // resolves Ready, never resets. The first-run modal in
+    // `Main.qml` gates on `loaded && count === 0` so it only fires
+    // after we've seen an authoritative empty catalog — without
+    // this we'd misread the initial Default state (count=0,
+    // pre-fetch) as "no systems" and fire the modal on every cold
+    // launch before Core has answered.
+    loaded: bool,
     error_message: QString,
 }
 
@@ -46,6 +54,7 @@ pub mod ffi {
         #[qml_element]
         #[qml_singleton]
         #[qproperty(i32, count)]
+        #[qproperty(bool, loaded)]
         #[qproperty(QString, error_message)]
         type CategoriesModel = super::CategoriesModelRust;
 
@@ -140,6 +149,9 @@ fn apply_state(
         model.as_mut().rust_mut().count = count;
         model.as_mut().end_reset_model();
         model.as_mut().count_changed();
+        if !model.loaded {
+            model.as_mut().set_loaded(true);
+        }
     }
     let qerr = QString::from(err.as_str());
     if model.error_message != qerr {

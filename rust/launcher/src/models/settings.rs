@@ -23,10 +23,17 @@
 //   * `current_language` — READ + NOTIFY. Mirrors `[general].language`
 //     from launcher.toml and is also recorded in persisted state so the
 //     settings snapshot stays coherent.
-//   * `available_button_layouts` — CONSTANT. Lowercase directory names
-//     used to compose resources/images/buttons/<layout>/Button*.png.
+//   * `available_button_layouts` — CONSTANT. Single-letter ids used to
+//     compose resources/images/buttons/<layout>/Button*.png. Style A is
+//     the legacy Nintendo-style glyph set, B is the Xbox-style set, C
+//     is the Sony-style set; the user-facing labels are "Style A/B/C"
+//     (see `SettingsScreen.qml::_buttonLayoutDisplay`) so the picker
+//     reads as a neutral aesthetic choice rather than a vendor pick.
 //   * `current_button_layout` — READ + NOTIFY, persisted. Defaults to
-//     "nintendo" so existing state files keep the current asset path.
+//     "a" — the new id for the previous "nintendo" asset directory.
+//     `normalize_button_layout` migrates legacy persisted values
+//     (`nintendo`/`xbox`/`sony`) to the new ids so users keep their
+//     selection across the rename.
 //   * `current_mouse_enabled` — READ + NOTIFY, persisted. Defaults to true
 //     so existing installs keep the visible cursor and mouse hit targets.
 //
@@ -62,8 +69,8 @@ use zaparoo_core::runtime;
 const MISTER_RESOLUTIONS: &[&str] = &["", "1280x720", "1920x1080", "640x480", "1920x1440"];
 const LANGUAGES: &[&str] = &["auto", "en", "it_IT"];
 const DEFAULT_LANGUAGE: &str = "auto";
-const BUTTON_LAYOUTS: &[&str] = &["nintendo", "xbox", "sony"];
-const DEFAULT_BUTTON_LAYOUT: &str = "nintendo";
+const BUTTON_LAYOUTS: &[&str] = &["a", "b", "c"];
+const DEFAULT_BUTTON_LAYOUT: &str = "a";
 
 #[derive(Default)]
 pub struct SettingsRust {
@@ -295,10 +302,19 @@ fn normalize_language(value: &str) -> &str {
 
 fn normalize_button_layout(value: &str) -> &'static str {
     let trimmed = value.trim();
+    // Legacy alias map: state files written by builds before the
+    // a/b/c rename hold "nintendo"/"xbox"/"sony"; preserve the user's
+    // pick instead of silently snapping back to the default.
+    let migrated = match trimmed {
+        "nintendo" => "a",
+        "xbox" => "b",
+        "sony" => "c",
+        other => other,
+    };
     BUTTON_LAYOUTS
         .iter()
         .copied()
-        .find(|layout| *layout == trimmed)
+        .find(|layout| *layout == migrated)
         .unwrap_or(DEFAULT_BUTTON_LAYOUT)
 }
 
@@ -363,12 +379,19 @@ mod tests {
     }
 
     #[test]
-    fn button_layout_normalization_defaults_to_nintendo() {
+    fn button_layout_normalization_defaults_to_a() {
         assert_eq!(normalize_button_layout(""), DEFAULT_BUTTON_LAYOUT);
         assert_eq!(
             normalize_button_layout("playstation"),
             DEFAULT_BUTTON_LAYOUT
         );
-        assert_eq!(normalize_button_layout("xbox"), "xbox");
+        assert_eq!(normalize_button_layout("b"), "b");
+    }
+
+    #[test]
+    fn button_layout_migrates_legacy_vendor_ids() {
+        assert_eq!(normalize_button_layout("nintendo"), "a");
+        assert_eq!(normalize_button_layout("xbox"), "b");
+        assert_eq!(normalize_button_layout("sony"), "c");
     }
 }

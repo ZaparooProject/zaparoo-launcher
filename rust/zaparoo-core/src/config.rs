@@ -367,7 +367,7 @@ mod tests {
             debug = true
 
             [settings]
-            button_layout = "sony"
+            button_layout = "c"
             mouse_enabled = false
         "#;
         let f = write_tmp(toml);
@@ -377,7 +377,7 @@ mod tests {
         assert_eq!(cfg.video_width, 640);
         assert_eq!(cfg.video_height, 480);
         assert!(cfg.debug_logging);
-        assert_eq!(cfg.settings.button_layout.as_deref(), Some("sony"));
+        assert_eq!(cfg.settings.button_layout.as_deref(), Some("c"));
         assert_eq!(cfg.settings.mouse_enabled, Some(false));
     }
 
@@ -392,10 +392,10 @@ mod tests {
     fn save_settings_mirror_creates_sections() {
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("launcher.toml");
-        save_settings_mirror(&path, "it_IT", "xbox", false).expect("save");
+        save_settings_mirror(&path, "it_IT", "b", false).expect("save");
         let cfg = load_config(&path);
         assert_eq!(cfg.language, "it_IT");
-        assert_eq!(cfg.settings.button_layout.as_deref(), Some("xbox"));
+        assert_eq!(cfg.settings.button_layout.as_deref(), Some("b"));
         assert_eq!(cfg.settings.mouse_enabled, Some(false));
     }
 
@@ -404,27 +404,27 @@ mod tests {
         let f = write_tmp(
             "[core]\nendpoint = \"ws://example.com/api\"\n[video]\nwidth = 1280\nheight = 720\n",
         );
-        save_settings_mirror(f.path(), "en", "nintendo", true).expect("save");
+        save_settings_mirror(f.path(), "en", "a", true).expect("save");
         let cfg = load_config(f.path());
         assert_eq!(cfg.language, "en");
         assert_eq!(cfg.core_endpoint, "ws://example.com/api");
         assert_eq!(cfg.video_width, 1280);
         assert_eq!(cfg.video_height, 720);
-        assert_eq!(cfg.settings.button_layout.as_deref(), Some("nintendo"));
+        assert_eq!(cfg.settings.button_layout.as_deref(), Some("a"));
         assert_eq!(cfg.settings.mouse_enabled, Some(true));
     }
 
     #[test]
     fn save_settings_mirror_normalizes_auto() {
         let f = write_tmp("");
-        save_settings_mirror(f.path(), "", "sony", false).expect("save");
+        save_settings_mirror(f.path(), "", "c", false).expect("save");
         let written = std::fs::read_to_string(f.path()).expect("read");
         assert!(written.contains("language = \"auto\""));
-        assert!(written.contains("button_layout = \"sony\""));
+        assert!(written.contains("button_layout = \"c\""));
         assert!(written.contains("mouse_enabled = false"));
         let cfg = load_config(f.path());
         assert_eq!(cfg.language, "");
-        assert_eq!(cfg.settings.button_layout.as_deref(), Some("sony"));
+        assert_eq!(cfg.settings.button_layout.as_deref(), Some("c"));
         assert_eq!(cfg.settings.mouse_enabled, Some(false));
     }
 

@@ -16,10 +16,11 @@ import Zaparoo.Browse as Browse
 // qmllint disable compiler
 
 // Settings screen — gamepad-driven vertical form. Resolution is MiSTer-only
-// because the underlying `vmode` command lives on MiSTer's Linux framebuffer.
-// Button layout is cross-platform and selects the resource directory for
-// help-bar button glyphs. Mouse support is cross-platform and controls
-// cursor visibility plus mouse hit targets.
+// because the underlying `vmode` command lives on MiSTer's Linux framebuffer
+// (currently hidden — the picker doesn't switch reliably yet). Button style
+// is cross-platform and selects the resource directory for help-bar button
+// glyphs (Style A/B/C → resources/images/buttons/{a,b,c}/). Mouse support
+// is cross-platform and controls cursor visibility plus mouse hit targets.
 //
 // Pure input dispatcher: emits `requestHubScreen()` on Escape; left/
 // right cycle the focused field's value via the model singleton.
@@ -45,19 +46,24 @@ Item {
     // while handleAction remains a simple input dispatcher.
     readonly property var fields: {
         const out = []
-        if (Browse.Settings.is_mister) {
-            out.push({
-                id: "resolution",
-                label: qsTr("Resolution")
-            })
-        }
+        // Resolution row hidden — `vmode` switching isn't reliable yet.
+        // Restore by re-enabling this block once the MiSTer-side path is
+        // trusted again; the picker plumbing in `_cycleResolution` and
+        // the Settings model's `current_resolution` property are still
+        // wired so the row works as soon as it's added back.
+        // if (Browse.Settings.is_mister) {
+        //     out.push({
+        //         id: "resolution",
+        //         label: qsTr("Resolution")
+        //     })
+        // }
         out.push({
             id: "language",
             label: qsTr("Language")
         })
         out.push({
             id: "buttonLayout",
-            label: qsTr("Button layout")
+            label: qsTr("Button style")
         })
         out.push({
             id: "mouseEnabled",
@@ -69,7 +75,7 @@ Item {
         })
         out.push({
             id: "runScraper",
-            label: qsTr("Run scraper")
+            label: qsTr("Scrape metadata")
         })
         return out
     }
@@ -234,11 +240,11 @@ Item {
     }
 
     function _buttonLayoutDisplay(value: string): string {
-        if (value === "xbox")
-            return qsTr("Xbox")
-        if (value === "sony")
-            return qsTr("Sony")
-        return qsTr("Nintendo")
+        if (value === "b")
+            return qsTr("Style B")
+        if (value === "c")
+            return qsTr("Style C")
+        return qsTr("Style A")
     }
 
     function _currentButtonLayoutIndex(): int {

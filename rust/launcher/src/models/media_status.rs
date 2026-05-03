@@ -207,14 +207,16 @@ impl ffi::MediaStatus {
     fn start_scrape(self: Pin<&mut Self>) {
         let resource = crate::models::global_store().media_status();
         crate::models::global_runtime().spawn(async move {
-            // Default scraper, all indexed systems, no force. Resolving
-            // a specific `scraper_id` is the QML caller's job once a
-            // chooser exists; the first cut just kicks the configured
-            // default. Core's `media.scrape` validates `scraperId` as
-            // `min=1`, so we send the conventional sentinel that Core
-            // resolves to its configured default.
+            // ES gamelist.xml across every indexed system, no re-scrape.
+            // Core ships this scraper in-tree (see `pkg/api/server.go`
+            // wiring `gamelistxml.NewGamelistXMLScraper`) and validates
+            // `scraperId` as `min=1` — there is no server-side "default"
+            // alias, so the id has to be a real scraper. An empty
+            // `systems` runs every system the scraper supports
+            // (gamelist.xml supports all). Picking a different scraper
+            // or a system subset is a future chooser-UI job.
             let params = MediaScrapeParams {
-                scraper_id: "default".into(),
+                scraper_id: "gamelist.xml".into(),
                 systems: Vec::new(),
                 force: false,
             };

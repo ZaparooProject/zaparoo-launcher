@@ -36,4 +36,13 @@ impl Tag {
             id: Some(id.into()),
         }
     }
+
+    /// Cross-endpoint tag declared by every endpoint whose data is
+    /// derived from Core's media database. The `Store` pulses this tag
+    /// whenever the indexing/optimizing run transitions from busy to
+    /// idle, so any endpoint that opts in is refetched after a fresh
+    /// build of the DB. Without this, the systems catalog (and anything
+    /// else fetched while the DB was empty) keeps returning the stale
+    /// pre-index result for the rest of the session.
+    pub const MEDIA_DB: Self = Self::any("MediaDb");
 }

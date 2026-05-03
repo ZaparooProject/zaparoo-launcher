@@ -93,12 +93,45 @@ impl std::fmt::Debug for Store {
 impl Store {
     pub fn new(client: Arc<Client>, runtime: Arc<Runtime>) -> Arc<Self> {
         let media_status = MediaStatusResource::new(&client, &runtime);
-        Arc::new(Self {
+        let store = Arc::new(Self {
             client,
             runtime,
             inner: Arc::new(Mutex::new(Inner::default())),
-            media_status,
-        })
+            media_status: media_status.clone(),
+        });
+        Self::spawn_media_db_invalidation_watcher(&store, &media_status);
+        store
+    }
+
+    /// Watches the live `MediaStatusResource` for the busy → idle edge
+    /// (indexing or optimizing finished) and pulses `Tag::MEDIA_DB`.
+    /// Cache entries whose `provides` set contains that tag — currently
+    /// the systems catalog — are refetched in place, so the UI picks
+    /// up systems that landed during the index run.
+    ///
+    /// Held weakly so the watcher exits when the store is dropped at
+    /// process teardown without forming a cycle that pins `Inner`.
+    fn spawn_media_db_invalidation_watcher(
+        store: &Arc<Self>,
+        media_status: &Arc<MediaStatusResource>,
+    ) {
+        let weak = Arc::downgrade(store);
+        let mut rx = media_status.subscribe();
+        store.runtime.spawn(async move {
+            let mut prev = rx.borrow_and_update().clone();
+            while rx.changed().await.is_ok() {
+                let curr = rx.borrow_and_update().clone();
+                let fire = is_media_db_completion_edge(&prev, &curr);
+                prev = curr;
+                if !fire {
+                    continue;
+                }
+                let Some(store) = weak.upgrade() else {
+                    return;
+                };
+                store.invalidate(&Tag::MEDIA_DB);
+            }
+        });
     }
 
     pub fn subscribe_notifications(&self) -> broadcast::Receiver<Notification> {
@@ -268,6 +301,18 @@ impl Store {
     }
 }
 
+/// True when `curr` represents the busy → idle edge of an indexing /
+/// optimizing run. "Busy" is `indexing || optimizing` because Core
+/// stays in the optimizing phase after the file scan ends and before
+/// the DB is queryable, and the catalog should refetch only once the
+/// whole pipeline has wound down. Pulled out of the watcher so the
+/// edge logic is unit-testable without driving a runtime.
+fn is_media_db_completion_edge(prev: &MediaStatusState, curr: &MediaStatusState) -> bool {
+    let prev_busy = prev.indexing || prev.optimizing;
+    let curr_busy = curr.indexing || curr.optimizing;
+    prev_busy && !curr_busy
+}
+
 /// RTK-Query tag matching. Two tags match iff their kinds agree and at
 /// least one side has a `None` id (the "any" wildcard) or both sides
 /// share the same specific id. Used for both directions:
@@ -417,6 +462,68 @@ mod tests {
         let mut rx_b = b.subscribe();
         assert!(matches!(*rx_a.borrow_and_update(), ResourceStatus::Idle));
         assert!(matches!(*rx_b.borrow_and_update(), ResourceStatus::Idle));
+    }
+
+    // Media-DB completion edge detection. The watcher in
+    // `spawn_media_db_invalidation_watcher` calls `Store::invalidate`
+    // exactly once per busy → idle transition; these tests pin down
+    // the truth table of the underlying helper.
+
+    fn busy() -> MediaStatusState {
+        MediaStatusState {
+            indexing: true,
+            ..MediaStatusState::default()
+        }
+    }
+
+    fn optimizing() -> MediaStatusState {
+        MediaStatusState {
+            optimizing: true,
+            ..MediaStatusState::default()
+        }
+    }
+
+    fn idle() -> MediaStatusState {
+        MediaStatusState::default()
+    }
+
+    #[test]
+    fn completion_edge_fires_when_indexing_finishes() {
+        assert!(is_media_db_completion_edge(&busy(), &idle()));
+    }
+
+    #[test]
+    fn completion_edge_fires_when_optimizing_finishes() {
+        // Core's pipeline can land in optimizing without first flipping
+        // indexing on for our subscriber (e.g. a partial-resume path);
+        // the helper still treats the transition out of optimizing as
+        // a completion.
+        assert!(is_media_db_completion_edge(&optimizing(), &idle()));
+    }
+
+    #[test]
+    fn completion_edge_skips_indexing_to_optimizing_handoff() {
+        // The DB isn't queryable yet — we wait for the optimizing phase
+        // to drain before refetching.
+        let mut prev = idle();
+        prev.indexing = true;
+        let mut curr = idle();
+        curr.optimizing = true;
+        assert!(!is_media_db_completion_edge(&prev, &curr));
+    }
+
+    #[test]
+    fn completion_edge_skips_idle_to_busy_transitions() {
+        assert!(!is_media_db_completion_edge(&idle(), &busy()));
+        assert!(!is_media_db_completion_edge(&idle(), &optimizing()));
+    }
+
+    #[test]
+    fn completion_edge_skips_idle_to_idle() {
+        // Notifications can repeat the same idle snapshot when only
+        // metadata fields change (totals, step display); no spurious
+        // invalidation should fire on those.
+        assert!(!is_media_db_completion_edge(&idle(), &idle()));
     }
 
     // RTK-Query tag matching parity. See `tags_match` in this module.

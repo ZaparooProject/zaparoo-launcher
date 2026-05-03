@@ -13,10 +13,14 @@ Item {
 
     property bool open: false
     property rect anchorRect: Qt.rect(0, 0, 0, 0)
+    // Each entry is `{ id: string, label: string }`. `id` is the dispatch
+    // key the router switches on (e.g. "launch_game", "qr_code"); `label`
+    // is the localized text. Position-keyed dispatch was a footgun —
+    // dynamic per-owner menus silently re-shuffled the index/action map.
     property var entries: []
     property int currentIndex: 0
 
-    signal accepted(int index)
+    signal accepted(string id)
     signal closeRequested()
 
     readonly property int margin: Sizing.pctH(2)
@@ -60,8 +64,10 @@ Item {
             menu.move(-1)
         else if (action === "down")
             menu.move(1)
-        else if (action === "accept")
-            menu.accepted(menu.currentIndex)
+        else if (action === "accept") {
+            if (menu.currentIndex >= 0 && menu.currentIndex < menu.entries.length)
+                menu.accepted(menu.entries[menu.currentIndex].id)
+        }
         else if (action === "cancel")
             menu.closeRequested()
     }
@@ -96,7 +102,7 @@ Item {
                     id: row
 
                     required property int index
-                    required property string modelData
+                    required property var modelData
 
                     width: parent.width
                     height: menu.rowHeight
@@ -110,7 +116,7 @@ Item {
                         anchors.verticalCenter: parent.verticalCenter
                         anchors.leftMargin: menu.horizontalPadding
                         anchors.rightMargin: menu.horizontalPadding
-                        text: row.modelData
+                        text: row.modelData.label
                         color: row.index === menu.currentIndex ? Theme.textPrimary : Theme.textLabel
                         font.family: Theme.fontUi
                         font.pixelSize: Sizing.fontSize(2.4)
@@ -123,7 +129,7 @@ Item {
                         hoverEnabled: true
                         acceptedButtons: Qt.LeftButton
                         onEntered: menu.currentIndex = row.index
-                        onClicked: menu.accepted(row.index)
+                        onClicked: menu.accepted(row.modelData.id)
                     }
                 }
             }

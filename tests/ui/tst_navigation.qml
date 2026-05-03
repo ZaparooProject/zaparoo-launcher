@@ -34,6 +34,11 @@ TestCase {
         // qmllint disable compiler
         main.hubScreen.resetFocus()
         // qmllint enable compiler
+        // Cancel any in-flight dpad-repeat timer left over from a prior
+        // test — handleKey(dpad) arms a 350 ms initial timer and tests
+        // run in microseconds, so the pending fire would land on the
+        // next test if we didn't reset it here.
+        main._stopRepeat()
     }
 
     function test_initial_state_is_hub(): void {
@@ -198,4 +203,193 @@ TestCase {
                 "Left at first bottom-row index wraps to last")
     }
     // qmllint enable compiler
+
+    // Hold-to-repeat (dpad). The repeat state machine is driven by
+    // `_armRepeat` (called from handleKey on a dpad press) and
+    // unwound by `_stopRepeat` and `handleKeyRelease`. These tests
+    // drive the helpers directly to keep the assertion surface
+    // narrow — handleKey's outer "fire handleAction then _armRepeat"
+    // shape is one trivial line and doesn't need a per-action test
+    // that drags real screen logic into the harness.
+
+    function test_is_repeatable_action_accepts_dpad_directions(): void {
+        // qmllint disable compiler
+        compare(main._isRepeatableAction("up"), true)
+        compare(main._isRepeatableAction("down"), true)
+        compare(main._isRepeatableAction("left"), true)
+        compare(main._isRepeatableAction("right"), true)
+        // qmllint enable compiler
+    }
+
+    function test_is_repeatable_action_rejects_other_actions(): void {
+        // qmllint disable compiler
+        compare(main._isRepeatableAction("accept"), false)
+        compare(main._isRepeatableAction("cancel"), false)
+        compare(main._isRepeatableAction("page_prev"), false)
+        compare(main._isRepeatableAction("page_next"), false)
+        compare(main._isRepeatableAction("write_card"), false)
+        compare(main._isRepeatableAction(""), false)
+        // qmllint enable compiler
+    }
+
+    function test_arm_repeat_records_held_and_starts_initial(): void {
+        main._armRepeat("down", Qt.Key_Down)
+        compare(main._heldAction, "down")
+        compare(main._heldKey, Qt.Key_Down)
+        compare(main._repeatPending, true,
+                "Initial-delay timer must be running after _armRepeat")
+        compare(main._repeatTicking, false,
+                "Steady tick must not start before the initial delay")
+    }
+
+    function test_arm_repeat_with_non_dpad_action_is_noop(): void {
+        main._armRepeat("accept", Qt.Key_Return)
+        compare(main._heldAction, "")
+        compare(main._heldKey, 0)
+        compare(main._repeatPending, false)
+        compare(main._repeatTicking, false)
+    }
+
+    function test_stop_repeat_clears_state(): void {
+        main._armRepeat("down", Qt.Key_Down)
+        main._stopRepeat()
+        compare(main._heldAction, "")
+        compare(main._heldKey, 0)
+        compare(main._repeatPending, false)
+        compare(main._repeatTicking, false)
+    }
+
+    function test_release_of_held_key_clears_state(): void {
+        main._armRepeat("down", Qt.Key_Down)
+        main.handleKeyRelease(Qt.Key_Down)
+        compare(main._heldAction, "")
+        compare(main._heldKey, 0)
+        compare(main._repeatPending, false)
+    }
+
+    // A release of a key that didn't start the repeat (a chord, a
+    // stray press mid-hold) must not cancel the active repeat. Only
+    // the originating key's release stops it.
+    function test_release_of_unrelated_key_keeps_state(): void {
+        main._armRepeat("down", Qt.Key_Down)
+        main.handleKeyRelease(Qt.Key_Right)
+        compare(main._heldAction, "down",
+                "Release of an unrelated key must leave the held repeat alone")
+        compare(main._heldKey, Qt.Key_Down)
+        compare(main._repeatPending, true)
+    }
+
+    // Re-arming with a different direction replaces the held key —
+    // a fresh dpad press is intent to change direction, not a chord.
+    function test_arm_repeat_replaces_held_action(): void {
+        main._armRepeat("down", Qt.Key_Down)
+        main._armRepeat("right", Qt.Key_Right)
+        compare(main._heldAction, "right")
+        compare(main._heldKey, Qt.Key_Right)
+        compare(main._repeatPending, true,
+                "Re-arm restarts the initial-delay timer")
+    }
+
+    // Context-menu builder. Drives the pure helper directly per the QML
+    // test isolation rule — no real menu opening, no handleAction.
+    // Compares only the entry id sequence; labels are qsTr() and asserted
+    // separately so the tests stay translation-friendly.
+    function _idsOf(entries) {
+        const out = []
+        for (let i = 0; i < entries.length; ++i)
+            out.push(entries[i].id)
+        return out
+    }
+
+    function test_context_menu_systems_owner_is_single_launch_core(): void {
+        // qmllint disable compiler
+        const entries = main.buildContextMenuEntries("systems", "", false)
+        compare(_idsOf(entries), ["launch_system"],
+                "Systems context menu is just Launch core regardless of has_nfc")
+        verify(entries[0].label.length > 0,
+               "Launch core label is set (not asserted in English for translation)")
+        // qmllint enable compiler
+    }
+
+    function test_context_menu_systems_has_nfc_does_not_add_entries(): void {
+        // qmllint disable compiler
+        const entries = main.buildContextMenuEntries("systems", "", true)
+        compare(_idsOf(entries), ["launch_system"],
+                "has_nfc must not affect the systems menu")
+        // qmllint enable compiler
+    }
+
+    function test_context_menu_games_directory_returns_empty(): void {
+        // qmllint disable compiler
+        compare(main.buildContextMenuEntries("games", "directory", true), [],
+                "Folder tiles have no context menu, even with reader attached")
+        // qmllint enable compiler
+    }
+
+    function test_context_menu_games_root_returns_empty(): void {
+        // qmllint disable compiler
+        compare(main.buildContextMenuEntries("games", "root", true), [])
+        // qmllint enable compiler
+    }
+
+    function test_context_menu_games_no_reader_omits_write_card(): void {
+        // qmllint disable compiler
+        const entries = main.buildContextMenuEntries("games", "media", false)
+        compare(_idsOf(entries), ["qr_code", "launch_game"],
+                "Write to NFC token must be hidden when no reader is reported")
+        // qmllint enable compiler
+    }
+
+    function test_context_menu_games_with_reader_includes_write_card(): void {
+        // qmllint disable compiler
+        const entries = main.buildContextMenuEntries("games", "media", true)
+        compare(_idsOf(entries), ["write_card", "qr_code", "launch_game"])
+        // qmllint enable compiler
+    }
+
+    function test_context_menu_unknown_owner_returns_empty(): void {
+        // qmllint disable compiler
+        compare(main.buildContextMenuEntries("nope", "", true), [],
+                "Unknown owners get no entries — safe default")
+        // qmllint enable compiler
+    }
+
+    // QR-code payload wrapper. The web app at zaparoo.app/write reads the
+    // zapscript out of the `v=` query param, so the helper must
+    // URL-encode reserved characters.
+    function test_qr_payload_empty_zapscript(): void {
+        // qmllint disable compiler
+        compare(main._buildQrPayload(""), "https://zaparoo.app/write?v=")
+        // qmllint enable compiler
+    }
+
+    function test_qr_payload_plain_ascii(): void {
+        // qmllint disable compiler
+        compare(main._buildQrPayload("foo"), "https://zaparoo.app/write?v=foo")
+        // qmllint enable compiler
+    }
+
+    function test_qr_payload_encodes_reserved_chars(): void {
+        // qmllint disable compiler
+        // encodeURIComponent leaves `* - _ . ! ~ ' ( )` unescaped — only
+        // characters that would terminate or restructure the URL get
+        // percent-encoded. Real zapscripts look like
+        // `**launch.system:foo`; only the `:` needs escaping (it would
+        // otherwise be read as a port separator in some parsers).
+        const payload = main._buildQrPayload("**launch.system:Atari2600")
+        compare(payload,
+                "https://zaparoo.app/write?v=**launch.system%3AAtari2600")
+        // qmllint enable compiler
+    }
+
+    function test_qr_payload_encodes_url_breakers(): void {
+        // qmllint disable compiler
+        // Belt-and-braces check that characters that *would* break the URL
+        // (space, `&`, `?`) are escaped as expected. None of these appear
+        // in current zapscripts but a future zapscript with arguments
+        // containing them must still survive a round-trip.
+        compare(main._buildQrPayload("a b&c?d"),
+                "https://zaparoo.app/write?v=a%20b%26c%3Fd")
+        // qmllint enable compiler
+    }
 }
