@@ -198,6 +198,16 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <location filename="../app/Main.qml" line="526"/>
+        <source>Remove from favorites</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app/Main.qml" line="526"/>
+        <source>Add to favorites</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <location filename="../app/Main.qml" line="525"/>
         <source>Write to NFC token</source>
         <translation type="unfinished">Scrivi sul token NFC</translation>

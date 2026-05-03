@@ -303,7 +303,7 @@ TestCase {
 
     function test_context_menu_systems_owner_is_single_launch_core(): void {
         // qmllint disable compiler
-        const entries = main.buildContextMenuEntries("systems", "", false)
+        const entries = main.buildContextMenuEntries("systems", "", false, false)
         compare(_idsOf(entries), ["launch_system"],
                 "Systems context menu is just Launch core regardless of has_nfc")
         verify(entries[0].label.length > 0,
@@ -313,7 +313,7 @@ TestCase {
 
     function test_context_menu_systems_has_nfc_does_not_add_entries(): void {
         // qmllint disable compiler
-        const entries = main.buildContextMenuEntries("systems", "", true)
+        const entries = main.buildContextMenuEntries("systems", "", true, false)
         compare(_idsOf(entries), ["launch_system"],
                 "has_nfc must not affect the systems menu")
         // qmllint enable compiler
@@ -321,35 +321,47 @@ TestCase {
 
     function test_context_menu_games_directory_returns_empty(): void {
         // qmllint disable compiler
-        compare(main.buildContextMenuEntries("games", "directory", true), [],
+        compare(main.buildContextMenuEntries("games", "directory", true, false), [],
                 "Folder tiles have no context menu, even with reader attached")
         // qmllint enable compiler
     }
 
     function test_context_menu_games_root_returns_empty(): void {
         // qmllint disable compiler
-        compare(main.buildContextMenuEntries("games", "root", true), [])
+        compare(main.buildContextMenuEntries("games", "root", true, false), [])
         // qmllint enable compiler
     }
 
     function test_context_menu_games_no_reader_omits_write_card(): void {
         // qmllint disable compiler
-        const entries = main.buildContextMenuEntries("games", "media", false)
-        compare(_idsOf(entries), ["qr_code", "launch_game"],
+        const entries = main.buildContextMenuEntries("games", "media", false, false)
+        compare(_idsOf(entries), ["toggle_favorite", "qr_code", "launch_game"],
                 "Write to NFC token must be hidden when no reader is reported")
         // qmllint enable compiler
     }
 
     function test_context_menu_games_with_reader_includes_write_card(): void {
         // qmllint disable compiler
-        const entries = main.buildContextMenuEntries("games", "media", true)
-        compare(_idsOf(entries), ["write_card", "qr_code", "launch_game"])
+        const entries = main.buildContextMenuEntries("games", "media", true, false)
+        compare(_idsOf(entries), ["toggle_favorite", "write_card", "qr_code", "launch_game"])
+        // qmllint enable compiler
+    }
+
+    function test_context_menu_games_favorite_label_toggles(): void {
+        // qmllint disable compiler
+        const addEntries = main.buildContextMenuEntries("games", "media", false, false)
+        const removeEntries = main.buildContextMenuEntries("games", "media", false, true)
+        compare(addEntries[0].id, "toggle_favorite")
+        compare(removeEntries[0].id, "toggle_favorite")
+        verify(addEntries[0].label.length > 0)
+        verify(removeEntries[0].label.length > 0)
+        verify(addEntries[0].label !== removeEntries[0].label)
         // qmllint enable compiler
     }
 
     function test_context_menu_unknown_owner_returns_empty(): void {
         // qmllint disable compiler
-        compare(main.buildContextMenuEntries("nope", "", true), [],
+        compare(main.buildContextMenuEntries("nope", "", true, false), [],
                 "Unknown owners get no entries — safe default")
         // qmllint enable compiler
     }

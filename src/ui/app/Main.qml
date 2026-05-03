@@ -537,7 +537,7 @@ MainLayout {
     onContextMenuCloseRequested: root.closeContextMenu()
     onContextMenuAccepted: id => root.handleContextMenuAccepted(id)
 
-    // Pure helper — owner/entryType/hasNfc → list of `{id,label}` entries.
+    // Pure helper — owner/entryType/hasNfc/isFavorite → list of `{id,label}` entries.
     // Empty list = no menu (caller bails out of openContextMenu).
     //
     // No `list<var>` return annotation: MiSTer's AOT-compiled static QML
@@ -545,14 +545,17 @@ MainLayout {
     // `entries.length === 0` despite the function pushing 3 items in.
     // Plain JS arrays round-trip cleanly through an unannotated return.
     function buildContextMenuEntries(
-            owner: string, entryType: string, hasNfc: bool) {
+            owner: string, entryType: string, hasNfc: bool, isFavorite: bool) {
         if (owner === "systems") {
             return [{ id: "launch_system", label: qsTr("Launch core") }]
         }
         if (owner === "games") {
             if (entryType === "directory" || entryType === "root")
                 return []
-            const entries = []
+            const entries = [{
+                id: "toggle_favorite",
+                label: isFavorite ? qsTr("Remove from favorites") : qsTr("Add to favorites")
+            }]
             if (hasNfc)
                 entries.push({ id: "write_card", label: qsTr("Write to NFC token") })
             entries.push({ id: "qr_code", label: qsTr("QR code") })
@@ -573,13 +576,15 @@ MainLayout {
         if (index < 0)
             return
         let entryType = ""
+        let isFavorite = false
         if (owner === "games") {
             if (index >= Browse.GamesModel.count)
                 return
             entryType = Browse.GamesModel.entry_type_at(index)
+            isFavorite = Browse.GamesModel.is_favorite_at(index)
         }
         const entries = root.buildContextMenuEntries(
-            owner, entryType, Browse.SystemStatus.has_nfc)
+            owner, entryType, Browse.SystemStatus.has_nfc, isFavorite)
         if (entries.length === 0)
             return
         root.contextMenuEntries = entries
@@ -611,6 +616,9 @@ MainLayout {
             Browse.SystemsModel.launch_at(targetIndex)
         } else if (id === "launch_game") {
             Browse.GamesModel.launch_at(targetIndex)
+        } else if (id === "toggle_favorite") {
+            if (owner === "games")
+                Browse.GamesModel.toggle_favorite_at(targetIndex)
         } else if (id === "write_card") {
             if (owner === "systems") {
                 root.beginCardWrite("systems")

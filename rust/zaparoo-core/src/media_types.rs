@@ -629,6 +629,27 @@ pub struct MediaTagsResult {
     pub tags: Vec<TagInfo>,
 }
 
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MediaTagsUpdateParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub media_id: Option<i64>,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub system: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub path: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub add: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub remove: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct MediaTagsUpdateResult {
+    #[serde(default)]
+    pub tags: Vec<TagInfo>,
+}
+
 /// Parameters for `media.generate` — triggers a (re)build of Core's media
 /// database. `systems` optionally narrows the scope; `None` indexes every
 /// configured system. `fuzzySystem` is intentionally omitted: it exists

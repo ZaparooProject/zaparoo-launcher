@@ -10,6 +10,7 @@ pub mod catalog;
 pub mod media_browse;
 pub mod media_history;
 pub mod media_search;
+pub mod media_tags_update;
 pub mod readers;
 pub mod readers_write;
 pub mod run;

@@ -18,8 +18,9 @@ use crate::media_types::{
     MediaHistoryTopParams, MediaHistoryTopResult, MediaImageBulkParams, MediaImageBulkResult,
     MediaImageParams, MediaImageResult, MediaIndexParams, MediaLookupParams, MediaLookupResult,
     MediaMetaParams, MediaMetaResult, MediaResult, MediaScrapeParams, MediaSearchParams,
-    MediaSearchResult, MediaTagsParams, MediaTagsResult, ReadersResult, ReadersWriteParams,
-    RunParams, ScrapersResult, SystemsParams, SystemsResult, VersionResult,
+    MediaSearchResult, MediaTagsParams, MediaTagsResult, MediaTagsUpdateParams,
+    MediaTagsUpdateResult, ReadersResult, ReadersWriteParams, RunParams, ScrapersResult,
+    SystemsParams, SystemsResult, VersionResult,
 };
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
@@ -558,6 +559,17 @@ impl Client {
         params: MediaTagsParams,
     ) -> Result<MediaTagsResult, ClientError> {
         let val = self.call("media.tags", &params).await?;
+        serde_json::from_value(val).map_err(|e| ClientError {
+            message: e.to_string(),
+        })
+    }
+
+    /// Adds or removes mutable user tags for one indexed media item.
+    pub async fn media_tags_update(
+        &self,
+        params: MediaTagsUpdateParams,
+    ) -> Result<MediaTagsUpdateResult, ClientError> {
+        let val = self.call("media.tags.update", &params).await?;
         serde_json::from_value(val).map_err(|e| ClientError {
             message: e.to_string(),
         })
