@@ -16,9 +16,10 @@
 use crate::media_types::{
     MediaBrowseParams, MediaBrowseResult, MediaHistoryParams, MediaHistoryResult,
     MediaHistoryTopParams, MediaHistoryTopResult, MediaImageBulkParams, MediaImageBulkResult,
-    MediaImageParams, MediaImageResult, MediaLookupParams, MediaLookupResult, MediaMetaParams,
-    MediaMetaResult, MediaSearchParams, MediaSearchResult, MediaTagsParams, MediaTagsResult,
-    ReadersResult, ReadersWriteParams, RunParams, SystemsParams, SystemsResult, VersionResult,
+    MediaImageParams, MediaImageResult, MediaIndexParams, MediaLookupParams, MediaLookupResult,
+    MediaMetaParams, MediaMetaResult, MediaResult, MediaScrapeParams, MediaSearchParams,
+    MediaSearchResult, MediaTagsParams, MediaTagsResult, ReadersResult, ReadersWriteParams,
+    RunParams, ScrapersResult, SystemsParams, SystemsResult, VersionResult,
 };
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
@@ -557,6 +558,65 @@ impl Client {
         params: MediaTagsParams,
     ) -> Result<MediaTagsResult, ClientError> {
         let val = self.call("media.tags", &params).await?;
+        serde_json::from_value(val).map_err(|e| ClientError {
+            message: e.to_string(),
+        })
+    }
+
+    /// Snapshot of Core's media state — database build status plus the
+    /// active-media list. The launcher uses the `database` block to seed
+    /// the status pill / first-run gate; later notifications
+    /// (`media.indexing`) supersede the seed.
+    pub async fn media(&self) -> Result<MediaResult, ClientError> {
+        #[derive(Serialize)]
+        struct P {}
+        let val = self.call("media", &P {}).await?;
+        serde_json::from_value(val).map_err(|e| ClientError {
+            message: e.to_string(),
+        })
+    }
+
+    /// Triggers a (re)build of Core's media database. With an empty
+    /// `params`, the build runs across every configured system. Core
+    /// emits `media.indexing` notifications during the run.
+    pub async fn media_generate(&self, params: MediaIndexParams) -> Result<(), ClientError> {
+        self.call("media.generate", &params).await?;
+        Ok(())
+    }
+
+    /// Cancels an in-flight `media.generate`. Core's response is null on
+    /// success and an error if no build is running, which surfaces
+    /// through `ClientError`.
+    pub async fn media_generate_cancel(&self) -> Result<(), ClientError> {
+        #[derive(Serialize)]
+        struct P {}
+        self.call("media.generate.cancel", &P {}).await?;
+        Ok(())
+    }
+
+    /// Runs a scraper across (a subset of) Core's media database.
+    /// `scraper_id` is required server-side — pick one from `scrapers()`.
+    /// Core emits `media.scraping` notifications during the run.
+    pub async fn media_scrape(&self, params: MediaScrapeParams) -> Result<(), ClientError> {
+        self.call("media.scrape", &params).await?;
+        Ok(())
+    }
+
+    /// Cancels an in-flight `media.scrape`. As with the indexer, Core
+    /// returns an error when no scraper is running.
+    pub async fn media_scrape_cancel(&self) -> Result<(), ClientError> {
+        #[derive(Serialize)]
+        struct P {}
+        self.call("media.scrape.cancel", &P {}).await?;
+        Ok(())
+    }
+
+    /// Lists the scrapers Core knows how to run. Used to resolve a
+    /// default `scraperId` for the "Run scraper" Settings action.
+    pub async fn scrapers(&self) -> Result<ScrapersResult, ClientError> {
+        #[derive(Serialize)]
+        struct P {}
+        let val = self.call("scrapers", &P {}).await?;
         serde_json::from_value(val).map_err(|e| ClientError {
             message: e.to_string(),
         })

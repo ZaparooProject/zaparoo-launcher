@@ -63,12 +63,83 @@ Item {
             id: "mouseEnabled",
             label: qsTr("Mouse support")
         })
+        out.push({
+            id: "updateMediaDb",
+            label: qsTr("Update media database")
+        })
+        out.push({
+            id: "runScraper",
+            label: qsTr("Run scraper")
+        })
         return out
+    }
+
+    // Live-state caption helpers for the action rows. Empty string when
+    // the row's operation is idle, so the field renders as quietly as
+    // the cycler rows above. Pause/cancel paths use the same vocabulary
+    // as the Core TUI so the launcher looks like a third surface for
+    // the same flow.
+    function _indexActionStatus(): string {
+        if (Browse.MediaStatus.optimizing)
+            return qsTr("Optimizing")
+        if (Browse.MediaStatus.indexing)
+            return Browse.MediaStatus.paused ? qsTr("Paused") : qsTr("In progress")
+        return ""
+    }
+
+    function _scrapeActionStatus(): string {
+        if (Browse.MediaStatus.scraping)
+            return Browse.MediaStatus.scrape_paused ? qsTr("Paused") : qsTr("In progress")
+        return ""
+    }
+
+    // Index and scrape can't run concurrently — Core serialises them.
+    // While one is in flight the *other* row is non-actionable so we
+    // don't queue a request that Core will reject.
+    readonly property bool _indexBusy:
+        Browse.MediaStatus.indexing || Browse.MediaStatus.optimizing
+    readonly property bool _scrapeBusy: Browse.MediaStatus.scraping
+
+    function _triggerIndex(): void {
+        if (settings._scrapeBusy)
+            return
+        if (settings._indexBusy)
+            Browse.MediaStatus.cancel_index()
+        else
+            Browse.MediaStatus.start_index()
+    }
+
+    function _triggerScrape(): void {
+        if (settings._indexBusy)
+            return
+        if (settings._scrapeBusy)
+            Browse.MediaStatus.cancel_scrape()
+        else
+            Browse.MediaStatus.start_scrape()
     }
 
     readonly property int fieldCount: settings.fields.length
     readonly property bool focusedFieldIsMouse:
         settings.fieldCount > 0 && settings.fields[settings.currentIndex].id === "mouseEnabled"
+    // True when the focused field is an action button (updateMediaDb,
+    // runScraper). Drives the help-bar Accept hint.
+    readonly property bool focusedFieldIsAction:
+        settings.fieldCount > 0
+        && (settings.fields[settings.currentIndex].id === "updateMediaDb"
+            || settings.fields[settings.currentIndex].id === "runScraper")
+    // True when the focused action's matching operation is currently
+    // running, so the help bar can label Accept as "Cancel" rather
+    // than "Start".
+    readonly property bool focusedActionBusy: {
+        if (settings.fieldCount === 0)
+            return false
+        const id = settings.fields[settings.currentIndex].id
+        if (id === "updateMediaDb")
+            return settings._indexBusy
+        if (id === "runScraper")
+            return settings._scrapeBusy
+        return false
+    }
 
     property int currentIndex: 0
 
@@ -196,6 +267,7 @@ Item {
             settings._cycleButtonLayout(direction)
         else if (id === "mouseEnabled")
             settings._setMouseEnabled(direction)
+        // Action fields ignore left/right — they only respond to accept.
     }
 
     function handleAction(action: string): void {
@@ -210,9 +282,15 @@ Item {
         } else if (action === "right") {
             settings._cycleFocused(1)
         } else if (action === "accept") {
-            if (settings.fieldCount > 0
-                && settings.fields[settings.currentIndex].id === "mouseEnabled")
+            if (settings.fieldCount === 0)
+                return
+            const id = settings.fields[settings.currentIndex].id
+            if (id === "mouseEnabled")
                 settings._toggleMouseEnabled()
+            else if (id === "updateMediaDb")
+                settings._triggerIndex()
+            else if (id === "runScraper")
+                settings._triggerScrape()
         } else if (action === "cancel") {
             settings.requestHubScreen()
         }
@@ -264,8 +342,16 @@ Item {
                        : modelData.id === "buttonLayout"
                        ? settings._buttonLayoutDisplay(Browse.Settings.current_button_layout)
                        : ""
-                control: modelData.id === "mouseEnabled" ? "toggle" : "value"
+                control: modelData.id === "mouseEnabled" ? "toggle"
+                         : (modelData.id === "updateMediaDb"
+                            || modelData.id === "runScraper") ? "action"
+                         : "value"
                 checked: Browse.Settings.current_mouse_enabled
+                actionStatus: modelData.id === "updateMediaDb"
+                              ? settings._indexActionStatus()
+                              : modelData.id === "runScraper"
+                              ? settings._scrapeActionStatus()
+                              : ""
                 // Pickers wrap modulo, so both arrows apply when the
                 // focused field has a populated option list.
                 canCyclePrev: (modelData.id === "resolution"
@@ -289,6 +375,12 @@ Item {
                     settings.currentIndex = index
                     if (modelData.id === "mouseEnabled")
                         settings._toggleMouseEnabled()
+                }
+                onAccepted: {
+                    if (modelData.id === "updateMediaDb")
+                        settings._triggerIndex()
+                    else if (modelData.id === "runScraper")
+                        settings._triggerScrape()
                 }
             }
         }

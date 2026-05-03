@@ -64,10 +64,12 @@ ApplicationWindow {
     property alias recentsScreen: recentsScreen
     property alias settingsScreen: settingsScreen
     property alias contextMenu: contextMenu
+    property alias firstRunIndexModal: firstRunIndexModal
 
     property bool cardWriteModalVisible: false
     property bool cardWriteFailed: false
     property bool qrCodeModalVisible: false
+    property bool firstRunIndexModalVisible: false
     property bool contextMenuVisible: false
     property rect contextMenuAnchor: Qt.rect(0, 0, 0, 0)
     readonly property var contextMenuEntries: [
@@ -86,6 +88,16 @@ ApplicationWindow {
     // content-hiding bindings (row/grid `visible`) resolve statically
     // in qmllint.
     property string pendingTransition: ""
+
+    // Cold-launch curtain. False until the catalog has loaded for the
+    // first time this session; while false the host screens are
+    // hidden and `BootOverlay` paints alone over the global
+    // background. Flipped exactly once by Main.qml's connection-state
+    // watcher when `connection_state` first reaches READY. After that,
+    // the Loader unmounts the overlay and a subsequent disconnect
+    // surfaces only via the top-right status pill — the user keeps
+    // their cached catalog and just sees the link state change.
+    property bool bootComplete: false
 
     // Per-screen state derivation. Shape mirrors ScreenStateOverlay's
     // `state` ternary so the help bar and the in-screen overlay agree
@@ -114,6 +126,7 @@ ApplicationWindow {
 
     signal cancelCardWriteRequested()
     signal closeQrCodeRequested()
+    signal closeFirstRunIndexRequested()
 
     // Two-way sync between root.activeScreen and ScreenManager.activeScreen.
     // Binding-breaking assignments (tests setting root.activeScreen = "games")
@@ -207,6 +220,10 @@ ApplicationWindow {
         id: stackedScreens
 
         anchors.fill: parent
+        // Screens stay hidden until the catalog has loaded for the
+        // first time. BootOverlay holds the window in the meantime;
+        // see the `bootComplete` property declaration above.
+        visible: root.bootComplete
 
         HubScreen {
             id: hubScreen
@@ -244,6 +261,21 @@ ApplicationWindow {
         }
     }
 
+    // ── Boot overlay ─────────────────────────────────────────────────────────
+    //
+    // Painted between the screens and the modal layer; unmounts itself
+    // the first time `bootComplete` flips true. Loader (rather than
+    // `visible: false`) so the overlay leaves the scene graph after
+    // dismissal — a subsequent disconnect must not bring it back over
+    // the user's cached catalog.
+
+    Loader {
+        anchors.fill: parent
+        active: !root.bootComplete
+        z: 50
+        sourceComponent: BootOverlay { }
+    }
+
     // ── Card writer modal ────────────────────────────────────────────────────
 
     Modal {
@@ -273,6 +305,18 @@ ApplicationWindow {
 
         anchors.fill: parent
         open: root.qrCodeModalVisible
+    }
+
+    // First-run mediadb index modal. Pushed by Main.qml the first time
+    // we connect to a Core whose mediadb is empty. Blocks the screens
+    // beneath until the initial scan completes (or the user cancels and
+    // tries again).
+    FirstRunIndexModal {
+        id: firstRunIndexModal
+
+        anchors.fill: parent
+        open: root.firstRunIndexModalVisible
+        onCloseRequested: root.closeFirstRunIndexRequested()
     }
 
     // ── Top-right HUD ─────────────────────────────────────────────────────────
@@ -362,51 +406,16 @@ ApplicationWindow {
         }
     }
 
-    // ── Connection status strip ───────────────────────────────────────────────
-    //
-    // Shown only when Core is unreachable or the catalog failed to load;
-    // otherwise the strip is hidden and takes no space. Connection state
-    // constants mirror rust/launcher/src/models/app_status.rs:
-    //   0 DISCONNECTED · 1 CONNECTING · 2 READY · 3 ERROR.
-
-    Rectangle {
-        id: statusStrip
-
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: instructionsBar.top
-        height: visible ? Sizing.pctH(4) : 0
-        visible: Browse.AppStatus.connection_state !== 2
-        color: Theme.bgBar
-        border.width: 1
-        // White border on ERROR draws the eye to the strip; the muted
-        // border on CONNECTING/DISCONNECTED keeps it informational.
-        border.color: Browse.AppStatus.connection_state === 3
-                      ? Theme.textPrimary
-                      : Theme.borderSubtle
-        z: 150
-
-        Text {
-            anchors.centerIn: parent
-            // `%1` placeholder keeps translators in charge of word order —
-            // some languages won't lead with "Core error". `last_error`
-            // is untranslated (it's the Rust-side error string) on purpose.
-            text: {
-                const state = Browse.AppStatus.connection_state;
-                if (state === 3) {
-                    const msg = Browse.AppStatus.last_error ?? "";
-                    return msg !== ""
-                        ? qsTr("Core error: %1").arg(msg)
-                        : qsTr("Core error");
-                }
-                if (state === 1) return qsTr("Connecting to Zaparoo Core…");
-                return qsTr("Disconnected from Zaparoo Core");
-            }
-            font.family: Theme.fontUi
-            font.pixelSize: Sizing.fontSize(2.5)
-            color: Theme.textPrimary
-            renderType: Text.NativeRendering
-        }
+    // Mutually-exclusive Core/indexing/scraper status surface. Sits on
+    // its own line directly under `topHud`, right-aligned to the same
+    // edge as the clock. When the pill is idle (no connection issue,
+    // no indexing, no scraping) it collapses to zero size and the
+    // second line takes no visual space.
+    CoreStatusPill {
+        anchors.top: topHud.bottom
+        anchors.right: topHud.right
+        anchors.topMargin: Sizing.pctH(0.8)
+        z: 200
     }
 
     // ── Instructions bar ──────────────────────────────────────────────────────
@@ -458,6 +467,16 @@ ApplicationWindow {
                 return [{ button: "ButtonB", label: qsTr("Cancel") }];
             if (root.qrCodeModalVisible)
                 return [{ button: "ButtonB", label: qsTr("Close") }];
+            if (!root.bootComplete)
+                return [];
+            if (root.firstRunIndexModalVisible) {
+                const phase = root.firstRunIndexModal.phase;
+                if (phase === "running")
+                    return [{ button: "ButtonB", label: qsTr("Cancel") }];
+                if (phase === "completed")
+                    return [];
+                return [{ button: "ButtonA", label: qsTr("Start") }];
+            }
             if (root.pendingTransition !== "")
                 return [];
             if (root.activeScreen === root.screenHub) {
@@ -525,8 +544,10 @@ ApplicationWindow {
                     });
                 }
                 // Left/Right cycles the focused field's value. Skip
-                // the cue when there are no fields.
-                if (root.settingsScreen.fieldCount > 0) {
+                // the cue when the focused field is an action row
+                // (no left/right binding) or there are no fields.
+                if (root.settingsScreen.fieldCount > 0
+                    && !root.settingsScreen.focusedFieldIsAction) {
                     row.push({
                         buttons: ["DpadLeft", "DpadRight"],
                         label: qsTr("Change")
@@ -534,6 +555,12 @@ ApplicationWindow {
                 }
                 if (root.settingsScreen.focusedFieldIsMouse)
                     row.push({ button: "ButtonA", label: qsTr("Toggle") });
+                else if (root.settingsScreen.focusedFieldIsAction)
+                    row.push({
+                        button: "ButtonA",
+                        label: root.settingsScreen.focusedActionBusy
+                               ? qsTr("Cancel") : qsTr("Start")
+                    });
                 row.push({ button: "ButtonB", label: qsTr("Back") });
                 return row;
             }

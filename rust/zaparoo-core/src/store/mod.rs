@@ -14,10 +14,12 @@
 // intersects a successful mutation's `invalidates` list.
 
 mod endpoint;
+mod media_status;
 mod mutation;
 mod tag;
 
 pub use endpoint::Endpoint;
+pub use media_status::{MediaStatusResource, MediaStatusState};
 pub use mutation::Mutation;
 pub use tag::Tag;
 
@@ -76,6 +78,10 @@ pub struct Store {
     client: Arc<Client>,
     runtime: Arc<Runtime>,
     inner: Arc<Mutex<Inner>>,
+    /// Singleton media-status publisher. Eagerly constructed on
+    /// `Store::new` so the seeding task starts as soon as the launcher
+    /// has a `Client`, even if no QML side has subscribed yet.
+    media_status: Arc<MediaStatusResource>,
 }
 
 impl std::fmt::Debug for Store {
@@ -86,15 +92,24 @@ impl std::fmt::Debug for Store {
 
 impl Store {
     pub fn new(client: Arc<Client>, runtime: Arc<Runtime>) -> Arc<Self> {
+        let media_status = MediaStatusResource::new(&client, &runtime);
         Arc::new(Self {
             client,
             runtime,
             inner: Arc::new(Mutex::new(Inner::default())),
+            media_status,
         })
     }
 
     pub fn subscribe_notifications(&self) -> broadcast::Receiver<Notification> {
         self.client.subscribe_notifications()
+    }
+
+    /// Shared `MediaStatusResource`. Singleton — every QML caller uses
+    /// the same publisher, so subscribing late still observes the
+    /// current state through the underlying watch channel.
+    pub fn media_status(&self) -> Arc<MediaStatusResource> {
+        self.media_status.clone()
     }
 
     /// Direct access to the underlying `Client` for callers that need

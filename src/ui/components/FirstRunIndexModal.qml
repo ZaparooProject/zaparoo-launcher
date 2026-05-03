@@ -1,0 +1,320 @@
+// Zaparoo Launcher
+// Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+
+import QtQuick
+import Zaparoo.Theme
+import Zaparoo.Browse as Browse
+
+// cxx-qt 0.8 patches `isFinal: true` on singleton properties but the
+// qmltypes schema has no `isFinal` slot, so every read trips qmllint's
+// "Member can be shadowed" check. Until the schema grows the slot,
+// suppress the compiler category file-wide.
+// qmllint disable compiler
+
+// Blocking first-run modal. Shown once per session when the launcher
+// first connects to a Core whose media database doesn't exist yet.
+// The launcher refuses to drill into Systems / Games until an initial
+// scan has run, so this modal owns input and only releases when the
+// scan completes (auto-dismiss after a short "Done" beat) or — after
+// a cancel — when the user presses Start again and lets it finish.
+//
+// Three visual phases:
+//   "idle"      — explanatory body + a single "Start scan" button.
+//   "running"   — progress bar driven by `current_step / total_steps`,
+//                 the current step display below, and a Cancel button.
+//                 During the vacuum phase the bar is replaced with an
+//                 "Optimizing database — almost done" line (no animation
+//                 — software-renderer constraint).
+//   "completed" — "Done. N files indexed." for ~1.5 s, then auto-pop.
+//
+// The component is purely presentational; routing and the modal stack
+// are owned by `Main.qml`. We emit `closeRequested` and trust the
+// router to actually pop. `handleAction(accept|cancel)` is the input
+// hook called from `Main.qml`'s modal-dispatch branch.
+Item {
+    id: modal
+
+    property bool open: false
+
+    // "idle" → user must press Start.
+    // "running" → indexing in flight (or optimizing).
+    // "completed" → finished, completionTimer ticking down to dismiss.
+    property string phase: "idle"
+
+    signal closeRequested()
+
+    visible: modal.open
+    anchors.fill: parent
+    z: 300
+
+    onOpenChanged: {
+        if (modal.open) {
+            modal.phase = Browse.MediaStatus.indexing ? "running" : "idle"
+        } else {
+            modal.phase = "idle"
+            completionTimer.stop()
+        }
+    }
+
+    // Track Core's indexing flag. Pressing Start optimistically flips
+    // phase to "running" before the first notification arrives (so the
+    // "Preparing…" body paints immediately); the Connections below
+    // simply confirms or unwinds when the notification stream catches
+    // up.
+    Connections {
+        target: Browse.MediaStatus
+        function onIndexingChanged(): void {
+            if (!modal.open)
+                return
+            if (Browse.MediaStatus.indexing) {
+                modal.phase = "running"
+                completionTimer.stop()
+                return
+            }
+            if (modal.phase === "running") {
+                if (Browse.MediaStatus.total_files > 0) {
+                    modal.phase = "completed"
+                    completionTimer.restart()
+                } else {
+                    // Cancel landed before any files were counted, or
+                    // Core never started. Drop back to idle so the user
+                    // can retry.
+                    modal.phase = "idle"
+                }
+            }
+        }
+
+        // If Core acquires a populated mediadb out of band — restart,
+        // manual TUI-driven index in another session, etc. — the
+        // first-run gate has nothing left to defend, so we close.
+        function onExistsChanged(): void {
+            if (modal.open
+                && Browse.MediaStatus.exists
+                && modal.phase !== "completed") {
+                modal.closeRequested()
+            }
+        }
+    }
+
+    function handleAction(action: string): void {
+        if (action === "accept") {
+            if (modal.phase === "idle") {
+                Browse.MediaStatus.start_index()
+                modal.phase = "running"
+            }
+        } else if (action === "cancel") {
+            if (modal.phase === "running")
+                Browse.MediaStatus.cancel_index()
+        }
+    }
+
+    // Scrim. Eats clicks so they don't reach the screen tree underneath.
+    Rectangle {
+        anchors.fill: parent
+        color: "#cc000000"
+
+        MouseArea {
+            anchors.fill: parent
+        }
+    }
+
+    Rectangle {
+        id: panel
+
+        anchors.centerIn: parent
+        width: Math.min(parent.width * 0.78, Sizing.pctH(90))
+        height: Sizing.pctH(46)
+        color: Theme.bgPanel
+        border.width: 2
+        border.color: Theme.textPrimary
+        radius: Sizing.cornerRadius
+
+        Text {
+            id: titleText
+
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.topMargin: Sizing.pctH(6)
+            anchors.leftMargin: Sizing.pctW(5)
+            anchors.rightMargin: Sizing.pctW(5)
+            text: qsTr("First-time setup")
+            font.family: Theme.fontUi
+            font.pixelSize: Sizing.fontSize(3.2)
+            color: Theme.textPrimary
+            wrapMode: Text.WordWrap
+            horizontalAlignment: Text.AlignHCenter
+            renderType: Text.NativeRendering
+        }
+
+        Text {
+            id: bodyIdle
+
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: titleText.bottom
+            anchors.topMargin: Sizing.pctH(2)
+            anchors.leftMargin: Sizing.pctW(6)
+            anchors.rightMargin: Sizing.pctW(6)
+            visible: modal.phase === "idle"
+            text: qsTr("Zaparoo needs to scan your games before you can use the launcher. This usually takes a few minutes.")
+            font.family: Theme.fontUi
+            font.pixelSize: Sizing.fontSize(2.5)
+            color: Theme.textPrimary
+            wrapMode: Text.WordWrap
+            horizontalAlignment: Text.AlignHCenter
+            renderType: Text.NativeRendering
+        }
+
+        Item {
+            id: runningView
+
+            anchors.top: titleText.bottom
+            anchors.topMargin: Sizing.pctH(4)
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.leftMargin: Sizing.pctW(7)
+            anchors.rightMargin: Sizing.pctW(7)
+            height: Sizing.pctH(14)
+            visible: modal.phase === "running"
+
+            // Vacuum phase fallback. Mirrors the mobile app's "Optimizing
+            // database" copy without the pulsing animation (software
+            // renderer pays per-frame for translucent overlays).
+            Text {
+                anchors.fill: parent
+                visible: Browse.MediaStatus.optimizing
+                text: qsTr("Optimizing database — almost done")
+                font.family: Theme.fontUi
+                font.pixelSize: Sizing.fontSize(2.6)
+                color: Theme.textPrimary
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+                wrapMode: Text.WordWrap
+                renderType: Text.NativeRendering
+            }
+
+            Item {
+                anchors.fill: parent
+                visible: !Browse.MediaStatus.optimizing
+
+                Rectangle {
+                    id: progressTrack
+
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.topMargin: Sizing.pctH(1)
+                    height: Sizing.pctH(1.4)
+                    color: Theme.borderSubtle
+                    radius: height / 2
+
+                    Rectangle {
+                        readonly property real _ratio: {
+                            const tot = Browse.MediaStatus.total_steps
+                            if (tot <= 0)
+                                return 0
+                            const cur = Browse.MediaStatus.current_step
+                            return Math.max(0, Math.min(1, cur / tot))
+                        }
+
+                        anchors.left: parent.left
+                        anchors.top: parent.top
+                        anchors.bottom: parent.bottom
+                        width: progressTrack.width * _ratio
+                        color: Theme.accent
+                        radius: parent.radius
+                    }
+                }
+
+                Text {
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: progressTrack.bottom
+                    anchors.topMargin: Sizing.pctH(2.4)
+                    text: {
+                        const display = Browse.MediaStatus.current_step_display
+                        const cur = Browse.MediaStatus.current_step
+                        const tot = Browse.MediaStatus.total_steps
+                        if (Browse.MediaStatus.paused)
+                            return qsTr("Indexing paused")
+                        if (tot > 0 && display !== "")
+                            return qsTr("Step %1 of %2 — %3").arg(cur).arg(tot).arg(display)
+                        if (tot > 0)
+                            return qsTr("Step %1 of %2").arg(cur).arg(tot)
+                        return qsTr("Preparing…")
+                    }
+                    font.family: Theme.fontUi
+                    font.pixelSize: Sizing.fontSize(2.3)
+                    color: Theme.textLabel
+                    wrapMode: Text.WordWrap
+                    horizontalAlignment: Text.AlignHCenter
+                    renderType: Text.NativeRendering
+                    elide: Text.ElideRight
+                    maximumLineCount: 2
+                }
+            }
+        }
+
+        Text {
+            id: completionMessage
+
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: titleText.bottom
+            anchors.topMargin: Sizing.pctH(4)
+            anchors.leftMargin: Sizing.pctW(6)
+            anchors.rightMargin: Sizing.pctW(6)
+            visible: modal.phase === "completed"
+            text: qsTr("Done. %1 files indexed.").arg(Browse.MediaStatus.total_files)
+            font.family: Theme.fontUi
+            font.pixelSize: Sizing.fontSize(2.6)
+            color: Theme.textPrimary
+            horizontalAlignment: Text.AlignHCenter
+            wrapMode: Text.WordWrap
+            renderType: Text.NativeRendering
+        }
+
+        Rectangle {
+            id: actionButton
+
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: Sizing.pctH(5)
+            width: Sizing.pctW(28)
+            height: Sizing.pctH(7)
+            color: Theme.bgBar
+            border.width: 1
+            border.color: Theme.borderMid
+            radius: Sizing.cornerRadius
+            visible: modal.phase !== "completed"
+
+            Text {
+                anchors.centerIn: parent
+                text: modal.phase === "running"
+                      ? qsTr("Cancel")
+                      : qsTr("Start scan")
+                font.family: Theme.fontUi
+                font.pixelSize: Sizing.fontSize(2.5)
+                color: Theme.textPrimary
+                renderType: Text.NativeRendering
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                acceptedButtons: Qt.LeftButton
+                onClicked: modal.handleAction(modal.phase === "running"
+                                              ? "cancel" : "accept")
+            }
+        }
+    }
+
+    Timer {
+        id: completionTimer
+
+        interval: 1500
+        repeat: false
+        onTriggered: modal.closeRequested()
+    }
+}

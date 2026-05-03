@@ -111,7 +111,7 @@ Item {
                         anchors.leftMargin: menu.horizontalPadding
                         anchors.rightMargin: menu.horizontalPadding
                         text: row.modelData
-                        color: index === menu.currentIndex ? Theme.textPrimary : Theme.textLabel
+                        color: row.index === menu.currentIndex ? Theme.textPrimary : Theme.textLabel
                         font.family: Theme.fontUi
                         font.pixelSize: Sizing.fontSize(2.4)
                         elide: Text.ElideRight

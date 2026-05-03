@@ -31,6 +31,11 @@ MainLayout {
     readonly property string modalCardWrite: "card_write"
     readonly property string modalContextMenu: "context_menu"
     readonly property string modalQrCode: "qr_code"
+    readonly property string modalFirstRunIndex: "first_run_index"
+    // One-shot session flag: the first-run modal is shown at most
+    // once per launcher process, even if the WS link drops and the
+    // mediadb-empty condition would otherwise be satisfied again.
+    property bool _firstRunIndexShown: false
     property string cardWriteOwner: ""
     property string contextMenuOwner: ""
     property int contextMenuIndex: -1
@@ -100,6 +105,11 @@ MainLayout {
                 root.recentsScreen.restoreSelection()
             }
         }
+        // Kick the first-run check in case both READY and a seeded
+        // empty-mediadb snapshot landed before our Connections wired up
+        // (e.g. an unusually fast warm-cache reconnect).
+        root._maybeCompleteBoot()
+        root._maybeOpenFirstRunIndex()
     }
 
     // Seed row/grid indices from persisted state when models deliver new
@@ -564,6 +574,65 @@ MainLayout {
             ScreenManager.popModal()
     }
 
+    // First-run modal lifecycle. Push exactly once per session, the
+    // moment we see an authoritative MediaStatus snapshot (`seeded ===
+    // true`) reporting an empty mediadb (`exists === false`) on a
+    // ready Core link. The `seeded` gate is critical: the singleton's
+    // initial Default state has `exists: false`, so without it we'd
+    // fire the modal on cold launch before the watch channel has
+    // received a single notification.
+    function _maybeOpenFirstRunIndex(): void {
+        if (root._firstRunIndexShown)
+            return
+        if (Browse.AppStatus.connection_state !== 2 /* READY */)
+            return
+        if (!Browse.MediaStatus.seeded)
+            return
+        if (Browse.MediaStatus.exists)
+            return
+        root._firstRunIndexShown = true
+        root.firstRunIndexModalVisible = true
+        if (ScreenManager.topModal !== root.modalFirstRunIndex)
+            ScreenManager.pushModal(root.modalFirstRunIndex)
+    }
+
+    function closeFirstRunIndexModal(): void {
+        root.firstRunIndexModalVisible = false
+        if (ScreenManager.topModal === root.modalFirstRunIndex)
+            ScreenManager.popModal()
+    }
+
+    Connections {
+        target: Browse.AppStatus
+        function onConnection_stateChanged(): void {
+            root._maybeOpenFirstRunIndex()
+            root._maybeCompleteBoot()
+        }
+    }
+
+    // One-shot dismiss for the cold-launch curtain. The first time the
+    // catalog reports READY we flip `bootComplete` and never reset it
+    // — a later disconnect surfaces only via the status pill so the
+    // user keeps their cached catalog.
+    function _maybeCompleteBoot(): void {
+        if (root.bootComplete)
+            return
+        if (Browse.AppStatus.connection_state === 2 /* READY */)
+            root.bootComplete = true
+    }
+
+    Connections {
+        target: Browse.MediaStatus
+        function onSeededChanged(): void {
+            root._maybeOpenFirstRunIndex()
+        }
+        function onExistsChanged(): void {
+            root._maybeOpenFirstRunIndex()
+        }
+    }
+
+    onCloseFirstRunIndexRequested: root.closeFirstRunIndexModal()
+
     function beginCardWrite(owner: string): void {
         if (owner === "systems")
             Browse.SystemsModel.cancel_card_write()
@@ -639,6 +708,8 @@ MainLayout {
                 root.closeQrCodeModal()
             } else if (ScreenManager.topModal === root.modalContextMenu) {
                 root.contextMenu.handleAction(action)
+            } else if (ScreenManager.topModal === root.modalFirstRunIndex) {
+                root.firstRunIndexModal.handleAction(action)
             }
             // While a modal owns input, swallow everything not handled
             // above rather than leak it to the root screen.

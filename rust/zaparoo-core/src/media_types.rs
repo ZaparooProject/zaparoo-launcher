@@ -629,6 +629,162 @@ pub struct MediaTagsResult {
     pub tags: Vec<TagInfo>,
 }
 
+/// Parameters for `media.generate` — triggers a (re)build of Core's media
+/// database. `systems` optionally narrows the scope; `None` indexes every
+/// configured system. `fuzzySystem` is intentionally omitted: it exists
+/// in Core for LLM clients that may misspell ids, and the launcher
+/// composes ids from canonical Core data so a mismatch would be a bug
+/// to fix rather than paper over.
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MediaIndexParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub systems: Option<Vec<String>>,
+}
+
+/// Parameters for `media.scrape` — runs the named scraper across the
+/// indexed media database. `scraper_id` is required server-side
+/// (validated as `min=1`); the launcher resolves it from the `scrapers`
+/// RPC. `systems` optionally narrows the run; `force` re-scrapes media
+/// already attached to a title slug.
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MediaScrapeParams {
+    pub scraper_id: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub systems: Vec<String>,
+    #[serde(default)]
+    pub force: bool,
+}
+
+/// Snapshot of Core's media database build state. Mirrors the upstream
+/// `IndexingStatusResponse` shape verbatim — every numeric field is
+/// optional because Core only populates them while a build is actually
+/// in progress (or reports `total_media`/`total_files` after the build
+/// settles).
+///
+/// Used for both the `media.indexing` notification body and the
+/// `database` block of the `media` query response, so we keep it in
+/// one place.
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "wire-faithful mirror of Core's IndexingStatusResponse"
+)]
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IndexingStatusResponse {
+    #[serde(default)]
+    pub total_steps: Option<i32>,
+    #[serde(default)]
+    pub current_step: Option<i32>,
+    #[serde(default)]
+    pub current_step_display: Option<String>,
+    #[serde(default)]
+    pub total_files: Option<i32>,
+    #[serde(default)]
+    pub total_media: Option<i32>,
+    #[serde(default)]
+    pub exists: bool,
+    #[serde(default)]
+    pub indexing: bool,
+    #[serde(default)]
+    pub optimizing: bool,
+    #[serde(default)]
+    pub paused: bool,
+}
+
+/// Snapshot of Core's scraper progress. Mirrors `ScrapingStatusResponse`
+/// from upstream. `scraper_id` and `system_id` carry the in-flight job's
+/// identifiers; the counters are cumulative for the run.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScrapingStatusResponse {
+    #[serde(default)]
+    pub scraper_id: String,
+    #[serde(default)]
+    pub system_id: String,
+    #[serde(default)]
+    pub processed: i32,
+    #[serde(default)]
+    pub total: i32,
+    #[serde(default)]
+    pub matched: i32,
+    #[serde(default)]
+    pub skipped: i32,
+    #[serde(default)]
+    pub total_scraped: i32,
+    #[serde(default)]
+    pub scraping: bool,
+    #[serde(default)]
+    pub done: bool,
+    #[serde(default)]
+    pub paused: bool,
+}
+
+/// Currently-active media as reported by `media`. The launcher does not
+/// surface this surface yet, but the field is part of the documented
+/// `media` envelope so we deserialise it for forward-compatibility —
+/// trimming it would mean the next consumer has to re-extend the wire
+/// type before they can use it.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActiveMediaInfo {
+    #[serde(default)]
+    pub started: String,
+    #[serde(default)]
+    pub launcher_id: String,
+    #[serde(default)]
+    pub system_id: String,
+    #[serde(default)]
+    pub system_name: String,
+    #[serde(default)]
+    pub media_path: String,
+    #[serde(default)]
+    pub media_name: String,
+    #[serde(default)]
+    pub launcher_controls: Vec<String>,
+    #[serde(default)]
+    pub media_id: Option<i64>,
+    #[serde(default)]
+    pub relative_path: Option<String>,
+    #[serde(default)]
+    pub zap_script: String,
+}
+
+/// Response envelope for the `media` query. Carries both the database
+/// build state (used for the first-run gate / status pill) and the
+/// active-media list (carried for completeness — see
+/// `ActiveMediaInfo`).
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MediaResult {
+    #[serde(default)]
+    pub database: IndexingStatusResponse,
+    #[serde(default)]
+    pub active: Vec<ActiveMediaInfo>,
+}
+
+/// One scraper Core knows how to run. `id` is the value to pass to
+/// `media.scrape.scraperId`; `name` is a human label; `supported_systems`
+/// is the system-id allow-list — empty means "supports every indexed
+/// system."
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScraperInfo {
+    #[serde(default)]
+    pub id: String,
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub supported_systems: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct ScrapersResult {
+    #[serde(default)]
+    pub scrapers: Vec<ScraperInfo>,
+}
+
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct RunParams {
     pub text: String,
@@ -709,11 +865,13 @@ mod tests {
     )]
 
     use super::{
-        BrowseEntry, MediaBrowseParams, MediaBrowseResult, MediaHistoryParams, MediaHistoryResult,
-        MediaHistoryTopParams, MediaHistoryTopResult, MediaImageBulkResult, MediaImageParams,
-        MediaImageResult, MediaLookupParams, MediaLookupResult, MediaMetaParams, MediaMetaResult,
-        MediaSearchParams, MediaSearchResult, MediaTagsParams, MediaTagsResult, ReaderInfo,
-        ReadersResult, SystemsResult, VersionResult,
+        BrowseEntry, IndexingStatusResponse, MediaBrowseParams, MediaBrowseResult,
+        MediaHistoryParams, MediaHistoryResult, MediaHistoryTopParams, MediaHistoryTopResult,
+        MediaImageBulkResult, MediaImageParams, MediaImageResult, MediaIndexParams,
+        MediaLookupParams, MediaLookupResult, MediaMetaParams, MediaMetaResult, MediaResult,
+        MediaScrapeParams, MediaSearchParams, MediaSearchResult, MediaTagsParams, MediaTagsResult,
+        ReaderInfo, ReadersResult, ScrapersResult, ScrapingStatusResponse, SystemsResult,
+        VersionResult,
     };
 
     #[test]
@@ -1451,5 +1609,181 @@ mod tests {
     fn media_image_bulk_result_defaults_to_empty_items() {
         let result: MediaImageBulkResult = serde_json::from_str("{}").expect("parse");
         assert!(result.items.is_empty());
+    }
+
+    #[test]
+    fn media_index_params_defaults_to_empty_object() {
+        let params = MediaIndexParams::default();
+        let json = serde_json::to_value(&params).expect("serialise");
+        let object = json.as_object().expect("object");
+        assert!(object.is_empty());
+        assert!(!object.contains_key("fuzzySystem"));
+    }
+
+    #[test]
+    fn media_index_params_serialises_systems_when_set() {
+        let params = MediaIndexParams {
+            systems: Some(vec!["SNES".into(), "NES".into()]),
+        };
+        let json = serde_json::to_value(&params).expect("serialise");
+        let object = json.as_object().expect("object");
+        assert_eq!(
+            object
+                .get("systems")
+                .and_then(|v| v.as_array())
+                .map(Vec::len),
+            Some(2)
+        );
+        assert!(!object.contains_key("fuzzySystem"));
+    }
+
+    #[test]
+    fn media_scrape_params_serialises_required_scraper_id() {
+        let params = MediaScrapeParams {
+            scraper_id: "screenscraper".into(),
+            ..MediaScrapeParams::default()
+        };
+        let json = serde_json::to_value(&params).expect("serialise");
+        let object = json.as_object().expect("object");
+        assert_eq!(
+            object.get("scraperId").and_then(|v| v.as_str()),
+            Some("screenscraper")
+        );
+        // `force` is not skipped; default is `false`.
+        assert_eq!(
+            object.get("force").and_then(serde_json::Value::as_bool),
+            Some(false)
+        );
+        // `systems` is skipped when empty.
+        assert!(!object.contains_key("systems"));
+    }
+
+    #[test]
+    fn media_scrape_params_serialises_systems_and_force() {
+        let params = MediaScrapeParams {
+            scraper_id: "screenscraper".into(),
+            systems: vec!["SNES".into()],
+            force: true,
+        };
+        let json = serde_json::to_value(&params).expect("serialise");
+        let object = json.as_object().expect("object");
+        assert_eq!(
+            object.get("force").and_then(serde_json::Value::as_bool),
+            Some(true)
+        );
+        assert_eq!(
+            object
+                .get("systems")
+                .and_then(|v| v.as_array())
+                .map(Vec::len),
+            Some(1)
+        );
+    }
+
+    #[test]
+    fn indexing_status_response_parses_running_payload() {
+        let json = r#"{
+            "totalSteps": 4,
+            "currentStep": 2,
+            "currentStepDisplay": "Indexing SNES",
+            "totalFiles": 1234,
+            "totalMedia": 567,
+            "exists": true,
+            "indexing": true,
+            "optimizing": false,
+            "paused": false
+        }"#;
+        let result: IndexingStatusResponse = serde_json::from_str(json).expect("parse");
+        assert_eq!(result.total_steps, Some(4));
+        assert_eq!(result.current_step, Some(2));
+        assert_eq!(
+            result.current_step_display.as_deref(),
+            Some("Indexing SNES")
+        );
+        assert_eq!(result.total_files, Some(1234));
+        assert_eq!(result.total_media, Some(567));
+        assert!(result.exists);
+        assert!(result.indexing);
+        assert!(!result.optimizing);
+        assert!(!result.paused);
+    }
+
+    #[test]
+    fn indexing_status_response_handles_idle_payload() {
+        // Core sends `*int omitempty` for the counters; an idle Core
+        // (no build in flight) reports only the booleans.
+        let json = r#"{"exists": true, "indexing": false, "optimizing": false, "paused": false}"#;
+        let result: IndexingStatusResponse = serde_json::from_str(json).expect("parse");
+        assert!(result.total_steps.is_none());
+        assert!(result.current_step.is_none());
+        assert!(result.current_step_display.is_none());
+        assert!(result.total_files.is_none());
+        assert!(result.total_media.is_none());
+        assert!(result.exists);
+    }
+
+    #[test]
+    fn scraping_status_response_parses_running_payload() {
+        let json = r#"{
+            "scraperId": "screenscraper",
+            "systemId": "SNES",
+            "processed": 12,
+            "total": 200,
+            "matched": 10,
+            "skipped": 2,
+            "totalScraped": 50,
+            "scraping": true,
+            "done": false,
+            "paused": false
+        }"#;
+        let result: ScrapingStatusResponse = serde_json::from_str(json).expect("parse");
+        assert_eq!(result.scraper_id, "screenscraper");
+        assert_eq!(result.system_id, "SNES");
+        assert_eq!(result.processed, 12);
+        assert_eq!(result.total, 200);
+        assert_eq!(result.matched, 10);
+        assert_eq!(result.skipped, 2);
+        assert_eq!(result.total_scraped, 50);
+        assert!(result.scraping);
+        assert!(!result.done);
+    }
+
+    #[test]
+    fn media_result_parses_envelope_with_database_and_active() {
+        let json = r#"{
+            "database": {"exists": true, "indexing": false, "optimizing": false, "paused": false, "totalMedia": 42},
+            "active": [
+                {
+                    "started": "2026-05-03T12:00:00Z",
+                    "launcherId": "SNES",
+                    "systemId": "SNES",
+                    "systemName": "Super Nintendo",
+                    "mediaPath": "/p",
+                    "mediaName": "X",
+                    "zapScript": "@SNES/X"
+                }
+            ]
+        }"#;
+        let result: MediaResult = serde_json::from_str(json).expect("parse");
+        assert!(result.database.exists);
+        assert_eq!(result.database.total_media, Some(42));
+        assert_eq!(result.active.len(), 1);
+        assert_eq!(result.active[0].system_id, "SNES");
+        assert_eq!(result.active[0].zap_script, "@SNES/X");
+    }
+
+    #[test]
+    fn scrapers_result_parses_payload() {
+        let json = r#"{
+            "scrapers": [
+                {"id":"screenscraper","name":"ScreenScraper","supportedSystems":["SNES","NES"]},
+                {"id":"local","name":"Local"}
+            ]
+        }"#;
+        let result: ScrapersResult = serde_json::from_str(json).expect("parse");
+        assert_eq!(result.scrapers.len(), 2);
+        assert_eq!(result.scrapers[0].id, "screenscraper");
+        assert_eq!(result.scrapers[0].supported_systems, vec!["SNES", "NES"]);
+        assert!(result.scrapers[1].supported_systems.is_empty());
     }
 }

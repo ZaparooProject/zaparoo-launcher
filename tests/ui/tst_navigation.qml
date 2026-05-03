@@ -23,6 +23,11 @@ TestCase {
     }
 
     function init(): void {
+        // The cold-launch BootOverlay normally hides every screen until
+        // Core's catalog reaches READY. Tests don't run a real Core, so
+        // we mark the boot complete up-front; otherwise every visibility
+        // assertion below would fail against the boot curtain.
+        main.bootComplete = true
         main.activeScreen = main.screenHub
         // Hub focus is two rows now (categories + actions); reset both
         // axes so a prior test's row-jump doesn't leak into the next.

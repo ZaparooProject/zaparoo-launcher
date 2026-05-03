@@ -30,9 +30,17 @@ Item {
     // nothing at the ends of a list.
     property bool canCyclePrev: true
     property bool canCycleNext: true
+    // For `control: "action"` — short live-state string painted on the
+    // right ("In progress", "Paused", or "" when idle). The screen
+    // owns the binding; the field treats it as a plain caption.
+    property string actionStatus: ""
 
     signal hovered()
     signal clicked()
+    // Emitted when the action-control row receives an accept press.
+    // The screen wires this to the matching invokable (start/cancel
+    // index, start/cancel scrape) and gates by `actionStatus`.
+    signal accepted()
 
     implicitHeight: Sizing.pctH(8)
 
@@ -127,12 +135,32 @@ Item {
         }
     }
 
+    // Right-side caption for `control: "action"`. No `< >` arrows, no
+    // toggle pill — just a single muted-when-idle string showing the
+    // current operation state. Empty `actionStatus` collapses to no
+    // text, matching the visual quietness of an idle row.
+    Text {
+        visible: root.control === "action"
+        anchors.right: parent.right
+        anchors.rightMargin: Sizing.pctW(3)
+        anchors.verticalCenter: parent.verticalCenter
+        text: root.actionStatus
+        color: Theme.textPrimary
+        font.family: Theme.fontUi
+        font.pixelSize: Sizing.fontSize(2.4)
+        renderType: Text.NativeRendering
+    }
+
     MouseArea {
         anchors.fill: parent
         hoverEnabled: true
         acceptedButtons: Qt.LeftButton
 
         onEntered: root.hovered()
-        onClicked: root.clicked()
+        onClicked: {
+            root.clicked();
+            if (root.control === "action")
+                root.accepted();
+        }
     }
 }
