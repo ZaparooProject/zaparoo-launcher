@@ -299,7 +299,7 @@ ApplicationWindow {
         open: root.contextMenuVisible
         anchorRect: root.contextMenuAnchor
         entries: root.contextMenuEntries
-        onAccepted: index => root.contextMenuAccepted(index)
+        onAccepted: id => root.contextMenuAccepted(id)
         onCloseRequested: root.contextMenuCloseRequested()
     }
 

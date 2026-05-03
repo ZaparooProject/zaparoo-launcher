@@ -164,8 +164,8 @@ Item {
                     return
                 Browse.GamesState.set_selected_at_top(
                     Browse.GamesModel.path_at(idx))
-                games.requestContextMenu(
-                    idx, games.gamesGrid.currentCellRectIn(games))
+                const rect = games.gamesGrid.currentCellRectIn(games)
+                games.requestContextMenu(idx, rect)
             }
         } else if (action === "cancel") {
             if (games._atFolderLevel())

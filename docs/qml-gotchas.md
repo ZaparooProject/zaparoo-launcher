@@ -20,6 +20,19 @@ fact; avoiding them is faster.
 - **Function type annotations are required.** Add `: ParamType` parameters and
   `: ReturnType` return types to all functions in singleton `.qml` files.
 
+- **Don't annotate JS-array returns as `list<var>`.** A function whose body
+  builds a JS array of plain JS objects — `[{ id, label }, ...]` consumed
+  by `.length` and `[i].field` access — must NOT carry a `: list<var>`
+  return annotation. On the static QML build (MiSTer ARM32, AOT-compiled)
+  the array is coerced through that type and the caller observes
+  `result.length === 0` even when the body pushed N items in. The desktop
+  dynamic-QML runtime returns the array as-is, so the divergence is
+  silent: works in `just run`, breaks on `just deploy-mister`, no qmllint
+  warning, no runtime error. Use `: var` or omit the return annotation
+  for JS-array helpers; reserve `list<T>` for homogeneous lists of QML
+  items consumed by a `Repeater` / model. When something works on
+  desktop but not on MiSTer, suspect AOT-QML coercion first.
+
 - **`NumberAnimation on propName`** conflicts with `property T propName: value`.
   Drop the `: value` initializer; the animation takes over immediately.
 

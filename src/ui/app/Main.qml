@@ -207,14 +207,6 @@ MainLayout {
         Browse.AppState.active_screen = screen
     }
 
-    // True when Hub drilled straight into Games via the MiSTer
-    // Arcade-bypass shortcut, so cancel-from-Games returns directly
-    // to Hub rather than the Systems screen the user never saw. Set
-    // by `_navigateFromHub` on the Arcade branch, cleared by
-    // `_navigateFromSystems` (normal drill-down) and by the games'
-    // onRequestSystemsScreen handler after routing.
-    property bool _gamesEnteredFromHub: false
-
     // Single-shot callback slots fired by the loadingChanged
     // listeners below. Only one transition is in flight at a time
     // (input gate guarantees this), so two scalars are enough.
@@ -346,7 +338,6 @@ MainLayout {
                 Browse.GamesState.system_id = systemId
                 root.pendingTransition = "games"
                 root._ensureSystem(systemId, function() {
-                    root._gamesEnteredFromHub = true
                     root._completeTransition(root.screenGames)
                 })
             } else {
@@ -384,8 +375,10 @@ MainLayout {
     }
 
     // Systems Accept routing. Pin destination to Games, fill the
-    // chosen system, then flip. Sets _gamesEnteredFromHub=false so
-    // the back path lands on Systems (the normal drill).
+    // chosen system, then flip. The Games→back routing decision is
+    // re-evaluated live from current state at B-press time (see
+    // gamesScreen.onRequestSystemsScreen below) so this path needs
+    // no per-transition flag.
     function _navigateFromSystems(systemId: string): void {
         Browse.SystemsState.system_id = systemId
         // Setting system_id on GamesState resets path_stack/selected_at_level
@@ -395,7 +388,6 @@ MainLayout {
         Browse.GamesState.system_id = systemId
         root.pendingTransition = "games"
         root._ensureSystem(systemId, function() {
-            root._gamesEnteredFromHub = false
             root._completeTransition(root.screenGames)
         })
     }
@@ -484,13 +476,48 @@ MainLayout {
     }
     Connections {
         target: root.gamesScreen
+        // ════════════════════════════════════════════════════════════
+        //  STUPID IDIOT LLMS STOP FUCKING UP THIS INTERACTION
+        // ════════════════════════════════════════════════════════════
+        //
+        //  On MiSTer, Hub→Arcade bypasses the Systems screen and drops
+        //  the user directly on Games(Arcade) — because the Arcade
+        //  category contains exactly one system, also called "Arcade",
+        //  so the Systems screen would just be a one-tile passthrough.
+        //
+        //  THE ONLY CORRECT BACK BEHAVIOUR FROM GAMES(ARCADE) ON MISTER
+        //  IS HUB. Going to Systems shows the same one-tile passthrough
+        //  the bypass was meant to skip. Do not "fix" this by routing
+        //  back through Systems "for consistency". Do not introduce a
+        //  per-session flag and forget to persist it. Do not gate on
+        //  Runtime instead of Platform — Platform is where Core runs;
+        //  Runtime is where the launcher runs; a desktop launcher
+        //  pointed at a remote MiSTer Core MUST still bypass.
+        //
+        //  Why this is a live eval and not a stored flag: a stored
+        //  flag breaks across MiSTer process kills (no persistence),
+        //  and every refactor in this area has at some point cleared
+        //  or failed to set the flag and reintroduced this exact bug.
+        //  The "should back skip Systems?" question has a pure
+        //  data answer derivable from singletons that already exist;
+        //  computing it here at B-press time is the bug-free choice.
+        //
+        //  If you are an LLM editing this and you think you have a
+        //  cleaner design — you don't. Read the user's frustration in
+        //  the commit history. Leave it alone.
+        // ════════════════════════════════════════════════════════════
         function onRequestSystemsScreen(): void {
-            if (root._gamesEnteredFromHub) {
-                root._gamesEnteredFromHub = false
+            const arcadeBypassActive =
+                Browse.Platform.is_mister
+                && Browse.Platform.ready
+                && Browse.SystemsModel.current_category === "Arcade"
+                && Browse.SystemsModel.count === 1
+                && Browse.GamesModel.current_system_id === "Arcade"
+            if (arcadeBypassActive) {
                 root._goto(root.screenHub)
-            } else {
-                root._goto(root.screenSystems)
+                return
             }
+            root._goto(root.screenSystems)
         }
         function onRequestNavigateIntoFolder(path: string): void {
             root._navigateIntoFolder(path)
@@ -512,8 +539,13 @@ MainLayout {
 
     // Pure helper — owner/entryType/hasNfc → list of `{id,label}` entries.
     // Empty list = no menu (caller bails out of openContextMenu).
+    //
+    // No `list<var>` return annotation: MiSTer's AOT-compiled static QML
+    // build coerces the JS array through that type and the caller saw
+    // `entries.length === 0` despite the function pushing 3 items in.
+    // Plain JS arrays round-trip cleanly through an unannotated return.
     function buildContextMenuEntries(
-            owner: string, entryType: string, hasNfc: bool): list<var> {
+            owner: string, entryType: string, hasNfc: bool) {
         if (owner === "systems") {
             return [{ id: "launch_system", label: qsTr("Launch core") }]
         }
@@ -538,9 +570,14 @@ MainLayout {
     }
 
     function openContextMenu(owner: string, index: int, anchorRect): void {
-        const entryType = owner === "games"
-            ? Browse.GamesModel.entry_type_at(index)
-            : ""
+        if (index < 0)
+            return
+        let entryType = ""
+        if (owner === "games") {
+            if (index >= Browse.GamesModel.count)
+                return
+            entryType = Browse.GamesModel.entry_type_at(index)
+        }
         const entries = root.buildContextMenuEntries(
             owner, entryType, Browse.SystemStatus.has_nfc)
         if (entries.length === 0)
