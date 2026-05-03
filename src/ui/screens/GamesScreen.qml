@@ -22,15 +22,19 @@ Item {
 
     property alias gamesGrid: gamesGrid
 
-    // True while the cover gate in `GamesModel` is holding `loading`.
-    // Mirrors the `transitioning` contract in `SystemsScreen.qml` /
-    // `RecentsScreen.qml`: the screen body hides while transitioning so
-    // the centred `ScreenStateOverlay` paints alone on a cleared band,
-    // rather than reading as pasted on top of a populated grid. The
-    // cover gate already scopes `loading` to the initial-page path
-    // (pagination uses a separate `loading_more` flag), so PgDn doesn't
-    // trip this hide.
-    readonly property bool transitioning: Browse.GamesModel.loading
+    // Router-driven flag: `MainLayout.qml` writes this to
+    // `root.pendingTransition !== ""` for every peer screen, including
+    // this one. The screen body hides while it's true so the global
+    // "Loading…" cue paints alone on a cleared band rather than over
+    // a populated grid.
+    property bool transitioning: false
+
+    // Cover-gate flag: true while `GamesModel` is holding `loading`
+    // for the initial-page paint. Pagination uses a separate
+    // `loading_more` flag, so PgDn doesn't trip this. The body hides
+    // on either flag (see `visible:` bindings below) so the centred
+    // `ScreenStateOverlay` paints alone in both cases.
+    readonly property bool coverGateLoading: Browse.GamesModel.loading
 
     // Emitted when the user presses Escape — Main.qml flips the
     // active screen back to SystemsScreen (one peer up the back-stack;
@@ -185,7 +189,7 @@ Item {
     // entry count for the path.
     TopStatusStrip {
         id: topStrip
-        visible: !games.transitioning
+        visible: !games.transitioning && !games.coverGateLoading
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
@@ -214,7 +218,7 @@ Item {
     PagedGrid {
         id: gamesGrid
 
-        visible: !games.transitioning
+        visible: !games.transitioning && !games.coverGateLoading
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: topStrip.bottom
@@ -247,7 +251,7 @@ Item {
     // tile selection).
     ActiveLabel {
         id: activeLabel
-        visible: !games.transitioning
+        visible: !games.transitioning && !games.coverGateLoading
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: gamesGrid.bottom

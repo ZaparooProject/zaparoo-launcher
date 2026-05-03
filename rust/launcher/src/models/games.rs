@@ -596,18 +596,11 @@ impl ffi::GamesModel {
         if let Some(handle) = self.as_mut().rust_mut().watcher.take() {
             handle.abort();
         }
-        // Tear down any cover gate left from the prior path: abort the
-        // timer task, clear the waiting-keys set, and bump
-        // `cover_gate_seq` so any callback the aborted timer may have
-        // already queued onto the Qt thread sees a stale ticket and
-        // bails. Without this bump, a stale callback could fire after
-        // the new path's `set_loading(true)` and prematurely release
-        // its gate.
-        if let Some(handle) = self.as_mut().rust_mut().cover_gate_timer.take() {
-            handle.abort();
-        }
-        self.as_mut().rust_mut().pending_first_paint_keys.clear();
-        self.rust().cover_gate_seq.fetch_add(1, Ordering::SeqCst);
+        // Tear down any cover gate left from the prior path. See
+        // `reset_cover_gate` for the rationale; without this teardown
+        // a stale timer callback could fire after the new path's
+        // `set_loading(true)` and prematurely release its gate.
+        reset_cover_gate(self.as_mut());
 
         let seq = self.rust().seq.clone();
         let ticket = seq.fetch_add(1, Ordering::SeqCst) + 1;
@@ -852,6 +845,20 @@ where
         .collect()
 }
 
+/// Abort any in-flight cover-gate timer, drop the waiting-keys set,
+/// and bump `cover_gate_seq` so a callback that already queued onto
+/// the Qt thread before the abort took effect sees a stale ticket and
+/// bails. Used on every browse status edge that doesn't go on to call
+/// `arm_cover_gate` itself (Pending, Errored, and the
+/// `start_initial_browse` reset).
+fn reset_cover_gate(mut model: Pin<&mut ffi::GamesModel>) {
+    if let Some(handle) = model.as_mut().rust_mut().cover_gate_timer.take() {
+        handle.abort();
+    }
+    model.as_mut().rust_mut().pending_first_paint_keys.clear();
+    model.rust().cover_gate_seq.fetch_add(1, Ordering::SeqCst);
+}
+
 /// Decide whether to hold `loading=true` until the page's covers are
 /// cached, or release immediately. Called once per `apply_initial_page`.
 ///
@@ -1027,6 +1034,12 @@ fn leading_dir_count(entries: &[BrowseEntry]) -> i32 {
 fn apply_status(mut model: Pin<&mut ffi::GamesModel>, status: ResourceStatus<MediaBrowseResult>) {
     match project_status(status) {
         Projection::Pending => {
+            // A new browse round started (or a Ready→Pending refetch
+            // is in flight). Abort any cover gate left from the
+            // previous Ready so its safety-timer callback can't race
+            // with the loading=true we're about to set and clear it
+            // mid-load.
+            reset_cover_gate(model.as_mut());
             if !model.loading {
                 model.as_mut().set_loading(true);
             }
@@ -1077,6 +1090,10 @@ fn apply_status(mut model: Pin<&mut ffi::GamesModel>, status: ResourceStatus<Med
         }
         Projection::Errored { message } => {
             warn!("media.browse errored: {message}");
+            // Errored takes us out of Ready without going through
+            // `arm_cover_gate`, so any timer left armed by the prior
+            // Ready needs to be torn down explicitly.
+            reset_cover_gate(model.as_mut());
             let qstr = QString::from(message.as_str());
             if model.error_message != qstr {
                 model.as_mut().set_error_message(qstr);

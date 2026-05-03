@@ -318,6 +318,11 @@ impl CacheState {
             };
             if let Some(entry) = self.map.remove(&victim) {
                 self.total_bytes = self.total_bytes.saturating_sub(entry.bytes.len());
+                // Keep the `media_ids` sidecar in lock-step with
+                // `map` — without this, the hint table grows
+                // unboundedly past `cap_bytes` because the eviction
+                // pass only touches the primary cache.
+                self.media_ids.remove(&victim);
                 debug!(
                     system_id = %victim.system_id,
                     path = %victim.path,
@@ -614,10 +619,35 @@ fn process_batch_outcomes(
                     let mut s = state.write().unwrap();
                     s.pending.insert(key.clone());
                 }
-                {
+                let dropped = {
                     #[allow(clippy::unwrap_used, reason = "Mutex poisoning is unrecoverable")]
                     let mut q = queue.lock().unwrap();
                     q.push_back(key);
+                    // Mirror the `enqueue_with_media_id` cap: a
+                    // long-running burst of transient failures can
+                    // push the queue past `MAX_QUEUE_LEN` if we
+                    // re-enter without trimming. Drop the oldest
+                    // fronts and clear them from `pending` so a
+                    // future `enqueue` for the same key can re-add
+                    // it instead of being short-circuited.
+                    let mut dropped: Vec<MediaKey> = Vec::new();
+                    while q.len() > MAX_QUEUE_LEN {
+                        let Some(stale) = q.pop_front() else { break };
+                        dropped.push(stale);
+                    }
+                    dropped
+                };
+                if !dropped.is_empty() {
+                    #[allow(clippy::unwrap_used, reason = "RwLock poisoning is unrecoverable")]
+                    let mut guard = state.write().unwrap();
+                    for stale in &dropped {
+                        guard.pending.remove(stale);
+                    }
+                    debug!(
+                        dropped = dropped.len(),
+                        queue_cap = MAX_QUEUE_LEN,
+                        "media_image_cache: retry queue cap hit, dropped stale enqueues"
+                    );
                 }
                 queue_notify.notify_one();
             } else {
@@ -696,18 +726,27 @@ async fn fetch_batch(
     // Build the request, preferring `media_id` from the sidecar when
     // we have one — Core resolves the row directly without a path
     // lookup. Falls back to `(system, path)` on any key without a
-    // hint or on Cores that don't recognise the id.
-    let items: Vec<MediaImageBulkItem> = {
+    // hint or on Cores that don't recognise the id. Captures the
+    // `had_id_hint` boolean from the same guard snapshot so the
+    // post-RPC classification can't disagree with the request shape
+    // it was built from (a concurrent batch's `media_ids.remove`
+    // between two read locks would otherwise re-classify a hinted
+    // item as un-hinted).
+    let paired: Vec<(MediaImageBulkItem, bool)> = {
         #[allow(clippy::unwrap_used, reason = "RwLock poisoning is unrecoverable")]
         let guard = state.read().unwrap();
         batch
             .iter()
             .map(|k| match guard.media_ids.get(k) {
-                Some(id) => MediaImageBulkItem::for_media_id(*id),
-                None => MediaImageBulkItem::for_media(k.system_id.as_ref(), k.path.as_ref()),
+                Some(id) => (MediaImageBulkItem::for_media_id(*id), true),
+                None => (
+                    MediaImageBulkItem::for_media(k.system_id.as_ref(), k.path.as_ref()),
+                    false,
+                ),
             })
             .collect()
     };
+    let (items, id_hinted): (Vec<MediaImageBulkItem>, Vec<bool>) = paired.into_iter().unzip();
     let params = MediaImageBulkParams {
         items,
         image_types: Vec::new(),
@@ -746,21 +785,15 @@ async fn fetch_batch(
             .map(|k| (k, FetchOutcome::Transient))
             .collect();
     }
-    // Snapshot which keys were sent with a `media_id` hint so a
-    // per-item error can fall back to `(system, path)` instead of
-    // burning the row into the negative memo. Core treats `media_id`
-    // as session-ephemeral, so a stale hint after a Core restart can
-    // surface as "media not found" — we drop the sidecar entry and
-    // retry transiently, which on the next batch sends the canonical
-    // `(system, path)` and self-heals.
-    let id_hinted: Vec<bool> = {
-        #[allow(clippy::unwrap_used, reason = "RwLock poisoning is unrecoverable")]
-        let guard = state.read().unwrap();
-        batch
-            .iter()
-            .map(|k| guard.media_ids.contains_key(k))
-            .collect()
-    };
+    // The `id_hinted` snapshot captured alongside `items` above
+    // tells us, for each response slot, whether we sent a
+    // `media_id` hint. A per-item error against a hinted request
+    // falls back to `(system, path)` on retry instead of burning
+    // the row into the negative memo — Core treats `media_id` as
+    // session-ephemeral, so a stale hint after a Core restart can
+    // surface as "media not found", and we want to drop the
+    // sidecar entry and retry transiently rather than mark the row
+    // as a permanent miss.
     batch
         .iter()
         .cloned()

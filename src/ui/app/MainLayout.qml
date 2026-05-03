@@ -226,6 +226,7 @@ ApplicationWindow {
             id: gamesScreen
             anchors.fill: parent
             visible: root.activeScreen === root.screenGames
+            transitioning: root.pendingTransition !== ""
         }
 
         RecentsScreen {
