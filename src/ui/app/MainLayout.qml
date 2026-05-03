@@ -477,8 +477,10 @@ ApplicationWindow {
         readonly property var helpEntries: {
             if (root.contextMenuVisible)
                 return [
+                    { button: "Dpad", label: qsTr("Move") },
                     { button: "ButtonA", label: qsTr("Select") },
-                    { button: "ButtonB", label: qsTr("Close") }
+                    { button: "ButtonB", label: qsTr("Close") },
+                    { button: "ButtonX", label: qsTr("Close") }
                 ];
             if (root.cardWriteModalVisible)
                 return [{ button: "ButtonB", label: qsTr("Cancel") }];

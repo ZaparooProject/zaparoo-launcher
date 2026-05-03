@@ -68,7 +68,7 @@ Item {
             if (menu.currentIndex >= 0 && menu.currentIndex < menu.entries.length)
                 menu.accepted(menu.entries[menu.currentIndex].id)
         }
-        else if (action === "cancel")
+        else if (action === "cancel" || action === "write_card")
             menu.closeRequested()
     }
 
