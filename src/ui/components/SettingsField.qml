@@ -42,6 +42,12 @@ Item {
     // index, start/cancel scrape) and gates by `actionStatus`.
     signal accepted()
 
+    // Item.enabled (built-in) gates the MouseArea below; the dimmed
+    // opacity here gives a matching visual cue. Setting `enabled: false`
+    // on the row makes Accept a no-op (the index/scrape pair use this
+    // when one of the two is in flight — Core serialises them).
+    opacity: enabled ? 1.0 : 0.4
+
     implicitHeight: Sizing.pctH(8)
 
     Rectangle {
@@ -157,10 +163,16 @@ Item {
         acceptedButtons: Qt.LeftButton
 
         onEntered: root.hovered()
+        // Action rows fire `accepted()` (the screen runs start/cancel
+        // there); every other control fires `clicked()` (the screen
+        // moves focus and toggles a value). Emitting both for action
+        // rows used to make `onClicked` and `onAccepted` race over
+        // the same press.
         onClicked: {
-            root.clicked();
             if (root.control === "action")
                 root.accepted();
+            else
+                root.clicked();
         }
     }
 }

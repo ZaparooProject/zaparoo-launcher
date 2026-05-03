@@ -140,6 +140,20 @@ Item {
             return settings._scrapeBusy
         return false
     }
+    // True when the focused action can't run right now because the
+    // *other* media operation has the bus. Drives the dimmed-row
+    // visual and lets the help bar drop the Accept hint instead of
+    // promising a press that will silently no-op.
+    readonly property bool focusedActionDisabled: {
+        if (settings.fieldCount === 0)
+            return false
+        const id = settings.fields[settings.currentIndex].id
+        if (id === "updateMediaDb")
+            return settings._scrapeBusy
+        if (id === "runScraper")
+            return settings._indexBusy
+        return false
+    }
 
     property int currentIndex: 0
 
@@ -334,6 +348,15 @@ Item {
 
                 width: form.width
                 isFocused: index === settings.currentIndex
+                // Index and scrape can't run together; while one
+                // operation is in flight the other row dims and its
+                // MouseArea stops responding. Keyboard Accept is
+                // separately gated in `_triggerIndex`/`_triggerScrape`.
+                enabled: modelData.id === "updateMediaDb"
+                         ? !settings._scrapeBusy
+                         : modelData.id === "runScraper"
+                         ? !settings._indexBusy
+                         : true
                 label: modelData.label
                 value: modelData.id === "resolution"
                        ? settings._resolutionDisplay(Browse.Settings.current_resolution)
@@ -376,7 +399,12 @@ Item {
                     if (modelData.id === "mouseEnabled")
                         settings._toggleMouseEnabled()
                 }
+                // Action rows route through `onAccepted` only (see
+                // `SettingsField.qml`'s MouseArea), so the focus
+                // commit lives here too — clicking an action row
+                // moves focus before firing the action.
                 onAccepted: {
+                    settings.currentIndex = index
                     if (modelData.id === "updateMediaDb")
                         settings._triggerIndex()
                     else if (modelData.id === "runScraper")

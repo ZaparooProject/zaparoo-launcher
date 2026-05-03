@@ -555,7 +555,8 @@ ApplicationWindow {
                 }
                 if (root.settingsScreen.focusedFieldIsMouse)
                     row.push({ button: "ButtonA", label: qsTr("Toggle") });
-                else if (root.settingsScreen.focusedFieldIsAction)
+                else if (root.settingsScreen.focusedFieldIsAction
+                         && !root.settingsScreen.focusedActionDisabled)
                     row.push({
                         button: "ButtonA",
                         label: root.settingsScreen.focusedActionBusy
