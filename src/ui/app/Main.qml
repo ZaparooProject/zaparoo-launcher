@@ -42,10 +42,12 @@ MainLayout {
     readonly property bool activeCardWritePending:
         root.cardWriteOwner === "systems" ? Browse.SystemsModel.card_write_pending
         : root.cardWriteOwner === "games" ? Browse.GamesModel.card_write_pending
+        : root.cardWriteOwner === "favorites" ? Browse.FavoritesModel.card_write_pending
         : false
     readonly property string activeCardWriteError:
         root.cardWriteOwner === "systems" ? Browse.SystemsModel.card_write_error
         : root.cardWriteOwner === "games" ? Browse.GamesModel.card_write_error
+        : root.cardWriteOwner === "favorites" ? Browse.FavoritesModel.card_write_error
         : ""
 
     // Bound here (not in GamesScreen.qml) because `set_system` can fire
@@ -80,6 +82,7 @@ MainLayout {
         if (savedScreen === root.screenGames
             || savedScreen === root.screenSystems
             || savedScreen === root.screenHub
+            || savedScreen === root.screenFavorites
             || savedScreen === root.screenRecents
             || savedScreen === root.screenSettings)
             root.activeScreen = savedScreen
@@ -90,12 +93,19 @@ MainLayout {
         // Connection below fires it on first delivery.
         if (Browse.CategoriesModel.count > 0)
             root.hubScreen.restoreFromCategoriesReset()
-        // Warm-start into Recents needs the same restore-on-ready
-        // dance _navigateToRecents performs, otherwise the grid lands
-        // on index 0 and ignores the persisted RecentsState.selected_path.
-        // RecentsModel binds eagerly via bind_to_endpoint! so the
-        // synchronous branch is the common path; the async waiter
-        // covers a slow Core link on cold launch.
+        // Warm-start into Favorites/Recents needs the same
+        // restore-on-ready dance the navigate helpers perform,
+        // otherwise the grid lands on index 0 and ignores persisted
+        // selected_path.
+        if (savedScreen === root.screenFavorites) {
+            if (Browse.FavoritesModel.loading) {
+                root._favoritesReadyCallback = function() {
+                    root.favoritesScreen.restoreSelection()
+                }
+            } else {
+                root.favoritesScreen.restoreSelection()
+            }
+        }
         if (savedScreen === root.screenRecents) {
             if (Browse.RecentsModel.loading) {
                 root._recentsReadyCallback = function() {
@@ -216,6 +226,7 @@ MainLayout {
     // the QML lint pass to be happy.
     property var _categoryReadyCallback: null
     property var _systemReadyCallback: null
+    property var _favoritesReadyCallback: null
     property var _recentsReadyCallback: null
 
     // Listen for SystemsModel fills owned by an in-flight transition.
@@ -260,6 +271,18 @@ MainLayout {
             if (cb === null)
                 return
             root._recentsReadyCallback = null
+            cb()
+        }
+    }
+    Connections {
+        target: Browse.FavoritesModel
+        function onLoadingChanged(): void {
+            if (Browse.FavoritesModel.loading)
+                return
+            const cb = root._favoritesReadyCallback
+            if (cb === null)
+                return
+            root._favoritesReadyCallback = null
             cb()
         }
     }
@@ -346,6 +369,19 @@ MainLayout {
                 })
             }
         })
+    }
+
+    function _navigateToFavorites(): void {
+        root.pendingTransition = "favorites"
+        if (!Browse.FavoritesModel.loading) {
+            root.favoritesScreen.restoreSelection()
+            root._completeTransition(root.screenFavorites)
+            return
+        }
+        root._favoritesReadyCallback = function() {
+            root.favoritesScreen.restoreSelection()
+            root._completeTransition(root.screenFavorites)
+        }
     }
 
     // Hub → Recents transition. RecentsModel binds eagerly via
@@ -442,8 +478,16 @@ MainLayout {
             root._navigateFromHub(category)
         }
         function onRequestQuit(): void { Qt.quit() }
+        function onRequestFavoritesScreen(): void { root._navigateToFavorites() }
         function onRequestRecentsScreen(): void { root._navigateToRecents() }
         function onRequestSettingsScreen(): void { root._navigateToSettings() }
+    }
+    Connections {
+        target: root.favoritesScreen
+        function onRequestHubScreen(): void { root._goto(root.screenHub) }
+        function onRequestContextMenu(index: int, anchorRect): void {
+            root.openContextMenu("favorites", index, anchorRect)
+        }
     }
     Connections {
         target: root.recentsScreen
@@ -549,7 +593,7 @@ MainLayout {
         if (owner === "systems") {
             return [{ id: "launch_system", label: qsTr("Launch core") }]
         }
-        if (owner === "games") {
+        if (owner === "games" || owner === "favorites") {
             if (entryType === "directory" || entryType === "root")
                 return []
             const entries = [{
@@ -582,6 +626,10 @@ MainLayout {
                 return
             entryType = Browse.GamesModel.entry_type_at(index)
             isFavorite = Browse.GamesModel.is_favorite_at(index)
+        } else if (owner === "favorites") {
+            if (index >= Browse.FavoritesModel.count)
+                return
+            isFavorite = Browse.FavoritesModel.is_favorite_at(index)
         }
         const entries = root.buildContextMenuEntries(
             owner, entryType, Browse.SystemStatus.has_nfc, isFavorite)
@@ -615,10 +663,15 @@ MainLayout {
         if (id === "launch_system") {
             Browse.SystemsModel.launch_at(targetIndex)
         } else if (id === "launch_game") {
-            Browse.GamesModel.launch_at(targetIndex)
+            if (owner === "favorites")
+                Browse.FavoritesModel.launch_at(targetIndex)
+            else
+                Browse.GamesModel.launch_at(targetIndex)
         } else if (id === "toggle_favorite") {
             if (owner === "games")
                 Browse.GamesModel.toggle_favorite_at(targetIndex)
+            else if (owner === "favorites")
+                Browse.FavoritesModel.toggle_favorite_at(targetIndex)
         } else if (id === "write_card") {
             if (owner === "systems") {
                 root.beginCardWrite("systems")
@@ -626,13 +679,18 @@ MainLayout {
             } else if (owner === "games") {
                 root.beginCardWrite("games")
                 Browse.GamesModel.write_card_at(targetIndex)
+            } else if (owner === "favorites") {
+                root.beginCardWrite("favorites")
+                Browse.FavoritesModel.write_card_at(targetIndex)
             }
         } else if (id === "qr_code") {
             const text = owner === "systems"
                 ? Browse.SystemsModel.launch_text_at(targetIndex)
                 : owner === "games"
                     ? Browse.GamesModel.launch_text_at(targetIndex)
-                    : ""
+                    : owner === "favorites"
+                        ? Browse.FavoritesModel.launch_text_at(targetIndex)
+                        : ""
             if (text !== "") {
                 Browse.QrCode.generate(root._buildQrPayload(text))
                 root.openQrCodeModal()
@@ -721,6 +779,8 @@ MainLayout {
             Browse.SystemsModel.cancel_card_write()
         else if (owner === "games")
             Browse.GamesModel.cancel_card_write()
+        else if (owner === "favorites")
+            Browse.FavoritesModel.cancel_card_write()
         root.cardWriteOwner = owner
         root.cardWriteFailed = false
         root.cardWriteModalVisible = true
@@ -747,6 +807,8 @@ MainLayout {
             Browse.SystemsModel.cancel_card_write()
         else if (root.cardWriteOwner === "games")
             Browse.GamesModel.cancel_card_write()
+        else if (root.cardWriteOwner === "favorites")
+            Browse.FavoritesModel.cancel_card_write()
         root.hideCardWriteModal()
     }
 
@@ -802,6 +864,8 @@ MainLayout {
             root.gamesScreen.handleAction(action)
         } else if (root.activeScreen === root.screenSystems) {
             root.systemsScreen.handleAction(action)
+        } else if (root.activeScreen === root.screenFavorites) {
+            root.favoritesScreen.handleAction(action)
         } else if (root.activeScreen === root.screenRecents) {
             root.recentsScreen.handleAction(action)
         } else if (root.activeScreen === root.screenSettings) {
@@ -954,6 +1018,7 @@ MainLayout {
                 switch (root.pendingTransition) {
                 case "systems": return qsTr("Loading systems…")
                 case "games":   return qsTr("Loading games…")
+                case "favorites": return qsTr("Loading favorites…")
                 case "recents": return qsTr("Loading recently played…")
                 default:        return qsTr("Loading…")
                 }

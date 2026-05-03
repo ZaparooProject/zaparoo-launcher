@@ -31,11 +31,12 @@ import Zaparoo.Theme
 //   - name:       string — model display name (used by the procedural
 //                          fallback while the cover PNG decodes)
 //   - coverKey:   string — relative path under resources/images/ (no extension)
+//   - favorite:   int    — optional 0/1; shows a small heart badge when 1
 //
 // PagedGrid.qml and HubScreen's static category row both wrap their
-// Tile delegate in a TileLoader that defines exactly these four
-// properties; QML's late-binding model means a caller that forgets
-// one fails silently at runtime rather than at build time, so the
+// Tile delegate in a TileLoader that defines the required properties
+// above; QML's late-binding model means a caller that forgets one
+// fails silently at runtime rather than at build time, so the
 // Component.onCompleted check below converts that footgun into a
 // loud warning.
 Item {
@@ -59,6 +60,7 @@ Item {
     readonly property bool delegateIsFocused: parent.isFocused
     readonly property string delegateName: parent.name
     readonly property string delegateCoverKey: parent.coverKey
+    readonly property bool delegateFavorite: parent.favorite !== 0
     // qmllint enable missing-property compiler
 
     Component.onCompleted: {
@@ -222,6 +224,23 @@ Item {
         smooth: true
         asynchronous: false
         visible: root.showCaption && cover.status === Image.Loading
+    }
+
+    Image {
+        id: favoriteGlyph
+        anchors.left: parent.left
+        anchors.top: parent.top
+        anchors.leftMargin: parent.width / 12
+        anchors.topMargin: parent.width / 12
+        width: parent.width / 6
+        height: width
+        source: Resources.iconUrl("Heart")
+        sourceSize.width: width
+        sourceSize.height: height
+        fillMode: Image.PreserveAspectFit
+        smooth: true
+        asynchronous: false
+        visible: root.delegateFavorite
     }
 
     // Non-caption procedural fallback. Sits at the same geometry as

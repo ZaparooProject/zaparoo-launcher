@@ -17,6 +17,7 @@ QtObject {
     readonly property string screenHub: "hub"
     readonly property string screenSystems: "systems"
     readonly property string screenGames: "games"
+    readonly property string screenFavorites: "favorites"
     readonly property string screenRecents: "recents"
     readonly property string screenSettings: "settings"
 

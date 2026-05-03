@@ -50,7 +50,7 @@ TestCase {
     function fillModel(count: int): void {
         model.clear()
         for (let i = 0; i < count; i++)
-            model.append({ "name": "item-" + i, "coverKey": "" })
+            model.append({ "name": "item-" + i, "coverKey": "", "favorite": 0 })
         // Wait for Repeater itemCount to catch up before any test assertions.
         tryCompare(grid, "itemCount", count)
     }

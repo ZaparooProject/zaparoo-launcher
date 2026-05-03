@@ -19,4 +19,5 @@ Loader {
     required property bool isFocused
     required property string name
     required property string coverKey
+    property int favorite: 0
 }

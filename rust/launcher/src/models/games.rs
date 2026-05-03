@@ -69,6 +69,7 @@ const SYSTEM_ID_ROLE: i32 = 256 + 4;
 const COVER_KEY_ROLE: i32 = 256 + 5;
 const ENTRY_TYPE_ROLE: i32 = 256 + 6;
 const FILE_COUNT_ROLE: i32 = 256 + 7;
+const FAVORITE_ROLE: i32 = 256 + 8;
 
 // Default API page size before QML binds the model's `page_size` to the
 // grid's `pageSize`. 15 = 5 columns × 3 rows, the desktop default. The
@@ -322,6 +323,7 @@ impl ffi::GamesModel {
             COVER_KEY_ROLE => QVariant::from(&QString::from(cover_key_for(entry).as_str())),
             ENTRY_TYPE_ROLE => QVariant::from(&QString::from(entry.entry_type.as_str())),
             FILE_COUNT_ROLE => QVariant::from(&i32::try_from(entry.file_count).unwrap_or(i32::MAX)),
+            FAVORITE_ROLE => QVariant::from(&favorite_role_value(&entry.tags)),
             _ => QVariant::default(),
         }
     }
@@ -335,6 +337,7 @@ impl ffi::GamesModel {
         h.insert(COVER_KEY_ROLE, QByteArray::from("coverKey"));
         h.insert(ENTRY_TYPE_ROLE, QByteArray::from("entryType"));
         h.insert(FILE_COUNT_ROLE, QByteArray::from("fileCount"));
+        h.insert(FAVORITE_ROLE, QByteArray::from("favorite"));
         h
     }
 
@@ -755,6 +758,10 @@ fn has_favorite_tag(tags: &[TagInfo]) -> bool {
         .any(|tag| tag.tag_type == "user" && tag.tag == "favorite")
 }
 
+fn favorite_role_value(tags: &[TagInfo]) -> i32 {
+    if has_favorite_tag(tags) { 1 } else { 0 }
+}
+
 fn favorite_params_for_entry(entry: &BrowseEntry, add: bool) -> Option<MediaTagsUpdateParams> {
     let mut params = MediaTagsUpdateParams::default();
     if add {
@@ -797,6 +804,11 @@ fn apply_favorite_tags(
         return;
     }
     model.as_mut().rust_mut().entries[index as usize].tags = tags;
+    let mut roles = QList::<i32>::default();
+    roles.append(FAVORITE_ROLE);
+    let parent = QModelIndex::default();
+    let idx = model.index(index, 0, &parent);
+    model.as_mut().data_changed(&idx, &idx, &roles);
 }
 
 /// Pure helper for `cover_key_for`. Split out so tests can drive the

@@ -27,6 +27,8 @@ pub mod app_state;
 pub mod app_status;
 pub mod browse;
 pub mod categories;
+pub mod favorites;
+pub mod favorites_state;
 pub mod games;
 pub mod games_state;
 pub mod hub_state;

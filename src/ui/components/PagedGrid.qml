@@ -351,6 +351,7 @@ Item {
                 // embedded PNG from the key or shows the procedural
                 // fallback with `name` rendered large.
                 required property string coverKey
+                required property int favorite
 
                 readonly property int cellPage: Math.floor(index / root.pageSize)
                 readonly property int cellLocal: index % root.pageSize
@@ -427,6 +428,7 @@ Item {
                     isFocused: root.focused
                     name: cellItem.name
                     coverKey: cellItem._gatedCoverKey
+                    favorite: cellItem.favorite
                 }
 
                 MouseArea {

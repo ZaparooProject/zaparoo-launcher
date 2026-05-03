@@ -72,9 +72,9 @@ TestCase {
     }
 
     // Down on hub moves focus between the categories row and the
-    // actions row (Recently Played / Settings); it must never flip
-    // off-screen to systems. Accept is the only path that drills
-    // into another screen.
+    // actions row (Favorites / Recently Played / Settings); it must
+    // never flip off-screen to systems. Accept is the only path that
+    // drills into another screen.
     function test_down_on_hub_does_not_route_to_systems(): void {
         main.handleKey(Qt.Key_Down)
         compare(main.activeScreen, main.screenHub,
@@ -126,9 +126,8 @@ TestCase {
     // Cross-row mapping. The test harness has no live CategoriesModel
     // so we can't drive the full handleAction("down") flow with real
     // categories — instead we unit-test the pure arithmetic helper
-    // that owns the math. The shape verifies the user-stated
-    // 4-over-2-centered mapping (a→e, b→e, c→f, d→f and e→b, f→c)
-    // and a couple of degenerate cases.
+    // that owns the math. The shape verifies centered row mapping and
+    // a couple of degenerate cases.
     // qmllint disable compiler
     function test_cross_row_4_over_2_down(): void {
         const map = main.hubScreen._mapCrossRow
@@ -179,14 +178,14 @@ TestCase {
     }
 
     // Bottom row wraps left/right. Use Down from top[0] to drop into
-    // the bottom row first; bottomCount=2 so a single Right at the
+    // the bottom row first; bottomCount=3 so a single Right at the
     // last index must wrap to 0.
     function test_bottom_row_right_wraps_to_first(): void {
         main.handleKey(Qt.Key_Down)
-        // _mapCrossRow(0, topCount=0, 2) lands us at bottom[1].
+        // _mapCrossRow(0, topCount=0, 3) lands us at bottom[2].
         compare(main.hubScreen.currentRow, 1)
-        compare(main.hubScreen.currentIndex, 1,
-                "Centered map of top[0] with empty top lands at bottom[1]")
+        compare(main.hubScreen.currentIndex, 2,
+                "Centered map of top[0] with empty top lands at bottom[2]")
         main.handleKey(Qt.Key_Right)
         compare(main.hubScreen.currentIndex, 0,
                 "Right at last bottom-row index wraps to first")
@@ -195,11 +194,14 @@ TestCase {
     function test_bottom_row_left_wraps_to_last(): void {
         main.handleKey(Qt.Key_Down)
         compare(main.hubScreen.currentRow, 1)
-        // Drive Left twice: bottom[1] → bottom[0] → wrap to bottom[1].
+        // Drive Left three times:
+        // bottom[2] → bottom[1] → bottom[0] → wrap to bottom[2].
+        main.handleKey(Qt.Key_Left)
+        compare(main.hubScreen.currentIndex, 1)
         main.handleKey(Qt.Key_Left)
         compare(main.hubScreen.currentIndex, 0)
         main.handleKey(Qt.Key_Left)
-        compare(main.hubScreen.currentIndex, 1,
+        compare(main.hubScreen.currentIndex, 2,
                 "Left at first bottom-row index wraps to last")
     }
     // qmllint enable compiler
@@ -344,6 +346,20 @@ TestCase {
         // qmllint disable compiler
         const entries = main.buildContextMenuEntries("games", "media", true, false)
         compare(_idsOf(entries), ["toggle_favorite", "write_card", "qr_code", "launch_game"])
+        // qmllint enable compiler
+    }
+
+    function test_context_menu_favorites_matches_games_media_entries(): void {
+        // qmllint disable compiler
+        const entries = main.buildContextMenuEntries("favorites", "", true, true)
+        compare(_idsOf(entries), ["toggle_favorite", "write_card", "qr_code", "launch_game"])
+        // qmllint enable compiler
+    }
+
+    function test_context_menu_favorites_no_reader_omits_write_card(): void {
+        // qmllint disable compiler
+        const entries = main.buildContextMenuEntries("favorites", "", false, true)
+        compare(_idsOf(entries), ["toggle_favorite", "qr_code", "launch_game"])
         // qmllint enable compiler
     }
 

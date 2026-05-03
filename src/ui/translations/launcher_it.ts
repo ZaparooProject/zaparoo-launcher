@@ -147,6 +147,29 @@
     </message>
 </context>
 <context>
+    <name>FavoritesScreen</name>
+    <message>
+        <location filename="../screens/FavoritesScreen.qml" line="143"/>
+        <source>Favorites</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../screens/FavoritesScreen.qml" line="148"/>
+        <source>%1 entries</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../screens/FavoritesScreen.qml" line="195"/>
+        <source>No favorites yet</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../screens/FavoritesScreen.qml" line="196"/>
+        <source>Loading favorites…</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>GamesScreen</name>
     <message>
         <location filename="../screens/GamesScreen.qml" line="214"/>
@@ -168,11 +191,16 @@
     <name>HubScreen</name>
     <message>
         <location filename="../screens/HubScreen.qml" line="85"/>
+        <source>Favorites</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../screens/HubScreen.qml" line="86"/>
         <source>Recently Played</source>
         <translation>Giocati di recente</translation>
     </message>
     <message>
-        <location filename="../screens/HubScreen.qml" line="86"/>
+        <location filename="../screens/HubScreen.qml" line="87"/>
         <source>Settings</source>
         <translation>Impostazioni</translation>
     </message>
@@ -225,6 +253,11 @@
     <message>
         <location filename="../app/Main.qml" line="910"/>
         <source>Loading systems…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app/Main.qml" line="998"/>
+        <source>Loading favorites…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>

@@ -24,6 +24,7 @@ use zaparoo_core::systems_catalog::CatalogData;
 const COVER_KEY_ROLE: i32 = 256 + 1;
 const NAME_ROLE: i32 = 256 + 2;
 const CATEGORY_ROLE: i32 = 256 + 3;
+const FAVORITE_ROLE: i32 = 256 + 4;
 
 pub struct SystemInfo {
     pub id: String,
@@ -258,6 +259,7 @@ impl ffi::SystemsModel {
             }
             NAME_ROLE => QVariant::from(&QString::from(s.name.as_str())),
             CATEGORY_ROLE => QVariant::from(&QString::from(s.category.as_str())),
+            FAVORITE_ROLE => QVariant::from(&0_i32),
             _ => QVariant::default(),
         }
     }
@@ -267,6 +269,7 @@ impl ffi::SystemsModel {
         h.insert(COVER_KEY_ROLE, QByteArray::from("coverKey"));
         h.insert(NAME_ROLE, QByteArray::from("name"));
         h.insert(CATEGORY_ROLE, QByteArray::from("category"));
+        h.insert(FAVORITE_ROLE, QByteArray::from("favorite"));
         h
     }
 

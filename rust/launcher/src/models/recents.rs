@@ -49,6 +49,7 @@ const PATH_ROLE: i32 = 256 + 2;
 const SYSTEM_ID_ROLE: i32 = 256 + 3;
 const COVER_KEY_ROLE: i32 = 256 + 4;
 const LAUNCHER_ID_ROLE: i32 = 256 + 5;
+const FAVORITE_ROLE: i32 = 256 + 6;
 
 // Page size for the initial load and every cursor follow-up. Core caps
 // `limit` at 100; history rows are tiny (one tile + one caption per row)
@@ -311,6 +312,7 @@ impl ffi::RecentsModel {
             SYSTEM_ID_ROLE => QVariant::from(&QString::from(entry.system_id.as_str())),
             COVER_KEY_ROLE => QVariant::from(&QString::from(cover_key_for(entry).as_str())),
             LAUNCHER_ID_ROLE => QVariant::from(&QString::from(entry.launcher_id.as_str())),
+            FAVORITE_ROLE => QVariant::from(&0_i32),
             _ => QVariant::default(),
         }
     }
@@ -322,6 +324,7 @@ impl ffi::RecentsModel {
         h.insert(SYSTEM_ID_ROLE, QByteArray::from("systemId"));
         h.insert(COVER_KEY_ROLE, QByteArray::from("coverKey"));
         h.insert(LAUNCHER_ID_ROLE, QByteArray::from("launcherId"));
+        h.insert(FAVORITE_ROLE, QByteArray::from("favorite"));
         h
     }
 

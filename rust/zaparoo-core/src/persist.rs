@@ -28,6 +28,7 @@ pub struct PersistedState {
     pub hub: HubState,
     pub systems: SystemsState,
     pub games: GamesState,
+    pub favorites: FavoritesState,
     pub recents: RecentsState,
     pub settings: SettingsState,
 }
@@ -40,8 +41,8 @@ pub struct HubState {
     /// (categories), 1 = bottom (action tiles).
     pub selected_row: u32,
     /// The bottom-row action tile that last had focus. One of
-    /// `"recents"` or `"settings"`. Empty defaults to the leftmost
-    /// action when restored.
+    /// `"favorites"`, `"recents"` or `"settings"`. Empty defaults
+    /// to the leftmost action when restored.
     pub selected_action: String,
 }
 
@@ -75,6 +76,14 @@ impl Default for GamesState {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct RecentsState {
+    pub selected_path: String,
+}
+
+/// Favorite-games selection state. The list itself is owned by Core
+/// (`media.search` with `user:favorite`); we just remember focus.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct FavoritesState {
     pub selected_path: String,
 }
 
@@ -200,8 +209,8 @@ mod tests {
     )]
 
     use super::{
-        load_from, save_to, GamesState, HubState, PersistedState, RecentsState, SettingsState,
-        SystemsState,
+        load_from, save_to, FavoritesState, GamesState, HubState, PersistedState, RecentsState,
+        SettingsState, SystemsState,
     };
     use std::thread;
 
@@ -234,6 +243,9 @@ mod tests {
             },
             recents: RecentsState {
                 selected_path: "/roms/nes/mario/smb.nes".into(),
+            },
+            favorites: FavoritesState {
+                selected_path: "/roms/nes/zelda.nes".into(),
             },
             settings: SettingsState {
                 resolution: "1920x1080".into(),
@@ -288,6 +300,7 @@ mod tests {
                                 path_stack: vec![String::new()],
                                 selected_at_level: vec![format!("/roms/{i}/{j}.rom")],
                             },
+                            favorites: FavoritesState::default(),
                             recents: RecentsState::default(),
                             settings: SettingsState::default(),
                         };
@@ -317,6 +330,7 @@ mod tests {
         assert_eq!(state.hub, HubState::default());
         assert_eq!(state.systems, SystemsState::default());
         assert_eq!(state.games, GamesState::default());
+        assert_eq!(state.favorites, FavoritesState::default());
         assert_eq!(state.recents, RecentsState::default());
         assert_eq!(state.settings, SettingsState::default());
     }

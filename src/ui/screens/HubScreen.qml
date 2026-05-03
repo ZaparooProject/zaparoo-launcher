@@ -20,7 +20,7 @@ import Zaparoo.Browse as Browse
 //
 //   * Top row: dynamic categories from Browse.CategoriesModel (Arcade,
 //     Computer, Console, Handheld).
-//   * Bottom row: fixed actions — Recently Played and Settings.
+//   * Bottom row: fixed actions — Favorites, Recently Played and Settings.
 //
 // Both rows wrap left/right modulo their own count, and Up/Down flip
 // between rows in a closed loop (Up from top wraps to bottom, Down
@@ -37,7 +37,8 @@ import Zaparoo.Browse as Browse
 // generalizes for any (topCount, bottomCount); see `_mapCrossRow`.
 //
 // Pure input dispatcher: emits one of `requestAccept(category)`,
-// `requestRecentsScreen`, `requestSettingsScreen`, or `requestQuit`.
+// `requestFavoritesScreen`, `requestRecentsScreen`,
+// `requestSettingsScreen`, or `requestQuit`.
 //
 // All cross-screen orchestration (model fills, deferred set_category,
 // cover prefetch, transition overlay, screen flip) lives in Main.qml.
@@ -54,6 +55,7 @@ Item {
 
     signal requestAccept(category: string)
     signal requestQuit()
+    signal requestFavoritesScreen()
     signal requestRecentsScreen()
     signal requestSettingsScreen()
 
@@ -82,6 +84,7 @@ Item {
     // bound to `actionEntries[i].text` pick up the new values
     // automatically.
     readonly property var actionEntries: [
+        { id: "favorites", coverKey: "icons/Heart",    text: qsTr("Favorites") },
         { id: "recents",  coverKey: "icons/History",  text: qsTr("Recently Played") },
         { id: "settings", coverKey: "icons/Settings", text: qsTr("Settings") }
     ]
@@ -257,7 +260,9 @@ Item {
         }
 
         const id = hub.actionEntries[hub.currentIndex].id
-        if (id === "recents")
+        if (id === "favorites")
+            hub.requestFavoritesScreen()
+        else if (id === "recents")
             hub.requestRecentsScreen()
         else if (id === "settings")
             hub.requestSettingsScreen()
@@ -383,11 +388,10 @@ Item {
 
     // Action row. Same cell geometry and centring formula as
     // categoriesRow so the two rows visually read as one grid; the
-    // only difference is a static three-entry array model and clamp-
-    // not-wrap navigation. Positioned directly below categoriesRow
-    // with a vertical gap equal to categoriesRow.spacing so the
-    // visual gutter between rows matches the gutter between tiles
-    // within a row.
+    // only difference is a static three-entry array model. Positioned
+    // directly below categoriesRow with a vertical gap equal to
+    // categoriesRow.spacing so the visual gutter between rows matches
+    // the gutter between tiles within a row.
     Item {
         id: actionsRow
 

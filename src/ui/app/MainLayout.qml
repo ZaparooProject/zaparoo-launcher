@@ -30,6 +30,7 @@ ApplicationWindow {
     readonly property string screenHub: ScreenManager.screenHub
     readonly property string screenSystems: ScreenManager.screenSystems
     readonly property string screenGames: ScreenManager.screenGames
+    readonly property string screenFavorites: ScreenManager.screenFavorites
     readonly property string screenRecents: ScreenManager.screenRecents
     readonly property string screenSettings: ScreenManager.screenSettings
 
@@ -61,6 +62,7 @@ ApplicationWindow {
     property alias hubScreen: hubScreen
     property alias systemsScreen: systemsScreen
     property alias gamesScreen: gamesScreen
+    property alias favoritesScreen: favoritesScreen
     property alias recentsScreen: recentsScreen
     property alias settingsScreen: settingsScreen
     property alias contextMenu: contextMenu
@@ -117,6 +119,11 @@ ApplicationWindow {
         Browse.GamesModel.loading ? "loading"
         : ((Browse.GamesModel.error_message ?? "") !== "" ? "error"
         : (Browse.GamesModel.count === 0 ? "empty" : "ready"))
+
+    readonly property string favoritesScreenState:
+        Browse.FavoritesModel.loading ? "loading"
+        : ((Browse.FavoritesModel.error_message ?? "") !== "" ? "error"
+        : (Browse.FavoritesModel.count === 0 ? "empty" : "ready"))
 
     readonly property string hubScreenState:
         (Browse.CategoriesModel.error_message ?? "") !== "" ? "error"
@@ -246,6 +253,13 @@ ApplicationWindow {
             id: gamesScreen
             anchors.fill: parent
             visible: root.activeScreen === root.screenGames
+            transitioning: root.pendingTransition !== ""
+        }
+
+        FavoritesScreen {
+            id: favoritesScreen
+            anchors.fill: parent
+            visible: root.activeScreen === root.screenFavorites
             transitioning: root.pendingTransition !== ""
         }
 
@@ -519,18 +533,28 @@ ApplicationWindow {
                     { button: "ButtonB", label: qsTr("Back") }
                 ];
             }
-            if (root.activeScreen === root.screenRecents) {
-                if (root.recentsScreenState === "loading")
+            if (root.activeScreen === root.screenFavorites
+                || root.activeScreen === root.screenRecents) {
+                const isFavorites = root.activeScreen === root.screenFavorites
+                const state = isFavorites
+                    ? root.favoritesScreenState
+                    : root.recentsScreenState
+                const grid = isFavorites
+                    ? root.favoritesScreen.favoritesGrid
+                    : root.recentsScreen.recentsGrid
+                if (state === "loading")
                     return [{ button: "ButtonB", label: qsTr("Back") }];
-                if (root.recentsScreenState === "ready") {
-                    const pages = root.recentsScreen.recentsGrid.pageCount;
+                if (state === "ready") {
+                    const pages = grid.pageCount;
                     let row = [
                         { button: "Dpad", label: qsTr("Move") }
                     ];
                     if (pages > 1)
                         row.push({ buttons: ["ButtonL", "ButtonR"], label: qsTr("Page") });
-                    row.push({ button: "ButtonA", label: qsTr("Open") },
-                             { button: "ButtonB", label: qsTr("Back") });
+                    row.push({ button: "ButtonA", label: qsTr("Open") });
+                    if (isFavorites)
+                        row.push({ button: "ButtonX", label: qsTr("Options") });
+                    row.push({ button: "ButtonB", label: qsTr("Back") });
                     return row;
                 }
                 return [
