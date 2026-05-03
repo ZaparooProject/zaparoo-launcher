@@ -9,7 +9,7 @@ use std::pin::Pin;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::task::JoinHandle;
-use tracing::{trace, warn};
+use tracing::{debug, trace, warn};
 use zaparoo_core::endpoints::catalog::CatalogEndpoint;
 use zaparoo_core::endpoints::readers_write::ReadersWriteMutation;
 use zaparoo_core::endpoints::run::RunMutation;
@@ -204,6 +204,13 @@ fn apply_state(mut model: Pin<&mut ffi::SystemsModel>, (data, err): (Option<Cata
             model.rust().seq.fetch_add(1, Ordering::SeqCst);
             let rows = rows_for_category(Some(&data), &cat);
             let count = rows.len() as i32;
+            let ids: Vec<&str> = rows.iter().map(|s| s.id.as_str()).collect();
+            debug!(
+                category = %cat,
+                count,
+                ?ids,
+                "systems: apply_state filled rows for category",
+            );
             model.as_mut().begin_reset_model();
             model.as_mut().rust_mut().systems = rows;
             model.as_mut().rust_mut().count = count;
@@ -339,6 +346,7 @@ impl ffi::SystemsModel {
             let rows = rows_for_category(catalog.as_ref(), &cat);
             let count = rows.len() as i32;
             let cat_for_log = cat.clone();
+            let ids_for_log: Vec<String> = rows.iter().map(|s| s.id.clone()).collect();
             let _ = qt_thread.queue(move |mut model| {
                 let current = seq.load(Ordering::SeqCst);
                 if current != ticket {
@@ -350,6 +358,12 @@ impl ffi::SystemsModel {
                     );
                     return;
                 }
+                debug!(
+                    category = %cat_for_log,
+                    count,
+                    ids = ?ids_for_log,
+                    "systems: set_category worker filled rows",
+                );
                 model.as_mut().begin_reset_model();
                 model.as_mut().rust_mut().systems = rows;
                 model.as_mut().rust_mut().count = count;

@@ -65,11 +65,13 @@ ApplicationWindow {
     property alias settingsScreen: settingsScreen
     property alias contextMenu: contextMenu
     property alias firstRunIndexModal: firstRunIndexModal
+    property alias logUploadModal: logUploadModal
 
     property bool cardWriteModalVisible: false
     property bool cardWriteFailed: false
     property bool qrCodeModalVisible: false
     property bool firstRunIndexModalVisible: false
+    property bool logUploadModalVisible: false
     property bool contextMenuVisible: false
     property rect contextMenuAnchor: Qt.rect(0, 0, 0, 0)
     // Owner-aware. Written by Main.qml at openContextMenu time; each entry
@@ -130,6 +132,7 @@ ApplicationWindow {
     signal cancelCardWriteRequested()
     signal closeQrCodeRequested()
     signal closeFirstRunIndexRequested()
+    signal closeLogUploadRequested()
 
     // Two-way sync between root.activeScreen and ScreenManager.activeScreen.
     // Binding-breaking assignments (tests setting root.activeScreen = "games")
@@ -322,6 +325,17 @@ ApplicationWindow {
         onCloseRequested: root.closeFirstRunIndexRequested()
     }
 
+    // Log-upload modal. Pushed by Main.qml when the user triggers the
+    // "Upload log" action in Settings. Owns its own three-phase view
+    // (uploading / success / error) — the router only sees open / close.
+    LogUploadModal {
+        id: logUploadModal
+
+        anchors.fill: parent
+        open: root.logUploadModalVisible
+        onCloseRequested: root.closeLogUploadRequested()
+    }
+
     // ── Top-right HUD ─────────────────────────────────────────────────────────
     //
     // Host status icons plus clock. The Row is right-anchored so icons
@@ -470,6 +484,21 @@ ApplicationWindow {
                 return [{ button: "ButtonB", label: qsTr("Cancel") }];
             if (root.qrCodeModalVisible)
                 return [{ button: "ButtonB", label: qsTr("Close") }];
+            if (root.logUploadModalVisible) {
+                const phase = root.logUploadModal.phase;
+                if (phase === root.logUploadModal._stateSuccess)
+                    return [
+                        { button: "ButtonA", label: qsTr("Done") },
+                        { button: "ButtonB", label: qsTr("Close") }
+                    ];
+                if (phase === root.logUploadModal._stateError)
+                    return [
+                        { button: "ButtonA", label: qsTr("Retry") },
+                        { button: "ButtonB", label: qsTr("Close") }
+                    ];
+                // Idle / uploading: only Cancel.
+                return [{ button: "ButtonB", label: qsTr("Cancel") }];
+            }
             if (!root.bootComplete)
                 return [];
             if (root.firstRunIndexModalVisible) {
@@ -558,7 +587,7 @@ ApplicationWindow {
                         label: qsTr("Change")
                     });
                 }
-                if (root.settingsScreen.focusedFieldIsMouse)
+                if (root.settingsScreen.focusedFieldIsToggle)
                     row.push({ button: "ButtonA", label: qsTr("Toggle") });
                 else if (root.settingsScreen.focusedFieldIsAction
                          && !root.settingsScreen.focusedActionDisabled)

@@ -163,6 +163,7 @@ pub fn save_settings_mirror(
     language: &str,
     button_layout: &str,
     mouse_enabled: bool,
+    debug_logging: bool,
 ) -> Result<(), String> {
     let mut table = if path.exists() {
         let src = std::fs::read_to_string(path)
@@ -201,6 +202,17 @@ pub fn save_settings_mirror(
         toml::Value::String(button_layout.trim().to_string()),
     );
     settings.insert("mouse_enabled".into(), toml::Value::Boolean(mouse_enabled));
+
+    let logging_value = table
+        .entry("logging")
+        .or_insert_with(|| toml::Value::Table(toml::Table::new()));
+    let Some(logging) = logging_value.as_table_mut() else {
+        return Err(format!(
+            "config key [logging] in {} is not a table",
+            path.display()
+        ));
+    };
+    logging.insert("debug".into(), toml::Value::Boolean(debug_logging));
 
     let serialized =
         toml::to_string(&table).map_err(|e| format!("config serialisation failed: {e}"))?;
@@ -392,11 +404,12 @@ mod tests {
     fn save_settings_mirror_creates_sections() {
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("launcher.toml");
-        save_settings_mirror(&path, "it_IT", "b", false).expect("save");
+        save_settings_mirror(&path, "it_IT", "b", false, true).expect("save");
         let cfg = load_config(&path);
         assert_eq!(cfg.language, "it_IT");
         assert_eq!(cfg.settings.button_layout.as_deref(), Some("b"));
         assert_eq!(cfg.settings.mouse_enabled, Some(false));
+        assert!(cfg.debug_logging);
     }
 
     #[test]
@@ -404,7 +417,7 @@ mod tests {
         let f = write_tmp(
             "[core]\nendpoint = \"ws://example.com/api\"\n[video]\nwidth = 1280\nheight = 720\n",
         );
-        save_settings_mirror(f.path(), "en", "a", true).expect("save");
+        save_settings_mirror(f.path(), "en", "a", true, false).expect("save");
         let cfg = load_config(f.path());
         assert_eq!(cfg.language, "en");
         assert_eq!(cfg.core_endpoint, "ws://example.com/api");
@@ -412,20 +425,23 @@ mod tests {
         assert_eq!(cfg.video_height, 720);
         assert_eq!(cfg.settings.button_layout.as_deref(), Some("a"));
         assert_eq!(cfg.settings.mouse_enabled, Some(true));
+        assert!(!cfg.debug_logging);
     }
 
     #[test]
     fn save_settings_mirror_normalizes_auto() {
         let f = write_tmp("");
-        save_settings_mirror(f.path(), "", "c", false).expect("save");
+        save_settings_mirror(f.path(), "", "c", false, true).expect("save");
         let written = std::fs::read_to_string(f.path()).expect("read");
         assert!(written.contains("language = \"auto\""));
         assert!(written.contains("button_layout = \"c\""));
         assert!(written.contains("mouse_enabled = false"));
+        assert!(written.contains("debug = true"));
         let cfg = load_config(f.path());
         assert_eq!(cfg.language, "");
         assert_eq!(cfg.settings.button_layout.as_deref(), Some("c"));
         assert_eq!(cfg.settings.mouse_enabled, Some(false));
+        assert!(cfg.debug_logging);
     }
 
     // Single test because std::env is process-global; splitting into

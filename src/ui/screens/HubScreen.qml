@@ -475,8 +475,14 @@ Item {
         anchors.right: parent.right
         height: Sizing.pctH(7)
         text: {
-            if (hub.currentRow === 1)
-                return hub.actionEntries[hub.currentIndex].text
+            if (hub.currentRow === 1) {
+                // currentIndex can briefly outrun actionEntries.length
+                // during cold launch, before HubState is clamped to the
+                // row. Guard the lookup so an undefined access doesn't
+                // surface as a TypeError in the log.
+                const entry = hub.actionEntries[hub.currentIndex]
+                return entry ? entry.text : ""
+            }
             if (Browse.CategoriesModel.count > 0)
                 return Browse.CategoriesModel.category_at(hub.currentIndex)
             return ""

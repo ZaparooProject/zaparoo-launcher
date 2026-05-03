@@ -32,6 +32,7 @@ MainLayout {
     readonly property string modalContextMenu: "context_menu"
     readonly property string modalQrCode: "qr_code"
     readonly property string modalFirstRunIndex: "first_run_index"
+    readonly property string modalLogUpload: "log_upload"
     // One-shot session flag: the first-run modal is shown at most
     // once per launcher process, even if the WS link drops and the
     // mediadb-empty condition would otherwise be satisfied again.
@@ -452,6 +453,7 @@ MainLayout {
     Connections {
         target: root.settingsScreen
         function onRequestHubScreen(): void { root._goto(root.screenHub) }
+        function onRequestLogUploadModal(): void { root.openLogUploadModal() }
     }
     Connections {
         target: root.systemsScreen
@@ -540,12 +542,14 @@ MainLayout {
     // Pure helper — owner/entryType/hasNfc → list of `{id,label}` entries.
     // Empty list = no menu (caller bails out of openContextMenu).
     //
-    // No `list<var>` return annotation: MiSTer's AOT-compiled static QML
-    // build coerces the JS array through that type and the caller saw
-    // `entries.length === 0` despite the function pushing 3 items in.
-    // Plain JS arrays round-trip cleanly through an unannotated return.
+    // Annotated as `: var` (not `list<var>`): MiSTer's AOT-compiled
+    // static QML build coerces the JS array through `list<var>` and the
+    // caller saw `entries.length === 0` despite the function pushing 3
+    // items in. Plain `var` round-trips cleanly and silences the
+    // qmllint "insufficiently annotated" coercion warning at the call
+    // site.
     function buildContextMenuEntries(
-            owner: string, entryType: string, hasNfc: bool) {
+            owner: string, entryType: string, hasNfc: bool): var {
         if (owner === "systems") {
             return [{ id: "launch_system", label: qsTr("Launch core") }]
         }
@@ -677,6 +681,28 @@ MainLayout {
             ScreenManager.popModal()
     }
 
+    // Log-upload modal lifecycle. Triggered from the Settings "Upload
+    // log" action; the modal kicks off `Browse.LogUpload.upload()` on
+    // its own when `open` flips true. The modal owns its three-phase
+    // view; the router only owns push/pop and stack bookkeeping.
+    function openLogUploadModal(): void {
+        // Reset before showing so a previous success/error from earlier
+        // in the session doesn't paint stale state behind the new
+        // upload's "Uploading…" copy.
+        Browse.LogUpload.reset()
+        root.logUploadModalVisible = true
+        if (ScreenManager.topModal !== root.modalLogUpload)
+            ScreenManager.pushModal(root.modalLogUpload)
+    }
+
+    function closeLogUploadModal(): void {
+        root.logUploadModalVisible = false
+        if (ScreenManager.topModal === root.modalLogUpload)
+            ScreenManager.popModal()
+    }
+
+    onCloseLogUploadRequested: root.closeLogUploadModal()
+
     Connections {
         target: Browse.AppStatus
         function onConnection_stateChanged(): void {
@@ -785,6 +811,8 @@ MainLayout {
                 root.contextMenu.handleAction(action)
             } else if (ScreenManager.topModal === root.modalFirstRunIndex) {
                 root.firstRunIndexModal.handleAction(action)
+            } else if (ScreenManager.topModal === root.modalLogUpload) {
+                root.logUploadModal.handleAction(action)
             }
             // While a modal owns input, swallow everything not handled
             // above rather than leak it to the root screen.

@@ -43,7 +43,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::broadcast::error::RecvError;
 use tokio::task::JoinHandle;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 use zaparoo_core::client::ClientError;
 use zaparoo_core::endpoints::media_browse::{BrowseArgs, MediaBrowseEndpoint};
 use zaparoo_core::endpoints::readers_write::ReadersWriteMutation;
@@ -568,6 +568,7 @@ impl ffi::GamesModel {
             ?path,
             ?systems,
             eligible_for_auto_nav,
+            page_size = self.page_size,
             "games: start_initial_browse",
         );
         self.as_mut().ensure_cover_subscription();
@@ -1031,6 +1032,45 @@ fn leading_dir_count(entries: &[BrowseEntry]) -> i32 {
     i32::try_from(n).unwrap_or(i32::MAX)
 }
 
+/// Drop any root-type entry whose path is a strict ancestor of another
+/// root entry's path. Defends against Core occasionally surfacing the
+/// shared parent dir (e.g. `/media/fat/games`) as a system root alongside
+/// the actual per-system roots beneath it; the parent appears as a
+/// phantom option in the launcher's roots screen, and selecting it
+/// browses into a directory that contains every other system.
+///
+/// Only `root`-type entries participate. `directory` and `media` entries
+/// pass through unchanged — a normal directory listing where a folder
+/// and its subfolder appear as siblings is legitimate.
+fn dedup_roots_drop_ancestors(entries: Vec<BrowseEntry>) -> Vec<BrowseEntry> {
+    let root_paths: Vec<String> = entries
+        .iter()
+        .filter(|e| e.entry_type == "root" && !e.path.is_empty())
+        .map(|e| e.path.trim_end_matches('/').to_string())
+        .collect();
+    entries
+        .into_iter()
+        .filter(|e| {
+            if e.entry_type != "root" || e.path.is_empty() {
+                return true;
+            }
+            let candidate = e.path.trim_end_matches('/');
+            !root_paths
+                .iter()
+                .any(|other| is_strict_ancestor_path(candidate, other.as_str()))
+        })
+        .collect()
+}
+
+fn is_strict_ancestor_path(parent: &str, child: &str) -> bool {
+    if parent.is_empty() || child.is_empty() || parent == child {
+        return false;
+    }
+    child
+        .strip_prefix(parent)
+        .is_some_and(|rest| rest.starts_with('/'))
+}
+
 fn apply_status(mut model: Pin<&mut ffi::GamesModel>, status: ResourceStatus<MediaBrowseResult>) {
     match project_status(status) {
         Projection::Pending => {
@@ -1050,7 +1090,7 @@ fn apply_status(mut model: Pin<&mut ffi::GamesModel>, status: ResourceStatus<Med
                 model.as_mut().set_has_next_page(false);
             }
         }
-        Projection::Ready(result) => {
+        Projection::Ready(mut result) => {
             let eligible = model.rust().auto_nav_eligible;
             // Eligibility is consumed by the first Ready that follows
             // an eligible load. A subsequent refetch (mutation
@@ -1061,6 +1101,7 @@ fn apply_status(mut model: Pin<&mut ffi::GamesModel>, status: ResourceStatus<Med
             model.as_mut().rust_mut().auto_nav_eligible = false;
             let platform = platform::current();
             let current_path = model.current_path.to_string();
+            let current_system_id = model.current_system_id.to_string();
             info!(
                 entries_len = result.entries.len(),
                 total_files = result.total_files,
@@ -1068,6 +1109,43 @@ fn apply_status(mut model: Pin<&mut ffi::GamesModel>, status: ResourceStatus<Med
                 ?current_path,
                 "media.browse Ready",
             );
+            if result.entries.is_empty() {
+                warn!(
+                    ?current_path,
+                    ?current_system_id,
+                    total_files = result.total_files,
+                    "media.browse returned 0 entries",
+                );
+            } else {
+                let mut type_counts: std::collections::BTreeMap<&str, usize> =
+                    std::collections::BTreeMap::new();
+                for e in &result.entries {
+                    *type_counts.entry(e.entry_type.as_str()).or_insert(0) += 1;
+                }
+                let sample: Vec<_> = result
+                    .entries
+                    .iter()
+                    .take(3)
+                    .map(|e| {
+                        format!(
+                            "{}|sid={}|sids={:?}|type={}|path={}",
+                            e.name, e.system_id, e.system_ids, e.entry_type, e.path
+                        )
+                    })
+                    .collect();
+                debug!(?type_counts, ?sample, "media.browse Ready entry shape",);
+            }
+            let pre_dedup = result.entries.len();
+            result.entries = dedup_roots_drop_ancestors(result.entries);
+            let removed = pre_dedup.saturating_sub(result.entries.len());
+            if removed > 0 {
+                warn!(
+                    removed,
+                    ?current_path,
+                    ?current_system_id,
+                    "media.browse: dropped ancestor-of-sibling root entries",
+                );
+            }
             match decide_initial(&result, eligible, platform.as_ref(), &current_path) {
                 InitialAction::AutoNavigate { path } => {
                     info!(?path, "media.browse: auto-navigating into single folder");
@@ -1240,9 +1318,9 @@ mod tests {
     )]
 
     use super::{
-        compute_unresolved_keys, cover_key_for_with, decide_initial, display_name, entry_system_id,
-        leading_dir_count, media_key_for, position_of_game_path, project_status, transform_entries,
-        InitialAction, Projection,
+        compute_unresolved_keys, cover_key_for_with, decide_initial, dedup_roots_drop_ancestors,
+        display_name, entry_system_id, is_strict_ancestor_path, leading_dir_count, media_key_for,
+        position_of_game_path, project_status, transform_entries, InitialAction, Projection,
     };
     use crate::media_image_cache::{MediaImageCache, MediaKey};
     use std::collections::HashSet;
@@ -1524,6 +1602,98 @@ mod tests {
     #[test]
     fn leading_dir_count_zero_on_empty() {
         assert_eq!(leading_dir_count(&[]), 0);
+    }
+
+    #[test]
+    fn is_strict_ancestor_path_matches_parent_of_child() {
+        assert!(is_strict_ancestor_path(
+            "/media/fat/games",
+            "/media/fat/games/Genesis",
+        ));
+        assert!(is_strict_ancestor_path(
+            "/media/fat/games",
+            "/media/fat/games/MegaDrive",
+        ));
+    }
+
+    #[test]
+    fn is_strict_ancestor_path_rejects_equal_paths() {
+        assert!(!is_strict_ancestor_path("/a/b", "/a/b"));
+    }
+
+    #[test]
+    fn is_strict_ancestor_path_rejects_unrelated_paths() {
+        assert!(!is_strict_ancestor_path("/a/b", "/a/bc"));
+        assert!(!is_strict_ancestor_path("/a/b", "/x/b/c"));
+    }
+
+    #[test]
+    fn is_strict_ancestor_path_rejects_empty_inputs() {
+        assert!(!is_strict_ancestor_path("", "/a"));
+        assert!(!is_strict_ancestor_path("/a", ""));
+    }
+
+    #[test]
+    fn dedup_roots_drops_ancestor_root_when_sibling_is_descendant() {
+        // The Genesis 3-root payload Core surfaced on a real MiSTer:
+        // /media/fat/games appears alongside the per-system roots beneath
+        // it. The shared parent dir must not reach the launcher's roots
+        // screen as a third option.
+        let entries = vec![
+            root("MegaDrive", "/media/fat/games/MegaDrive", "Genesis"),
+            root("Genesis", "/media/fat/games/Genesis", "Genesis"),
+            root("games", "/media/fat/games", "Genesis"),
+        ];
+        let kept = dedup_roots_drop_ancestors(entries);
+        assert_eq!(kept.len(), 2);
+        assert!(kept.iter().any(|e| e.path == "/media/fat/games/MegaDrive"));
+        assert!(kept.iter().any(|e| e.path == "/media/fat/games/Genesis"));
+        assert!(!kept.iter().any(|e| e.path == "/media/fat/games"));
+    }
+
+    #[test]
+    fn dedup_roots_passes_through_unrelated_roots() {
+        let entries = vec![
+            root("primary", "/roms/A", "NES"),
+            root("backup", "/roms/B", "NES"),
+        ];
+        let kept = dedup_roots_drop_ancestors(entries);
+        assert_eq!(kept.len(), 2);
+    }
+
+    #[test]
+    fn dedup_roots_ignores_non_root_entries() {
+        // A directory listing that contains a folder and its subfolder is
+        // legitimate (e.g. inside a system browse). The filter only
+        // applies to root-typed entries.
+        let entries = vec![
+            folder("parent", "/x"),
+            folder("child", "/x/sub"),
+            media("smb", "/x/sub/smb.nes", "NES"),
+        ];
+        let kept = dedup_roots_drop_ancestors(entries);
+        assert_eq!(kept.len(), 3);
+    }
+
+    #[test]
+    fn dedup_roots_keeps_root_with_blank_path() {
+        // Blank-path roots cannot be navigated into (handled separately
+        // by decide_initial). They never participate as ancestors and
+        // never get dropped as descendants.
+        let entries = vec![root("ghost", "", "NES"), root("real", "/roms/NES", "NES")];
+        let kept = dedup_roots_drop_ancestors(entries);
+        assert_eq!(kept.len(), 2);
+    }
+
+    #[test]
+    fn dedup_roots_handles_trailing_slash_on_either_side() {
+        let entries = vec![
+            root("parent", "/media/fat/games/", "Genesis"),
+            root("child", "/media/fat/games/Genesis", "Genesis"),
+        ];
+        let kept = dedup_roots_drop_ancestors(entries);
+        assert_eq!(kept.len(), 1);
+        assert_eq!(kept[0].path, "/media/fat/games/Genesis");
     }
 
     #[test]

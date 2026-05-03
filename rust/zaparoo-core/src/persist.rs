@@ -92,6 +92,8 @@ pub struct SettingsState {
     pub button_layout: String,
     #[serde(default = "default_mouse_enabled")]
     pub mouse_enabled: bool,
+    #[serde(default)]
+    pub debug_logging: bool,
 }
 
 impl Default for SettingsState {
@@ -101,6 +103,7 @@ impl Default for SettingsState {
             language: String::new(),
             button_layout: default_button_layout(),
             mouse_enabled: default_mouse_enabled(),
+            debug_logging: false,
         }
     }
 }
@@ -240,6 +243,7 @@ mod tests {
                 language: "it_IT".into(),
                 button_layout: "b".into(),
                 mouse_enabled: false,
+                debug_logging: true,
             },
         };
         save_to(&path, &original);
@@ -331,6 +335,7 @@ mod tests {
         assert_eq!(state.settings.language, "");
         assert_eq!(state.settings.button_layout, "a");
         assert!(state.settings.mouse_enabled);
+        assert!(!state.settings.debug_logging);
     }
 
     #[test]

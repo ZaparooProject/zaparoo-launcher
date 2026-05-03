@@ -449,7 +449,22 @@ impl Client {
         &self,
         params: MediaBrowseParams,
     ) -> Result<MediaBrowseResult, ClientError> {
+        debug!(
+            path = %params.path,
+            systems = ?params.systems,
+            max_results = ?params.max_results,
+            cursor_set = params.cursor.is_some(),
+            letter = ?params.letter,
+            sort = ?params.sort,
+            "media.browse request",
+        );
         let val = self.call("media.browse", &params).await?;
+        let entries_len = val
+            .get("entries")
+            .and_then(Value::as_array)
+            .map_or(0, Vec::len);
+        let total_files = val.get("totalFiles").and_then(Value::as_u64).unwrap_or(0);
+        debug!(entries_len, total_files, "media.browse response");
         serde_json::from_value(val).map_err(|e| ClientError {
             message: e.to_string(),
         })
