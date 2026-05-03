@@ -36,9 +36,11 @@ use cxx_qt::{CxxQtType, Threading};
 use cxx_qt_lib::{
     QByteArray, QHash, QHashPair_i32_QByteArray, QList, QModelIndex, QString, QVariant,
 };
+use std::collections::HashSet;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::broadcast::error::RecvError;
 use tokio::task::JoinHandle;
 use tracing::{info, warn};
@@ -126,6 +128,22 @@ pub struct GamesModelRust {
     // `start_initial_browse` so the model singleton owns exactly one
     // subscriber for the whole process lifetime.
     cover_subscription: Option<JoinHandle<()>>,
+    // Keys whose first-paint we're still waiting on. While non-empty we
+    // hold `loading = true` so the screen-flip overlay covers the gap
+    // between "page rendered with glyphs" and "covers cached". Drained
+    // by `notify_cover_update` as each cover lands; force-cleared by
+    // the gate timer or a subsequent `start_initial_browse`.
+    pending_first_paint_keys: HashSet<MediaKey>,
+    // Safety timer that force-releases the cover gate after a bounded
+    // delay, so a stalled bulk RPC can't park the user on `Loading…`
+    // forever.
+    cover_gate_timer: Option<JoinHandle<()>>,
+    // Bumped on every cover-gate arm and on every `start_initial_browse`.
+    // The timer's queued closure compares against the current value and
+    // bails on a mismatch — necessary because aborting the JoinHandle
+    // doesn't cancel a callback that was already queued onto the Qt
+    // thread between sleep-completion and abort.
+    cover_gate_seq: Arc<AtomicU64>,
 }
 
 impl Default for GamesModelRust {
@@ -150,6 +168,9 @@ impl Default for GamesModelRust {
             auto_nav_eligible: false,
             card_write_seq: Arc::new(AtomicU64::new(0)),
             cover_subscription: None,
+            pending_first_paint_keys: HashSet::new(),
+            cover_gate_timer: None,
+            cover_gate_seq: Arc::new(AtomicU64::new(0)),
         }
     }
 }
@@ -575,6 +596,18 @@ impl ffi::GamesModel {
         if let Some(handle) = self.as_mut().rust_mut().watcher.take() {
             handle.abort();
         }
+        // Tear down any cover gate left from the prior path: abort the
+        // timer task, clear the waiting-keys set, and bump
+        // `cover_gate_seq` so any callback the aborted timer may have
+        // already queued onto the Qt thread sees a stale ticket and
+        // bails. Without this bump, a stale callback could fire after
+        // the new path's `set_loading(true)` and prematurely release
+        // its gate.
+        if let Some(handle) = self.as_mut().rust_mut().cover_gate_timer.take() {
+            handle.abort();
+        }
+        self.as_mut().rust_mut().pending_first_paint_keys.clear();
+        self.rust().cover_gate_seq.fetch_add(1, Ordering::SeqCst);
 
         let seq = self.rust().seq.clone();
         let ticket = seq.fetch_add(1, Ordering::SeqCst) + 1;
@@ -651,7 +684,7 @@ fn cover_key_for(entry: &BrowseEntry) -> String {
         // for keys we've already learned have nothing to fetch.
         if let Some(k) = media_key.as_ref() {
             if !cache.is_negative(k) {
-                cache.enqueue(k.clone());
+                cache.enqueue_with_media_id(k.clone(), entry.media_id);
             }
         }
     }
@@ -717,7 +750,7 @@ fn enqueue_cover_fetches(entries: &[BrowseEntry]) {
         media_total += 1;
         if let Some(key) = media_key_for(entry) {
             enqueued += 1;
-            cache.enqueue(key);
+            cache.enqueue_with_media_id(key, entry.media_id);
         }
     }
     info!(
@@ -731,6 +764,10 @@ fn enqueue_cover_fetches(entries: &[BrowseEntry]) {
 /// `entries` vec — pages top out at a few hundred rows after look-
 /// ahead, and the bridge runs only when the cover-cache fetch driver
 /// delivers a result.
+///
+/// Also drains `pending_first_paint_keys`: each cover landing during
+/// the gate's hold ticks the set down, and emptying the set releases
+/// the gate so the screen-flip overlay clears.
 fn notify_cover_update(mut model: Pin<&mut ffi::GamesModel>, key: &MediaKey) {
     let rows: Vec<i32> = model
         .entries
@@ -741,15 +778,141 @@ fn notify_cover_update(mut model: Pin<&mut ffi::GamesModel>, key: &MediaKey) {
         })
         .filter_map(|(i, _)| i32::try_from(i).ok())
         .collect();
-    if rows.is_empty() {
+    if !rows.is_empty() {
+        let mut roles = QList::<i32>::default();
+        roles.append(COVER_KEY_ROLE);
+        let parent = QModelIndex::default();
+        for row in rows {
+            let idx = model.index(row, 0, &parent);
+            model.as_mut().data_changed(&idx, &idx, &roles);
+        }
+    }
+    // Tick the gate's pending set down. `remove` returns false if the
+    // key wasn't gated (broadcast events fire for every cache update,
+    // including miss-recovery enqueues from `cover_key_for`); we only
+    // try to release when a gated key was actually drained.
+    let was_pending = model
+        .as_mut()
+        .rust_mut()
+        .pending_first_paint_keys
+        .remove(key);
+    if was_pending && model.pending_first_paint_keys.is_empty() && model.loading {
+        if let Some(handle) = model.as_mut().rust_mut().cover_gate_timer.take() {
+            handle.abort();
+        }
+        // Bytes are cached, but QML's `MediaImageProvider` still has to
+        // decode them. The hidden cover pre-warmer in `GamesScreen.qml`
+        // dispatches all N requests at once and the provider's 4-worker
+        // pool decodes them in ~75–150 ms; without this settle window
+        // the gate flips `loading=false` ~80 ms after the last byte
+        // lands and `gamesGrid` materialises before the last few
+        // decodes complete, painting the procedural fallback over those
+        // tiles for a frame or two. The settle uses the same seq-ticket
+        // guard as the safety timer so a folder change cancels the
+        // pending release.
+        info!("games: cover gate bytes settled — entering decode-settle window");
+        let seq = model.rust().cover_gate_seq.clone();
+        let ticket = seq.fetch_add(1, Ordering::SeqCst) + 1;
+        let qt_thread = model.qt_thread();
+        let handle = global_runtime().spawn(async move {
+            tokio::time::sleep(Duration::from_millis(200)).await;
+            let _ = qt_thread.queue(move |mut model: Pin<&mut ffi::GamesModel>| {
+                if seq.load(Ordering::SeqCst) != ticket {
+                    return;
+                }
+                model.as_mut().rust_mut().cover_gate_timer = None;
+                if model.loading {
+                    info!("games: cover gate released after decode-settle window");
+                    model.as_mut().set_loading(false);
+                }
+            });
+        });
+        model.as_mut().rust_mut().cover_gate_timer = Some(handle);
+    }
+}
+
+/// Compute the set of media keys on the current page whose covers we
+/// must wait on before releasing the cover gate. Folders, unattributed
+/// entries, already-cached keys, and negatively-memoised keys are all
+/// excluded. Pure helper so the gate's binning logic is unit-testable
+/// without spinning up the global cache + tokio runtime.
+fn compute_unresolved_keys<F, G>(
+    entries: &[BrowseEntry],
+    is_cached: F,
+    is_negative: G,
+) -> HashSet<MediaKey>
+where
+    F: Fn(&MediaKey) -> bool,
+    G: Fn(&MediaKey) -> bool,
+{
+    entries
+        .iter()
+        .filter_map(media_key_for)
+        .filter(|k| !is_cached(k) && !is_negative(k))
+        .collect()
+}
+
+/// Decide whether to hold `loading=true` until the page's covers are
+/// cached, or release immediately. Called once per `apply_initial_page`.
+///
+/// - If every media entry is already cached or negatively-memoised
+///   (folder-only page, or revisit), set loading=false right now —
+///   there's nothing to wait on, the screen-flip overlay clears.
+/// - Otherwise, store the unresolved set on the model, arm a 3 s safety
+///   timer, and leave loading=true. `notify_cover_update` will drain
+///   the set as covers land; whichever happens first (set empties or
+///   timer fires) releases the gate.
+///
+/// The 3 s timeout is the fall-through: if the bulk RPC stalls, the
+/// user sees `Loading…` for at most 3 s before the existing
+/// "list with placeholders → covers pop in" behaviour resumes.
+fn arm_cover_gate(mut model: Pin<&mut ffi::GamesModel>) {
+    if let Some(handle) = model.as_mut().rust_mut().cover_gate_timer.take() {
+        handle.abort();
+    }
+    let cache = global_media_image_cache();
+    let unresolved = compute_unresolved_keys(
+        &model.entries,
+        |k| cache.is_cached(k),
+        |k| cache.is_negative(k),
+    );
+    if unresolved.is_empty() {
+        model.as_mut().rust_mut().pending_first_paint_keys.clear();
+        if model.loading {
+            model.as_mut().set_loading(false);
+        }
         return;
     }
-    let mut roles = QList::<i32>::default();
-    roles.append(COVER_KEY_ROLE);
-    let parent = QModelIndex::default();
-    for row in rows {
-        let idx = model.index(row, 0, &parent);
-        model.as_mut().data_changed(&idx, &idx, &roles);
+    info!(
+        pending = unresolved.len(),
+        "games: arm cover gate (holding loading until covers cached)"
+    );
+    model.as_mut().rust_mut().pending_first_paint_keys = unresolved;
+    let seq = model.rust().cover_gate_seq.clone();
+    let ticket = seq.fetch_add(1, Ordering::SeqCst) + 1;
+    let qt_thread = model.qt_thread();
+    let handle = global_runtime().spawn(async move {
+        tokio::time::sleep(Duration::from_secs(3)).await;
+        let _ = qt_thread.queue(move |model| {
+            if seq.load(Ordering::SeqCst) != ticket {
+                return;
+            }
+            release_cover_gate_after_timeout(model);
+        });
+    });
+    model.as_mut().rust_mut().cover_gate_timer = Some(handle);
+}
+
+/// Force-release the cover gate from the safety timer. Called only via
+/// the timer's queued callback after a seq-match check; the
+/// notify-driven release path lives inline in `notify_cover_update`.
+fn release_cover_gate_after_timeout(mut model: Pin<&mut ffi::GamesModel>) {
+    let pending = model.pending_first_paint_keys.len();
+    info!(pending, "games: cover gate timed out, releasing");
+    model.as_mut().rust_mut().pending_first_paint_keys.clear();
+    model.as_mut().rust_mut().cover_gate_timer = None;
+    if model.loading {
+        model.as_mut().set_loading(false);
     }
 }
 
@@ -950,9 +1113,11 @@ fn apply_initial_page(mut model: Pin<&mut ffi::GamesModel>, result: MediaBrowseR
     model.as_mut().set_dir_count(dir_count);
     model.as_mut().set_total_files(total);
     model.as_mut().set_has_next_page(has_next_page);
-    if model.loading {
-        model.as_mut().set_loading(false);
-    }
+    // Decide whether to release `loading` immediately or hold it until
+    // covers are cached. `arm_cover_gate` flips loading off itself when
+    // the page has nothing to wait on (folder-only or fully-cached
+    // revisit); otherwise it leaves loading=true and arms the timer.
+    arm_cover_gate(model.as_mut());
     if !model.error_message.is_empty() {
         model.as_mut().set_error_message(QString::default());
     }
@@ -1058,11 +1223,12 @@ mod tests {
     )]
 
     use super::{
-        cover_key_for_with, decide_initial, display_name, entry_system_id, leading_dir_count,
-        media_key_for, position_of_game_path, project_status, transform_entries, InitialAction,
-        Projection,
+        compute_unresolved_keys, cover_key_for_with, decide_initial, display_name, entry_system_id,
+        leading_dir_count, media_key_for, position_of_game_path, project_status, transform_entries,
+        InitialAction, Projection,
     };
     use crate::media_image_cache::{MediaImageCache, MediaKey};
+    use std::collections::HashSet;
     use zaparoo_core::media_types::{BrowseEntry, MediaBrowseResult, Pagination};
     use zaparoo_core::platform::Platform;
     use zaparoo_core::remote_resource::ResourceStatus;
@@ -1481,5 +1647,69 @@ mod tests {
         let result = MediaBrowseResult::default();
         assert!(!result.has_next_page());
         assert_eq!(result.next_cursor(), None);
+    }
+
+    #[test]
+    fn compute_unresolved_keys_folder_only_page_returns_empty() {
+        let entries = vec![folder("Games", "/x/Games"), folder("Saves", "/x/Saves")];
+        let unresolved = compute_unresolved_keys(&entries, |_| false, |_| false);
+        assert!(unresolved.is_empty());
+    }
+
+    #[test]
+    fn compute_unresolved_keys_all_cached_returns_empty() {
+        let entries = vec![
+            media("smb", "/p/smb", "NES"),
+            media("zelda", "/p/zelda", "NES"),
+        ];
+        let unresolved = compute_unresolved_keys(&entries, |_| true, |_| false);
+        assert!(unresolved.is_empty());
+    }
+
+    #[test]
+    fn compute_unresolved_keys_mixed_returns_only_uncached() {
+        let cached_path = "/p/smb";
+        let entries = vec![
+            media("smb", cached_path, "NES"),
+            media("zelda", "/p/zelda", "NES"),
+            folder("Saves", "/p/Saves"),
+        ];
+        let unresolved =
+            compute_unresolved_keys(&entries, |k| k.path.as_ref() == cached_path, |_| false);
+        let expected: HashSet<MediaKey> = [MediaKey::new("NES", "/p/zelda")].into_iter().collect();
+        assert_eq!(unresolved, expected);
+    }
+
+    #[test]
+    fn compute_unresolved_keys_excludes_negative_memo() {
+        // Negative-memoised keys are "Core said no image" — gate must
+        // not wait on them, otherwise the gate stays armed until the
+        // safety timer fires every time.
+        let negative_path = "/p/no-image";
+        let entries = vec![
+            media("smb", "/p/smb", "NES"),
+            media("orphan", negative_path, "NES"),
+        ];
+        let unresolved =
+            compute_unresolved_keys(&entries, |_| false, |k| k.path.as_ref() == negative_path);
+        let expected: HashSet<MediaKey> = [MediaKey::new("NES", "/p/smb")].into_iter().collect();
+        assert_eq!(unresolved, expected);
+    }
+
+    #[test]
+    fn compute_unresolved_keys_skips_unattributed_entries() {
+        // Browse entries without enough info to key on — folder, root,
+        // unattributed media — never produce a MediaKey, so the gate
+        // doesn't wait on them.
+        let entries = vec![
+            folder("Games", "/x/Games"),
+            root("NES", "/roms/NES", "NES"),
+            BrowseEntry {
+                entry_type: "media".into(),
+                ..BrowseEntry::default()
+            },
+        ];
+        let unresolved = compute_unresolved_keys(&entries, |_| false, |_| false);
+        assert!(unresolved.is_empty());
     }
 }

@@ -22,6 +22,16 @@ Item {
 
     property alias gamesGrid: gamesGrid
 
+    // True while the cover gate in `GamesModel` is holding `loading`.
+    // Mirrors the `transitioning` contract in `SystemsScreen.qml` /
+    // `RecentsScreen.qml`: the screen body hides while transitioning so
+    // the centred `ScreenStateOverlay` paints alone on a cleared band,
+    // rather than reading as pasted on top of a populated grid. The
+    // cover gate already scopes `loading` to the initial-page path
+    // (pagination uses a separate `loading_more` flag), so PgDn doesn't
+    // trip this hide.
+    readonly property bool transitioning: Browse.GamesModel.loading
+
     // Emitted when the user presses Escape — Main.qml flips the
     // active screen back to SystemsScreen (one peer up the back-stack;
     // a second Escape from there pops to Hub).
@@ -175,6 +185,7 @@ Item {
     // entry count for the path.
     TopStatusStrip {
         id: topStrip
+        visible: !games.transitioning
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
@@ -203,6 +214,7 @@ Item {
     PagedGrid {
         id: gamesGrid
 
+        visible: !games.transitioning
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: topStrip.bottom
@@ -235,6 +247,7 @@ Item {
     // tile selection).
     ActiveLabel {
         id: activeLabel
+        visible: !games.transitioning
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: gamesGrid.bottom

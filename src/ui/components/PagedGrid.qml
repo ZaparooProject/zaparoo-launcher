@@ -358,6 +358,57 @@ Item {
                 readonly property int cellCol: cellLocal % root.columns
                 readonly property bool isSelected: index === root.currentIndex
 
+                // Cover-load gate. PagedGrid's Repeater materialises every
+                // model row at construction, so without a gate every loaded
+                // cell would fire its image-provider request immediately
+                // and saturate the async pool — visible-page covers then
+                // can't finish decoding before the cover gate releases,
+                // which produces the per-tile pop-in we tried to fix in
+                // v1.
+                //
+                // Two-tier gate:
+                //   - request range (±2 pages): cells inside this radius
+                //     fire image-provider requests. Bounds the initial
+                //     fanout to a fixed ~50 covers while still
+                //     pre-decoding pages N+1 and N+2 so a forward PgDn
+                //     lands on already-cached pixmaps.
+                //   - retention range (±5 pages): cells already requested
+                //     keep their TileLoader coverKey set so Tile's Image
+                //     keeps the decoded texture *referenced*. That
+                //     prevents QQuickPixmapCache from evicting it when
+                //     the user pages on, so a back-nav within the
+                //     retention window doesn't pay re-decode. Cells that
+                //     are in retention range but were never requested
+                //     stay gated to "" — retention doesn't get to trigger
+                //     new requests, only to keep already-loaded ones
+                //     alive.
+                //
+                // Off-radius cells (outside both ranges, or in retention
+                // range without ever having been requested) set their
+                // coverKey to "" so Tile's Image collapses to source: ""
+                // and the texture reference drops; Qt may evict.
+                //
+                // Memory ceiling: ±5 around currentPage = up to 11 pages
+                // × pageSize covers ≈ 110 covers ≈ 40 MB decoded — OK on
+                // MiSTer's shared 512 MB. The decoders run at nice +10
+                // (see media_image_provider.cpp), so a re-decode after
+                // crossing past the retention edge is invisible to the
+                // renderer.
+                readonly property bool _coverInRange:
+                    Math.abs(cellPage - root.currentPage) <= 2
+                readonly property bool _coverInRetentionRange:
+                    Math.abs(cellPage - root.currentPage) <= 5
+                property bool _coverEverRequested: false
+                Binding on _coverEverRequested {
+                    when: cellItem._coverInRange
+                    value: true
+                    restoreMode: Binding.RestoreNone
+                }
+                readonly property string _gatedCoverKey:
+                    (_coverInRange
+                     || (_coverEverRequested && _coverInRetentionRange))
+                        ? coverKey : ""
+
                 width: root.cellWidth
                 height: root.cellHeight
                 x: root.leftInset
@@ -375,7 +426,7 @@ Item {
                     isSelected: cellItem.isSelected
                     isFocused: root.focused
                     name: cellItem.name
-                    coverKey: cellItem.coverKey
+                    coverKey: cellItem._gatedCoverKey
                 }
 
                 MouseArea {

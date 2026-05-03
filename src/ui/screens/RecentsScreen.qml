@@ -34,6 +34,15 @@ Item {
     // a Recents-as-source path.
     property bool transitioning: false
 
+    // True while either the cross-screen router is mid-flip
+    // (`transitioning`) or the in-screen cover gate is holding
+    // `RecentsModel.loading`. The grid + active-label hide on this so
+    // the centred `ScreenStateOverlay` paints alone on a cleared band
+    // during cold-launch / model-reset, matching `GamesScreen.qml`.
+    // Pagination uses a separate `loading_more` flag and is unaffected.
+    readonly property bool _gateHide:
+        recents.transitioning || Browse.RecentsModel.loading
+
     signal requestHubScreen()
 
     // Restore the previously focused entry when the model is Ready.
@@ -125,6 +134,7 @@ Item {
     // server-side total. Good enough until Core surfaces a total.
     TopStatusStrip {
         id: topStrip
+        visible: !recents._gateHide
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
@@ -142,6 +152,7 @@ Item {
     PagedGrid {
         id: recentsGrid
 
+        visible: !recents._gateHide
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: topStrip.bottom
@@ -164,6 +175,7 @@ Item {
 
     ActiveLabel {
         id: activeLabel
+        visible: !recents._gateHide
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: recentsGrid.bottom

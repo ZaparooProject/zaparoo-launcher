@@ -15,10 +15,10 @@
 
 use crate::media_types::{
     MediaBrowseParams, MediaBrowseResult, MediaHistoryParams, MediaHistoryResult,
-    MediaHistoryTopParams, MediaHistoryTopResult, MediaImageParams, MediaImageResult,
-    MediaLookupParams, MediaLookupResult, MediaMetaParams, MediaMetaResult, MediaSearchParams,
-    MediaSearchResult, MediaTagsParams, MediaTagsResult, ReadersResult, ReadersWriteParams,
-    RunParams, SystemsParams, SystemsResult, VersionResult,
+    MediaHistoryTopParams, MediaHistoryTopResult, MediaImageBulkParams, MediaImageBulkResult,
+    MediaImageParams, MediaImageResult, MediaLookupParams, MediaLookupResult, MediaMetaParams,
+    MediaMetaResult, MediaSearchParams, MediaSearchResult, MediaTagsParams, MediaTagsResult,
+    ReadersResult, ReadersWriteParams, RunParams, SystemsParams, SystemsResult, VersionResult,
 };
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
@@ -464,6 +464,22 @@ impl Client {
         &self,
         params: MediaImageParams,
     ) -> Result<MediaImageResult, ClientError> {
+        let val = self.call("media.image", &params).await?;
+        serde_json::from_value(val).map_err(|e| ClientError {
+            message: e.to_string(),
+        })
+    }
+
+    /// Batched `media.image`: resolves up to `MEDIA_IMAGE_BATCH_MAX`
+    /// (50) covers in a single JSON-RPC call. Core dispatches by
+    /// request shape, so the wire method name is the same as the
+    /// single-shot wrapper. Per-item failures (system not found, no
+    /// image) come back inside the response as an `error` string —
+    /// the call itself only fails on transport / RPC-level errors.
+    pub async fn media_image_bulk(
+        &self,
+        params: MediaImageBulkParams,
+    ) -> Result<MediaImageBulkResult, ClientError> {
         let val = self.call("media.image", &params).await?;
         serde_json::from_value(val).map_err(|e| ClientError {
             message: e.to_string(),

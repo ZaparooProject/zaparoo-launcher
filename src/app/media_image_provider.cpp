@@ -7,11 +7,15 @@
 #include <QByteArray>
 #include <QImage>
 #include <QImageReader>
+#include <QLatin1Char>
 #include <QList>
+#include <QQuickTextureFactory>
 #include <QString>
 #include <QStringList>
 #include <cstddef>
 #include <cstdint>
+#include <sys/resource.h>
+#include <utility>
 
 extern "C" void zaparoo_media_image_bytes_for(
     const char* encoded, std::size_t encoded_len,
@@ -65,13 +69,54 @@ QImage scaleForRequestedSize(const QImage& image, const QSize& requestedSize)
 }
 } // namespace
 
-MediaImageProvider::MediaImageProvider() : QQuickImageProvider(QQuickImageProvider::Image) {}
-
-QImage MediaImageProvider::requestImage(const QString& id, QSize* size, const QSize& requestedSize)
+MediaImageResponse::MediaImageResponse(QString id, QSize requestedSize)
+    : m_id(std::move(id)), m_requestedSize(requestedSize)
 {
+    // QThreadPool would `delete` the runnable after `run()` returns,
+    // but `QQuickAsyncImageProvider` expects the response to live until
+    // the QML engine has consumed `textureFactory()`. Disabling
+    // auto-delete hands ownership to Qt's QObject lifecycle, which
+    // calls `deleteLater()` once the engine is done with it.
+    setAutoDelete(false);
+}
+
+QQuickTextureFactory* MediaImageResponse::textureFactory() const
+{
+    // Hand off the worker-built factory to QtQuick (it takes ownership
+    // and will destroy it when the response is consumed). On the
+    // unexpected path where `run()` didn't populate `m_factory` (decode
+    // failed and m_image is null), fall back to the per-call
+    // construction the base contract expects so QtQuick still gets a
+    // non-null factory and the response unwinds cleanly.
+    if (m_factory)
+    {
+        return m_factory.release();
+    }
+    return QQuickTextureFactory::textureFactoryForImage(m_image);
+}
+
+void MediaImageResponse::run()
+{
+    // De-prioritize the decoder thread on first use so the QML render
+    // thread (default niceness on the GUI thread) always preempts it.
+    // setpriority(PRIO_PROCESS, 0, …) on Linux is per-thread (NPTL nice),
+    // and bumping nice UP doesn't require CAP_SYS_NICE — any user can
+    // drop their own thread's priority. The +10 niceness puts decoders
+    // at the bottom of the OS scheduler's preference list without going
+    // full IDLE, so they still make progress when the GUI is paused.
+    // Persists for the lifetime of the QThreadPool's worker thread, so
+    // the thread_local guard skips the syscall on subsequent runs that
+    // land on the same worker.
+    static thread_local bool s_decoderNiced = false;
+    if (!s_decoderNiced)
+    {
+        setpriority(PRIO_PROCESS, 0, 10);
+        s_decoderNiced = true;
+    }
+
     // QtQuick strips the `image://media-image/` prefix before calling
-    // us, so `id` is the raw encoded key (base64url-no-pad).
-    const QByteArray idUtf8 = id.toUtf8();
+    // the provider, so `m_id` is the raw encoded key (base64url-no-pad).
+    const QByteArray idUtf8 = m_id.toUtf8();
     QByteArray bytes;
     zaparoo_media_image_bytes_for(idUtf8.constData(), static_cast<std::size_t>(idUtf8.size()),
                                   &appendBytesCallback, &bytes);
@@ -81,11 +126,8 @@ QImage MediaImageProvider::requestImage(const QString& id, QSize* size, const QS
     {
         qWarning("media-image provider: 0 bytes for id=%s (cache miss or empty payload)",
                  idUtf8.constData());
-        if (size != nullptr)
-        {
-            *size = QSize(0, 0);
-        }
-        return {};
+        emit finished();
+        return;
     }
     QImage image;
     if (!image.loadFromData(bytes))
@@ -119,15 +161,34 @@ QImage MediaImageProvider::requestImage(const QString& id, QSize* size, const QS
             "supportedFormats=[%s]",
             idUtf8.constData(), static_cast<long long>(bytes.size()), qUtf8Printable(prefixHex),
             qUtf8Printable(formatNames.join(QStringLiteral(", "))));
-        if (size != nullptr)
-        {
-            *size = QSize(0, 0);
-        }
-        return {};
+        emit finished();
+        return;
     }
-    if (size != nullptr)
-    {
-        *size = image.size();
-    }
-    return scaleForRequestedSize(image, requestedSize);
+    m_image = scaleForRequestedSize(image, m_requestedSize);
+    // Build the texture factory here so the GUI thread doesn't pay
+    // the allocation cost during paint. `textureFactoryForImage` is
+    // documented as safe to call on any thread; the resulting factory
+    // wraps `m_image` and is consumed once by QtQuick after `finished()`.
+    m_factory.reset(QQuickTextureFactory::textureFactoryForImage(m_image));
+    emit finished();
+}
+
+MediaImageProvider::MediaImageProvider()
+{
+    // Workers run at nice +10 (see MediaImageResponse::run), so they
+    // get CPU only when the GUI thread isn't asking for it. With that
+    // safety in place, parallelism here is "free" against renderer
+    // responsiveness and we want all of it: PagedGrid widens its
+    // cover-radius gate to ±2 pages, so a page advance can land 30
+    // covers in the queue at once, and a fatter pool drains them
+    // sooner so page N+2's decode finishes before the user gets there.
+    m_pool.setMaxThreadCount(4);
+}
+
+QQuickImageResponse* MediaImageProvider::requestImageResponse(const QString& id,
+                                                              const QSize& requestedSize)
+{
+    auto* response = new MediaImageResponse(id, requestedSize);
+    m_pool.start(response);
+    return response;
 }

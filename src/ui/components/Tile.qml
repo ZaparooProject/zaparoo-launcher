@@ -43,6 +43,17 @@ Item {
 
     anchors.fill: parent
 
+    // Do NOT add `layer.enabled` here. On Qt's software adaptation
+    // it allocates a per-item QImage backing store, blits it into
+    // the parent on every paint (extra memcpy, not the cached-blit
+    // win the docs imply for hardware rendering), and its
+    // compositing path with translucent siblings/parents differs
+    // from the direct-paint path — visible as flicker on focus
+    // moves and lost transparency around the focus ring.
+    // `layer.enabled` is documented for scene graph (GPU) rendering;
+    // on the MiSTer software target it is a regression, not an
+    // optimization.
+
     // qmllint disable missing-property compiler
     readonly property bool delegateIsSelected: parent.isSelected
     readonly property bool delegateIsFocused: parent.isFocused
@@ -90,22 +101,15 @@ Item {
         Resources.coverUrl(root.delegateCoverKey)
     readonly property bool _hasCover: cover.status === Image.Ready
 
-    // Selected tile bumps up a hair so the user can see at a glance
-    // which one is current. PagedGrid bumps cellItem.z for the
-    // selected slot, so the scaled tile draws on top of its
-    // right/bottom neighbours. Gated on `_focusedSelection` so a tile
-    // in an unfocused section doesn't compete for the eye with the
-    // focused section's selection cue.
-    //
-    // No `Behavior on scale`: under software rendering, animating
-    // two tiles' scale across 120 ms forces a bilinear resample of
-    // each decoded cover PNG every frame, on both the outgoing and
-    // incoming tile. The focus outline ring is the primary focus
-    // cue; the scale bump is supplementary and looks fine snapping
-    // instantly. See `docs/qml-gotchas.md` → "Software-renderer
-    // animation costs".
-    transformOrigin: Item.Center
-    scale: root._focusedSelection ? 1.06 : 1.0
+    // No focus scale bump. The earlier 1.06 scale on the focused tile
+    // forced a bilinear resample of the cover pixmap on every focus
+    // move and overflowed the cell by ~3% on each side, dirtying
+    // strips of up to four neighbours per press — under software
+    // rendering on MiSTer that read as choppy d-pad navigation on
+    // covered grids. The focus outline ring + caption + active-label
+    // already mark the selection clearly, so the size cue isn't worth
+    // the per-press repaint cost. See `docs/qml-gotchas.md` →
+    // "Software-renderer animation costs".
 
     // Tile body. Solid card so the white icon has a high-contrast
     // surface. Always visible — no opacity gating — which is the
@@ -246,9 +250,10 @@ Item {
     }
 
     // Bottom caption strip (caption mode only). Single line, ellipsised
-    // when long. Same focus-tinted colouring as the non-caption
-    // fallback so the focused tile's caption brightens with the rest
-    // of the focus cue.
+    // when long. Tints to `textPrimary` on the focused tile so the
+    // selection reads at a glance even when the focus outline ring is
+    // outside the eye's centre — matches the procedural fallback's
+    // focus tint above.
     Text {
         id: caption
         anchors {

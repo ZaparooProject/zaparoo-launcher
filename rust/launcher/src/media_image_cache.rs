@@ -42,7 +42,9 @@ use tokio::runtime::Runtime;
 use tokio::sync::{broadcast, Notify};
 use tracing::{debug, info, warn};
 
-use zaparoo_core::media_types::MediaImageParams;
+use zaparoo_core::media_types::{
+    MediaImageBulkItem, MediaImageBulkItemResult, MediaImageBulkParams, MEDIA_IMAGE_BATCH_MAX,
+};
 use zaparoo_core::store::Store;
 
 /// Field separator used inside the encoded key. Unit Separator (US,
@@ -256,6 +258,15 @@ struct CacheState {
     /// inside the locked state so the read/bump/decision happens
     /// atomically with the `pending` mutation that drives the retry.
     attempts: HashMap<MediaKey, u8>,
+    /// Sidecar of latest-known `media_id` hints per `MediaKey`. Used
+    /// only to populate the `mediaId` field on outgoing batched
+    /// requests when the model has one — the cache keeps identifying
+    /// rows by `(systemId, path)` because Core treats `media_id` as
+    /// session-ephemeral and the launcher must continue to work after
+    /// a Core restart that invalidates the integers. Entries get
+    /// cleaned up alongside the row in `evict_until_fits` so the
+    /// sidecar can't outgrow the rest of the cache.
+    media_ids: HashMap<MediaKey, i64>,
     /// Strictly increasing LRU clock. Bumped on every successful read
     /// or insert; the entry with the smallest value is the LRU.
     clock: u64,
@@ -269,6 +280,7 @@ impl CacheState {
             negative: NegativeMemo::default(),
             pending: HashSet::new(),
             attempts: HashMap::new(),
+            media_ids: HashMap::new(),
             clock: 0,
         }
     }
@@ -437,13 +449,24 @@ impl MediaImageCache {
     /// most likely enqueued for a page the user has already navigated
     /// past, and a future role-data lookup (or an explicit re-enqueue)
     /// can re-add them if they become relevant again.
-    pub fn enqueue(&self, key: MediaKey) {
+    ///
+    /// The optional `media_id` is a wire hint that the fetch driver
+    /// passes to Core in place of `(system, path)` on the next batched
+    /// request. Cache identity stays `(systemId, path)` and any failure
+    /// path still falls back to the canonical pair, so a stale id
+    /// (Core restart) self-heals on the next attempt. Safe to call
+    /// repeatedly: the latest non-`None` hint wins, and `None` leaves
+    /// any prior hint untouched.
+    pub fn enqueue_with_media_id(&self, key: MediaKey, media_id: Option<i64>) {
         if key.system_id.is_empty() || key.path.is_empty() {
             return;
         }
         let should_send = {
             #[allow(clippy::unwrap_used, reason = "RwLock poisoning is unrecoverable")]
             let mut guard = self.state.write().unwrap();
+            if let Some(id) = media_id {
+                guard.media_ids.insert(key.clone(), id);
+            }
             if guard.map.contains_key(&key)
                 || guard.negative.contains(&key)
                 || guard.pending.contains(&key)
@@ -524,92 +547,119 @@ fn spawn_fetch_driver<F>(
         let store_factory = store_factory.clone();
         runtime.spawn(async move {
             loop {
-                let next_key = {
+                // Drain a whole batch in one critical section so a
+                // page-fill burst of 6–10 enqueues hits Core as a
+                // single `media.image` request.
+                let batch: Vec<MediaKey> = {
                     #[allow(clippy::unwrap_used, reason = "Mutex poisoning is unrecoverable")]
                     let mut q = queue.lock().unwrap();
-                    q.pop_back()
+                    let mut out = Vec::with_capacity(MEDIA_IMAGE_BATCH_MAX);
+                    while out.len() < MEDIA_IMAGE_BATCH_MAX {
+                        let Some(k) = q.pop_back() else { break };
+                        out.push(k);
+                    }
+                    out
                 };
-                let Some(key) = next_key else {
+                if batch.is_empty() {
                     queue_notify.notified().await;
                     continue;
-                };
-                let store = store_factory();
-                let outcome = fetch_one(&store, &key).await;
-                let is_transient = matches!(outcome, FetchOutcome::Transient);
-                let update = finish_fetch(&state, cap_bytes, &key, outcome);
-                if is_transient {
-                    let attempts = {
-                        #[allow(clippy::unwrap_used, reason = "RwLock poisoning is unrecoverable")]
-                        let mut s = state.write().unwrap();
-                        let entry = s.attempts.entry(key.clone()).or_insert(0);
-                        *entry = entry.saturating_add(1);
-                        *entry
-                    };
-                    if attempts < MAX_FETCH_ATTEMPTS {
-                        // Re-enter `pending` and re-enqueue at the back.
-                        // Fresh-page enqueues that arrive in the meantime
-                        // still drain ahead because we always pop from
-                        // the back; this retry waits behind anything the
-                        // user is actively looking at.
-                        {
-                            #[allow(
-                                clippy::unwrap_used,
-                                reason = "RwLock poisoning is unrecoverable"
-                            )]
-                            let mut s = state.write().unwrap();
-                            s.pending.insert(key.clone());
-                        }
-                        {
-                            #[allow(
-                                clippy::unwrap_used,
-                                reason = "Mutex poisoning is unrecoverable"
-                            )]
-                            let mut q = queue.lock().unwrap();
-                            q.push_back(key);
-                        }
-                        queue_notify.notify_one();
-                    } else {
-                        // Bounded give-up: clear the counter, no negative
-                        // memo. The next user-driven enqueue (page
-                        // revisit) gets a fresh `MAX_FETCH_ATTEMPTS`
-                        // budget via `enqueue`'s `attempts.remove`.
-                        #[allow(clippy::unwrap_used, reason = "RwLock poisoning is unrecoverable")]
-                        state.write().unwrap().attempts.remove(&key);
-                        info!(
-                            system_id = %key.system_id,
-                            path = %key.path,
-                            attempts,
-                            "media_image_cache: giving up after transient failures",
-                        );
-                    }
-                    continue;
                 }
-                // Success or NoImage: clear the attempts counter and
-                // broadcast the resolved state.
+                let store = store_factory();
+                let outcomes = fetch_batch(&store, &state, &batch).await;
+                process_batch_outcomes(
+                    &state,
+                    cap_bytes,
+                    &updates_tx,
+                    &queue,
+                    &queue_notify,
+                    outcomes,
+                );
+            }
+        });
+    }
+}
+
+/// Apply outcomes for a finished batch: write each into the cache via
+/// `finish_fetch`, broadcast updates, and re-enqueue keys that
+/// failed transiently. Pulled out of the worker loop so the driver
+/// stays at one screen of code and the retry/give-up branches read
+/// the same as before.
+fn process_batch_outcomes(
+    state: &Arc<RwLock<CacheState>>,
+    cap_bytes: usize,
+    updates_tx: &broadcast::Sender<MediaImageUpdate>,
+    queue: &Arc<Mutex<VecDeque<MediaKey>>>,
+    queue_notify: &Arc<Notify>,
+    outcomes: Vec<(MediaKey, FetchOutcome)>,
+) {
+    for (key, outcome) in outcomes {
+        let is_transient = matches!(outcome, FetchOutcome::Transient);
+        let update = finish_fetch(state, cap_bytes, &key, outcome);
+        if is_transient {
+            let attempts = {
+                #[allow(clippy::unwrap_used, reason = "RwLock poisoning is unrecoverable")]
+                let mut s = state.write().unwrap();
+                let entry = s.attempts.entry(key.clone()).or_insert(0);
+                *entry = entry.saturating_add(1);
+                *entry
+            };
+            if attempts < MAX_FETCH_ATTEMPTS {
+                // Re-enter `pending` and re-enqueue at the back. The
+                // next batch picks it up alongside whatever the user
+                // has enqueued in the meantime; LIFO drain order
+                // means the fresh page lands first while this retry
+                // tags along behind it.
                 {
                     #[allow(clippy::unwrap_used, reason = "RwLock poisoning is unrecoverable")]
                     let mut s = state.write().unwrap();
-                    s.attempts.remove(&key);
+                    s.pending.insert(key.clone());
                 }
-                if let Some(update) = update {
-                    if let Some(ext) = update.ext {
-                        info!(
-                            system_id = %key.system_id,
-                            path = %key.path,
-                            ext,
-                            "media_image_cache: cached image",
-                        );
-                    } else {
-                        info!(
-                            system_id = %key.system_id,
-                            path = %key.path,
-                            "media_image_cache: no image (negative memo)",
-                        );
-                    }
-                    let _ = updates_tx.send(update);
+                {
+                    #[allow(clippy::unwrap_used, reason = "Mutex poisoning is unrecoverable")]
+                    let mut q = queue.lock().unwrap();
+                    q.push_back(key);
                 }
+                queue_notify.notify_one();
+            } else {
+                // Bounded give-up: clear the counter, no negative
+                // memo. The next user-driven enqueue (page revisit)
+                // gets a fresh `MAX_FETCH_ATTEMPTS` budget via
+                // `enqueue`'s `attempts.remove`.
+                #[allow(clippy::unwrap_used, reason = "RwLock poisoning is unrecoverable")]
+                state.write().unwrap().attempts.remove(&key);
+                info!(
+                    system_id = %key.system_id,
+                    path = %key.path,
+                    attempts,
+                    "media_image_cache: giving up after transient failures",
+                );
             }
-        });
+            continue;
+        }
+        // Success or NoImage: clear the attempts counter and
+        // broadcast the resolved state.
+        {
+            #[allow(clippy::unwrap_used, reason = "RwLock poisoning is unrecoverable")]
+            let mut s = state.write().unwrap();
+            s.attempts.remove(&key);
+        }
+        if let Some(update) = update {
+            if let Some(ext) = update.ext {
+                info!(
+                    system_id = %key.system_id,
+                    path = %key.path,
+                    ext,
+                    "media_image_cache: cached image",
+                );
+            } else {
+                info!(
+                    system_id = %key.system_id,
+                    path = %key.path,
+                    "media_image_cache: no image (negative memo)",
+                );
+            }
+            let _ = updates_tx.send(update);
+        }
     }
 }
 
@@ -631,27 +681,146 @@ enum FetchOutcome {
     Transient,
 }
 
-async fn fetch_one(store: &Arc<Store>, key: &MediaKey) -> FetchOutcome {
-    let result = store
-        .client()
-        .media_image(MediaImageParams::for_media(
-            key.system_id.as_ref(),
-            key.path.as_ref(),
-        ))
-        .await;
+/// Fetch a batch of media images in a single bulk JSON-RPC. Returns
+/// one outcome per input key, in the same order. A batch-level RPC
+/// failure tags every key as `Transient` so the existing retry path
+/// applies uniformly. Per-item `error` strings from Core are
+/// definitive negatives (`NoImage`) — Core only returns errors here
+/// for "system not found", "media not found", and "no image", which
+/// are all stable answers for `(systemId, path)`.
+async fn fetch_batch(
+    store: &Arc<Store>,
+    state: &Arc<RwLock<CacheState>>,
+    batch: &[MediaKey],
+) -> Vec<(MediaKey, FetchOutcome)> {
+    // Build the request, preferring `media_id` from the sidecar when
+    // we have one — Core resolves the row directly without a path
+    // lookup. Falls back to `(system, path)` on any key without a
+    // hint or on Cores that don't recognise the id.
+    let items: Vec<MediaImageBulkItem> = {
+        #[allow(clippy::unwrap_used, reason = "RwLock poisoning is unrecoverable")]
+        let guard = state.read().unwrap();
+        batch
+            .iter()
+            .map(|k| match guard.media_ids.get(k) {
+                Some(id) => MediaImageBulkItem::for_media_id(*id),
+                None => MediaImageBulkItem::for_media(k.system_id.as_ref(), k.path.as_ref()),
+            })
+            .collect()
+    };
+    let params = MediaImageBulkParams {
+        items,
+        image_types: Vec::new(),
+    };
+    let result = store.client().media_image_bulk(params).await;
     let response = match result {
         Ok(r) => r,
         Err(e) => {
             info!(
+                batch_size = batch.len(),
+                "media_image_cache: media.image (bulk) failed: {} (transient, will retry on next enqueue)",
+                e.message,
+            );
+            return batch
+                .iter()
+                .cloned()
+                .map(|k| (k, FetchOutcome::Transient))
+                .collect();
+        }
+    };
+    if response.items.len() != batch.len() {
+        // Core's batch contract guarantees one response item per
+        // request item. A length mismatch is an upstream regression
+        // we can't usefully recover from at the per-key level, so
+        // mark the whole batch as transient — the retry will either
+        // self-correct on a fresh Core build or burn through the
+        // attempt budget and stop spamming.
+        warn!(
+            requested = batch.len(),
+            received = response.items.len(),
+            "media_image_cache: media.image (bulk) length mismatch, retrying as transient",
+        );
+        return batch
+            .iter()
+            .cloned()
+            .map(|k| (k, FetchOutcome::Transient))
+            .collect();
+    }
+    // Snapshot which keys were sent with a `media_id` hint so a
+    // per-item error can fall back to `(system, path)` instead of
+    // burning the row into the negative memo. Core treats `media_id`
+    // as session-ephemeral, so a stale hint after a Core restart can
+    // surface as "media not found" — we drop the sidecar entry and
+    // retry transiently, which on the next batch sends the canonical
+    // `(system, path)` and self-heals.
+    let id_hinted: Vec<bool> = {
+        #[allow(clippy::unwrap_used, reason = "RwLock poisoning is unrecoverable")]
+        let guard = state.read().unwrap();
+        batch
+            .iter()
+            .map(|k| guard.media_ids.contains_key(k))
+            .collect()
+    };
+    batch
+        .iter()
+        .cloned()
+        .zip(response.items.into_iter())
+        .zip(id_hinted.into_iter())
+        .map(|((key, item), had_id_hint)| {
+            let outcome = classify_bulk_item(&key, item, had_id_hint);
+            if matches!(outcome, FetchOutcome::Transient) && had_id_hint {
+                // Drop the suspect hint so the retry sends
+                // `(system, path)` instead. Self-heals the rare case
+                // where Core was restarted and the id we cached
+                // points at a different (or no) row.
+                #[allow(clippy::unwrap_used, reason = "RwLock poisoning is unrecoverable")]
+                state.write().unwrap().media_ids.remove(&key);
+            }
+            (key, outcome)
+        })
+        .collect()
+}
+
+/// Map a single batched response entry onto a `FetchOutcome`. Mirrors
+/// the single-shot decode path: empty payload / unsupported format /
+/// per-item error → `NoImage`; base64 decode failure → `Transient`;
+/// otherwise `Success`. When the request item carried a stale
+/// `media_id` hint, a per-item error becomes `Transient` so the retry
+/// can fall back to `(system, path)` — the per-batch driver drops the
+/// sidecar hint before the retry runs.
+fn classify_bulk_item(
+    key: &MediaKey,
+    item: MediaImageBulkItemResult,
+    had_id_hint: bool,
+) -> FetchOutcome {
+    if let Some(err) = item.error {
+        if had_id_hint {
+            info!(
                 system_id = %key.system_id,
                 path = %key.path,
-                "media_image_cache: media.image failed: {} (transient, will retry on next enqueue)",
-                e.message,
+                "media_image_cache: media.image (bulk) error with media_id hint: {err} (transient, will retry with (system, path))",
             );
             return FetchOutcome::Transient;
         }
+        info!(
+            system_id = %key.system_id,
+            path = %key.path,
+            "media_image_cache: media.image (bulk) per-item error: {err} (treating as no image)",
+        );
+        return FetchOutcome::NoImage;
+    }
+    let Some(image) = item.image else {
+        // Defensive: Core's contract is one of `image`/`error`. An
+        // item with neither is a regression — treat it as no image so
+        // we don't loop on a phantom transient.
+        warn!(
+            system_id = %key.system_id,
+            path = %key.path,
+            "media_image_cache: media.image (bulk) item missing both image and error, treating as no image",
+        );
+        return FetchOutcome::NoImage;
     };
-    let bytes = match BASE64_STANDARD.decode(response.data.as_bytes()) {
+    let bytes = match BASE64_STANDARD.decode(image.data.as_bytes()) {
         Ok(b) => b,
         Err(e) => {
             warn!(
@@ -662,13 +831,6 @@ async fn fetch_one(store: &Arc<Store>, key: &MediaKey) -> FetchOutcome {
             return FetchOutcome::Transient;
         }
     };
-    // Defensive: a zero-length payload would land in the cache as a
-    // valid-looking entry, the provider would hand 0 bytes to QtQuick,
-    // and `QImage::loadFromData` would fail silently. Core already
-    // skips empty binaries (see `media_image.go:176`), but treating
-    // empty bytes as a negative result here closes the foot-gun
-    // permanently — the negative memo absorbs `(system_id, path)` so
-    // we don't refetch on every page revisit.
     if bytes.is_empty() {
         warn!(
             system_id = %key.system_id,
@@ -677,20 +839,17 @@ async fn fetch_one(store: &Arc<Store>, key: &MediaKey) -> FetchOutcome {
         );
         return FetchOutcome::NoImage;
     }
-    // Prefer `extension` (Core derives it from MIME or source path),
-    // fall back to `content_type`. No magic-byte sniffing — Core
-    // started populating both fields for exactly this reason.
-    let ext = response
+    let ext = image
         .extension
         .as_deref()
         .and_then(ext_from_extension_field)
-        .or_else(|| ext_for_content_type(&response.content_type));
+        .or_else(|| ext_for_content_type(&image.content_type));
     let Some(ext) = ext else {
         warn!(
             system_id = %key.system_id,
             path = %key.path,
-            extension = ?response.extension,
-            content_type = response.content_type,
+            extension = ?image.extension,
+            content_type = image.content_type,
             bytes_len = bytes.len(),
             "media_image_cache: unsupported extension/content_type, skipping cache",
         );
@@ -988,14 +1147,15 @@ mod tests {
     }
 
     #[test]
-    fn fetch_one_treats_empty_bytes_as_no_image() {
-        // `fetch_one` short-circuits to `FetchOutcome::NoImage` when
-        // base64 decoding yields zero bytes (defensive guard against a
-        // future Core regression that lets empty payloads through).
-        // We can't call `fetch_one` directly without a live Store, so
-        // exercise the downstream contract: NoImage → negative memo,
-        // no map entry, pending cleared. This locks in the behaviour
-        // that empty payloads do not pollute the cache and the
+    fn no_image_outcome_records_negative_without_map_entry() {
+        // The bulk decode path (`classify_bulk_item`) short-circuits
+        // to `FetchOutcome::NoImage` when base64 decoding yields zero
+        // bytes — a defensive guard against any future Core
+        // regression that lets empty payloads through. We can't drive
+        // the decoder directly without a live Store, so exercise the
+        // downstream contract: `NoImage` → negative memo, no map
+        // entry, pending cleared. This locks in the behaviour that
+        // empty payloads do not pollute the cache and the
         // `(system_id, path)` is suppressed from refetch.
         let state = Arc::new(RwLock::new(CacheState::new()));
         let k = key("SNES", "/empty");
@@ -1275,7 +1435,7 @@ mod tests {
         // Push MAX_QUEUE_LEN + 5 distinct keys; the first 5 must be
         // the ones that get dropped.
         for i in 0..(MAX_QUEUE_LEN + 5) {
-            cache.enqueue(key("SNES", &format!("/p/{i}")));
+            cache.enqueue_with_media_id(key("SNES", &format!("/p/{i}")), None);
         }
         let queue_len = cache.queue.lock().unwrap().len();
         assert_eq!(
@@ -1306,7 +1466,7 @@ mod tests {
         // Re-enqueueing a previously-dropped key must succeed (it's
         // no longer in pending). Verify by checking the queue grows.
         let revived = key("SNES", "/p/0");
-        cache.enqueue(revived.clone());
+        cache.enqueue_with_media_id(revived.clone(), None);
         let queue_len = cache.queue.lock().unwrap().len();
         // Pushing one extra back into a full queue truncates one
         // *other* old entry off the front, so length stays at cap.
