@@ -221,7 +221,58 @@ MainLayout {
             const sels = Browse.GamesState.selected_at_level
             const savedPath = sels.length > 0 ? sels[sels.length - 1] : ""
             const idx = savedPath === "" ? -1 : Browse.GamesModel.index_for_game_path(savedPath)
-            root.gamesScreen.gamesGrid.setCurrentIndexImmediate(idx >= 0 ? idx : 0)
+            if (idx >= 0) {
+                root.gamesScreen.gamesGrid.setCurrentIndexImmediate(idx)
+                root._pendingGameRestorePath = ""
+                return
+            }
+            // Saved entry isn't on page 1. If there are more pages,
+            // keep paginating until it shows up or we exhaust the
+            // folder; the count-watcher below drives the loop.
+            // Otherwise (entry truly gone, or single-page folder)
+            // fall back to row 0.
+            if (savedPath !== "" && Browse.GamesModel.has_next_page) {
+                root._pendingGameRestorePath = savedPath
+                root.gamesScreen.gamesGrid.setCurrentIndexImmediate(0)
+                Browse.GamesModel.fetch_more()
+                return
+            }
+            root._pendingGameRestorePath = ""
+            root.gamesScreen.gamesGrid.setCurrentIndexImmediate(0)
+        }
+        // Pages 2+ append rows via begin_insert_rows / end_insert_rows
+        // (no model reset), so we can't piggy-back on onModelReset to
+        // retry the lookup. `count` bumps on every append, giving us a
+        // stable per-page edge to resume the deep-page restore on.
+        function onCountChanged(): void {
+            const path = root._pendingGameRestorePath
+            if (path === "")
+                return
+            // User input updates `selected_at_level` on every move,
+            // so a divergence between the pending path and the top
+            // of stack means the user navigated during the restore
+            // — drop the auto-restore and let them stay where they
+            // landed.
+            const sels = Browse.GamesState.selected_at_level
+            const currentTop = sels.length > 0 ? sels[sels.length - 1] : ""
+            if (currentTop !== path) {
+                root._pendingGameRestorePath = ""
+                return
+            }
+            const idx = Browse.GamesModel.index_for_game_path(path)
+            if (idx >= 0) {
+                root.gamesScreen.gamesGrid.setCurrentIndexImmediate(idx)
+                root._pendingGameRestorePath = ""
+                return
+            }
+            if (Browse.GamesModel.has_next_page) {
+                // fetch_more is itself debounced by `loading_more` and
+                // `has_next_page`, so a redundant call here is a cheap
+                // no-op rather than a duplicate request.
+                Browse.GamesModel.fetch_more()
+                return
+            }
+            root._pendingGameRestorePath = ""
         }
     }
 
@@ -249,6 +300,13 @@ MainLayout {
     property var _systemReadyCallback: null
     property var _favoritesReadyCallback: null
     property var _recentsReadyCallback: null
+    // Saved games-screen entry path that wasn't on the freshly seeded
+    // page 1 of MediaBrowse. The GamesModel.onCountChanged watcher
+    // below paginates forward via fetch_more until the path is found
+    // or `has_next_page` goes false. Cleared on resolution and on
+    // any navigation that starts a new browse target so a stale
+    // restore can't keep paginating after the user moves on.
+    property string _pendingGameRestorePath: ""
 
     // Listen for SystemsModel fills owned by an in-flight transition.
     // `loading` flips true at the start of set_category and false when
