@@ -236,6 +236,12 @@ Item {
             return qsTr("English")
         if (value === "it_IT")
             return qsTr("Italian")
+        if (value === "sk_SK")
+            return qsTr("Slovak")
+        if (value === "ro_RO")
+            return qsTr("Romanian")
+        if (value === "nl_NL")
+            return qsTr("Dutch")
         return qsTr("Auto")
     }
 

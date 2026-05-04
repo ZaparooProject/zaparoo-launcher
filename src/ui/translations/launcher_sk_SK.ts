@@ -1,62 +1,62 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE TS>
-<TS version="2.1" language="en" sourcelanguage="en">
+<TS version="2.1" language="sk_SK" sourcelanguage="en">
 <context>
     <name>Main</name>
     <message>
         <location filename="../app/Main.qml" line="601"/>
         <source>Launch core</source>
-        <translation>Launch core</translation>
+        <translation>Spustiť core</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="608"/>
         <source>Remove from favorites</source>
-        <translation>Remove from favorites</translation>
+        <translation>Odstrániť z obľúbených</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="608"/>
         <source>Add to favorites</source>
-        <translation>Add to favorites</translation>
+        <translation>Pridať do obľúbených</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="611"/>
         <source>Write to NFC token</source>
-        <translation>Write to NFC token</translation>
+        <translation>Zapísať na NFC token</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="612"/>
         <source>QR code</source>
-        <translation>QR code</translation>
+        <translation>QR kód</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="613"/>
         <source>Launch game</source>
-        <translation>Launch game</translation>
+        <translation>Spustiť hru</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="1050"/>
         <source>Loading systems…</source>
-        <translation>Loading systems…</translation>
+        <translation>Načítavajú sa systémy…</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="1051"/>
         <source>Loading games…</source>
-        <translation>Loading games…</translation>
+        <translation>Načítavajú sa hry…</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="1052"/>
         <source>Loading favorites…</source>
-        <translation>Loading favorites…</translation>
+        <translation>Načítavajú sa obľúbené…</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="1053"/>
         <source>Loading recently played…</source>
-        <translation>Loading recently played…</translation>
+        <translation>Načítavajú sa nedávno hrané…</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="1054"/>
         <source>Loading…</source>
-        <translation>Loading…</translation>
+        <translation>Načítava sa…</translation>
     </message>
 </context>
 <context>
@@ -69,12 +69,12 @@
     <message>
         <location filename="../app/MainLayout.qml" line="308"/>
         <source>Writing failed</source>
-        <translation>Writing failed</translation>
+        <translation>Zápis zlyhal</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="309"/>
         <source>Put a writable card near the reader</source>
-        <translation>Put a writable card near the reader</translation>
+        <translation>Priložte zapisovateľnú kartu k čítačke</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="494"/>
@@ -84,12 +84,12 @@
         <location filename="../app/MainLayout.qml" line="603"/>
         <location filename="../app/MainLayout.qml" line="641"/>
         <source>Move</source>
-        <translation>Move</translation>
+        <translation>Presunúť</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="495"/>
         <source>Select</source>
-        <translation>Select</translation>
+        <translation>Vybrať</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="496"/>
@@ -98,7 +98,7 @@
         <location filename="../app/MainLayout.qml" line="508"/>
         <location filename="../app/MainLayout.qml" line="513"/>
         <source>Close</source>
-        <translation>Close</translation>
+        <translation>Zavrieť</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="500"/>
@@ -106,12 +106,12 @@
         <location filename="../app/MainLayout.qml" line="523"/>
         <location filename="../app/MainLayout.qml" line="623"/>
         <source>Cancel</source>
-        <translation>Cancel</translation>
+        <translation>Zrušiť</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="507"/>
         <source>Done</source>
-        <translation>Done</translation>
+        <translation>Hotovo</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="512"/>
@@ -119,13 +119,13 @@
         <location filename="../app/MainLayout.qml" line="592"/>
         <location filename="../app/MainLayout.qml" line="652"/>
         <source>Retry</source>
-        <translation>Retry</translation>
+        <translation>Skúsiť znova</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="526"/>
         <location filename="../app/MainLayout.qml" line="623"/>
         <source>Start</source>
-        <translation>Start</translation>
+        <translation>Spustiť</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="539"/>
@@ -133,12 +133,12 @@
         <location filename="../app/MainLayout.qml" line="585"/>
         <location filename="../app/MainLayout.qml" line="645"/>
         <source>Open</source>
-        <translation>Open</translation>
+        <translation>Otvoriť</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="540"/>
         <source>Quit</source>
-        <translation>Quit</translation>
+        <translation>Ukončiť</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="545"/>
@@ -152,31 +152,31 @@
         <location filename="../app/MainLayout.qml" line="648"/>
         <location filename="../app/MainLayout.qml" line="653"/>
         <source>Back</source>
-        <translation>Back</translation>
+        <translation>Späť</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="556"/>
         <location filename="../app/MainLayout.qml" line="584"/>
         <location filename="../app/MainLayout.qml" line="644"/>
         <source>Page</source>
-        <translation>Page</translation>
+        <translation>Strana</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="558"/>
         <location filename="../app/MainLayout.qml" line="587"/>
         <location filename="../app/MainLayout.qml" line="647"/>
         <source>Options</source>
-        <translation>Options</translation>
+        <translation>Možnosti</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="613"/>
         <source>Change</source>
-        <translation>Change</translation>
+        <translation>Zmeniť</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="617"/>
         <source>Toggle</source>
-        <translation>Toggle</translation>
+        <translation>Prepnúť</translation>
     </message>
 </context>
 <context>
@@ -184,22 +184,22 @@
     <message>
         <location filename="../components/BootOverlay.qml" line="74"/>
         <source>Can't reach Zaparoo Core. Check your connection.</source>
-        <translation>Can't reach Zaparoo Core. Check your connection.</translation>
+        <translation>Nedá sa pripojiť k Zaparoo Core. Skontrolujte pripojenie.</translation>
     </message>
     <message>
         <location filename="../components/BootOverlay.qml" line="76"/>
         <source>Reconnecting…</source>
-        <translation>Reconnecting…</translation>
+        <translation>Opätovné pripájanie…</translation>
     </message>
     <message>
         <location filename="../components/BootOverlay.qml" line="78"/>
         <source>Loading library…</source>
-        <translation>Loading library…</translation>
+        <translation>Načítava sa knižnica…</translation>
     </message>
     <message>
         <location filename="../components/BootOverlay.qml" line="83"/>
         <source>Connecting to Zaparoo Core…</source>
-        <translation>Connecting to Zaparoo Core…</translation>
+        <translation>Pripája sa k Zaparoo Core…</translation>
     </message>
 </context>
 <context>
@@ -208,67 +208,67 @@
         <location filename="../components/CoreStatusPill.qml" line="48"/>
         <location filename="../components/CoreStatusPill.qml" line="50"/>
         <source>Disconnected</source>
-        <translation>Disconnected</translation>
+        <translation>Odpojené</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="49"/>
         <source>Reconnecting…</source>
-        <translation>Reconnecting…</translation>
+        <translation>Opätovné pripájanie…</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="51"/>
         <source>Connecting…</source>
-        <translation>Connecting…</translation>
+        <translation>Pripája sa…</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="52"/>
         <source>Core error</source>
-        <translation>Core error</translation>
+        <translation>Chyba Core</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="54"/>
         <source>Optimizing database</source>
-        <translation>Optimizing database</translation>
+        <translation>Optimalizuje sa databáza</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="60"/>
         <source>Indexing paused</source>
-        <translation>Indexing paused</translation>
+        <translation>Indexovanie pozastavené</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="62"/>
         <source>Indexing %1/%2 - %3</source>
-        <translation>Indexing %1/%2 - %3</translation>
+        <translation>Indexuje sa %1/%2 - %3</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="64"/>
         <source>Indexing %1/%2</source>
-        <translation>Indexing %1/%2</translation>
+        <translation>Indexuje sa %1/%2</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="65"/>
         <source>Indexing…</source>
-        <translation>Indexing…</translation>
+        <translation>Indexuje sa…</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="73"/>
         <source>Scrape paused</source>
-        <translation>Scrape paused</translation>
+        <translation>Sťahovanie metadát pozastavené</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="75"/>
         <source>Scraping %1/%2 - %3</source>
-        <translation>Scraping %1/%2 - %3</translation>
+        <translation>Sťahujú sa metadáta %1/%2 - %3</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="77"/>
         <source>Scraping %1/%2</source>
-        <translation>Scraping %1/%2</translation>
+        <translation>Sťahujú sa metadáta %1/%2</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="78"/>
         <source>Scraping…</source>
-        <translation>Scraping…</translation>
+        <translation>Sťahujú sa metadáta…</translation>
     </message>
 </context>
 <context>
@@ -276,52 +276,52 @@
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="156"/>
         <source>First-time setup</source>
-        <translation>First-time setup</translation>
+        <translation>Prvé nastavenie</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="170"/>
         <source>Zaparoo needs to scan your games before you can use the launcher. This usually takes a few minutes.</source>
-        <translation>Zaparoo needs to scan your games before you can use the launcher. This usually takes a few minutes.</translation>
+        <translation>Zaparoo musí pred použitím spúšťača prehľadať vaše hry. Zvyčajne to trvá niekoľko minút.</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="192"/>
         <source>Optimizing database - almost done</source>
-        <translation>Optimizing database - almost done</translation>
+        <translation>Optimalizuje sa databáza - takmer hotovo</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="245"/>
         <source>Indexing paused</source>
-        <translation>Indexing paused</translation>
+        <translation>Indexovanie pozastavené</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="247"/>
         <source>Step %1 of %2 - %3</source>
-        <translation>Step %1 of %2 - %3</translation>
+        <translation>Krok %1 z %2 - %3</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="249"/>
         <source>Step %1 of %2</source>
-        <translation>Step %1 of %2</translation>
+        <translation>Krok %1 z %2</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="250"/>
         <source>Preparing…</source>
-        <translation>Preparing…</translation>
+        <translation>Pripravuje sa…</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="269"/>
         <source>Done. %1 files indexed.</source>
-        <translation>Done. %1 files indexed.</translation>
+        <translation>Hotovo. Indexovaných súborov: %1.</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="300"/>
         <source>Cancel</source>
-        <translation>Cancel</translation>
+        <translation>Zrušiť</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="301"/>
         <source>Start scan</source>
-        <translation>Start scan</translation>
+        <translation>Spustiť skenovanie</translation>
     </message>
 </context>
 <context>
@@ -329,7 +329,7 @@
     <message>
         <location filename="../components/LoadingIndicator.qml" line="28"/>
         <source>Loading…</source>
-        <translation>Loading…</translation>
+        <translation>Načítava sa…</translation>
     </message>
 </context>
 <context>
@@ -337,32 +337,32 @@
     <message>
         <location filename="../components/LogUploadModal.qml" line="113"/>
         <source>Upload log file</source>
-        <translation>Upload log file</translation>
+        <translation>Nahrať súbor záznamu</translation>
     </message>
     <message>
         <location filename="../components/LogUploadModal.qml" line="126"/>
         <source>Uploading log file - this may take a moment.</source>
-        <translation>Uploading log file - this may take a moment.</translation>
+        <translation>Nahráva sa súbor záznamu - môže to chvíľu trvať.</translation>
     </message>
     <message>
         <location filename="../components/LogUploadModal.qml" line="233"/>
         <source>Upload failed: %1</source>
-        <translation>Upload failed: %1</translation>
+        <translation>Nahranie zlyhalo: %1</translation>
     </message>
     <message>
         <location filename="../components/LogUploadModal.qml" line="234"/>
         <source>Upload failed.</source>
-        <translation>Upload failed.</translation>
+        <translation>Nahranie zlyhalo.</translation>
     </message>
     <message>
         <location filename="../components/LogUploadModal.qml" line="264"/>
         <source>Retry</source>
-        <translation>Retry</translation>
+        <translation>Skúsiť znova</translation>
     </message>
     <message>
         <location filename="../components/LogUploadModal.qml" line="265"/>
         <source>Done</source>
-        <translation>Done</translation>
+        <translation>Hotovo</translation>
     </message>
 </context>
 <context>
@@ -375,7 +375,7 @@
     <message>
         <location filename="../components/Modal.qml" line="113"/>
         <source>Cancel</source>
-        <translation>Cancel</translation>
+        <translation>Zrušiť</translation>
     </message>
 </context>
 <context>
@@ -383,17 +383,17 @@
     <message>
         <location filename="../components/ScreenStateOverlay.qml" line="28"/>
         <source>Nothing here</source>
-        <translation>Nothing here</translation>
+        <translation>Nič tu nie je</translation>
     </message>
     <message>
         <location filename="../components/ScreenStateOverlay.qml" line="29"/>
         <source>Loading…</source>
-        <translation>Loading…</translation>
+        <translation>Načítava sa…</translation>
     </message>
     <message>
         <location filename="../components/ScreenStateOverlay.qml" line="61"/>
         <source>Failed to load</source>
-        <translation>Failed to load</translation>
+        <translation>Načítanie zlyhalo</translation>
     </message>
 </context>
 <context>
@@ -401,7 +401,7 @@
     <message>
         <location filename="../components/TopStatusStrip.qml" line="77"/>
         <source>Page %1 / %2</source>
-        <translation>Page %1 / %2</translation>
+        <translation>Strana %1 / %2</translation>
     </message>
 </context>
 <context>
@@ -409,22 +409,22 @@
     <message>
         <location filename="../screens/FavoritesScreen.qml" line="150"/>
         <source>Favorites</source>
-        <translation>Favorites</translation>
+        <translation>Obľúbené</translation>
     </message>
     <message>
         <location filename="../screens/FavoritesScreen.qml" line="155"/>
         <source>%1 entries</source>
-        <translation>%1 entries</translation>
+        <translation>%1 položiek</translation>
     </message>
     <message>
         <location filename="../screens/FavoritesScreen.qml" line="207"/>
         <source>No favorites yet</source>
-        <translation>No favorites yet</translation>
+        <translation>Zatiaľ žiadne obľúbené</translation>
     </message>
     <message>
         <location filename="../screens/FavoritesScreen.qml" line="208"/>
         <source>Loading favorites…</source>
-        <translation>Loading favorites…</translation>
+        <translation>Načítavajú sa obľúbené…</translation>
     </message>
 </context>
 <context>
@@ -432,17 +432,17 @@
     <message>
         <location filename="../screens/GamesScreen.qml" line="214"/>
         <source>%1 files</source>
-        <translation>%1 files</translation>
+        <translation>%1 súborov</translation>
     </message>
     <message>
         <location filename="../screens/GamesScreen.qml" line="275"/>
         <source>No games in this system</source>
-        <translation>No games in this system</translation>
+        <translation>V tomto systéme nie sú žiadne hry</translation>
     </message>
     <message>
         <location filename="../screens/GamesScreen.qml" line="276"/>
         <source>Loading games…</source>
-        <translation>Loading games…</translation>
+        <translation>Načítavajú sa hry…</translation>
     </message>
 </context>
 <context>
@@ -450,22 +450,22 @@
     <message>
         <location filename="../screens/HubScreen.qml" line="87"/>
         <source>Favorites</source>
-        <translation>Favorites</translation>
+        <translation>Obľúbené</translation>
     </message>
     <message>
         <location filename="../screens/HubScreen.qml" line="88"/>
         <source>Recently Played</source>
-        <translation>Recently Played</translation>
+        <translation>Nedávno hrané</translation>
     </message>
     <message>
         <location filename="../screens/HubScreen.qml" line="89"/>
         <source>Settings</source>
-        <translation>Settings</translation>
+        <translation>Nastavenia</translation>
     </message>
     <message>
         <location filename="../screens/HubScreen.qml" line="508"/>
         <source>No systems available. Run Update media database from Settings.</source>
-        <translation>No systems available. Run Update media database from Settings.</translation>
+        <translation>Nie sú dostupné žiadne systémy. Spustite Aktualizovať databázu médií v Nastaveniach.</translation>
     </message>
 </context>
 <context>
@@ -473,22 +473,22 @@
     <message>
         <location filename="../screens/RecentsScreen.qml" line="143"/>
         <source>Recently Played</source>
-        <translation>Recently Played</translation>
+        <translation>Nedávno hrané</translation>
     </message>
     <message>
         <location filename="../screens/RecentsScreen.qml" line="148"/>
         <source>%1 entries</source>
-        <translation>%1 entries</translation>
+        <translation>%1 položiek</translation>
     </message>
     <message>
         <location filename="../screens/RecentsScreen.qml" line="195"/>
         <source>Nothing played yet</source>
-        <translation>Nothing played yet</translation>
+        <translation>Zatiaľ nič nehrané</translation>
     </message>
     <message>
         <location filename="../screens/RecentsScreen.qml" line="196"/>
         <source>Loading recently played…</source>
-        <translation>Loading recently played…</translation>
+        <translation>Načítavajú sa nedávno hrané…</translation>
     </message>
 </context>
 <context>
@@ -496,114 +496,114 @@
     <message>
         <location filename="../screens/SettingsScreen.qml" line="66"/>
         <source>Language</source>
-        <translation>Language</translation>
+        <translation>Jazyk</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="70"/>
         <source>Button style</source>
-        <translation>Button style</translation>
+        <translation>Štýl tlačidiel</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="74"/>
         <source>Mouse support</source>
-        <translation>Mouse support</translation>
+        <translation>Podpora myši</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="78"/>
         <source>Update media database</source>
-        <translation>Update media database</translation>
+        <translation>Aktualizovať databázu médií</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="82"/>
         <source>Scrape metadata</source>
-        <translation>Scrape metadata</translation>
+        <translation>Stiahnuť metadáta</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="86"/>
         <source>Debug logging</source>
-        <translation>Debug logging</translation>
+        <translation>Ladenie záznamu</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="90"/>
         <source>Upload log file</source>
-        <translation>Upload log file</translation>
+        <translation>Nahrať súbor záznamu</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="102"/>
         <source>Optimizing</source>
-        <translation>Optimizing</translation>
+        <translation>Optimalizuje sa</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="104"/>
         <location filename="../screens/SettingsScreen.qml" line="110"/>
         <source>Paused</source>
-        <translation>Paused</translation>
+        <translation>Pozastavené</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="104"/>
         <location filename="../screens/SettingsScreen.qml" line="110"/>
         <source>In progress</source>
-        <translation>In progress</translation>
+        <translation>Prebieha</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="196"/>
         <source>Default</source>
-        <translation>Default</translation>
+        <translation>Predvolené</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="236"/>
         <source>English</source>
-        <translation>English</translation>
+        <translation>Angličtina</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="238"/>
         <source>Italian</source>
-        <translation>Italian</translation>
+        <translation>Taliančina</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="240"/>
         <source>Slovak</source>
-        <translation>Slovak</translation>
+        <translation>Slovenčina</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="242"/>
         <source>Romanian</source>
-        <translation>Romanian</translation>
+        <translation>Rumunčina</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="244"/>
         <source>Dutch</source>
-        <translation>Dutch</translation>
+        <translation>Holandčina</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="245"/>
         <source>Auto</source>
-        <translation>Auto</translation>
+        <translation>Automaticky</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="270"/>
         <source>Style B</source>
-        <translation>Style B</translation>
+        <translation>Štýl B</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="272"/>
         <source>Style C</source>
-        <translation>Style C</translation>
+        <translation>Štýl C</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="273"/>
         <source>Style A</source>
-        <translation>Style A</translation>
+        <translation>Štýl A</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="368"/>
         <source>Settings</source>
-        <translation>Settings</translation>
+        <translation>Nastavenia</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="481"/>
         <source>No settings available on this platform</source>
-        <translation>No settings available on this platform</translation>
+        <translation>Na tejto platforme nie sú dostupné žiadne nastavenia</translation>
     </message>
 </context>
 <context>
@@ -611,17 +611,17 @@
     <message>
         <location filename="../screens/SystemsScreen.qml" line="161"/>
         <source>%1 systems</source>
-        <translation>%1 systems</translation>
+        <translation>%1 systémov</translation>
     </message>
     <message>
         <location filename="../screens/SystemsScreen.qml" line="215"/>
         <source>No systems in this category</source>
-        <translation>No systems in this category</translation>
+        <translation>V tejto kategórii nie sú žiadne systémy</translation>
     </message>
     <message>
         <location filename="../screens/SystemsScreen.qml" line="216"/>
         <source>Loading systems…</source>
-        <translation>Loading systems…</translation>
+        <translation>Načítavajú sa systémy…</translation>
     </message>
 </context>
 </TS>

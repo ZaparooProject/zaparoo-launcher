@@ -1,62 +1,62 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE TS>
-<TS version="2.1" language="en" sourcelanguage="en">
+<TS version="2.1" language="ro_RO" sourcelanguage="en">
 <context>
     <name>Main</name>
     <message>
         <location filename="../app/Main.qml" line="601"/>
         <source>Launch core</source>
-        <translation>Launch core</translation>
+        <translation>Lansează core</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="608"/>
         <source>Remove from favorites</source>
-        <translation>Remove from favorites</translation>
+        <translation>Elimină din favorite</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="608"/>
         <source>Add to favorites</source>
-        <translation>Add to favorites</translation>
+        <translation>Adaugă la favorite</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="611"/>
         <source>Write to NFC token</source>
-        <translation>Write to NFC token</translation>
+        <translation>Scrie pe tokenul NFC</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="612"/>
         <source>QR code</source>
-        <translation>QR code</translation>
+        <translation>Cod QR</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="613"/>
         <source>Launch game</source>
-        <translation>Launch game</translation>
+        <translation>Lansează jocul</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="1050"/>
         <source>Loading systems…</source>
-        <translation>Loading systems…</translation>
+        <translation>Se încarcă sistemele…</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="1051"/>
         <source>Loading games…</source>
-        <translation>Loading games…</translation>
+        <translation>Se încarcă jocurile…</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="1052"/>
         <source>Loading favorites…</source>
-        <translation>Loading favorites…</translation>
+        <translation>Se încarcă favoritele…</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="1053"/>
         <source>Loading recently played…</source>
-        <translation>Loading recently played…</translation>
+        <translation>Se încarcă jocurile recente…</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="1054"/>
         <source>Loading…</source>
-        <translation>Loading…</translation>
+        <translation>Se încarcă…</translation>
     </message>
 </context>
 <context>
@@ -69,12 +69,12 @@
     <message>
         <location filename="../app/MainLayout.qml" line="308"/>
         <source>Writing failed</source>
-        <translation>Writing failed</translation>
+        <translation>Scrierea a eșuat</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="309"/>
         <source>Put a writable card near the reader</source>
-        <translation>Put a writable card near the reader</translation>
+        <translation>Pune un card inscriptibil lângă cititor</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="494"/>
@@ -84,12 +84,12 @@
         <location filename="../app/MainLayout.qml" line="603"/>
         <location filename="../app/MainLayout.qml" line="641"/>
         <source>Move</source>
-        <translation>Move</translation>
+        <translation>Mută</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="495"/>
         <source>Select</source>
-        <translation>Select</translation>
+        <translation>Selectează</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="496"/>
@@ -98,7 +98,7 @@
         <location filename="../app/MainLayout.qml" line="508"/>
         <location filename="../app/MainLayout.qml" line="513"/>
         <source>Close</source>
-        <translation>Close</translation>
+        <translation>Închide</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="500"/>
@@ -106,12 +106,12 @@
         <location filename="../app/MainLayout.qml" line="523"/>
         <location filename="../app/MainLayout.qml" line="623"/>
         <source>Cancel</source>
-        <translation>Cancel</translation>
+        <translation>Anulează</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="507"/>
         <source>Done</source>
-        <translation>Done</translation>
+        <translation>Gata</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="512"/>
@@ -119,7 +119,7 @@
         <location filename="../app/MainLayout.qml" line="592"/>
         <location filename="../app/MainLayout.qml" line="652"/>
         <source>Retry</source>
-        <translation>Retry</translation>
+        <translation>Reîncearcă</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="526"/>
@@ -133,12 +133,12 @@
         <location filename="../app/MainLayout.qml" line="585"/>
         <location filename="../app/MainLayout.qml" line="645"/>
         <source>Open</source>
-        <translation>Open</translation>
+        <translation>Deschide</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="540"/>
         <source>Quit</source>
-        <translation>Quit</translation>
+        <translation>Ieșire</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="545"/>
@@ -152,31 +152,31 @@
         <location filename="../app/MainLayout.qml" line="648"/>
         <location filename="../app/MainLayout.qml" line="653"/>
         <source>Back</source>
-        <translation>Back</translation>
+        <translation>Înapoi</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="556"/>
         <location filename="../app/MainLayout.qml" line="584"/>
         <location filename="../app/MainLayout.qml" line="644"/>
         <source>Page</source>
-        <translation>Page</translation>
+        <translation>Pagină</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="558"/>
         <location filename="../app/MainLayout.qml" line="587"/>
         <location filename="../app/MainLayout.qml" line="647"/>
         <source>Options</source>
-        <translation>Options</translation>
+        <translation>Opțiuni</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="613"/>
         <source>Change</source>
-        <translation>Change</translation>
+        <translation>Schimbă</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="617"/>
         <source>Toggle</source>
-        <translation>Toggle</translation>
+        <translation>Comută</translation>
     </message>
 </context>
 <context>
@@ -184,22 +184,22 @@
     <message>
         <location filename="../components/BootOverlay.qml" line="74"/>
         <source>Can't reach Zaparoo Core. Check your connection.</source>
-        <translation>Can't reach Zaparoo Core. Check your connection.</translation>
+        <translation>Nu se poate ajunge la Zaparoo Core. Verifică conexiunea.</translation>
     </message>
     <message>
         <location filename="../components/BootOverlay.qml" line="76"/>
         <source>Reconnecting…</source>
-        <translation>Reconnecting…</translation>
+        <translation>Se reconectează…</translation>
     </message>
     <message>
         <location filename="../components/BootOverlay.qml" line="78"/>
         <source>Loading library…</source>
-        <translation>Loading library…</translation>
+        <translation>Se încarcă biblioteca…</translation>
     </message>
     <message>
         <location filename="../components/BootOverlay.qml" line="83"/>
         <source>Connecting to Zaparoo Core…</source>
-        <translation>Connecting to Zaparoo Core…</translation>
+        <translation>Se conectează la Zaparoo Core…</translation>
     </message>
 </context>
 <context>
@@ -208,67 +208,67 @@
         <location filename="../components/CoreStatusPill.qml" line="48"/>
         <location filename="../components/CoreStatusPill.qml" line="50"/>
         <source>Disconnected</source>
-        <translation>Disconnected</translation>
+        <translation>Deconectat</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="49"/>
         <source>Reconnecting…</source>
-        <translation>Reconnecting…</translation>
+        <translation>Se reconectează…</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="51"/>
         <source>Connecting…</source>
-        <translation>Connecting…</translation>
+        <translation>Se conectează…</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="52"/>
         <source>Core error</source>
-        <translation>Core error</translation>
+        <translation>Eroare Core</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="54"/>
         <source>Optimizing database</source>
-        <translation>Optimizing database</translation>
+        <translation>Se optimizează baza de date</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="60"/>
         <source>Indexing paused</source>
-        <translation>Indexing paused</translation>
+        <translation>Indexare întreruptă</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="62"/>
         <source>Indexing %1/%2 - %3</source>
-        <translation>Indexing %1/%2 - %3</translation>
+        <translation>Se indexează %1/%2 - %3</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="64"/>
         <source>Indexing %1/%2</source>
-        <translation>Indexing %1/%2</translation>
+        <translation>Se indexează %1/%2</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="65"/>
         <source>Indexing…</source>
-        <translation>Indexing…</translation>
+        <translation>Se indexează…</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="73"/>
         <source>Scrape paused</source>
-        <translation>Scrape paused</translation>
+        <translation>Preluarea metadatelor este întreruptă</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="75"/>
         <source>Scraping %1/%2 - %3</source>
-        <translation>Scraping %1/%2 - %3</translation>
+        <translation>Se preiau metadatele %1/%2 - %3</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="77"/>
         <source>Scraping %1/%2</source>
-        <translation>Scraping %1/%2</translation>
+        <translation>Se preiau metadatele %1/%2</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="78"/>
         <source>Scraping…</source>
-        <translation>Scraping…</translation>
+        <translation>Se preiau metadatele…</translation>
     </message>
 </context>
 <context>
@@ -276,52 +276,52 @@
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="156"/>
         <source>First-time setup</source>
-        <translation>First-time setup</translation>
+        <translation>Configurare inițială</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="170"/>
         <source>Zaparoo needs to scan your games before you can use the launcher. This usually takes a few minutes.</source>
-        <translation>Zaparoo needs to scan your games before you can use the launcher. This usually takes a few minutes.</translation>
+        <translation>Zaparoo trebuie să scaneze jocurile înainte să poți folosi lansatorul. De obicei durează câteva minute.</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="192"/>
         <source>Optimizing database - almost done</source>
-        <translation>Optimizing database - almost done</translation>
+        <translation>Se optimizează baza de date - aproape gata</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="245"/>
         <source>Indexing paused</source>
-        <translation>Indexing paused</translation>
+        <translation>Indexare întreruptă</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="247"/>
         <source>Step %1 of %2 - %3</source>
-        <translation>Step %1 of %2 - %3</translation>
+        <translation>Pasul %1 din %2 - %3</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="249"/>
         <source>Step %1 of %2</source>
-        <translation>Step %1 of %2</translation>
+        <translation>Pasul %1 din %2</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="250"/>
         <source>Preparing…</source>
-        <translation>Preparing…</translation>
+        <translation>Se pregătește…</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="269"/>
         <source>Done. %1 files indexed.</source>
-        <translation>Done. %1 files indexed.</translation>
+        <translation>Gata. %1 fișiere indexate.</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="300"/>
         <source>Cancel</source>
-        <translation>Cancel</translation>
+        <translation>Anulează</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="301"/>
         <source>Start scan</source>
-        <translation>Start scan</translation>
+        <translation>Pornește scanarea</translation>
     </message>
 </context>
 <context>
@@ -329,7 +329,7 @@
     <message>
         <location filename="../components/LoadingIndicator.qml" line="28"/>
         <source>Loading…</source>
-        <translation>Loading…</translation>
+        <translation>Se încarcă…</translation>
     </message>
 </context>
 <context>
@@ -337,32 +337,32 @@
     <message>
         <location filename="../components/LogUploadModal.qml" line="113"/>
         <source>Upload log file</source>
-        <translation>Upload log file</translation>
+        <translation>Încarcă fișierul jurnal</translation>
     </message>
     <message>
         <location filename="../components/LogUploadModal.qml" line="126"/>
         <source>Uploading log file - this may take a moment.</source>
-        <translation>Uploading log file - this may take a moment.</translation>
+        <translation>Se încarcă fișierul jurnal - poate dura puțin.</translation>
     </message>
     <message>
         <location filename="../components/LogUploadModal.qml" line="233"/>
         <source>Upload failed: %1</source>
-        <translation>Upload failed: %1</translation>
+        <translation>Încărcarea a eșuat: %1</translation>
     </message>
     <message>
         <location filename="../components/LogUploadModal.qml" line="234"/>
         <source>Upload failed.</source>
-        <translation>Upload failed.</translation>
+        <translation>Încărcarea a eșuat.</translation>
     </message>
     <message>
         <location filename="../components/LogUploadModal.qml" line="264"/>
         <source>Retry</source>
-        <translation>Retry</translation>
+        <translation>Reîncearcă</translation>
     </message>
     <message>
         <location filename="../components/LogUploadModal.qml" line="265"/>
         <source>Done</source>
-        <translation>Done</translation>
+        <translation>Gata</translation>
     </message>
 </context>
 <context>
@@ -375,7 +375,7 @@
     <message>
         <location filename="../components/Modal.qml" line="113"/>
         <source>Cancel</source>
-        <translation>Cancel</translation>
+        <translation>Anulează</translation>
     </message>
 </context>
 <context>
@@ -383,17 +383,17 @@
     <message>
         <location filename="../components/ScreenStateOverlay.qml" line="28"/>
         <source>Nothing here</source>
-        <translation>Nothing here</translation>
+        <translation>Nimic aici</translation>
     </message>
     <message>
         <location filename="../components/ScreenStateOverlay.qml" line="29"/>
         <source>Loading…</source>
-        <translation>Loading…</translation>
+        <translation>Se încarcă…</translation>
     </message>
     <message>
         <location filename="../components/ScreenStateOverlay.qml" line="61"/>
         <source>Failed to load</source>
-        <translation>Failed to load</translation>
+        <translation>Încărcarea a eșuat</translation>
     </message>
 </context>
 <context>
@@ -401,7 +401,7 @@
     <message>
         <location filename="../components/TopStatusStrip.qml" line="77"/>
         <source>Page %1 / %2</source>
-        <translation>Page %1 / %2</translation>
+        <translation>Pagina %1 / %2</translation>
     </message>
 </context>
 <context>
@@ -409,22 +409,22 @@
     <message>
         <location filename="../screens/FavoritesScreen.qml" line="150"/>
         <source>Favorites</source>
-        <translation>Favorites</translation>
+        <translation>Favorite</translation>
     </message>
     <message>
         <location filename="../screens/FavoritesScreen.qml" line="155"/>
         <source>%1 entries</source>
-        <translation>%1 entries</translation>
+        <translation>%1 intrări</translation>
     </message>
     <message>
         <location filename="../screens/FavoritesScreen.qml" line="207"/>
         <source>No favorites yet</source>
-        <translation>No favorites yet</translation>
+        <translation>Nu există favorite încă</translation>
     </message>
     <message>
         <location filename="../screens/FavoritesScreen.qml" line="208"/>
         <source>Loading favorites…</source>
-        <translation>Loading favorites…</translation>
+        <translation>Se încarcă favoritele…</translation>
     </message>
 </context>
 <context>
@@ -432,17 +432,17 @@
     <message>
         <location filename="../screens/GamesScreen.qml" line="214"/>
         <source>%1 files</source>
-        <translation>%1 files</translation>
+        <translation>%1 fișiere</translation>
     </message>
     <message>
         <location filename="../screens/GamesScreen.qml" line="275"/>
         <source>No games in this system</source>
-        <translation>No games in this system</translation>
+        <translation>Nu există jocuri în acest sistem</translation>
     </message>
     <message>
         <location filename="../screens/GamesScreen.qml" line="276"/>
         <source>Loading games…</source>
-        <translation>Loading games…</translation>
+        <translation>Se încarcă jocurile…</translation>
     </message>
 </context>
 <context>
@@ -450,22 +450,22 @@
     <message>
         <location filename="../screens/HubScreen.qml" line="87"/>
         <source>Favorites</source>
-        <translation>Favorites</translation>
+        <translation>Favorite</translation>
     </message>
     <message>
         <location filename="../screens/HubScreen.qml" line="88"/>
         <source>Recently Played</source>
-        <translation>Recently Played</translation>
+        <translation>Jucate recent</translation>
     </message>
     <message>
         <location filename="../screens/HubScreen.qml" line="89"/>
         <source>Settings</source>
-        <translation>Settings</translation>
+        <translation>Setări</translation>
     </message>
     <message>
         <location filename="../screens/HubScreen.qml" line="508"/>
         <source>No systems available. Run Update media database from Settings.</source>
-        <translation>No systems available. Run Update media database from Settings.</translation>
+        <translation>Nu există sisteme disponibile. Rulează Actualizare bază de date media din Setări.</translation>
     </message>
 </context>
 <context>
@@ -473,22 +473,22 @@
     <message>
         <location filename="../screens/RecentsScreen.qml" line="143"/>
         <source>Recently Played</source>
-        <translation>Recently Played</translation>
+        <translation>Jucate recent</translation>
     </message>
     <message>
         <location filename="../screens/RecentsScreen.qml" line="148"/>
         <source>%1 entries</source>
-        <translation>%1 entries</translation>
+        <translation>%1 intrări</translation>
     </message>
     <message>
         <location filename="../screens/RecentsScreen.qml" line="195"/>
         <source>Nothing played yet</source>
-        <translation>Nothing played yet</translation>
+        <translation>Nimic jucat încă</translation>
     </message>
     <message>
         <location filename="../screens/RecentsScreen.qml" line="196"/>
         <source>Loading recently played…</source>
-        <translation>Loading recently played…</translation>
+        <translation>Se încarcă jocurile recente…</translation>
     </message>
 </context>
 <context>
@@ -496,114 +496,114 @@
     <message>
         <location filename="../screens/SettingsScreen.qml" line="66"/>
         <source>Language</source>
-        <translation>Language</translation>
+        <translation>Limbă</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="70"/>
         <source>Button style</source>
-        <translation>Button style</translation>
+        <translation>Stil butoane</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="74"/>
         <source>Mouse support</source>
-        <translation>Mouse support</translation>
+        <translation>Suport mouse</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="78"/>
         <source>Update media database</source>
-        <translation>Update media database</translation>
+        <translation>Actualizează baza de date media</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="82"/>
         <source>Scrape metadata</source>
-        <translation>Scrape metadata</translation>
+        <translation>Preia metadatele</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="86"/>
         <source>Debug logging</source>
-        <translation>Debug logging</translation>
+        <translation>Jurnalizare de depanare</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="90"/>
         <source>Upload log file</source>
-        <translation>Upload log file</translation>
+        <translation>Încarcă fișierul jurnal</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="102"/>
         <source>Optimizing</source>
-        <translation>Optimizing</translation>
+        <translation>Se optimizează</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="104"/>
         <location filename="../screens/SettingsScreen.qml" line="110"/>
         <source>Paused</source>
-        <translation>Paused</translation>
+        <translation>Întrerupt</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="104"/>
         <location filename="../screens/SettingsScreen.qml" line="110"/>
         <source>In progress</source>
-        <translation>In progress</translation>
+        <translation>În desfășurare</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="196"/>
         <source>Default</source>
-        <translation>Default</translation>
+        <translation>Implicit</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="236"/>
         <source>English</source>
-        <translation>English</translation>
+        <translation>Engleză</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="238"/>
         <source>Italian</source>
-        <translation>Italian</translation>
+        <translation>Italiană</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="240"/>
         <source>Slovak</source>
-        <translation>Slovak</translation>
+        <translation>Slovacă</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="242"/>
         <source>Romanian</source>
-        <translation>Romanian</translation>
+        <translation>Română</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="244"/>
         <source>Dutch</source>
-        <translation>Dutch</translation>
+        <translation>Neerlandeză</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="245"/>
         <source>Auto</source>
-        <translation>Auto</translation>
+        <translation>Automat</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="270"/>
         <source>Style B</source>
-        <translation>Style B</translation>
+        <translation>Stil B</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="272"/>
         <source>Style C</source>
-        <translation>Style C</translation>
+        <translation>Stil C</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="273"/>
         <source>Style A</source>
-        <translation>Style A</translation>
+        <translation>Stil A</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="368"/>
         <source>Settings</source>
-        <translation>Settings</translation>
+        <translation>Setări</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="481"/>
         <source>No settings available on this platform</source>
-        <translation>No settings available on this platform</translation>
+        <translation>Nu există setări disponibile pe această platformă</translation>
     </message>
 </context>
 <context>
@@ -611,17 +611,17 @@
     <message>
         <location filename="../screens/SystemsScreen.qml" line="161"/>
         <source>%1 systems</source>
-        <translation>%1 systems</translation>
+        <translation>%1 sisteme</translation>
     </message>
     <message>
         <location filename="../screens/SystemsScreen.qml" line="215"/>
         <source>No systems in this category</source>
-        <translation>No systems in this category</translation>
+        <translation>Nu există sisteme în această categorie</translation>
     </message>
     <message>
         <location filename="../screens/SystemsScreen.qml" line="216"/>
         <source>Loading systems…</source>
-        <translation>Loading systems…</translation>
+        <translation>Se încarcă sistemele…</translation>
     </message>
 </context>
 </TS>

@@ -71,7 +71,7 @@ use zaparoo_core::runtime;
 /// the form renders it as `qsTr("Default")` so users can cycle back
 /// to no-override after picking a custom value.
 const MISTER_RESOLUTIONS: &[&str] = &["", "1280x720", "1920x1080", "640x480", "1920x1440"];
-const LANGUAGES: &[&str] = &["auto", "en", "it_IT"];
+const LANGUAGES: &[&str] = &["auto", "en", "it_IT", "sk_SK", "ro_RO", "nl_NL"];
 const DEFAULT_LANGUAGE: &str = "auto";
 const BUTTON_LAYOUTS: &[&str] = &["a", "b", "c"];
 const DEFAULT_BUTTON_LAYOUT: &str = "a";
@@ -393,6 +393,9 @@ mod tests {
         assert_eq!(normalize_language("AUTO"), DEFAULT_LANGUAGE);
         assert_eq!(normalize_language("fr"), DEFAULT_LANGUAGE);
         assert_eq!(normalize_language("it_IT"), "it_IT");
+        assert_eq!(normalize_language("sk_SK"), "sk_SK");
+        assert_eq!(normalize_language("ro_RO"), "ro_RO");
+        assert_eq!(normalize_language("nl_NL"), "nl_NL");
     }
 
     #[test]
