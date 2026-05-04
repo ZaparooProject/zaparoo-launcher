@@ -138,7 +138,7 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
-        anchors.topMargin: Sizing.pctH(11)
+        anchors.topMargin: Sizing.headerBottom + Sizing.pctH(1)
         height: Sizing.pctH(7)
         title: qsTr("Recently Played")
         currentPage: recentsGrid.currentPage

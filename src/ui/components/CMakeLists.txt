@@ -14,6 +14,7 @@ qt_add_qml_module(
         ContextMenu.qml
         CoreStatusPill.qml
         FirstRunIndexModal.qml
+        HeaderBar.qml
         LoadingIndicator.qml
         LogUploadModal.qml
         Modal.qml
@@ -21,6 +22,7 @@ qt_add_qml_module(
         QrCodeModal.qml
         ScreenStateOverlay.qml
         SettingsField.qml
+        SettingsSectionHeader.qml
         StatusIcon.qml
         Tile.qml
         TileLoader.qml

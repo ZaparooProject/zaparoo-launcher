@@ -25,8 +25,12 @@ import Zaparoo.Browse as Browse
 MainLayout {
     id: root
 
-    width: Screen.width
-    height: Screen.height
+    // Fullscreen builds (MiSTer) fill the screen; desktop windowed
+    // builds inherit MainLayout's 1280x720 design defaults so the user
+    // can resize freely. The fullscreen override is a one-shot in
+    // Component.onCompleted (below) rather than a binding — a binding
+    // here would re-assert 1280 after any user resize, fighting the
+    // OS resize gesture.
 
     readonly property string modalCardWrite: "card_write"
     readonly property string modalContextMenu: "context_menu"
@@ -71,6 +75,13 @@ MainLayout {
         Sizing.screenWidth = width
     }
     Component.onCompleted: {
+        // One-shot fullscreen sizing for embedded builds. Done as an
+        // imperative write rather than a binding so a user resize on
+        // a windowed build can never be undone by a re-evaluation.
+        if (root.fullScreen) {
+            root.width = Screen.width
+            root.height = Screen.height
+        }
         Sizing.screenWidth = width
         Sizing.screenHeight = height
         Browse.GamesModel.page_size = root._gamesPageSize

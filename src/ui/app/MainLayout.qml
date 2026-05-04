@@ -45,6 +45,8 @@ ApplicationWindow {
     // Screen.height, so the live launcher still fills the screen.
     width: 1280
     height: 720
+    minimumWidth: 426
+    minimumHeight: 240
     visible: true
     visibility: root.fullScreen ? Window.FullScreen : Window.Windowed
     title: qsTr("Zaparoo Launcher")
@@ -187,16 +189,20 @@ ApplicationWindow {
         asynchronous: false
     }
 
-    // ── Logo ──────────────────────────────────────────────────────────────────
+    // ── Top header (logo + status row + status pill) ───────────────────────────
 
-    Image {
+    // Single component owning the brand mark, host status icons +
+    // clock, and Core status pill. Height is fixed (Sizing.headerHeight)
+    // so the pill's slot stays reserved when idle and the logo always
+    // matches the stacked rows. Screens clear `Sizing.headerBottom`.
+    HeaderBar {
+        id: headerBar
+
         anchors.left: parent.left
+        anchors.right: parent.right
         anchors.top: parent.top
-        anchors.leftMargin: Sizing.pctW(2)
-        anchors.topMargin: Sizing.pctH(2)
-        height: Sizing.pctH(7)
-        fillMode: Image.PreserveAspectFit
-        source: "qrc:/qt/qml/Zaparoo/App/resources/images/logo.png"
+        anchors.topMargin: Sizing.headerTopMargin
+        z: 200
     }
 
     // ── Screen containers ─────────────────────────────────────────────────────
@@ -348,105 +354,6 @@ ApplicationWindow {
         anchors.fill: parent
         open: root.logUploadModalVisible
         onCloseRequested: root.closeLogUploadRequested()
-    }
-
-    // ── Top-right HUD ─────────────────────────────────────────────────────────
-    //
-    // Host status icons plus clock. The Row is right-anchored so icons
-    // can appear/disappear without moving the clock away from the edge.
-
-    Row {
-        id: topHud
-
-        anchors.top: parent.top
-        anchors.right: parent.right
-        anchors.topMargin: Sizing.pctH(2)
-        anchors.rightMargin: Sizing.pctW(2)
-        spacing: Sizing.pctW(1)
-        z: 200
-        // Explicit row height matches StatusIcon's square size so every
-        // child can verticalCenter against the row and the icons + clock
-        // sit on a single line. Without this Row height tracks the
-        // tallest child, which is the Text element (font ascender +
-        // descender) — that pushes icons up and out of alignment.
-        // Clock pixelSize runs larger than the icon box because a font's
-        // cap-height is ~0.7× pixelSize, so matching pixelSize to icon
-        // height makes glyphs look small next to the square SVGs; bumping
-        // the clock font to ~1.4× the icon size lands their visual weight
-        // on par. Row height takes the max so neither child clips.
-        readonly property real _iconSize: Sizing.fontSize(2.4)
-        readonly property real _clockFontSize: Sizing.fontSize(3.4)
-        height: Math.max(topHud._iconSize, topHud._clockFontSize)
-
-        StatusIcon {
-            anchors.verticalCenter: parent.verticalCenter
-            visible: Browse.SystemStatus.has_nfc
-            source: Resources.statusIconUrl("NFC")
-            name: "NFC"
-        }
-
-        StatusIcon {
-            anchors.verticalCenter: parent.verticalCenter
-            visible: Browse.SystemStatus.has_wifi_internet
-            source: Resources.statusIconUrl("WiFi")
-            name: "Wi-Fi"
-        }
-
-        StatusIcon {
-            anchors.verticalCenter: parent.verticalCenter
-            visible: Browse.SystemStatus.has_lan_internet
-            source: Resources.statusIconUrl("WiredNetwork")
-            name: "LAN"
-        }
-
-        StatusIcon {
-            anchors.verticalCenter: parent.verticalCenter
-            visible: Browse.SystemStatus.has_bluetooth
-            source: Resources.statusIconUrl("Bluetooth")
-            name: "Bluetooth"
-        }
-
-        Text {
-            id: clockLabel
-
-            // 30s tick keeps the displayed minute fresh without per-second
-            // wakeups; minutes-only display means we never need finer.
-            // Fixed width avoids reflow on the minute boundary because
-            // proportional digits make "11:11" narrower than "10:00".
-            property string currentTime: Qt.formatDateTime(new Date(), "HH:mm")
-
-            anchors.verticalCenter: parent.verticalCenter
-            height: parent.height
-            width: topHud._clockFontSize * 3
-            verticalAlignment: Text.AlignVCenter
-            horizontalAlignment: Text.AlignRight
-            text: clockLabel.currentTime
-            font.family: Theme.fontUi
-            font.pixelSize: topHud._clockFontSize
-            color: Theme.textPrimary
-            renderType: Text.NativeRendering
-
-            Timer {
-                interval: 30000
-                running: true
-                repeat: true
-                triggeredOnStart: true
-                onTriggered: clockLabel.currentTime =
-                    Qt.formatDateTime(new Date(), "HH:mm")
-            }
-        }
-    }
-
-    // Mutually-exclusive Core/indexing/scraper status surface. Sits on
-    // its own line directly under `topHud`, right-aligned to the same
-    // edge as the clock. When the pill is idle (no connection issue,
-    // no indexing, no scraping) it collapses to zero size and the
-    // second line takes no visual space.
-    CoreStatusPill {
-        anchors.top: topHud.bottom
-        anchors.right: topHud.right
-        anchors.topMargin: Sizing.pctH(0.8)
-        z: 200
     }
 
     // ── Instructions bar ──────────────────────────────────────────────────────

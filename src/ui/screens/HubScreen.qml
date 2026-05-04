@@ -60,12 +60,12 @@ Item {
     signal requestSettingsScreen()
 
     // Vertically center the (categories row + actions row + activeLabel)
-    // block in the band between the logo bottom (pctH(9)) and the help
-    // bar top (hub.height - pctH(6)). `_blockHeight` mirrors the
-    // anchor chain below: each row is `cellHeight + 2*verticalPadding`,
-    // the gap between them collapses the focus-bleed padding (see
-    // `actionsRow.anchors.topMargin`), and the label sits pctH(3) below
-    // the actions row at pctH(7) tall.
+    // block in the band between the HeaderBar bottom (Sizing.headerBottom)
+    // and the help bar top (hub.height - pctH(6)). `_blockHeight`
+    // mirrors the anchor chain below: each row is
+    // `cellHeight + 2*verticalPadding`, the gap between them collapses
+    // the focus-bleed padding (see `actionsRow.anchors.topMargin`),
+    // and the label sits pctH(3) below the actions row at pctH(7) tall.
     readonly property int _blockHeight:
         2 * (categoriesRow.cellHeight + 2 * categoriesRow.verticalPadding)
         + (categoriesRow.spacing
@@ -74,7 +74,7 @@ Item {
         + Sizing.pctH(3)
         + Sizing.pctH(7)
     readonly property int _blockY:
-        Math.round((Sizing.pctH(9) + hub.height - Sizing.pctH(6)
+        Math.round((Sizing.headerBottom + hub.height - Sizing.pctH(6)
                     - hub._blockHeight) / 2)
 
     // Static action-row data. Three fixed entries; order matches

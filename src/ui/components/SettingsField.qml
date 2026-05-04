@@ -145,20 +145,36 @@ Item {
         }
     }
 
-    // Right-side caption for `control: "action"`. No `< >` arrows, no
-    // toggle pill — just a single muted-when-idle string showing the
-    // current operation state. Empty `actionStatus` collapses to no
-    // text, matching the visual quietness of an idle row.
-    Text {
+    // Right-side cluster for `control: "action"`. The chevron is the
+    // affordance — it always paints so an idle action row reads as
+    // pressable. The status caption to its left only paints while the
+    // operation is in flight ("In progress" / "Paused" / "Optimizing");
+    // it's a status, not the label of the action.
+    Row {
         visible: root.control === "action"
         anchors.right: parent.right
         anchors.rightMargin: Sizing.pctW(3)
         anchors.verticalCenter: parent.verticalCenter
-        text: root.actionStatus
-        color: Theme.textPrimary
-        font.family: Theme.fontUi
-        font.pixelSize: Sizing.fontSize(2.4)
-        renderType: Text.NativeRendering
+        spacing: Sizing.pctW(1.5)
+
+        Text {
+            anchors.verticalCenter: parent.verticalCenter
+            visible: root.actionStatus !== ""
+            text: root.actionStatus
+            color: Theme.textLabel
+            font.family: Theme.fontUi
+            font.pixelSize: Sizing.fontSize(2.4)
+            renderType: Text.NativeRendering
+        }
+
+        Text {
+            anchors.verticalCenter: parent.verticalCenter
+            text: "›"
+            color: Theme.textPrimary
+            font.family: Theme.fontUi
+            font.pixelSize: Sizing.fontSize(3.0)
+            renderType: Text.NativeRendering
+        }
     }
 
     MouseArea {
