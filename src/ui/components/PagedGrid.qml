@@ -62,6 +62,8 @@ Item {
     // row the pointer targeted.
     signal itemHovered(int index)
     signal itemClicked(int index)
+    signal itemRightClicked(int index)
+    signal emptyRightClicked()
 
     // Per-instance shape overrides. -1 means "use the global Sizing
     // default" — Systems screen leaves these alone so the systems grid
@@ -328,6 +330,13 @@ Item {
 
     clip: true
 
+    MouseArea {
+        anchors.fill: parent
+        hoverEnabled: true
+        acceptedButtons: Qt.RightButton
+        onClicked: root.emptyRightClicked()
+    }
+
     Item {
         id: track
 
@@ -434,7 +443,8 @@ Item {
                 MouseArea {
                     anchors.fill: parent
                     hoverEnabled: true
-                    acceptedButtons: Qt.LeftButton
+                    acceptedButtons: Qt.LeftButton | Qt.RightButton
+                    cursorShape: Qt.PointingHandCursor
                     enabled: cellItem.visible
 
                     onEntered: {
@@ -443,10 +453,13 @@ Item {
                         root.itemHovered(cellItem.index)
                     }
 
-                    onClicked: {
+                    onClicked: (mouse) => {
                         if (root.currentIndex !== cellItem.index)
                             root.currentIndex = cellItem.index
-                        root.itemClicked(cellItem.index)
+                        if (mouse.button === Qt.RightButton)
+                            root.itemRightClicked(cellItem.index)
+                        else
+                            root.itemClicked(cellItem.index)
                     }
                 }
             }
