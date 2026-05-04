@@ -35,6 +35,10 @@ Item {
     property bool transitioning: false
 
     signal requestHubScreen()
+    // Forward signal carrying the focused action row's id. The router
+    // decides what the payload means — currently only "uploadLog" is
+    // wired, which opens the log-upload modal.
+    signal requestAccept(actionId: string)
 
     // Field registry. Each entry's `id` is read by handleAction to
     // route the cycle to the right model setter. Keeping this as data
@@ -76,6 +80,14 @@ Item {
         out.push({
             id: "runScraper",
             label: qsTr("Scrape metadata")
+        })
+        out.push({
+            id: "debugLogging",
+            label: qsTr("Debug logging")
+        })
+        out.push({
+            id: "uploadLog",
+            label: qsTr("Upload log file")
         })
         return out
     }
@@ -125,14 +137,22 @@ Item {
     }
 
     readonly property int fieldCount: settings.fields.length
-    readonly property bool focusedFieldIsMouse:
-        settings.fieldCount > 0 && settings.fields[settings.currentIndex].id === "mouseEnabled"
+    readonly property bool focusedFieldIsToggle: {
+        if (settings.fieldCount === 0)
+            return false
+        const id = settings.fields[settings.currentIndex].id
+        return id === "mouseEnabled" || id === "debugLogging"
+    }
     // True when the focused field is an action button (updateMediaDb,
-    // runScraper). Drives the help-bar Accept hint.
-    readonly property bool focusedFieldIsAction:
-        settings.fieldCount > 0
-        && (settings.fields[settings.currentIndex].id === "updateMediaDb"
-            || settings.fields[settings.currentIndex].id === "runScraper")
+    // runScraper, uploadLog). Drives the help-bar Accept hint.
+    readonly property bool focusedFieldIsAction: {
+        if (settings.fieldCount === 0)
+            return false
+        const id = settings.fields[settings.currentIndex].id
+        return id === "updateMediaDb"
+               || id === "runScraper"
+               || id === "uploadLog"
+    }
     // True when the focused action's matching operation is currently
     // running, so the help bar can label Accept as "Cancel" rather
     // than "Start".
@@ -275,6 +295,14 @@ Item {
         Browse.Settings.set_mouse_enabled(!Browse.Settings.current_mouse_enabled)
     }
 
+    function _setDebugLogging(direction: int): void {
+        Browse.Settings.set_debug_logging(direction > 0)
+    }
+
+    function _toggleDebugLogging(): void {
+        Browse.Settings.set_debug_logging(!Browse.Settings.current_debug_logging)
+    }
+
     function _cycleFocused(direction: int): void {
         if (settings.fieldCount === 0)
             return
@@ -287,6 +315,8 @@ Item {
             settings._cycleButtonLayout(direction)
         else if (id === "mouseEnabled")
             settings._setMouseEnabled(direction)
+        else if (id === "debugLogging")
+            settings._setDebugLogging(direction)
         // Action fields ignore left/right — they only respond to accept.
     }
 
@@ -307,10 +337,14 @@ Item {
             const id = settings.fields[settings.currentIndex].id
             if (id === "mouseEnabled")
                 settings._toggleMouseEnabled()
+            else if (id === "debugLogging")
+                settings._toggleDebugLogging()
             else if (id === "updateMediaDb")
                 settings._triggerIndex()
             else if (id === "runScraper")
                 settings._triggerScrape()
+            else if (id === "uploadLog")
+                settings.requestAccept("uploadLog")
         } else if (action === "cancel") {
             settings.requestHubScreen()
         }
@@ -371,11 +405,15 @@ Item {
                        : modelData.id === "buttonLayout"
                        ? settings._buttonLayoutDisplay(Browse.Settings.current_button_layout)
                        : ""
-                control: modelData.id === "mouseEnabled" ? "toggle"
+                control: modelData.id === "mouseEnabled" || modelData.id === "debugLogging"
+                         ? "toggle"
                          : (modelData.id === "updateMediaDb"
-                            || modelData.id === "runScraper") ? "action"
+                            || modelData.id === "runScraper"
+                            || modelData.id === "uploadLog") ? "action"
                          : "value"
-                checked: Browse.Settings.current_mouse_enabled
+                checked: modelData.id === "debugLogging"
+                         ? Browse.Settings.current_debug_logging
+                         : Browse.Settings.current_mouse_enabled
                 actionStatus: modelData.id === "updateMediaDb"
                               ? settings._indexActionStatus()
                               : modelData.id === "runScraper"
@@ -391,6 +429,8 @@ Item {
                                   && settings._buttonLayoutList().length > 1)
                               || (modelData.id === "mouseEnabled"
                                   && Browse.Settings.current_mouse_enabled)
+                              || (modelData.id === "debugLogging"
+                                  && Browse.Settings.current_debug_logging)
                 canCycleNext: (modelData.id === "resolution"
                                && settings._resolutionList().length > 0)
                               || (modelData.id === "language"
@@ -399,11 +439,15 @@ Item {
                                   && settings._buttonLayoutList().length > 1)
                               || (modelData.id === "mouseEnabled"
                                   && !Browse.Settings.current_mouse_enabled)
+                              || (modelData.id === "debugLogging"
+                                  && !Browse.Settings.current_debug_logging)
                 onHovered: settings.currentIndex = index
                 onClicked: {
                     settings.currentIndex = index
                     if (modelData.id === "mouseEnabled")
                         settings._toggleMouseEnabled()
+                    else if (modelData.id === "debugLogging")
+                        settings._toggleDebugLogging()
                 }
                 // Action rows route through `onAccepted` only (see
                 // `SettingsField.qml`'s MouseArea), so the focus
@@ -415,6 +459,8 @@ Item {
                         settings._triggerIndex()
                     else if (modelData.id === "runScraper")
                         settings._triggerScrape()
+                    else if (modelData.id === "uploadLog")
+                        settings.requestAccept("uploadLog")
                 }
             }
         }

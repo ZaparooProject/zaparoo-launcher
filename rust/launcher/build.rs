@@ -36,6 +36,7 @@ fn main() {
         "src/models/games_state.rs",
         "src/models/favorites_state.rs",
         "src/models/input.rs",
+        "src/models/log_upload.rs",
         "src/models/media_status.rs",
         "src/models/platform.rs",
         "src/models/qr_code.rs",
