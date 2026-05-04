@@ -19,7 +19,7 @@ import Zaparoo.Browse as Browse
 // because the underlying `vmode` command lives on MiSTer's Linux framebuffer
 // (currently hidden — the picker doesn't switch reliably yet). Button style
 // is cross-platform and selects the resource directory for help-bar button
-// glyphs (Style A/B/C → resources/images/buttons/{a,b,c}/). Mouse support
+// glyphs (Style A/B/C/D → resources/images/buttons/{a,b,c,d}/). Mouse support
 // is cross-platform and controls cursor visibility plus mouse hit targets.
 //
 // Pure input dispatcher: emits `requestHubScreen()` on Escape; left/
@@ -264,6 +264,8 @@ Item {
             return qsTr("Style B")
         if (value === "c")
             return qsTr("Style C")
+        if (value === "d")
+            return qsTr("Style D")
         return qsTr("Style A")
     }
 

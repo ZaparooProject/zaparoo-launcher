@@ -26,7 +26,8 @@
 //   * `available_button_layouts` — CONSTANT. Single-letter ids used to
 //     compose resources/images/buttons/<layout>/Button*.png. Style A is
 //     the legacy Nintendo-style glyph set, B is the Xbox-style set, C
-//     is the Sony-style set; the user-facing labels are "Style A/B/C"
+//     is the Sony-style set, and D is the alternate internal set; the
+//     user-facing labels are "Style A/B/C/D"
 //     (see `SettingsScreen.qml::_buttonLayoutDisplay`) so the picker
 //     reads as a neutral aesthetic choice rather than a vendor pick.
 //   * `current_button_layout` — READ + NOTIFY, persisted. Defaults to
@@ -73,7 +74,7 @@ use zaparoo_core::runtime;
 const MISTER_RESOLUTIONS: &[&str] = &["", "1280x720", "1920x1080", "640x480", "1920x1440"];
 const LANGUAGES: &[&str] = &["auto", "en", "it_IT"];
 const DEFAULT_LANGUAGE: &str = "auto";
-const BUTTON_LAYOUTS: &[&str] = &["a", "b", "c"];
+const BUTTON_LAYOUTS: &[&str] = &["a", "b", "c", "d"];
 const DEFAULT_BUTTON_LAYOUT: &str = "a";
 
 #[derive(Default)]
@@ -410,6 +411,7 @@ mod tests {
             DEFAULT_BUTTON_LAYOUT
         );
         assert_eq!(normalize_button_layout("b"), "b");
+        assert_eq!(normalize_button_layout("d"), "d");
     }
 
     #[test]
