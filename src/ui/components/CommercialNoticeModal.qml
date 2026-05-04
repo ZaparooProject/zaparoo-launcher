@@ -21,7 +21,9 @@ import Zaparoo.Browse as Browse
 // Pure presentation: input is dispatched by `Main.qml`, the only
 // interactive surface is the "I understand" action, and dismiss runs
 // through the `closeRequested` signal so the router owns the modal
-// stack.
+// stack. Chrome (scrim, panel, border, radius, title) comes from the
+// shared `Modal` shell so every dialog in the app reads as the same
+// surface.
 Item {
     id: modal
 
@@ -49,48 +51,17 @@ Item {
         // launcher becomes interactive.
     }
 
-    // Scrim. Eats clicks so they don't reach the screen tree underneath.
-    Rectangle {
-        anchors.fill: parent
-        color: "#cc000000"
+    Modal {
+        id: shell
 
-        MouseArea {
-            anchors.fill: parent
-        }
-    }
-
-    Rectangle {
-        id: panel
-
-        anchors.centerIn: parent
-        width: Math.min(parent.width * 0.78, Sizing.pctH(110))
-        height: contentColumn.height + Sizing.pctH(12)
-        color: Theme.bgPanel
-        border.width: 2
-        border.color: Theme.textPrimary
-        radius: Sizing.cornerRadius
+        open: modal.open
+        kind: "shell"
+        title: qsTr("Welcome to Zaparoo Launcher")
+        panelMaxWidth: Sizing.pctH(110)
 
         Column {
-            id: contentColumn
-
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.top: parent.top
-            anchors.topMargin: Sizing.pctH(6)
-            anchors.leftMargin: Sizing.pctW(6)
-            anchors.rightMargin: Sizing.pctW(6)
+            width: parent.width
             spacing: Sizing.pctH(3)
-
-            Text {
-                width: parent.width
-                text: qsTr("Welcome to Zaparoo Launcher")
-                font.family: Theme.fontUi
-                font.pixelSize: Sizing.fontSize(3.2)
-                color: Theme.textPrimary
-                wrapMode: Text.WordWrap
-                horizontalAlignment: Text.AlignHCenter
-                renderType: Text.NativeRendering
-            }
 
             Text {
                 width: parent.width
@@ -172,8 +143,6 @@ Item {
                 height: Sizing.pctH(7)
 
                 Rectangle {
-                    id: actionButton
-
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.verticalCenter: parent.verticalCenter
                     width: Sizing.pctW(28)

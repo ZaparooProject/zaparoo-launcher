@@ -97,6 +97,12 @@ Item {
         color: Theme.bgPanel
         border.width: 2
         border.color: Theme.textPrimary
+        radius: Sizing.cornerRadius
+        // Rows fill the full width and the focused row paints a square
+        // background, so without clipping the row colors would bleed
+        // past the rounded corner curvature at the top and bottom of
+        // the panel.
+        clip: true
 
         Column {
             anchors.fill: parent
