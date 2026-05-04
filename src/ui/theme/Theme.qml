@@ -18,6 +18,9 @@ QtObject {
     // contrast — the page bg pattern stays visible in the gaps between
     // tiles, and each tile reads as a self-contained chip.
     readonly property color surfaceCard: "#2a2a45"
+    // Modal scrim — translucent black so the screen behind a modal
+    // dims uniformly without a blur or shader pass.
+    readonly property color scrim: "#cc000000"
 
     // Borders
     readonly property color borderSubtle: "#1a1a2e"

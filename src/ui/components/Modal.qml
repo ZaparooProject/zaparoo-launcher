@@ -97,7 +97,7 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        color: "#cc000000"
+        color: Theme.scrim
 
         // Eat clicks on the scrim so they don't reach the screens
         // underneath.
@@ -164,6 +164,7 @@ Item {
                 // flips. Failure is a terminal display that auto-dismisses,
                 // not interactive.
                 Item {
+                    id: cancelSlot
                     width: parent.width
                     height: Sizing.pctH(7)
                     visible: modal.kind === "transient" && !modal.failed
@@ -171,7 +172,11 @@ Item {
                     Rectangle {
                         anchors.horizontalCenter: parent.horizontalCenter
                         anchors.verticalCenter: parent.verticalCenter
-                        width: Sizing.pctW(28)
+                        // Cap at pctW(28) for the typical case but never
+                        // exceed the slot width — the modal panel is
+                        // height-bound on widescreen, so a screen-width
+                        // pill can otherwise overflow the panel.
+                        width: Math.min(Sizing.pctW(28), cancelSlot.width)
                         height: parent.height
                         color: Theme.bgBar
                         border.width: 1
@@ -196,6 +201,7 @@ Item {
 
                 // Accept button — action_error flavor.
                 Item {
+                    id: acceptSlot
                     width: parent.width
                     height: Sizing.pctH(7)
                     visible: modal.kind === "action_error"
@@ -203,7 +209,7 @@ Item {
                     Rectangle {
                         anchors.horizontalCenter: parent.horizontalCenter
                         anchors.verticalCenter: parent.verticalCenter
-                        width: Sizing.pctW(28)
+                        width: Math.min(Sizing.pctW(28), acceptSlot.width)
                         height: parent.height
                         color: Theme.bgBar
                         border.width: 1
@@ -230,17 +236,29 @@ Item {
                 // accent border; mouse clicks bypass focus and dispatch
                 // straight to the matching signal.
                 Item {
+                    id: confirmSlot
+
                     width: parent.width
                     height: Sizing.pctH(7)
                     visible: modal.kind === "confirm"
 
+                    // Pill width caps at pctW(28) but shrinks to half
+                    // the slot (minus the gap) when the panel is too
+                    // narrow for two preferred pills. Computed off the
+                    // slot, not the Row, so the Row can stay implicitly
+                    // sized by its children and centered.
+                    readonly property int _gap: Sizing.pctW(2)
+                    readonly property int _pillWidth:
+                        Math.min(Sizing.pctW(28),
+                                 Math.max(0, (width - _gap) / 2))
+
                     Row {
                         anchors.horizontalCenter: parent.horizontalCenter
                         anchors.verticalCenter: parent.verticalCenter
-                        spacing: Sizing.pctW(2)
+                        spacing: confirmSlot._gap
 
                         Rectangle {
-                            width: Sizing.pctW(28)
+                            width: confirmSlot._pillWidth
                             height: Sizing.pctH(7)
                             color: Theme.bgBar
                             border.width: modal._focusYes ? 1 : 2
@@ -268,7 +286,7 @@ Item {
                         }
 
                         Rectangle {
-                            width: Sizing.pctW(28)
+                            width: confirmSlot._pillWidth
                             height: Sizing.pctH(7)
                             color: Theme.bgBar
                             border.width: modal._focusYes ? 2 : 1

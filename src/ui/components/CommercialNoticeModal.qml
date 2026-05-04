@@ -139,13 +139,14 @@ Item {
             }
 
             Item {
+                id: understandSlot
                 width: parent.width
                 height: Sizing.pctH(7)
 
                 Rectangle {
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.verticalCenter: parent.verticalCenter
-                    width: Sizing.pctW(28)
+                    width: Math.min(Sizing.pctW(28), understandSlot.width)
                     height: parent.height
                     color: Theme.bgBar
                     border.width: 1
