@@ -533,12 +533,12 @@
     <message>
         <location filename="../screens/SystemsScreen.qml" line="161"></location>
         <source>%1 systems</source>
-        <translation>%1 systems</translation>
+        <translation>%1 sistemas</translation>
     </message>
     <message>
         <location filename="../screens/SystemsScreen.qml" line="215"></location>
         <source>No systems in this category</source>
-        <translation>No systems in this category</translation>
+        <translation>No hay sistemas en esta categoría</translation>
     </message>
     <message>
         <location filename="../screens/SystemsScreen.qml" line="216"></location>
