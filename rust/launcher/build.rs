@@ -45,6 +45,7 @@ fn main() {
         "src/models/runtime.rs",
         "src/models/settings.rs",
         "src/models/system_status.rs",
+        "src/models/update_all_runner.rs",
     ]);
 
     // SAFETY: cc_builder is unsafe in 0.8 because cxx-qt makes no stability

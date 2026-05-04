@@ -38,7 +38,7 @@ import Zaparoo.Browse as Browse
 //
 // Pure input dispatcher: emits one of `requestAccept(category)`,
 // `requestFavoritesScreen`, `requestRecentsScreen`,
-// `requestSettingsScreen`, or `requestQuit`.
+// `requestSettingsScreen`, `requestUpdateAll`, or `requestQuit`.
 //
 // All cross-screen orchestration (model fills, deferred set_category,
 // cover prefetch, transition overlay, screen flip) lives in Main.qml.
@@ -48,7 +48,7 @@ Item {
     id: hub
 
     property bool transitioning: false
-    // 0 = categories row, 1 = actions row.
+    // 0 = categories row, 1 = actions row, 2 = bottom-right utility.
     property int currentRow: 0
     // Index within the active row.
     property int currentIndex: 0
@@ -58,6 +58,7 @@ Item {
     signal requestFavoritesScreen()
     signal requestRecentsScreen()
     signal requestSettingsScreen()
+    signal requestUpdateAll()
 
     // Vertically center the (categories row + actions row + activeLabel)
     // block in the band between the logo bottom (pctH(9)) and the help
@@ -135,7 +136,10 @@ Item {
         // Settings — the only meaningful action ("Run Update media
         // database from Settings") the empty-hub message points at.
         const savedRow = Browse.HubState.selected_row
-        if (savedRow === 1) {
+        if (savedRow === 2 && Browse.HubState.selected_action === "update_all") {
+            hub.currentRow = 2
+            hub.currentIndex = 0
+        } else if (savedRow === 1) {
             hub.currentRow = 1
             hub.currentIndex = hub._actionIndexForId(Browse.HubState.selected_action)
         } else if (Browse.CategoriesModel.count === 0) {
@@ -157,11 +161,26 @@ Item {
     // against. Both rows wrap modulo their count so a single Left/Right
     // press at either end whips around to the far side.
     function _navigate(delta: int): bool {
+        if (hub.currentRow === 2) {
+            if (delta < 0) {
+                hub.currentRow = 1
+                hub.currentIndex = hub._actionIndexForId("settings")
+                return true
+            }
+            return false
+        }
         const count = hub.currentRow === 0
             ? Browse.CategoriesModel.count
             : hub.actionEntries.length
         if (count <= 0)
             return false
+        if (hub.currentRow === 1
+            && delta > 0
+            && hub.currentIndex === count - 1) {
+            hub.currentRow = 2
+            hub.currentIndex = 0
+            return true
+        }
         const next = ((hub.currentIndex + delta) % count + count) % count
         if (next === hub.currentIndex)
             return false
@@ -192,6 +211,11 @@ Item {
     function _crossRow(): bool {
         const topCount = Browse.CategoriesModel.count
         const bottomCount = hub.actionEntries.length
+        if (hub.currentRow === 2) {
+            hub.currentRow = 1
+            hub.currentIndex = hub._actionIndexForId("settings")
+            return true
+        }
         if (hub.currentRow === 0) {
             if (bottomCount <= 0)
                 return false
@@ -225,9 +249,16 @@ Item {
             hub.actionEntries[hub.currentIndex].id
     }
 
+    function _commitUtilitySelection(): void {
+        Browse.HubState.selected_row = 2
+        Browse.HubState.selected_action = "update_all"
+    }
+
     function _commitCurrent(): void {
         if (hub.currentRow === 0)
             hub._commitCategorySelection()
+        else if (hub.currentRow === 2)
+            hub._commitUtilitySelection()
         else
             hub._commitActionSelection()
     }
@@ -248,6 +279,12 @@ Item {
         hub._commitActionSelection()
     }
 
+    function _focusUtility(): void {
+        hub.currentRow = 2
+        hub.currentIndex = 0
+        hub._commitUtilitySelection()
+    }
+
     function _activateCurrent(): void {
         if (hub.currentRow === 0) {
             // Empty row sends "" — router treats that as the committed
@@ -256,6 +293,10 @@ Item {
                 ? ""
                 : Browse.CategoriesModel.category_at(hub.currentIndex)
             hub.requestAccept(chosen)
+            return
+        }
+        if (hub.currentRow === 2) {
+            hub.requestUpdateAll()
             return
         }
 
@@ -487,6 +528,8 @@ Item {
                 const entry = hub.actionEntries[hub.currentIndex]
                 return entry ? entry.text : ""
             }
+            if (hub.currentRow === 2)
+                return qsTr("Update all")
             if (Browse.CategoriesModel.count > 0)
                 return Browse.CategoriesModel.category_at(hub.currentIndex)
             return ""
@@ -506,5 +549,47 @@ Item {
         errorMessage: Browse.CategoriesModel.error_message ?? ""
         count: Browse.CategoriesModel.count
         emptyText: qsTr("No systems available. Run Update media database from Settings.")
+    }
+
+    Rectangle {
+        id: updateAllButton
+
+        readonly property bool isSelected: hub.currentRow === 2
+        readonly property int buttonSize: Sizing.pctH(8)
+
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.rightMargin: Sizing.pctW(3)
+        anchors.bottomMargin: Sizing.pctH(8)
+        width: buttonSize
+        height: buttonSize
+        visible: !hub.transitioning
+        color: isSelected ? Theme.accent : Theme.surfaceCard
+        border.width: isSelected ? 3 : 1
+        border.color: isSelected ? Theme.textPrimary : Theme.borderMid
+        radius: Sizing.cornerRadius
+
+        Image {
+            anchors.centerIn: parent
+            width: parent.width * 0.58
+            height: width
+            fillMode: Image.PreserveAspectFit
+            source: Resources.iconUrl("Download")
+            sourceSize.width: width
+            sourceSize.height: height
+            smooth: true
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            hoverEnabled: true
+            acceptedButtons: Qt.LeftButton
+
+            onEntered: hub._focusUtility()
+            onClicked: {
+                hub._focusUtility()
+                hub._activateCurrent()
+            }
+        }
     }
 }

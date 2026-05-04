@@ -68,12 +68,14 @@ ApplicationWindow {
     property alias contextMenu: contextMenu
     property alias firstRunIndexModal: firstRunIndexModal
     property alias logUploadModal: logUploadModal
+    property alias updateAllModal: updateAllModal
 
     property bool cardWriteModalVisible: false
     property bool cardWriteFailed: false
     property bool qrCodeModalVisible: false
     property bool firstRunIndexModalVisible: false
     property bool logUploadModalVisible: false
+    property bool updateAllModalVisible: false
     property bool contextMenuVisible: false
     property rect contextMenuAnchor: Qt.rect(0, 0, 0, 0)
     // Owner-aware. Written by Main.qml at openContextMenu time; each entry
@@ -140,6 +142,7 @@ ApplicationWindow {
     signal closeQrCodeRequested()
     signal closeFirstRunIndexRequested()
     signal closeLogUploadRequested()
+    signal closeUpdateAllRequested()
 
     // Two-way sync between root.activeScreen and ScreenManager.activeScreen.
     // Binding-breaking assignments (tests setting root.activeScreen = "games")
@@ -350,6 +353,17 @@ ApplicationWindow {
         onCloseRequested: root.closeLogUploadRequested()
     }
 
+    // update_all terminal modal. Opened from the Hub utility icon.
+    // It blocks dismissal while the PTY child is running; after exit
+    // Accept/Escape closes it through Main.qml.
+    UpdateAllModal {
+        id: updateAllModal
+
+        anchors.fill: parent
+        open: root.updateAllModalVisible
+        onCloseRequested: root.closeUpdateAllRequested()
+    }
+
     // ── Top-right HUD ─────────────────────────────────────────────────────────
     //
     // Host status icons plus clock. The Row is right-anchored so icons
@@ -514,6 +528,19 @@ ApplicationWindow {
                     ];
                 // Idle / uploading: only Cancel.
                 return [{ button: "ButtonB", label: qsTr("Cancel") }];
+            }
+            if (root.updateAllModalVisible) {
+                const phase = root.updateAllModal.phase;
+                if (phase === root.updateAllModal._stateRunning)
+                    return [
+                        { button: "Dpad", label: qsTr("Control") },
+                        { button: "ButtonA", label: qsTr("Enter") },
+                        { button: "ButtonB", label: qsTr("Esc") }
+                    ];
+                return [
+                    { button: "ButtonA", label: qsTr("Close") },
+                    { button: "ButtonB", label: qsTr("Close") }
+                ];
             }
             if (!root.bootComplete)
                 return [];
