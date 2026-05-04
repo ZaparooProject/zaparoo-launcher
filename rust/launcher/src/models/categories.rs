@@ -5,6 +5,7 @@
 use cxx_qt::CxxQtType;
 use cxx_qt_lib::{QByteArray, QHash, QHashPair_i32_QByteArray, QModelIndex, QString, QVariant};
 use std::pin::Pin;
+use tracing::debug;
 use zaparoo_core::endpoints::catalog::CatalogEndpoint;
 use zaparoo_core::remote_resource::ResourceStatus;
 use zaparoo_core::systems_catalog::CatalogData;
@@ -144,6 +145,11 @@ fn apply_state(
 ) {
     if let Some(categories) = categories {
         let count = categories.len() as i32;
+        debug!(
+            count,
+            categories = ?categories,
+            "categories: apply_state filled list",
+        );
         model.as_mut().begin_reset_model();
         model.as_mut().rust_mut().categories = categories;
         model.as_mut().rust_mut().count = count;

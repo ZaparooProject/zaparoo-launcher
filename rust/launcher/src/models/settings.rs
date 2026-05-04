@@ -36,6 +36,10 @@
 //     selection across the rename.
 //   * `current_mouse_enabled` — READ + NOTIFY, persisted. Defaults to true
 //     so existing installs keep the visible cursor and mouse hit targets.
+//   * `current_debug_logging` — READ + NOTIFY, persisted. Defaults to false.
+//     Toggling it writes `[logging] debug = …` into launcher.toml; the
+//     tracing subscriber is built once at startup so the change only takes
+//     effect on the next launch (mirrors how `language` works).
 //
 // Launcher-owned durable settings are mirrored into both `state.toml`
 // and `launcher.toml`. `state.toml` keeps the in-process snapshot
@@ -82,6 +86,7 @@ pub struct SettingsRust {
     available_button_layouts: QStringList,
     current_button_layout: QString,
     current_mouse_enabled: bool,
+    current_debug_logging: bool,
 }
 
 #[cxx_qt::bridge]
@@ -105,6 +110,7 @@ pub mod ffi {
         #[qproperty(QStringList, available_button_layouts, READ, CONSTANT)]
         #[qproperty(QString, current_button_layout, READ, WRITE = set_button_layout, NOTIFY)]
         #[qproperty(bool, current_mouse_enabled, READ, WRITE = set_mouse_enabled, NOTIFY)]
+        #[qproperty(bool, current_debug_logging, READ, WRITE = set_debug_logging, NOTIFY)]
         type Settings = super::SettingsRust;
 
         #[qinvokable]
@@ -118,6 +124,9 @@ pub mod ffi {
 
         #[qinvokable]
         fn set_mouse_enabled(self: Pin<&mut Settings>, value: bool);
+
+        #[qinvokable]
+        fn set_debug_logging(self: Pin<&mut Settings>, value: bool);
     }
 
     impl cxx_qt::Initialize for Settings {}
@@ -145,6 +154,7 @@ impl Initialize for ffi::Settings {
         self.as_mut().rust_mut().current_button_layout =
             QString::from(merged.button_layout.as_str());
         self.as_mut().rust_mut().current_mouse_enabled = merged.mouse_enabled;
+        self.as_mut().rust_mut().current_debug_logging = merged.debug_logging;
     }
 }
 
@@ -209,6 +219,16 @@ impl ffi::Settings {
         self.as_mut().rust_mut().current_mouse_enabled = value;
         self.as_mut().current_mouse_enabled_changed();
     }
+
+    fn set_debug_logging(mut self: Pin<&mut Self>, value: bool) {
+        if self.current_debug_logging == value {
+            return;
+        }
+        let snapshot = persist_settings(|s| s.debug_logging = value);
+        mirror_settings_to_config(&config_file_path(), &snapshot.settings);
+        self.as_mut().rust_mut().current_debug_logging = value;
+        self.as_mut().current_debug_logging_changed();
+    }
 }
 
 fn persist_settings<F: FnOnce(&mut SettingsState)>(mutator: F) -> persist::PersistedState {
@@ -237,6 +257,7 @@ fn mirror_settings_to_config(config_path: &std::path::Path, settings: &SettingsS
         settings.language.as_str(),
         settings.button_layout.as_str(),
         settings.mouse_enabled,
+        settings.debug_logging,
     ) {
         warn!(
             "could not save settings mirror to {}: {e}",
@@ -261,6 +282,9 @@ fn merge_settings(snapshot: &SettingsState, config: &Config) -> SettingsState {
             .settings
             .mouse_enabled
             .unwrap_or(snapshot.mouse_enabled),
+        // Config wins so launcher.toml is the durable source of truth on
+        // MiSTer (state.toml lives on tmpfs).
+        debug_logging: config.debug_logging,
     }
 }
 

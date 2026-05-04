@@ -59,7 +59,7 @@ Item {
             if (Browse.MediaStatus.paused)
                 return qsTr("Indexing paused");
             if (tot > 0 && display !== "")
-                return qsTr("Indexing %1/%2 — %3").arg(cur).arg(tot).arg(display);
+                return qsTr("Indexing %1/%2 - %3").arg(cur).arg(tot).arg(display);
             if (tot > 0)
                 return qsTr("Indexing %1/%2").arg(cur).arg(tot);
             return qsTr("Indexing…");
@@ -72,7 +72,7 @@ Item {
             if (Browse.MediaStatus.scrape_paused)
                 return qsTr("Scrape paused");
             if (total > 0 && sys !== "")
-                return qsTr("Scraping %1/%2 — %3").arg(proc).arg(total).arg(sys);
+                return qsTr("Scraping %1/%2 - %3").arg(proc).arg(total).arg(sys);
             if (total > 0)
                 return qsTr("Scraping %1/%2").arg(proc).arg(total);
             return qsTr("Scraping…");
