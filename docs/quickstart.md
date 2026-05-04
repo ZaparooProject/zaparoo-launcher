@@ -110,7 +110,8 @@ instead.
 - Pressing Tab on a system or game sends a `readers.write` RPC with the
   selected entry's ZapScript. The launcher shows a card-write modal while the
   request is pending; the mock logs the write request.
-- Escape backs out; Escape on the top level quits.
+- Escape backs out; Escape on the top level opens a quit-confirm modal —
+  confirm to exit.
 
 The FPS counter in the corner should stay green (≥ 55). Red means the UI fell
 below 30 FPS and needs investigation.
