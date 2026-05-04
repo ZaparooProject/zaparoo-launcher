@@ -45,7 +45,7 @@ run: build
     ./build/bin/launcher
 
 run-dev: build-dev
-    ./build-dev/bin/launcher
+    ZAPAROO_CORE_ENDPOINT=ws://127.0.0.1:27497/api/v0.1 ./build-dev/bin/launcher
 
 # Run a local mock Zaparoo Core (ws://127.0.0.1:27497/api/v0.1).
 # Deliberately offset from the real Core's 7497 so dev never collides
