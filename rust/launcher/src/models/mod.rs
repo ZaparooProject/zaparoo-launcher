@@ -26,6 +26,7 @@
 pub mod app_state;
 pub mod app_status;
 pub mod browse;
+pub mod build_info;
 pub mod categories;
 pub mod favorites;
 pub mod favorites_state;
@@ -35,6 +36,7 @@ pub mod hub_state;
 pub mod input;
 pub mod log_upload;
 pub mod media_status;
+pub mod notice;
 pub mod platform;
 pub mod qr_code;
 pub mod recents;

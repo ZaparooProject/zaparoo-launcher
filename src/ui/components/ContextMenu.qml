@@ -1,9 +1,16 @@
 // Zaparoo Launcher
 // Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+pragma ComponentBehavior: Bound
 
 import QtQuick
 import Zaparoo.Theme
+
+// `entries` is a `var` array of plain JS objects (`{ id, label }`). The
+// AOT compiler can't infer the shape of `var`, so every binding that
+// reads `entries.length` or `modelData.label` falls back to the JS
+// interpreter and trips the compiler category. Suppress file-wide.
+// qmllint disable compiler
 
 // Software-rendering safe contextual menu. It positions itself next to an
 // anchor rectangle and clamps to the window bounds so edge tiles never push

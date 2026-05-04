@@ -379,12 +379,14 @@ TestCase {
     // test isolation rule — no real menu opening, no handleAction.
     // Compares only the entry id sequence; labels are qsTr() and asserted
     // separately so the tests stay translation-friendly.
-    function _idsOf(entries) {
+    // qmllint disable compiler
+    function _idsOf(entries: var): var {
         const out = []
         for (let i = 0; i < entries.length; ++i)
             out.push(entries[i].id)
         return out
     }
+    // qmllint enable compiler
 
     function test_context_menu_systems_owner_is_single_launch_core(): void {
         // qmllint disable compiler

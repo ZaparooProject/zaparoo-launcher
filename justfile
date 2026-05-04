@@ -20,6 +20,15 @@ build-release:
     cmake --preset desktop-release
     cmake --build --preset desktop-release
 
+# Release build with provenance markers baked in. Sets
+# ZAPAROO_OFFICIAL_BUILD=1 so the launcher reports
+# `channel = "official"` in About / License and the startup log,
+# distinguishing distributed packages from local dev builds. Use this
+# (not `build-release`) when producing a binary you intend to ship.
+release:
+    ZAPAROO_OFFICIAL_BUILD=1 cmake --preset desktop-release
+    ZAPAROO_OFFICIAL_BUILD=1 cmake --build --preset desktop-release
+
 build-dev:
     cmake --preset desktop-dev
     cmake --build --preset desktop-dev

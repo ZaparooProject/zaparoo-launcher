@@ -102,6 +102,11 @@ Item {
             id: "uploadLog",
             label: qsTr("Upload log file")
         })
+        out.push({
+            kind: "field",
+            id: "aboutLicense",
+            label: qsTr("About / License")
+        })
         return out
     }
 
@@ -191,7 +196,8 @@ Item {
         return id === "mouseEnabled" || id === "debugLogging"
     }
     // True when the focused field is an action button (updateMediaDb,
-    // runScraper, uploadLog). Drives the help-bar Accept hint.
+    // runScraper, uploadLog, aboutLicense). Drives the help-bar Accept
+    // hint and the SettingsField chevron.
     readonly property bool focusedFieldIsAction: {
         if (!settings._isField(settings.currentIndex))
             return false
@@ -199,6 +205,24 @@ Item {
         return id === "updateMediaDb"
                || id === "runScraper"
                || id === "uploadLog"
+               || id === "aboutLicense"
+    }
+    // Verb shown on the help-bar Accept hint for the focused action
+    // row. Index/scrape flip between Start and Cancel because the press
+    // toggles the in-flight operation; uploadLog and aboutLicense are
+    // single-press triggers, with aboutLicense reading "Open" because
+    // the press navigates rather than starts a job.
+    readonly property string focusedActionLabel: {
+        if (!settings._isField(settings.currentIndex))
+            return ""
+        const id = settings.fields[settings.currentIndex].id
+        if (id === "updateMediaDb" || id === "runScraper")
+            return settings.focusedActionBusy ? qsTr("Cancel") : qsTr("Start")
+        if (id === "uploadLog")
+            return qsTr("Start")
+        if (id === "aboutLicense")
+            return qsTr("Open")
+        return ""
     }
     // True when the focused action's matching operation is currently
     // running, so the help bar can label Accept as "Cancel" rather
@@ -401,6 +425,8 @@ Item {
                 settings._triggerScrape()
             else if (id === "uploadLog")
                 settings.requestAccept("uploadLog")
+            else if (id === "aboutLicense")
+                settings.requestAccept("aboutLicense")
         } else if (action === "cancel") {
             settings.requestHubScreen()
         }
@@ -529,7 +555,8 @@ Item {
                                  ? "toggle"
                                  : (row.modelData.id === "updateMediaDb"
                                     || row.modelData.id === "runScraper"
-                                    || row.modelData.id === "uploadLog") ? "action"
+                                    || row.modelData.id === "uploadLog"
+                                    || row.modelData.id === "aboutLicense") ? "action"
                                  : "value"
                         checked: row.modelData.id === "debugLogging"
                                  ? Browse.Settings.current_debug_logging
@@ -583,6 +610,8 @@ Item {
                                 settings._triggerScrape()
                             else if (row.modelData.id === "uploadLog")
                                 settings.requestAccept("uploadLog")
+                            else if (row.modelData.id === "aboutLicense")
+                                settings.requestAccept("aboutLicense")
                         }
                     }
                 }

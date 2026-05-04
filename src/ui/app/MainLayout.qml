@@ -33,6 +33,7 @@ ApplicationWindow {
     readonly property string screenFavorites: ScreenManager.screenFavorites
     readonly property string screenRecents: ScreenManager.screenRecents
     readonly property string screenSettings: ScreenManager.screenSettings
+    readonly property string screenAbout: ScreenManager.screenAbout
 
     // Runtime state. `activeScreen` mirrors ScreenManager's property
     // (two-way synced below so direct assignment from tests still
@@ -67,13 +68,16 @@ ApplicationWindow {
     property alias favoritesScreen: favoritesScreen
     property alias recentsScreen: recentsScreen
     property alias settingsScreen: settingsScreen
+    property alias aboutScreen: aboutScreen
     property alias contextMenu: contextMenu
+    property alias commercialNoticeModal: commercialNoticeModal
     property alias firstRunIndexModal: firstRunIndexModal
     property alias logUploadModal: logUploadModal
 
     property bool cardWriteModalVisible: false
     property bool cardWriteFailed: false
     property bool qrCodeModalVisible: false
+    property bool commercialNoticeModalVisible: false
     property bool firstRunIndexModalVisible: false
     property bool logUploadModalVisible: false
     property bool contextMenuVisible: false
@@ -140,6 +144,7 @@ ApplicationWindow {
 
     signal cancelCardWriteRequested()
     signal closeQrCodeRequested()
+    signal closeCommercialNoticeRequested()
     signal closeFirstRunIndexRequested()
     signal closeLogUploadRequested()
 
@@ -285,6 +290,13 @@ ApplicationWindow {
             visible: root.activeScreen === root.screenSettings
             transitioning: root.pendingTransition !== ""
         }
+
+        AboutScreen {
+            id: aboutScreen
+            anchors.fill: parent
+            visible: root.activeScreen === root.screenAbout
+            transitioning: root.pendingTransition !== ""
+        }
     }
 
     // ── Boot overlay ─────────────────────────────────────────────────────────
@@ -345,6 +357,18 @@ ApplicationWindow {
         onCloseRequested: root.closeFirstRunIndexRequested()
     }
 
+    // Commercial-use notice. Sits above every other modal (z: 310) so
+    // it always paints first on a fresh install. Once the user acks,
+    // `Browse.Notice.commercial_ack` flips to true on disk and the
+    // modal stays closed for the rest of this install.
+    CommercialNoticeModal {
+        id: commercialNoticeModal
+
+        anchors.fill: parent
+        open: root.commercialNoticeModalVisible
+        onCloseRequested: root.closeCommercialNoticeRequested()
+    }
+
     // Log-upload modal. Pushed by Main.qml when the user triggers the
     // "Upload log" action in Settings. Owns its own three-phase view
     // (uploading / success / error) — the router only sees open / close.
@@ -365,6 +389,12 @@ ApplicationWindow {
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         height: Sizing.pctH(6)
+        // Sits above every modal scrim (modals max out at z: 310 — see
+        // CommercialNoticeModal) so the help cue stays readable while a
+        // dialog is open. The bar's content is already modal-aware
+        // (helpEntries above branches per topModal), so the cue under
+        // the modal is the right one.
+        z: 400
         color: Theme.bgBar
         border.width: 1
         border.color: Theme.borderSubtle
@@ -422,6 +452,8 @@ ApplicationWindow {
                 // Idle / uploading: only Cancel.
                 return [{ button: "ButtonB", label: qsTr("Cancel") }];
             }
+            if (root.commercialNoticeModalVisible)
+                return [{ button: "ButtonA", label: qsTr("I understand") }];
             if (!root.bootComplete)
                 return [];
             if (root.firstRunIndexModalVisible) {
@@ -526,8 +558,20 @@ ApplicationWindow {
                          && !root.settingsScreen.focusedActionDisabled)
                     row.push({
                         button: "ButtonA",
-                        label: root.settingsScreen.focusedActionBusy
-                               ? qsTr("Cancel") : qsTr("Start")
+                        label: root.settingsScreen.focusedActionLabel
+                    });
+                row.push({ button: "ButtonB", label: qsTr("Back") });
+                return row;
+            }
+            if (root.activeScreen === root.screenAbout) {
+                let row = [];
+                // Up/Down only meaningful when the body actually
+                // overflows the viewport (per the minimal help-bar
+                // policy — never advertise a press that no-ops).
+                if (root.aboutScreen.contentOverflows)
+                    row.push({
+                        buttons: ["DpadUp", "DpadDown"],
+                        label: qsTr("Scroll")
                     });
                 row.push({ button: "ButtonB", label: qsTr("Back") });
                 return row;

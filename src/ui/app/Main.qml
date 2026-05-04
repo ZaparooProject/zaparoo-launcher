@@ -35,6 +35,7 @@ MainLayout {
     readonly property string modalCardWrite: "card_write"
     readonly property string modalContextMenu: "context_menu"
     readonly property string modalQrCode: "qr_code"
+    readonly property string modalCommercialNotice: "commercial_notice"
     readonly property string modalFirstRunIndex: "first_run_index"
     readonly property string modalLogUpload: "log_upload"
     // One-shot session flag: the first-run modal is shown at most
@@ -96,7 +97,8 @@ MainLayout {
             || savedScreen === root.screenHub
             || savedScreen === root.screenFavorites
             || savedScreen === root.screenRecents
-            || savedScreen === root.screenSettings)
+            || savedScreen === root.screenSettings
+            || savedScreen === root.screenAbout)
             root.activeScreen = savedScreen
         // If the catalog is already ready, fire the restore here so
         // the cascade (set_category → SystemsModel reset → seed
@@ -127,6 +129,12 @@ MainLayout {
                 root.recentsScreen.restoreSelection()
             }
         }
+        // Open the commercial-use notice on first paint of an unacked
+        // install. Sits in front of the media-DB first-run modal in the
+        // routing order — `_maybeOpenFirstRunIndex` early-returns until
+        // `Browse.Notice.commercial_ack` flips true, at which point the
+        // notice's close handler retriggers the media-DB check.
+        root._maybeOpenCommercialNotice()
         // Kick the first-run check in case both READY and a seeded
         // empty-mediadb snapshot landed before our Connections wired up
         // (e.g. an unusually fast warm-cache reconnect).
@@ -422,6 +430,12 @@ MainLayout {
         root._goto(root.screenSettings)
     }
 
+    // Settings → About transition. Static info screen, no async data,
+    // so the flip is instant — same shape as _navigateToSettings above.
+    function _navigateToAbout(): void {
+        root._goto(root.screenAbout)
+    }
+
     // Systems Accept routing. Pin destination to Games, fill the
     // chosen system, then flip. The Games→back routing decision is
     // re-evaluated live from current state at B-press time (see
@@ -511,7 +525,13 @@ MainLayout {
         function onRequestAccept(actionId: string): void {
             if (actionId === "uploadLog")
                 root.openLogUploadModal()
+            else if (actionId === "aboutLicense")
+                root._navigateToAbout()
         }
+    }
+    Connections {
+        target: root.aboutScreen
+        function onRequestSettingsScreen(): void { root._goto(root.screenSettings) }
     }
     Connections {
         target: root.systemsScreen
@@ -604,8 +624,7 @@ MainLayout {
     // static QML build coerces the JS array through `list<var>` and the
     // caller saw `entries.length === 0` despite the function pushing 3
     // items in. Plain `var` round-trips cleanly and silences the
-    // qmllint "insufficiently annotated" coercion warning at the call
-    // site.
+    // "insufficiently annotated" coercion warning at the call site.
     function buildContextMenuEntries(
             owner: string, entryType: string, hasNfc: bool, isFavorite: bool) {
         if (owner === "systems") {
@@ -743,6 +762,11 @@ MainLayout {
     function _maybeOpenFirstRunIndex(): void {
         if (root._firstRunIndexShown)
             return
+        // Defer to the commercial-use notice. The notice's close handler
+        // calls back into here once acked, so chaining is automatic and
+        // we avoid stacking two modals at the same time.
+        if (!Browse.Notice.commercial_ack)
+            return
         if (Browse.AppStatus.connection_state !== 2 /* READY */)
             return
         if (!Browse.CategoriesModel.loaded)
@@ -759,6 +783,40 @@ MainLayout {
         root.firstRunIndexModalVisible = false
         if (ScreenManager.topModal === root.modalFirstRunIndex)
             ScreenManager.popModal()
+    }
+
+    // Commercial-use first-run notice. Persisted ack lives in
+    // `launcher.toml` (not state.toml — MiSTer's tmpfs would re-show
+    // the notice on every reboot). The router opens the modal on first
+    // paint when the flag is false, and the modal's close handler is
+    // what advances to the next first-run gate (mediadb index).
+    function _maybeOpenCommercialNotice(): void {
+        if (Browse.Notice.commercial_ack)
+            return
+        if (root.commercialNoticeModalVisible)
+            return
+        // Defer until the cold-launch curtain has lifted. Otherwise
+        // the modal paints over the BootOverlay's "Connecting…" cue,
+        // and the user perceives the launcher as stuck — they can't
+        // tell whether dismissing the notice will reveal a working
+        // app or an actual connection failure. Waiting for boot means
+        // every "I understand" press lands on a hub that's already
+        // ready to use.
+        if (!root.bootComplete)
+            return
+        root.commercialNoticeModalVisible = true
+        if (ScreenManager.topModal !== root.modalCommercialNotice)
+            ScreenManager.pushModal(root.modalCommercialNotice)
+    }
+
+    function closeCommercialNoticeModal(): void {
+        root.commercialNoticeModalVisible = false
+        if (ScreenManager.topModal === root.modalCommercialNotice)
+            ScreenManager.popModal()
+        // Now that the notice is dismissed, re-check the media-DB gate
+        // — if the catalog had already settled empty behind the notice,
+        // this opens that modal as the next step in the chain.
+        root._maybeOpenFirstRunIndex()
     }
 
     // Log-upload modal lifecycle. Triggered from the Settings "Upload
@@ -798,8 +856,13 @@ MainLayout {
     function _maybeCompleteBoot(): void {
         if (root.bootComplete)
             return
-        if (Browse.AppStatus.connection_state === 2 /* READY */)
+        if (Browse.AppStatus.connection_state === 2 /* READY */) {
             root.bootComplete = true
+            // Curtain just lifted — fire the notice gate now that the
+            // hub is paintable. _maybeOpenCommercialNotice early-returns
+            // until bootComplete is true, so this is the natural edge.
+            root._maybeOpenCommercialNotice()
+        }
     }
 
     Connections {
@@ -813,6 +876,7 @@ MainLayout {
     }
 
     onCloseFirstRunIndexRequested: root.closeFirstRunIndexModal()
+    onCloseCommercialNoticeRequested: root.closeCommercialNoticeModal()
 
     function beginCardWrite(owner: string): void {
         if (owner === "systems")
@@ -895,6 +959,8 @@ MainLayout {
                 root.contextMenu.handleAction(action)
             } else if (ScreenManager.topModal === root.modalFirstRunIndex) {
                 root.firstRunIndexModal.handleAction(action)
+            } else if (ScreenManager.topModal === root.modalCommercialNotice) {
+                root.commercialNoticeModal.handleAction(action)
             } else if (ScreenManager.topModal === root.modalLogUpload) {
                 root.logUploadModal.handleAction(action)
             }
@@ -912,6 +978,8 @@ MainLayout {
             root.recentsScreen.handleAction(action)
         } else if (root.activeScreen === root.screenSettings) {
             root.settingsScreen.handleAction(action)
+        } else if (root.activeScreen === root.screenAbout) {
+            root.aboutScreen.handleAction(action)
         } else {
             root.hubScreen.handleAction(action)
         }
