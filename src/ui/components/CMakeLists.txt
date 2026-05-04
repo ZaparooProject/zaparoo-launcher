@@ -15,6 +15,7 @@ qt_add_qml_module(
         CoreStatusPill.qml
         FirstRunIndexModal.qml
         LoadingIndicator.qml
+        LogUploadModal.qml
         Modal.qml
         PagedGrid.qml
         QrCodeModal.qml
