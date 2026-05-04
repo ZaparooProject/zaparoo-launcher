@@ -182,6 +182,13 @@ Item {
             systems._focusIndex(index)
             systems.handleAction("accept")
         }
+        onItemRightClicked: (index) => {
+            systems._focusIndex(index)
+            systems.handleAction("write_card")
+        }
+        onEmptyRightClicked: systems.handleAction("cancel")
+        onPageWheelRequested: (delta) => systems.handleAction(
+            delta > 0 ? "page_next" : "page_prev")
 
         // Hide the tiles while the router holds us here on a forward
         // transition (Systems → Games) so the centred "Loading…" cue

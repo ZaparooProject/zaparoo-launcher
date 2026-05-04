@@ -128,6 +128,7 @@ Item {
                         anchors.fill: parent
                         hoverEnabled: true
                         acceptedButtons: Qt.LeftButton
+                        cursorShape: Qt.PointingHandCursor
                         onEntered: menu.currentIndex = row.index
                         onClicked: menu.accepted(row.modelData.id)
                     }

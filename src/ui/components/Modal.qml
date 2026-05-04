@@ -119,6 +119,7 @@ Item {
 
                 MouseArea {
                     anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
                     onClicked: modal.cancelRequested()
                 }
             }
@@ -146,6 +147,7 @@ Item {
 
                 MouseArea {
                     anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
                     onClicked: modal.accepted()
                 }
             }

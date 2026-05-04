@@ -44,6 +44,7 @@ Item {
         recents.transitioning || Browse.RecentsModel.loading
 
     signal requestHubScreen()
+    signal requestContextMenu(int index, var anchorRect)
 
     // Restore the previously focused entry when the model is Ready.
     // Called by the router after the Hub→Recents transition lands;
@@ -121,6 +122,13 @@ Item {
                 return
             }
             Browse.RecentsModel.launch_at(recents.recentsGrid.currentIndex)
+        } else if (action === "write_card") {
+            if (recents.recentsGrid.itemCount > 0) {
+                const idx = recents.recentsGrid.currentIndex
+                recents._persistFocus()
+                const rect = recents.recentsGrid.currentCellRectIn(recents)
+                recents.requestContextMenu(idx, rect)
+            }
         } else if (action === "cancel") {
             recents.requestHubScreen()
         }
@@ -171,6 +179,13 @@ Item {
             recents._focusIndex(index)
             recents.handleAction("accept")
         }
+        onItemRightClicked: (index) => {
+            recents._focusIndex(index)
+            recents.handleAction("write_card")
+        }
+        onEmptyRightClicked: recents.handleAction("cancel")
+        onPageWheelRequested: (delta) => recents.handleAction(
+            delta > 0 ? "page_next" : "page_prev")
     }
 
     ActiveLabel {

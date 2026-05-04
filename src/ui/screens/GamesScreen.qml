@@ -247,6 +247,13 @@ Item {
             games._focusIndex(index)
             games.handleAction("accept")
         }
+        onItemRightClicked: (index) => {
+            games._focusIndex(index)
+            games.handleAction("write_card")
+        }
+        onEmptyRightClicked: games.handleAction("cancel")
+        onPageWheelRequested: (delta) => games.handleAction(
+            delta > 0 ? "page_next" : "page_prev")
     }
 
     // Active game caption — single big line just under the grid. Same

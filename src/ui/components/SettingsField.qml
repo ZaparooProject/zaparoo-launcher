@@ -165,6 +165,7 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         acceptedButtons: Qt.LeftButton
+        cursorShape: Qt.PointingHandCursor
 
         onEntered: root.hovered()
         // Action rows fire `accepted()` (the screen runs start/cancel

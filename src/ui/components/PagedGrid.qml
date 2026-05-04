@@ -62,6 +62,9 @@ Item {
     // row the pointer targeted.
     signal itemHovered(int index)
     signal itemClicked(int index)
+    signal itemRightClicked(int index)
+    signal emptyRightClicked()
+    signal pageWheelRequested(int delta)
 
     // Per-instance shape overrides. -1 means "use the global Sizing
     // default" — Systems screen leaves these alone so the systems grid
@@ -144,6 +147,15 @@ Item {
 
     function setCurrentIndexImmediate(idx: int): void {
         root.currentIndex = idx
+    }
+
+    function _handleWheel(wheel): void {
+        const amount = wheel.angleDelta.y !== 0
+            ? wheel.angleDelta.y : wheel.pixelDelta.y
+        if (amount === 0)
+            return
+        root.pageWheelRequested(amount < 0 ? 1 : -1)
+        wheel.accepted = true
     }
 
     function currentCellRectIn(target: Item): rect {
@@ -328,6 +340,14 @@ Item {
 
     clip: true
 
+    MouseArea {
+        anchors.fill: parent
+        hoverEnabled: true
+        acceptedButtons: Qt.RightButton
+        onClicked: root.emptyRightClicked()
+        onWheel: (wheel) => root._handleWheel(wheel)
+    }
+
     Item {
         id: track
 
@@ -434,7 +454,8 @@ Item {
                 MouseArea {
                     anchors.fill: parent
                     hoverEnabled: true
-                    acceptedButtons: Qt.LeftButton
+                    acceptedButtons: Qt.LeftButton | Qt.RightButton
+                    cursorShape: Qt.PointingHandCursor
                     enabled: cellItem.visible
 
                     onEntered: {
@@ -443,11 +464,16 @@ Item {
                         root.itemHovered(cellItem.index)
                     }
 
-                    onClicked: {
+                    onClicked: (mouse) => {
                         if (root.currentIndex !== cellItem.index)
                             root.currentIndex = cellItem.index
-                        root.itemClicked(cellItem.index)
+                        if (mouse.button === Qt.RightButton)
+                            root.itemRightClicked(cellItem.index)
+                        else
+                            root.itemClicked(cellItem.index)
                     }
+
+                    onWheel: (wheel) => root._handleWheel(wheel)
                 }
             }
         }
@@ -486,6 +512,14 @@ Item {
             fillMode: Image.PreserveAspectFit
             smooth: true
             visible: root.hasPagesAbove
+
+            MouseArea {
+                anchors.fill: parent
+                acceptedButtons: Qt.LeftButton
+                cursorShape: Qt.PointingHandCursor
+                enabled: upArrow.visible
+                onClicked: root.pageWheelRequested(-1)
+            }
         }
 
         Image {
@@ -498,6 +532,14 @@ Item {
             fillMode: Image.PreserveAspectFit
             smooth: true
             visible: root.hasPagesBelow
+
+            MouseArea {
+                anchors.fill: parent
+                acceptedButtons: Qt.LeftButton
+                cursorShape: Qt.PointingHandCursor
+                enabled: downArrow.visible
+                onClicked: root.pageWheelRequested(1)
+            }
         }
 
         // Geometry-only Item between the arrows; nothing paints.

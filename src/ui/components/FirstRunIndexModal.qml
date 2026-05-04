@@ -309,6 +309,7 @@ Item {
             MouseArea {
                 anchors.fill: parent
                 acceptedButtons: Qt.LeftButton
+                cursorShape: Qt.PointingHandCursor
                 onClicked: modal.handleAction(modal.phase === "running"
                                               ? "cancel" : "accept")
             }
