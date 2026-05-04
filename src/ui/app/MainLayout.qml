@@ -73,6 +73,7 @@ ApplicationWindow {
     property alias commercialNoticeModal: commercialNoticeModal
     property alias firstRunIndexModal: firstRunIndexModal
     property alias logUploadModal: logUploadModal
+    property alias quitConfirmModal: quitConfirmModal
 
     property bool cardWriteModalVisible: false
     property bool cardWriteFailed: false
@@ -80,6 +81,7 @@ ApplicationWindow {
     property bool commercialNoticeModalVisible: false
     property bool firstRunIndexModalVisible: false
     property bool logUploadModalVisible: false
+    property bool quitConfirmModalVisible: false
     property bool contextMenuVisible: false
     property rect contextMenuAnchor: Qt.rect(0, 0, 0, 0)
     // Owner-aware. Written by Main.qml at openContextMenu time; each entry
@@ -147,6 +149,8 @@ ApplicationWindow {
     signal closeCommercialNoticeRequested()
     signal closeFirstRunIndexRequested()
     signal closeLogUploadRequested()
+    signal closeQuitConfirmRequested()
+    signal quitConfirmAccepted()
 
     // Two-way sync between root.activeScreen and ScreenManager.activeScreen.
     // Binding-breaking assignments (tests setting root.activeScreen = "games")
@@ -380,6 +384,21 @@ ApplicationWindow {
         onCloseRequested: root.closeLogUploadRequested()
     }
 
+    // Quit-confirm modal. Pushed by Main.qml when the user presses
+    // cancel on Hub. Default focus is "No" so an accidental press
+    // can't quit; "Yes" routes through `quitConfirmAccepted` and the
+    // router calls Qt.quit().
+    Modal {
+        id: quitConfirmModal
+
+        open: root.quitConfirmModalVisible
+        kind: "confirm"
+        title: qsTr("Quit Zaparoo Launcher?")
+        body: qsTr("Are you sure you want to exit?")
+        onConfirmed: root.quitConfirmAccepted()
+        onCancelRequested: root.closeQuitConfirmRequested()
+    }
+
     // ── Instructions bar ──────────────────────────────────────────────────────
 
     Rectangle {
@@ -454,6 +473,12 @@ ApplicationWindow {
             }
             if (root.commercialNoticeModalVisible)
                 return [{ button: "ButtonA", label: qsTr("I understand") }];
+            if (root.quitConfirmModalVisible)
+                return [
+                    { button: "Dpad", label: qsTr("Move") },
+                    { button: "ButtonA", label: qsTr("Select") },
+                    { button: "ButtonB", label: qsTr("Cancel") }
+                ];
             if (!root.bootComplete)
                 return [];
             if (root.firstRunIndexModalVisible) {

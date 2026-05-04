@@ -38,6 +38,7 @@ MainLayout {
     readonly property string modalCommercialNotice: "commercial_notice"
     readonly property string modalFirstRunIndex: "first_run_index"
     readonly property string modalLogUpload: "log_upload"
+    readonly property string modalQuitConfirm: "quit_confirm"
     // One-shot session flag: the first-run modal is shown at most
     // once per launcher process, even if the WS link drops and the
     // mediadb-empty condition would otherwise be satisfied again.
@@ -503,7 +504,7 @@ MainLayout {
         function onRequestAccept(category: string): void {
             root._navigateFromHub(category)
         }
-        function onRequestQuit(): void { Qt.quit() }
+        function onRequestQuit(): void { root.openQuitConfirmModal() }
         function onRequestFavoritesScreen(): void { root._navigateToFavorites() }
         function onRequestRecentsScreen(): void { root._navigateToRecents() }
         function onRequestSettingsScreen(): void { root._navigateToSettings() }
@@ -841,6 +842,24 @@ MainLayout {
 
     onCloseLogUploadRequested: root.closeLogUploadModal()
 
+    // Quit-confirm lifecycle. Hub's cancel signal lands on
+    // `openQuitConfirmModal` instead of `Qt.quit()` so a stray B / Esc
+    // can't kill the launcher; the modal owns the actual decision.
+    function openQuitConfirmModal(): void {
+        root.quitConfirmModalVisible = true
+        if (ScreenManager.topModal !== root.modalQuitConfirm)
+            ScreenManager.pushModal(root.modalQuitConfirm)
+    }
+
+    function closeQuitConfirmModal(): void {
+        root.quitConfirmModalVisible = false
+        if (ScreenManager.topModal === root.modalQuitConfirm)
+            ScreenManager.popModal()
+    }
+
+    onCloseQuitConfirmRequested: root.closeQuitConfirmModal()
+    onQuitConfirmAccepted: Qt.quit()
+
     Connections {
         target: Browse.AppStatus
         function onConnection_stateChanged(): void {
@@ -963,6 +982,8 @@ MainLayout {
                 root.commercialNoticeModal.handleAction(action)
             } else if (ScreenManager.topModal === root.modalLogUpload) {
                 root.logUploadModal.handleAction(action)
+            } else if (ScreenManager.topModal === root.modalQuitConfirm) {
+                root.quitConfirmModal.handleAction(action)
             }
             // While a modal owns input, swallow everything not handled
             // above rather than leak it to the root screen.
