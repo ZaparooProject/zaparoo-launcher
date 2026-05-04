@@ -84,7 +84,7 @@ Item {
     // bound to `actionEntries[i].text` pick up the new values
     // automatically.
     readonly property var actionEntries: [
-        { id: "favorites", coverKey: "icons/Heart",    text: qsTr("Favorites") },
+        { id: "favorites", coverKey: "icons/HeartOutline", text: qsTr("Favorites") },
         { id: "recents",  coverKey: "icons/History",  text: qsTr("Recently Played") },
         { id: "settings", coverKey: "icons/Settings", text: qsTr("Settings") }
     ]
