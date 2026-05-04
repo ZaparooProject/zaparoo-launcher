@@ -98,7 +98,7 @@ Item {
 
             Text {
                 width: parent.width
-                text: qsTr("Full details available any time under Settings → About / License.")
+                text: qsTr("Full details available any time under Settings > About / License.")
                 font.family: Theme.fontUi
                 font.pixelSize: Sizing.fontSize(2.3)
                 color: Theme.textLabel
