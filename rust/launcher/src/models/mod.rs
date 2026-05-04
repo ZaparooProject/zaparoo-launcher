@@ -44,6 +44,7 @@ pub mod settings;
 pub mod system_status;
 pub mod systems;
 pub mod systems_state;
+pub mod update_all_runner;
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, OnceLock};

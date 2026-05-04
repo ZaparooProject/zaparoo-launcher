@@ -25,6 +25,7 @@ qt_add_qml_module(
         Tile.qml
         TileLoader.qml
         TopStatusStrip.qml
+        UpdateAllModal.qml
 )
 
 target_link_libraries(

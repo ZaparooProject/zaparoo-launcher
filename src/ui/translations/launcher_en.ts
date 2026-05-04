@@ -209,6 +209,11 @@
         <source>No systems available. Run Update media database from Settings.</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <location filename="../screens/HubScreen.qml" line="528"/>
+        <source>Update all</source>
+        <translation>Update all</translation>
+    </message>
 </context>
 <context>
     <name>LoadingIndicator</name>
@@ -382,6 +387,49 @@
         <location filename="../app/MainLayout.qml" line="562"/>
         <source>Toggle</source>
         <translation>Toggle</translation>
+    </message>
+    <message>
+        <location filename="../app/MainLayout.qml" line="524"/>
+        <source>Control</source>
+        <translation>Control</translation>
+    </message>
+    <message>
+        <location filename="../app/MainLayout.qml" line="525"/>
+        <source>Enter</source>
+        <translation>Enter</translation>
+    </message>
+    <message>
+        <location filename="../app/MainLayout.qml" line="526"/>
+        <source>Esc</source>
+        <translation>Esc</translation>
+    </message>
+</context>
+<context>
+    <name>UpdateAllModal</name>
+    <message>
+        <location filename="../components/UpdateAllModal.qml" line="93"/>
+        <source>MiSTer update_all</source>
+        <translation>MiSTer update_all</translation>
+    </message>
+    <message>
+        <location filename="../components/UpdateAllModal.qml" line="156"/>
+        <source>D-pad controls update_all. This window stays open while it runs.</source>
+        <translation>D-pad controls update_all. This window stays open while it runs.</translation>
+    </message>
+    <message>
+        <location filename="../components/UpdateAllModal.qml" line="158"/>
+        <source>Done.</source>
+        <translation>Done.</translation>
+    </message>
+    <message>
+        <location filename="../components/UpdateAllModal.qml" line="160"/>
+        <source>Failed: %1</source>
+        <translation>Failed: %1</translation>
+    </message>
+    <message>
+        <location filename="../components/UpdateAllModal.qml" line="161"/>
+        <source>Failed.</source>
+        <translation>Failed.</translation>
     </message>
 </context>
 <context>

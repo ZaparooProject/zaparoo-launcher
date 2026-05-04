@@ -33,6 +33,7 @@ MainLayout {
     readonly property string modalQrCode: "qr_code"
     readonly property string modalFirstRunIndex: "first_run_index"
     readonly property string modalLogUpload: "log_upload"
+    readonly property string modalUpdateAll: "update_all"
     // One-shot session flag: the first-run modal is shown at most
     // once per launcher process, even if the WS link drops and the
     // mediadb-empty condition would otherwise be satisfied again.
@@ -482,6 +483,7 @@ MainLayout {
         function onRequestFavoritesScreen(): void { root._navigateToFavorites() }
         function onRequestRecentsScreen(): void { root._navigateToRecents() }
         function onRequestSettingsScreen(): void { root._navigateToSettings() }
+        function onRequestUpdateAll(): void { root.openUpdateAllModal() }
     }
     Connections {
         target: root.favoritesScreen
@@ -772,6 +774,21 @@ MainLayout {
 
     onCloseLogUploadRequested: root.closeLogUploadModal()
 
+    function openUpdateAllModal(): void {
+        Browse.UpdateAllRunner.reset()
+        root.updateAllModalVisible = true
+        if (ScreenManager.topModal !== root.modalUpdateAll)
+            ScreenManager.pushModal(root.modalUpdateAll)
+    }
+
+    function closeUpdateAllModal(): void {
+        root.updateAllModalVisible = false
+        if (ScreenManager.topModal === root.modalUpdateAll)
+            ScreenManager.popModal()
+    }
+
+    onCloseUpdateAllRequested: root.closeUpdateAllModal()
+
     Connections {
         target: Browse.AppStatus
         function onConnection_stateChanged(): void {
@@ -886,6 +903,8 @@ MainLayout {
                 root.firstRunIndexModal.handleAction(action)
             } else if (ScreenManager.topModal === root.modalLogUpload) {
                 root.logUploadModal.handleAction(action)
+            } else if (ScreenManager.topModal === root.modalUpdateAll) {
+                root.updateAllModal.handleAction(action)
             }
             // While a modal owns input, swallow everything not handled
             // above rather than leak it to the root screen.
@@ -1021,6 +1040,16 @@ MainLayout {
         Keys.onPressed: event => {
             if (event.isAutoRepeat)
                 return
+            if (ScreenManager.topModal === root.modalUpdateAll) {
+                const action = Browse.Input.action_for_key(event.key)
+                if (action !== "") {
+                    root.handleAction(action)
+                    root._armRepeat(action, event.key)
+                } else {
+                    root.updateAllModal.handleText(event.text)
+                }
+                return
+            }
             root.handleKey(event.key)
         }
         Keys.onReleased: event => {
