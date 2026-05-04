@@ -453,7 +453,10 @@ MainLayout {
     Connections {
         target: root.settingsScreen
         function onRequestHubScreen(): void { root._goto(root.screenHub) }
-        function onRequestLogUploadModal(): void { root.openLogUploadModal() }
+        function onRequestAccept(actionId: string): void {
+            if (actionId === "uploadLog")
+                root.openLogUploadModal()
+        }
     }
     Connections {
         target: root.systemsScreen

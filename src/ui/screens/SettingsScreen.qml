@@ -35,10 +35,10 @@ Item {
     property bool transitioning: false
 
     signal requestHubScreen()
-    // Asks the router to push the log-upload modal. Emitted when the
-    // upload-log action row is accepted; the modal owns its own state
-    // machine from there.
-    signal requestLogUploadModal()
+    // Forward signal carrying the focused action row's id. The router
+    // decides what the payload means — currently only "uploadLog" is
+    // wired, which opens the log-upload modal.
+    signal requestAccept(actionId: string)
 
     // Field registry. Each entry's `id` is read by handleAction to
     // route the cycle to the right model setter. Keeping this as data
@@ -344,7 +344,7 @@ Item {
             else if (id === "runScraper")
                 settings._triggerScrape()
             else if (id === "uploadLog")
-                settings.requestLogUploadModal()
+                settings.requestAccept("uploadLog")
         } else if (action === "cancel") {
             settings.requestHubScreen()
         }
@@ -460,7 +460,7 @@ Item {
                     else if (modelData.id === "runScraper")
                         settings._triggerScrape()
                     else if (modelData.id === "uploadLog")
-                        settings.requestLogUploadModal()
+                        settings.requestAccept("uploadLog")
                 }
             }
         }
