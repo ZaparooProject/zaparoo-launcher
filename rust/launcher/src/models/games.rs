@@ -499,7 +499,10 @@ impl ffi::GamesModel {
             return;
         }
         let Some(params) = favorite_params_for_entry(entry, !has_favorite_tag(&entry.tags)) else {
-            warn!("favorite update skipped: missing media identity for {}", entry.name);
+            warn!(
+                "favorite update skipped: missing media identity for {}",
+                entry.name
+            );
             return;
         };
         let name = entry.name.clone();
@@ -759,7 +762,11 @@ fn has_favorite_tag(tags: &[TagInfo]) -> bool {
 }
 
 fn favorite_role_value(tags: &[TagInfo]) -> i32 {
-    if has_favorite_tag(tags) { 1 } else { 0 }
+    if has_favorite_tag(tags) {
+        1
+    } else {
+        0
+    }
 }
 
 fn favorite_params_for_entry(entry: &BrowseEntry, add: bool) -> Option<MediaTagsUpdateParams> {

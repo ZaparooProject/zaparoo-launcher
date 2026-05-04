@@ -201,7 +201,8 @@ pub mod ffi {
         // cache bridge can target individual rows in `dataChanged`.
         // Forwarded to the QAbstractListModel implementation.
         #[inherit]
-        fn index(self: &FavoritesModel, row: i32, column: i32, parent: &QModelIndex) -> QModelIndex;
+        fn index(self: &FavoritesModel, row: i32, column: i32, parent: &QModelIndex)
+            -> QModelIndex;
     }
 
     impl cxx_qt::Threading for FavoritesModel {}
@@ -453,7 +454,10 @@ impl ffi::FavoritesModel {
         }
         let entry = &self.entries[index as usize];
         let Some(params) = favorite_params_for_entry(entry, !has_favorite_tag(&entry.tags)) else {
-            warn!("favorite update skipped: missing media identity for {}", entry.name);
+            warn!(
+                "favorite update skipped: missing media identity for {}",
+                entry.name
+            );
             return;
         };
         let name = entry.name.clone();
@@ -594,7 +598,11 @@ fn has_favorite_tag(tags: &[TagInfo]) -> bool {
 }
 
 fn favorite_role_value(tags: &[TagInfo]) -> i32 {
-    if has_favorite_tag(tags) { 1 } else { 0 }
+    if has_favorite_tag(tags) {
+        1
+    } else {
+        0
+    }
 }
 
 fn favorite_params_for_entry(entry: &MediaItem, add: bool) -> Option<MediaTagsUpdateParams> {
@@ -760,7 +768,8 @@ where
     F: Fn(&MediaKey) -> bool,
     G: Fn(&MediaKey) -> bool,
 {
-    entries.iter()
+    entries
+        .iter()
         .filter_map(media_key_for)
         .filter(|k| !is_cached(k) && !is_negative(k))
         .collect()
@@ -848,7 +857,8 @@ fn position_of_path(entries: &[MediaItem], needle: &str) -> i32 {
     if needle.is_empty() {
         return -1;
     }
-    entries.iter()
+    entries
+        .iter()
         .position(|e| e.path == needle)
         .map_or(-1, |i| i as i32)
 }
