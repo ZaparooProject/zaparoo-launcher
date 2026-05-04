@@ -763,11 +763,7 @@ fn has_favorite_tag(tags: &[TagInfo]) -> bool {
 }
 
 fn favorite_role_value(tags: &[TagInfo]) -> i32 {
-    if has_favorite_tag(tags) {
-        1
-    } else {
-        0
-    }
+    i32::from(has_favorite_tag(tags))
 }
 
 fn favorite_params_for_entry(entry: &BrowseEntry, add: bool) -> Option<MediaTagsUpdateParams> {
@@ -787,7 +783,7 @@ fn favorite_params_for_entry(entry: &BrowseEntry, add: bool) -> Option<MediaTags
         return None;
     }
     params.system = system;
-    params.path = entry.path.clone();
+    params.path.clone_from(&entry.path);
     Some(params)
 }
 

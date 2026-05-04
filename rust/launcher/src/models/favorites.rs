@@ -60,6 +60,13 @@ const FAVORITE_ROLE: i32 = 256 + 6;
 const PAGE_SIZE: u32 = 25;
 
 #[derive(Default)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "the bools are independent qproperties surfaced to QML; collapsing them \
+              into an enum would force the QML side to read a single state property \
+              and re-derive each flag locally, which is exactly the work the bridge \
+              avoids"
+)]
 pub struct FavoritesModelRust {
     entries: Vec<MediaItem>,
     count: i32,
@@ -598,11 +605,7 @@ fn has_favorite_tag(tags: &[TagInfo]) -> bool {
 }
 
 fn favorite_role_value(tags: &[TagInfo]) -> i32 {
-    if has_favorite_tag(tags) {
-        1
-    } else {
-        0
-    }
+    i32::from(has_favorite_tag(tags))
 }
 
 fn favorite_params_for_entry(entry: &MediaItem, add: bool) -> Option<MediaTagsUpdateParams> {
@@ -620,8 +623,8 @@ fn favorite_params_for_entry(entry: &MediaItem, add: bool) -> Option<MediaTagsUp
     if entry.system.id.is_empty() || entry.path.is_empty() {
         return None;
     }
-    params.system = entry.system.id.clone();
-    params.path = entry.path.clone();
+    params.system.clone_from(&entry.system.id);
+    params.path.clone_from(&entry.path);
     Some(params)
 }
 
@@ -847,7 +850,7 @@ fn release_cover_gate_after_timeout(mut model: Pin<&mut ffi::FavoritesModel>) {
 }
 
 /// Build the `text` payload sent to Core's `run` for a search entry.
-/// Search entries carry a Core-built ZapScript command, so use it
+/// Search entries carry a Core-built `ZapScript` command, so use it
 /// directly and suppress the run when it is empty.
 fn launch_text_for(entry: &MediaItem) -> String {
     entry.zap_script.clone()
