@@ -32,6 +32,7 @@ pub struct Config {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SettingsConfig {
+    pub browse_layout: Option<String>,
     pub button_layout: Option<String>,
     pub mouse_enabled: Option<bool>,
 }
@@ -95,6 +96,7 @@ struct RawInput {
 
 #[derive(Deserialize, Default)]
 struct RawSettings {
+    browse_layout: Option<String>,
     button_layout: Option<String>,
     mouse_enabled: Option<bool>,
 }
@@ -149,6 +151,10 @@ pub fn load_config(path: &Path) -> Config {
         cfg.key_to_action = input_actions::invert(&merged);
     }
     cfg.settings = SettingsConfig {
+        browse_layout: raw
+            .settings
+            .browse_layout
+            .map(|value| value.trim().to_string()),
         button_layout: raw
             .settings
             .button_layout
@@ -161,6 +167,7 @@ pub fn load_config(path: &Path) -> Config {
 pub fn save_settings_mirror(
     path: &Path,
     language: &str,
+    browse_layout: &str,
     button_layout: &str,
     mouse_enabled: bool,
     debug_logging: bool,
@@ -197,6 +204,10 @@ pub fn save_settings_mirror(
             path.display()
         ));
     };
+    settings.insert(
+        "browse_layout".into(),
+        toml::Value::String(browse_layout.trim().to_string()),
+    );
     settings.insert(
         "button_layout".into(),
         toml::Value::String(button_layout.trim().to_string()),
@@ -286,6 +297,7 @@ mod tests {
         assert_eq!(cfg.video_height, 1080);
         assert!(!cfg.debug_logging);
         assert_eq!(cfg.language, "");
+        assert_eq!(cfg.settings.browse_layout, None);
         assert_eq!(cfg.settings.button_layout, None);
         assert_eq!(cfg.settings.mouse_enabled, None);
         // Default keyboard bindings populate the map.
@@ -379,6 +391,7 @@ mod tests {
             debug = true
 
             [settings]
+            browse_layout = "list"
             button_layout = "c"
             mouse_enabled = false
         "#;
@@ -389,6 +402,7 @@ mod tests {
         assert_eq!(cfg.video_width, 640);
         assert_eq!(cfg.video_height, 480);
         assert!(cfg.debug_logging);
+        assert_eq!(cfg.settings.browse_layout.as_deref(), Some("list"));
         assert_eq!(cfg.settings.button_layout.as_deref(), Some("c"));
         assert_eq!(cfg.settings.mouse_enabled, Some(false));
     }
@@ -404,9 +418,10 @@ mod tests {
     fn save_settings_mirror_creates_sections() {
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("launcher.toml");
-        save_settings_mirror(&path, "it_IT", "b", false, true).expect("save");
+        save_settings_mirror(&path, "it_IT", "list", "b", false, true).expect("save");
         let cfg = load_config(&path);
         assert_eq!(cfg.language, "it_IT");
+        assert_eq!(cfg.settings.browse_layout.as_deref(), Some("list"));
         assert_eq!(cfg.settings.button_layout.as_deref(), Some("b"));
         assert_eq!(cfg.settings.mouse_enabled, Some(false));
         assert!(cfg.debug_logging);
@@ -417,12 +432,13 @@ mod tests {
         let f = write_tmp(
             "[core]\nendpoint = \"ws://example.com/api\"\n[video]\nwidth = 1280\nheight = 720\n",
         );
-        save_settings_mirror(f.path(), "en", "a", true, false).expect("save");
+        save_settings_mirror(f.path(), "en", "grid", "a", true, false).expect("save");
         let cfg = load_config(f.path());
         assert_eq!(cfg.language, "en");
         assert_eq!(cfg.core_endpoint, "ws://example.com/api");
         assert_eq!(cfg.video_width, 1280);
         assert_eq!(cfg.video_height, 720);
+        assert_eq!(cfg.settings.browse_layout.as_deref(), Some("grid"));
         assert_eq!(cfg.settings.button_layout.as_deref(), Some("a"));
         assert_eq!(cfg.settings.mouse_enabled, Some(true));
         assert!(!cfg.debug_logging);
@@ -431,14 +447,16 @@ mod tests {
     #[test]
     fn save_settings_mirror_normalizes_auto() {
         let f = write_tmp("");
-        save_settings_mirror(f.path(), "", "c", false, true).expect("save");
+        save_settings_mirror(f.path(), "", "list", "c", false, true).expect("save");
         let written = std::fs::read_to_string(f.path()).expect("read");
         assert!(written.contains("language = \"auto\""));
+        assert!(written.contains("browse_layout = \"list\""));
         assert!(written.contains("button_layout = \"c\""));
         assert!(written.contains("mouse_enabled = false"));
         assert!(written.contains("debug = true"));
         let cfg = load_config(f.path());
         assert_eq!(cfg.language, "");
+        assert_eq!(cfg.settings.browse_layout.as_deref(), Some("list"));
         assert_eq!(cfg.settings.button_layout.as_deref(), Some("c"));
         assert_eq!(cfg.settings.mouse_enabled, Some(false));
         assert!(cfg.debug_logging);

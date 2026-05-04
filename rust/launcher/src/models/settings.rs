@@ -23,6 +23,11 @@
 //   * `current_language` — READ + NOTIFY. Mirrors `[general].language`
 //     from launcher.toml and is also recorded in persisted state so the
 //     settings snapshot stays coherent.
+//   * `available_browse_layouts` — CONSTANT. The browsing layout picker
+//     choices. "grid" is the existing layout; "list" is the detailed list
+//     placeholder until the new browsing screen is built.
+//   * `current_browse_layout` — READ + NOTIFY, persisted. Defaults to
+//     "grid" so existing installs keep current behavior.
 //   * `available_button_layouts` — CONSTANT. Single-letter ids used to
 //     compose resources/images/buttons/<layout>/Button*.png. Style A is
 //     the legacy Nintendo-style glyph set, B is the Xbox-style set, C
@@ -47,9 +52,10 @@
 // `/tmp` lifecycle. Resolution is intentionally excluded from the config
 // mirror for now and remains state/session-backed only because startup
 // mode switching is not trusted yet. Button layout only changes the QML
-// resource path used by help-bar icons, mouse support drives the QML
-// cursor/input blocker, and language still takes effect on the next
-// launch because Qt installs translators only at startup.
+// resource path used by help-bar icons, browse layout selects the game
+// browsing presentation, mouse support drives the QML cursor/input blocker,
+// and language still takes effect on the next launch because Qt installs
+// translators only at startup.
 
 use crate::mister_runtime;
 use crate::models::{with_persist_mut, with_persist_read};
@@ -73,6 +79,8 @@ use zaparoo_core::runtime;
 const MISTER_RESOLUTIONS: &[&str] = &["", "1280x720", "1920x1080", "640x480", "1920x1440"];
 const LANGUAGES: &[&str] = &["auto", "en", "it_IT"];
 const DEFAULT_LANGUAGE: &str = "auto";
+const BROWSE_LAYOUTS: &[&str] = &["grid", "list"];
+const DEFAULT_BROWSE_LAYOUT: &str = "grid";
 const BUTTON_LAYOUTS: &[&str] = &["a", "b", "c"];
 const DEFAULT_BUTTON_LAYOUT: &str = "a";
 
@@ -83,6 +91,8 @@ pub struct SettingsRust {
     current_resolution: QString,
     available_languages: QStringList,
     current_language: QString,
+    available_browse_layouts: QStringList,
+    current_browse_layout: QString,
     available_button_layouts: QStringList,
     current_button_layout: QString,
     current_mouse_enabled: bool,
@@ -107,6 +117,8 @@ pub mod ffi {
         #[qproperty(QString, current_resolution, READ, WRITE = set_resolution, NOTIFY)]
         #[qproperty(QStringList, available_languages, READ, CONSTANT)]
         #[qproperty(QString, current_language, READ, WRITE = set_language, NOTIFY)]
+        #[qproperty(QStringList, available_browse_layouts, READ, CONSTANT)]
+        #[qproperty(QString, current_browse_layout, READ, WRITE = set_browse_layout, NOTIFY)]
         #[qproperty(QStringList, available_button_layouts, READ, CONSTANT)]
         #[qproperty(QString, current_button_layout, READ, WRITE = set_button_layout, NOTIFY)]
         #[qproperty(bool, current_mouse_enabled, READ, WRITE = set_mouse_enabled, NOTIFY)]
@@ -118,6 +130,9 @@ pub mod ffi {
 
         #[qinvokable]
         fn set_language(self: Pin<&mut Settings>, value: QString);
+
+        #[qinvokable]
+        fn set_browse_layout(self: Pin<&mut Settings>, value: QString);
 
         #[qinvokable]
         fn set_button_layout(self: Pin<&mut Settings>, value: QString);
@@ -150,6 +165,9 @@ impl Initialize for ffi::Settings {
         self.as_mut().rust_mut().current_resolution = QString::from(merged.resolution.as_str());
         self.as_mut().rust_mut().available_languages = languages();
         self.as_mut().rust_mut().current_language = QString::from(merged.language.as_str());
+        self.as_mut().rust_mut().available_browse_layouts = browse_layouts();
+        self.as_mut().rust_mut().current_browse_layout =
+            QString::from(merged.browse_layout.as_str());
         self.as_mut().rust_mut().available_button_layouts = button_layouts();
         self.as_mut().rust_mut().current_button_layout =
             QString::from(merged.button_layout.as_str());
@@ -193,6 +211,21 @@ impl ffi::Settings {
         mirror_settings_to_config(&config_file_path(), &snapshot.settings);
         self.as_mut().rust_mut().current_language = QString::from(value_str.as_str());
         self.as_mut().current_language_changed();
+    }
+
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "cxx-qt qinvokable signature requires QString by value"
+    )]
+    fn set_browse_layout(mut self: Pin<&mut Self>, value: QString) {
+        let value_str = normalize_browse_layout(&value.to_string()).to_string();
+        if self.current_browse_layout.to_string() == value_str {
+            return;
+        }
+        let snapshot = persist_settings(|s| s.browse_layout.clone_from(&value_str));
+        mirror_settings_to_config(&config_file_path(), &snapshot.settings);
+        self.as_mut().rust_mut().current_browse_layout = QString::from(value_str.as_str());
+        self.as_mut().current_browse_layout_changed();
     }
 
     #[allow(
@@ -255,6 +288,7 @@ fn mirror_settings_to_config(config_path: &std::path::Path, settings: &SettingsS
     if let Err(e) = save_settings_mirror(
         config_path,
         settings.language.as_str(),
+        settings.browse_layout.as_str(),
         settings.button_layout.as_str(),
         settings.mouse_enabled,
         settings.debug_logging,
@@ -270,6 +304,14 @@ fn merge_settings(snapshot: &SettingsState, config: &Config) -> SettingsState {
     SettingsState {
         resolution: snapshot.resolution.clone(),
         language: normalize_language(&config.language).to_string(),
+        browse_layout: normalize_browse_layout(
+            config
+                .settings
+                .browse_layout
+                .as_deref()
+                .unwrap_or(snapshot.browse_layout.as_str()),
+        )
+        .to_string(),
         button_layout: normalize_button_layout(
             config
                 .settings
@@ -304,6 +346,14 @@ fn button_layouts() -> QStringList {
     list
 }
 
+fn browse_layouts() -> QStringList {
+    let mut list = QStringList::default();
+    for layout in BROWSE_LAYOUTS {
+        list.append(QString::from(*layout));
+    }
+    list
+}
+
 fn languages() -> QStringList {
     let mut list = QStringList::default();
     for language in LANGUAGES {
@@ -322,6 +372,15 @@ fn normalize_language(value: &str) -> &str {
         .copied()
         .find(|language| *language == trimmed)
         .unwrap_or(DEFAULT_LANGUAGE)
+}
+
+fn normalize_browse_layout(value: &str) -> &'static str {
+    let trimmed = value.trim();
+    BROWSE_LAYOUTS
+        .iter()
+        .copied()
+        .find(|layout| *layout == trimmed)
+        .unwrap_or(DEFAULT_BROWSE_LAYOUT)
 }
 
 fn normalize_button_layout(value: &str) -> &'static str {
@@ -345,8 +404,9 @@ fn normalize_button_layout(value: &str) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::{
-        button_layouts, curated_resolutions, languages, normalize_button_layout,
-        normalize_language, BUTTON_LAYOUTS, DEFAULT_BUTTON_LAYOUT, DEFAULT_LANGUAGE, LANGUAGES,
+        browse_layouts, button_layouts, curated_resolutions, languages, normalize_browse_layout,
+        normalize_button_layout, normalize_language, BROWSE_LAYOUTS, BUTTON_LAYOUTS,
+        DEFAULT_BROWSE_LAYOUT, DEFAULT_BUTTON_LAYOUT, DEFAULT_LANGUAGE, LANGUAGES,
         MISTER_RESOLUTIONS,
     };
 
@@ -384,6 +444,22 @@ mod tests {
         let collected: Vec<String> = list.iter().map(String::from).collect();
         let expected: Vec<String> = LANGUAGES.iter().map(|s| (*s).to_string()).collect();
         assert_eq!(collected, expected);
+    }
+
+    #[test]
+    fn browse_layouts_preserve_order() {
+        let list = browse_layouts();
+        let collected: Vec<String> = list.iter().map(String::from).collect();
+        let expected: Vec<String> = BROWSE_LAYOUTS.iter().map(|s| (*s).to_string()).collect();
+        assert_eq!(collected, expected);
+    }
+
+    #[test]
+    fn browse_layout_normalization_defaults_to_grid() {
+        assert_eq!(normalize_browse_layout(""), DEFAULT_BROWSE_LAYOUT);
+        assert_eq!(normalize_browse_layout("detail"), DEFAULT_BROWSE_LAYOUT);
+        assert_eq!(normalize_browse_layout("grid"), "grid");
+        assert_eq!(normalize_browse_layout("list"), "list");
     }
 
     #[test]

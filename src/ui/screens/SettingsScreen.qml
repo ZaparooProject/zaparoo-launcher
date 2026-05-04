@@ -66,6 +66,10 @@ Item {
             label: qsTr("Language")
         })
         out.push({
+            id: "browseLayout",
+            label: qsTr("Browsing layout")
+        })
+        out.push({
             id: "buttonLayout",
             label: qsTr("Button style")
         })
@@ -226,6 +230,11 @@ Item {
         return raw === undefined || raw === null ? [] : raw
     }
 
+    function _browseLayoutList(): list<string> {
+        const raw = Browse.Settings.available_browse_layouts
+        return raw === undefined || raw === null ? [] : raw
+    }
+
     function _languageList(): list<string> {
         const raw = Browse.Settings.available_languages
         return raw === undefined || raw === null ? [] : raw
@@ -257,6 +266,32 @@ Item {
             idx = direction > 0 ? -1 : 0
         const next = ((idx + direction) % list.length + list.length) % list.length
         Browse.Settings.set_language(list[next])
+    }
+
+    function _browseLayoutDisplay(value: string): string {
+        if (value === "list")
+            return qsTr("Detailed list view")
+        return qsTr("Grid view")
+    }
+
+    function _currentBrowseLayoutIndex(): int {
+        const list = settings._browseLayoutList()
+        const cur = Browse.Settings.current_browse_layout
+        for (let i = 0; i < list.length; i++)
+            if (list[i] === cur)
+                return i
+        return -1
+    }
+
+    function _cycleBrowseLayout(direction: int): void {
+        const list = settings._browseLayoutList()
+        if (list.length === 0)
+            return
+        let idx = settings._currentBrowseLayoutIndex()
+        if (idx < 0)
+            idx = direction > 0 ? -1 : 0
+        const next = ((idx + direction) % list.length + list.length) % list.length
+        Browse.Settings.set_browse_layout(list[next])
     }
 
     function _buttonLayoutDisplay(value: string): string {
@@ -311,6 +346,8 @@ Item {
             settings._cycleResolution(direction)
         else if (id === "language")
             settings._cycleLanguage(direction)
+        else if (id === "browseLayout")
+            settings._cycleBrowseLayout(direction)
         else if (id === "buttonLayout")
             settings._cycleButtonLayout(direction)
         else if (id === "mouseEnabled")
@@ -402,6 +439,8 @@ Item {
                        ? settings._resolutionDisplay(Browse.Settings.current_resolution)
                        : modelData.id === "language"
                        ? settings._languageDisplay(Browse.Settings.current_language)
+                       : modelData.id === "browseLayout"
+                       ? settings._browseLayoutDisplay(Browse.Settings.current_browse_layout)
                        : modelData.id === "buttonLayout"
                        ? settings._buttonLayoutDisplay(Browse.Settings.current_button_layout)
                        : ""
@@ -425,6 +464,8 @@ Item {
                                && settings._resolutionList().length > 0)
                               || (modelData.id === "language"
                                   && settings._languageList().length > 1)
+                              || (modelData.id === "browseLayout"
+                                  && settings._browseLayoutList().length > 1)
                               || (modelData.id === "buttonLayout"
                                   && settings._buttonLayoutList().length > 1)
                               || (modelData.id === "mouseEnabled"
@@ -435,6 +476,8 @@ Item {
                                && settings._resolutionList().length > 0)
                               || (modelData.id === "language"
                                   && settings._languageList().length > 1)
+                              || (modelData.id === "browseLayout"
+                                  && settings._browseLayoutList().length > 1)
                               || (modelData.id === "buttonLayout"
                                   && settings._buttonLayoutList().length > 1)
                               || (modelData.id === "mouseEnabled"
