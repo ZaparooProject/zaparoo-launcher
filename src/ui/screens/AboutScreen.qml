@@ -95,18 +95,19 @@ Item {
             width: parent.width
             spacing: Sizing.pctH(2)
 
-            // Logo renders at half its 600x135 native size for a more
-            // restrained header; on narrower viewports it scales down
-            // further with PreserveAspectFit. sourceSize pinned to the
-            // native pixel dimensions stops Qt from upscaling then
-            // downsampling and keeps the lines crisp.
+            // Logo width is capped at a screen-height-relative size so
+            // the brand mark stays a header element across 240p →
+            // 1080p without ballooning. sourceSize is pinned to the
+            // native pixel dimensions to stop Qt upscaling then
+            // downsampling and to keep the lines crisp; height is
+            // derived from width via the image's intrinsic aspect.
             Image {
                 anchors.horizontalCenter: parent.horizontalCenter
                 source: "qrc:/qt/qml/Zaparoo/App/resources/images/logo.png"
                 fillMode: Image.PreserveAspectFit
                 sourceSize.width: 600
                 sourceSize.height: 135
-                width: Math.min(300, parent.width)
+                width: Math.min(parent.width, Sizing.pctH(35))
                 height: width * 135 / 600
             }
 
