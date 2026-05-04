@@ -64,6 +64,15 @@ fn main() {
     println!("cargo:rerun-if-env-changed=ZAPAROO_DEV_BUILD");
     println!("cargo:rerun-if-env-changed=ZAPAROO_OFFICIAL_BUILD");
 
+    // Rerun when HEAD or any branch ref moves so ZAPAROO_BUILD_COMMIT /
+    // ZAPAROO_BUILD_DATE refresh after rebases, branch switches, and
+    // commits that don't otherwise touch this crate. Emitting any
+    // rerun-if-* directive disables Cargo's "rerun on any package
+    // file change" default, which is why these are needed alongside
+    // the env-changed lines above.
+    println!("cargo:rerun-if-changed=../../.git/HEAD");
+    println!("cargo:rerun-if-changed=../../.git/refs/heads");
+
     println!("cargo:rustc-check-cfg=cfg(zaparoo_runtime, values(\"mister\"))");
     println!("cargo:rustc-check-cfg=cfg(dev_build)");
     if let Ok(rt) = std::env::var("ZAPAROO_RUNTIME") {
