@@ -11,6 +11,8 @@ qt_add_qml_module(
     QML_FILES
         ActiveLabel.qml
         BootOverlay.qml
+        BrowseDetailPane.qml
+        BrowseList.qml
         ContextMenu.qml
         CoreStatusPill.qml
         FirstRunIndexModal.qml

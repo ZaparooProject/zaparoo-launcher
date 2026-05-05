@@ -28,6 +28,7 @@ Item {
     // "Loading…" cue paints alone on a cleared band rather than over
     // a populated grid.
     property bool transitioning: false
+    readonly property bool _listLayout: Browse.Settings.current_browse_layout === "list"
 
     // Cover-gate flag: true while `GamesModel` is holding `loading`
     // for the initial-page paint. Pagination uses a separate
@@ -56,9 +57,35 @@ Item {
     // directions have a row-edge escape branch, so all four cardinal
     // actions share this exact body.
     function _performMove(dx: int, dy: int): void {
+        if (games._listLayout) {
+            if (dy !== 0)
+                games._performLinearMove(dy)
+            return
+        }
         if (games.gamesGrid.moveSelection(dx, dy))
             Browse.GamesState.set_selected_at_top(
                 Browse.GamesModel.path_at(games.gamesGrid.currentIndex))
+    }
+
+    function _performLinearMove(delta: int): void {
+        const count = games.gamesGrid.itemCount
+        if (count <= 0)
+            return
+        let next = games.gamesGrid.currentIndex + delta
+        if (next < 0)
+            next = count - 1
+        else if (next >= count)
+            next = 0
+        if (next === games.gamesGrid.currentIndex) {
+            if (next >= count - 2)
+                Browse.GamesModel.fetch_more()
+            return
+        }
+        games.gamesGrid.currentIndex = next
+        Browse.GamesState.set_selected_at_top(
+            Browse.GamesModel.path_at(games.gamesGrid.currentIndex))
+        if (next >= count - 2)
+            Browse.GamesModel.fetch_more()
     }
 
     // Page jump (L/R shoulder buttons). Wraps in both directions; same
@@ -164,7 +191,9 @@ Item {
                     return
                 Browse.GamesState.set_selected_at_top(
                     Browse.GamesModel.path_at(idx))
-                const rect = games.gamesGrid.currentCellRectIn(games)
+                const rect = games._listLayout
+                             ? gamesList.currentCellRectIn(games)
+                             : games.gamesGrid.currentCellRectIn(games)
                 games.requestContextMenu(idx, rect)
             }
         } else if (action === "cancel") {
@@ -215,6 +244,43 @@ Item {
                    : ""
     }
 
+    BrowseList {
+        id: gamesList
+
+        visible: !games.transitioning && !games.coverGateLoading && games._listLayout
+        anchors.left: parent.left
+        anchors.leftMargin: Sizing.pctW(5)
+        anchors.top: topStrip.bottom
+        anchors.topMargin: Sizing.pctH(2)
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: Sizing.pctH(8)
+        width: Sizing.pctW(45)
+        model: Browse.GamesModel
+        currentIndex: gamesGrid.currentIndex
+        onItemHovered: (index) => games._focusIndex(index)
+        onItemClicked: (index) => {
+            games._focusIndex(index)
+            games.handleAction("accept")
+        }
+        onItemRightClicked: (index) => {
+            games._focusIndex(index)
+            games.handleAction("write_card")
+        }
+        onEmptyRightClicked: games.handleAction("cancel")
+    }
+
+    BrowseDetailPane {
+        visible: !games.transitioning && !games.coverGateLoading && games._listLayout
+        anchors.left: gamesList.right
+        anchors.leftMargin: Sizing.pctW(5)
+        anchors.right: parent.right
+        anchors.rightMargin: Sizing.pctW(5)
+        anchors.top: gamesList.top
+        anchors.bottom: gamesList.bottom
+        title: gamesList.currentName
+        coverKey: gamesList.currentCoverKey
+    }
+
     // Grid fills the safe zone between the top strip and the active
     // label. bottomMargin = MainLayout's instructionsBar height
     // (pctH(6)) + pctH(2) gap + the active label's pctH(7). If you
@@ -222,12 +288,12 @@ Item {
     PagedGrid {
         id: gamesGrid
 
-        visible: !games.transitioning && !games.coverGateLoading
+        visible: !games.transitioning && !games.coverGateLoading && !games._listLayout
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: topStrip.bottom
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: Sizing.pctH(15)
+        anchors.bottomMargin: Sizing.pctH(8)
         model: Browse.GamesModel
         delegate: Tile { showCaption: true }
         // Cover-art tiles run taller than systems logos, so a 5x3
@@ -255,7 +321,7 @@ Item {
     // tile selection).
     ActiveLabel {
         id: activeLabel
-        visible: !games.transitioning && !games.coverGateLoading
+        visible: false
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: gamesGrid.bottom
@@ -266,9 +332,9 @@ Item {
     }
 
     ScreenStateOverlay {
-        anchors.centerIn: gamesGrid
-        width: gamesGrid.width
-        height: gamesGrid.height
+        anchors.centerIn: games._listLayout ? gamesList : gamesGrid
+        width: games._listLayout ? gamesList.width : gamesGrid.width
+        height: games._listLayout ? gamesList.height : gamesGrid.height
         loading: Browse.GamesModel.loading
         errorMessage: Browse.GamesModel.error_message ?? ""
         count: Browse.GamesModel.count
