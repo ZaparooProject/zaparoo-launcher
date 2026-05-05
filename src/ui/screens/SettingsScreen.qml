@@ -19,7 +19,7 @@ import Zaparoo.Browse as Browse
 // because the underlying `vmode` command lives on MiSTer's Linux framebuffer
 // (currently hidden — the picker doesn't switch reliably yet). Button style
 // is cross-platform and selects the resource directory for help-bar button
-// glyphs (Style A/B/C → resources/images/buttons/{a,b,c}/). Mouse support
+// glyphs (Style A/B/C/D → resources/images/buttons/{a,b,c,d}/). Mouse support
 // is cross-platform and controls cursor visibility plus mouse hit targets.
 //
 // Pure input dispatcher: emits `requestHubScreen()` on Escape; left/
@@ -40,16 +40,19 @@ Item {
     // wired, which opens the log-upload modal.
     signal requestAccept(actionId: string)
 
-    // Field registry. Each entry's `id` is read by handleAction to
-    // route the cycle to the right model setter. Keeping this as data
-    // (rather than a Repeater of typed children) makes adding fields
-    // a one-line edit and keeps the navigation logic uniform.
+    // Field registry. Each entry's `kind` is `"header"` (non-focusable
+    // group label) or `"field"` (a navigable row). Field entries also
+    // carry an `id` that handleAction routes to the right model setter.
+    // Keeping this as data (rather than a Repeater of typed children)
+    // makes adding rows a one-line edit and keeps navigation uniform.
     //
-    // Field-specific helpers below provide option lists, display labels,
-    // and model setters. This keeps the Repeater delegate presentational
-    // while handleAction remains a simple input dispatcher.
+    // Section grouping mirrors the Settings menus on Switch/Xbox/
+    // Playnite/Pegasus: a single page with non-focusable headers
+    // splitting commonly-used controls (General, Library) from rarer
+    // diagnostics-flavoured ones (Advanced).
     readonly property var fields: {
         const out = []
+        out.push({ kind: "header", label: qsTr("General") })
         // Resolution row hidden — `vmode` switching isn't reliable yet.
         // Restore by re-enabling this block once the MiSTer-side path is
         // trusted again; the picker plumbing in `_cycleResolution` and
@@ -57,41 +60,57 @@ Item {
         // wired so the row works as soon as it's added back.
         // if (Browse.Settings.is_mister) {
         //     out.push({
+        //         kind: "field",
         //         id: "resolution",
         //         label: qsTr("Resolution")
         //     })
         // }
         out.push({
+            kind: "field",
             id: "language",
             label: qsTr("Language")
         })
         out.push({
+            kind: "field",
             id: "browseLayout",
             label: qsTr("Browsing layout")
         })
         out.push({
+            kind: "field",
             id: "buttonLayout",
             label: qsTr("Button style")
         })
+        out.push({ kind: "header", label: qsTr("Library") })
         out.push({
-            id: "mouseEnabled",
-            label: qsTr("Mouse support")
-        })
-        out.push({
+            kind: "field",
             id: "updateMediaDb",
             label: qsTr("Update media database")
         })
         out.push({
+            kind: "field",
             id: "runScraper",
             label: qsTr("Scrape metadata")
         })
+        out.push({ kind: "header", label: qsTr("Advanced") })
         out.push({
+            kind: "field",
+            id: "mouseEnabled",
+            label: qsTr("Mouse support")
+        })
+        out.push({
+            kind: "field",
             id: "debugLogging",
             label: qsTr("Debug logging")
         })
         out.push({
+            kind: "field",
             id: "uploadLog",
             label: qsTr("Upload log file")
+        })
+        out.push({
+            kind: "field",
+            id: "aboutLicense",
+            label: qsTr("About / License")
         })
         return out
     }
@@ -141,27 +160,80 @@ Item {
     }
 
     readonly property int fieldCount: settings.fields.length
+
+    // True iff `idx` points at a focusable field row (not a header,
+    // not out of bounds). All `focused*` derivations early-return on
+    // header indices so a defensive out-of-band write to currentIndex
+    // can't mis-light the help bar.
+    function _isField(idx: int): bool {
+        if (idx < 0 || idx >= settings.fieldCount)
+            return false
+        return settings.fields[idx].kind === "field"
+    }
+
+    // First focusable row in the registry. Used to seed `currentIndex`
+    // at construction; returns -1 only if every entry is a header
+    // (registry mistake — shouldn't happen).
+    function _firstNavigableIndex(): int {
+        for (let i = 0; i < settings.fieldCount; i++)
+            if (settings.fields[i].kind === "field")
+                return i
+        return -1
+    }
+
+    // Walk from `from` in `direction` (±1) until we hit a focusable
+    // row or run off the registry. Headers are transparent — Up/Down
+    // skip across them so the user feels a single flat list.
+    function _seekNavigable(from: int, direction: int): int {
+        let i = from + direction
+        while (i >= 0 && i < settings.fieldCount) {
+            if (settings.fields[i].kind === "field")
+                return i
+            i += direction
+        }
+        return from
+    }
+
     readonly property bool focusedFieldIsToggle: {
-        if (settings.fieldCount === 0)
+        if (!settings._isField(settings.currentIndex))
             return false
         const id = settings.fields[settings.currentIndex].id
         return id === "mouseEnabled" || id === "debugLogging"
     }
     // True when the focused field is an action button (updateMediaDb,
-    // runScraper, uploadLog). Drives the help-bar Accept hint.
+    // runScraper, uploadLog, aboutLicense). Drives the help-bar Accept
+    // hint and the SettingsField chevron.
     readonly property bool focusedFieldIsAction: {
-        if (settings.fieldCount === 0)
+        if (!settings._isField(settings.currentIndex))
             return false
         const id = settings.fields[settings.currentIndex].id
         return id === "updateMediaDb"
                || id === "runScraper"
                || id === "uploadLog"
+               || id === "aboutLicense"
+    }
+    // Verb shown on the help-bar Accept hint for the focused action
+    // row. Index/scrape flip between Start and Cancel because the press
+    // toggles the in-flight operation; uploadLog and aboutLicense are
+    // single-press triggers, with aboutLicense reading "Open" because
+    // the press navigates rather than starts a job.
+    readonly property string focusedActionLabel: {
+        if (!settings._isField(settings.currentIndex))
+            return ""
+        const id = settings.fields[settings.currentIndex].id
+        if (id === "updateMediaDb" || id === "runScraper")
+            return settings.focusedActionBusy ? qsTr("Cancel") : qsTr("Start")
+        if (id === "uploadLog")
+            return qsTr("Start")
+        if (id === "aboutLicense")
+            return qsTr("Open")
+        return ""
     }
     // True when the focused action's matching operation is currently
     // running, so the help bar can label Accept as "Cancel" rather
     // than "Start".
     readonly property bool focusedActionBusy: {
-        if (settings.fieldCount === 0)
+        if (!settings._isField(settings.currentIndex))
             return false
         const id = settings.fields[settings.currentIndex].id
         if (id === "updateMediaDb")
@@ -175,7 +247,7 @@ Item {
     // visual and lets the help bar drop the Accept hint instead of
     // promising a press that will silently no-op.
     readonly property bool focusedActionDisabled: {
-        if (settings.fieldCount === 0)
+        if (!settings._isField(settings.currentIndex))
             return false
         const id = settings.fields[settings.currentIndex].id
         if (id === "updateMediaDb")
@@ -185,7 +257,16 @@ Item {
         return false
     }
 
-    property int currentIndex: 0
+    // Initial focus: first navigable row. The binding evaluates once
+    // (no reactive dependencies inside `_firstNavigableIndex`) and is
+    // broken the first time the user moves focus — handleAction's
+    // up/down branches assign to `currentIndex` directly. Falling back
+    // to 0 covers the all-headers degenerate case; helpers below
+    // early-return on `_isField(0) === false` if it ever lands there.
+    property int currentIndex: {
+        const idx = settings._firstNavigableIndex()
+        return idx >= 0 ? idx : 0
+    }
 
     function _resolutionList(): list<string> {
         const raw = Browse.Settings.available_resolutions
@@ -299,6 +380,8 @@ Item {
             return qsTr("Style B")
         if (value === "c")
             return qsTr("Style C")
+        if (value === "d")
+            return qsTr("Style D")
         return qsTr("Style A")
     }
 
@@ -339,7 +422,7 @@ Item {
     }
 
     function _cycleFocused(direction: int): void {
-        if (settings.fieldCount === 0)
+        if (!settings._isField(settings.currentIndex))
             return
         const id = settings.fields[settings.currentIndex].id
         if (id === "resolution")
@@ -359,17 +442,17 @@ Item {
 
     function handleAction(action: string): void {
         if (action === "up") {
-            if (settings.currentIndex > 0)
-                settings.currentIndex--
+            settings.currentIndex =
+                settings._seekNavigable(settings.currentIndex, -1)
         } else if (action === "down") {
-            if (settings.currentIndex < settings.fieldCount - 1)
-                settings.currentIndex++
+            settings.currentIndex =
+                settings._seekNavigable(settings.currentIndex, 1)
         } else if (action === "left") {
             settings._cycleFocused(-1)
         } else if (action === "right") {
             settings._cycleFocused(1)
         } else if (action === "accept") {
-            if (settings.fieldCount === 0)
+            if (!settings._isField(settings.currentIndex))
                 return
             const id = settings.fields[settings.currentIndex].id
             if (id === "mouseEnabled")
@@ -382,6 +465,8 @@ Item {
                 settings._triggerScrape()
             else if (id === "uploadLog")
                 settings.requestAccept("uploadLog")
+            else if (id === "aboutLicense")
+                settings.requestAccept("aboutLicense")
         } else if (action === "cancel") {
             settings.requestHubScreen()
         }
@@ -389,12 +474,18 @@ Item {
 
     // ── Visual tree ───────────────────────────────────────────────────────────
 
+    MouseArea {
+        anchors.fill: parent
+        acceptedButtons: Qt.RightButton
+        onClicked: settings.requestHubScreen()
+    }
+
     TopStatusStrip {
         id: topStrip
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
-        anchors.topMargin: Sizing.pctH(9)
+        anchors.topMargin: Sizing.headerBottom
         height: Sizing.pctH(7)
         title: qsTr("Settings")
         currentPage: 0
@@ -402,108 +493,180 @@ Item {
         totalText: ""
     }
 
-    // Form. Centered horizontally; width capped so the rows don't
-    // stretch edge-to-edge on widescreen. Each row is a SettingsField.
-    Column {
-        id: form
+    // Scroll focused row into view if it sits outside the Flickable's
+    // current viewport. No-op for header indices (they aren't focusable
+    // and currentIndex never lands on one in normal flow). Bind via
+    // onCurrentIndexChanged below; no animation — software-renderer
+    // budget can't pay for a moving column behind a focus border.
+    function _scrollFocusedIntoView(): void {
+        if (!settings._isField(settings.currentIndex))
+            return
+        const row = rowRepeater.itemAt(settings.currentIndex)
+        if (row === null)
+            return
+        const top = row.y
+        const bottom = top + row.height
+        if (top < flickable.contentY)
+            flickable.contentY = top
+        else if (bottom > flickable.contentY + flickable.height)
+            flickable.contentY = bottom - flickable.height
+    }
+
+    onCurrentIndexChanged: settings._scrollFocusedIntoView()
+
+    // Form lives in a Flickable so the section bands can grow past
+    // a single screen without dropping off-frame. Width capped so
+    // the rows don't stretch edge-to-edge on widescreen; bottom
+    // margin clears the help bar (pctH(6)) plus a small gap.
+    Flickable {
+        id: flickable
 
         anchors.top: topStrip.bottom
-        anchors.topMargin: Sizing.pctH(4)
+        anchors.topMargin: Sizing.pctH(2)
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: Sizing.pctH(8)
         anchors.horizontalCenter: parent.horizontalCenter
         width: Math.min(parent.width - Sizing.pctW(10), Sizing.pctW(70))
-        spacing: Sizing.pctH(1.5)
-        visible: settings.fieldCount > 0
+        contentWidth: width
+        contentHeight: form.implicitHeight
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
 
-        Repeater {
-            model: settings.fields
+        Column {
+            id: form
 
-            SettingsField {
-                id: fieldRow
+            width: parent.width
+            spacing: Sizing.pctH(1.5)
+            visible: settings.fieldCount > 0
 
-                required property int index
-                required property var modelData
+            Repeater {
+                id: rowRepeater
+                model: settings.fields
 
-                width: form.width
-                isFocused: index === settings.currentIndex
-                // Index and scrape can't run together; while one
-                // operation is in flight the other row dims and its
-                // MouseArea stops responding. Keyboard Accept is
-                // separately gated in `_triggerIndex`/`_triggerScrape`.
-                enabled: modelData.id === "updateMediaDb"
-                         ? !settings._scrapeBusy
-                         : modelData.id === "runScraper"
-                         ? !settings._indexBusy
-                         : true
-                label: modelData.label
-                value: modelData.id === "resolution"
-                       ? settings._resolutionDisplay(Browse.Settings.current_resolution)
-                       : modelData.id === "language"
-                       ? settings._languageDisplay(Browse.Settings.current_language)
-                       : modelData.id === "browseLayout"
-                       ? settings._browseLayoutDisplay(Browse.Settings.current_browse_layout)
-                       : modelData.id === "buttonLayout"
-                       ? settings._buttonLayoutDisplay(Browse.Settings.current_button_layout)
-                       : ""
-                control: modelData.id === "mouseEnabled" || modelData.id === "debugLogging"
-                         ? "toggle"
-                         : (modelData.id === "updateMediaDb"
-                            || modelData.id === "runScraper"
-                            || modelData.id === "uploadLog") ? "action"
-                         : "value"
-                checked: modelData.id === "debugLogging"
-                         ? Browse.Settings.current_debug_logging
-                         : Browse.Settings.current_mouse_enabled
-                actionStatus: modelData.id === "updateMediaDb"
-                              ? settings._indexActionStatus()
-                              : modelData.id === "runScraper"
-                              ? settings._scrapeActionStatus()
-                              : ""
-                // Pickers wrap modulo, so both arrows apply when the
-                // focused field has a populated option list.
-                canCyclePrev: (modelData.id === "resolution"
-                               && settings._resolutionList().length > 0)
-                              || (modelData.id === "language"
-                                  && settings._languageList().length > 1)
-                              || (modelData.id === "browseLayout"
-                                  && settings._browseLayoutList().length > 1)
-                              || (modelData.id === "buttonLayout"
-                                  && settings._buttonLayoutList().length > 1)
-                              || (modelData.id === "mouseEnabled"
-                                  && Browse.Settings.current_mouse_enabled)
-                              || (modelData.id === "debugLogging"
-                                  && Browse.Settings.current_debug_logging)
-                canCycleNext: (modelData.id === "resolution"
-                               && settings._resolutionList().length > 0)
-                              || (modelData.id === "language"
-                                  && settings._languageList().length > 1)
-                              || (modelData.id === "browseLayout"
-                                  && settings._browseLayoutList().length > 1)
-                              || (modelData.id === "buttonLayout"
-                                  && settings._buttonLayoutList().length > 1)
-                              || (modelData.id === "mouseEnabled"
-                                  && !Browse.Settings.current_mouse_enabled)
-                              || (modelData.id === "debugLogging"
-                                  && !Browse.Settings.current_debug_logging)
-                onHovered: settings.currentIndex = index
-                onClicked: {
-                    settings.currentIndex = index
-                    if (modelData.id === "mouseEnabled")
-                        settings._toggleMouseEnabled()
-                    else if (modelData.id === "debugLogging")
-                        settings._toggleDebugLogging()
-                }
-                // Action rows route through `onAccepted` only (see
-                // `SettingsField.qml`'s MouseArea), so the focus
-                // commit lives here too — clicking an action row
-                // moves focus before firing the action.
-                onAccepted: {
-                    settings.currentIndex = index
-                    if (modelData.id === "updateMediaDb")
-                        settings._triggerIndex()
-                    else if (modelData.id === "runScraper")
-                        settings._triggerScrape()
-                    else if (modelData.id === "uploadLog")
-                        settings.requestAccept("uploadLog")
+                // Wrapper row — both potential children exist but only
+                // the kind-matching one paints. A Loader would also
+                // work, but binding-through-`parent.modelData` adds
+                // static-analysis friction under
+                // ComponentBehavior:Bound; the wrapper Item is cheap
+                // (≤ 3 headers + ≤ 7 fields) and keeps every
+                // field-row binding readable in place.
+                Item {
+                    id: row
+
+                    required property int index
+                    required property var modelData
+
+                    readonly property bool isHeader:
+                        modelData.kind === "header"
+
+                    width: form.width
+                    implicitHeight: row.isHeader
+                                    ? header.implicitHeight
+                                    : field.implicitHeight
+
+                    SettingsSectionHeader {
+                        id: header
+                        visible: row.isHeader
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        label: row.modelData.label
+                    }
+
+                    SettingsField {
+                        id: field
+                        visible: !row.isHeader
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        isFocused: row.index === settings.currentIndex
+                        // Index and scrape can't run together; while
+                        // one operation is in flight the other row
+                        // dims and its MouseArea stops responding.
+                        // Keyboard Accept is separately gated in
+                        // `_triggerIndex`/`_triggerScrape`.
+                        enabled: row.modelData.id === "updateMediaDb"
+                                 ? !settings._scrapeBusy
+                                 : row.modelData.id === "runScraper"
+                                 ? !settings._indexBusy
+                                 : true
+                        label: row.modelData.label
+                        value: row.modelData.id === "resolution"
+                               ? settings._resolutionDisplay(Browse.Settings.current_resolution)
+                               : row.modelData.id === "language"
+                               ? settings._languageDisplay(Browse.Settings.current_language)
+                               : row.modelData.id === "browseLayout"
+                               ? settings._browseLayoutDisplay(Browse.Settings.current_browse_layout)
+                               : row.modelData.id === "buttonLayout"
+                               ? settings._buttonLayoutDisplay(Browse.Settings.current_button_layout)
+                               : ""
+                        control: row.modelData.id === "mouseEnabled"
+                                 || row.modelData.id === "debugLogging"
+                                 ? "toggle"
+                                 : (row.modelData.id === "updateMediaDb"
+                                    || row.modelData.id === "runScraper"
+                                    || row.modelData.id === "uploadLog"
+                                    || row.modelData.id === "aboutLicense") ? "action"
+                                 : "value"
+                        checked: row.modelData.id === "debugLogging"
+                                 ? Browse.Settings.current_debug_logging
+                                 : Browse.Settings.current_mouse_enabled
+                        actionStatus: row.modelData.id === "updateMediaDb"
+                                      ? settings._indexActionStatus()
+                                      : row.modelData.id === "runScraper"
+                                      ? settings._scrapeActionStatus()
+                                      : ""
+                        // Pickers wrap modulo, so both arrows apply
+                        // when the focused field has a populated
+                        // option list.
+                        canCyclePrev: (row.modelData.id === "resolution"
+                                       && settings._resolutionList().length > 0)
+                                      || (row.modelData.id === "language"
+                                          && settings._languageList().length > 1)
+                                      || (row.modelData.id === "browseLayout"
+                                          && settings._browseLayoutList().length > 1)
+                                      || (row.modelData.id === "buttonLayout"
+                                          && settings._buttonLayoutList().length > 1)
+                                      || (row.modelData.id === "mouseEnabled"
+                                          && Browse.Settings.current_mouse_enabled)
+                                      || (row.modelData.id === "debugLogging"
+                                          && Browse.Settings.current_debug_logging)
+                        canCycleNext: (row.modelData.id === "resolution"
+                                       && settings._resolutionList().length > 0)
+                                      || (row.modelData.id === "language"
+                                          && settings._languageList().length > 1)
+                                      || (row.modelData.id === "browseLayout"
+                                          && settings._browseLayoutList().length > 1)
+                                      || (row.modelData.id === "buttonLayout"
+                                          && settings._buttonLayoutList().length > 1)
+                                      || (row.modelData.id === "mouseEnabled"
+                                          && !Browse.Settings.current_mouse_enabled)
+                                      || (row.modelData.id === "debugLogging"
+                                          && !Browse.Settings.current_debug_logging)
+                        onHovered: settings.currentIndex = row.index
+                        onClicked: {
+                            settings.currentIndex = row.index
+                            if (row.modelData.id === "mouseEnabled")
+                                settings._toggleMouseEnabled()
+                            else if (row.modelData.id === "debugLogging")
+                                settings._toggleDebugLogging()
+                        }
+                        onRightClicked: settings.requestHubScreen()
+                        // Action rows route through `onAccepted` only
+                        // (see `SettingsField.qml`'s MouseArea), so
+                        // the focus commit lives here too — clicking
+                        // an action row moves focus before firing the
+                        // action.
+                        onAccepted: {
+                            settings.currentIndex = row.index
+                            if (row.modelData.id === "updateMediaDb")
+                                settings._triggerIndex()
+                            else if (row.modelData.id === "runScraper")
+                                settings._triggerScrape()
+                            else if (row.modelData.id === "uploadLog")
+                                settings.requestAccept("uploadLog")
+                            else if (row.modelData.id === "aboutLicense")
+                                settings.requestAccept("aboutLicense")
+                        }
+                    }
                 }
             }
         }

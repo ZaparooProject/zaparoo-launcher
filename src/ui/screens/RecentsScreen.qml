@@ -45,6 +45,7 @@ Item {
         recents.transitioning || Browse.RecentsModel.loading
 
     signal requestHubScreen()
+    signal requestContextMenu(int index, var anchorRect)
 
     // Restore the previously focused entry when the model is Ready.
     // Called by the router after the Hub→Recents transition lands;
@@ -150,6 +151,15 @@ Item {
                 return
             }
             Browse.RecentsModel.launch_at(recents.recentsGrid.currentIndex)
+        } else if (action === "write_card") {
+            if (recents.recentsGrid.itemCount > 0) {
+                const idx = recents.recentsGrid.currentIndex
+                recents._persistFocus()
+                const rect = recents._listLayout
+                             ? recentsList.currentCellRectIn(recents)
+                             : recents.recentsGrid.currentCellRectIn(recents)
+                recents.requestContextMenu(idx, rect)
+            }
         } else if (action === "cancel") {
             recents.requestHubScreen()
         }
@@ -167,7 +177,7 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
-        anchors.topMargin: Sizing.pctH(11)
+        anchors.topMargin: Sizing.headerBottom + Sizing.pctH(1)
         height: Sizing.pctH(7)
         title: qsTr("Recently Played")
         currentPage: recentsGrid.currentPage
@@ -197,6 +207,8 @@ Item {
             recents.handleAction("accept")
         }
         onEmptyRightClicked: recents.handleAction("cancel")
+        onPageWheelRequested: (delta) => recents.handleAction(
+            delta > 0 ? "page_next" : "page_prev")
     }
 
     BrowseDetailPane {
@@ -233,6 +245,13 @@ Item {
             recents._focusIndex(index)
             recents.handleAction("accept")
         }
+        onItemRightClicked: (index) => {
+            recents._focusIndex(index)
+            recents.handleAction("write_card")
+        }
+        onEmptyRightClicked: recents.handleAction("cancel")
+        onPageWheelRequested: (delta) => recents.handleAction(
+            delta > 0 ? "page_next" : "page_prev")
     }
 
     ActiveLabel {

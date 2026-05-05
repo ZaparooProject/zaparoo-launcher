@@ -182,6 +182,7 @@ qt_add_translations(launcher
     TS_FILES
         "${CMAKE_SOURCE_DIR}/src/ui/translations/launcher_en.ts"
         "${CMAKE_SOURCE_DIR}/src/ui/translations/launcher_it.ts"
+        "${CMAKE_SOURCE_DIR}/src/ui/translations/launcher_es.ts"
     RESOURCE_PREFIX "/i18n"
     IMMEDIATE_CALL
 )

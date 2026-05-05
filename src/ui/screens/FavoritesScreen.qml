@@ -210,6 +210,8 @@ Item {
             favorites.handleAction("write_card")
         }
         onEmptyRightClicked: favorites.handleAction("cancel")
+        onPageWheelRequested: (delta) => favorites.handleAction(
+            delta > 0 ? "page_next" : "page_prev")
     }
 
     BrowseDetailPane {

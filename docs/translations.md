@@ -149,3 +149,13 @@ other locales fall through to the source strings.
   `Dockerfile.toolchain` (host-only; `.qm` files are
   architecture-independent and bundled into the target resource by
   the host build).
+
+## Translators
+
+| Locale | Translator |
+|---|---|
+| Italian (`it_IT`) | Andrea Bogazzi ([@asturur](https://github.com/asturur)) |
+| Spanish (`es_ES`) | Carlos R. ([@crodriguezdominguez](https://github.com/crodriguezdominguez)) |
+
+Translators are added to this table when their `.ts` file is merged. Names
+also appear on the About screen so end users see them.

@@ -21,6 +21,7 @@ qt_add_qml_module(
         FavoritesScreen.qml
         RecentsScreen.qml
         SettingsScreen.qml
+        AboutScreen.qml
     IMPORTS
         Zaparoo.Ui
         Zaparoo.Theme

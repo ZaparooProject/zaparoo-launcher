@@ -1,10 +1,17 @@
 // Zaparoo Launcher
 // Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+pragma ComponentBehavior: Bound
 
 import QtQuick
 import Zaparoo.Theme
 import Zaparoo.Browse as Browse
+
+// cxx-qt 0.8 patches `isFinal: true` on singleton properties but the
+// qmltypes schema has no `isFinal` slot, so every read trips qmllint's
+// "Member can be shadowed" check. Until the schema grows the slot,
+// suppress the compiler category file-wide.
+// qmllint disable compiler
 
 Item {
     id: root

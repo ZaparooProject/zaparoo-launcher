@@ -214,19 +214,18 @@ Item {
     // case where SystemsModel is empty; the user sees the id rather
     // than nothing.
     //
-    // The screen Item fills the whole window, so the strip has to
-    // clear the MainLayout logo (topMargin pctH(2) + height pctH(7) —
-    // bottom edge at pctH(9)) with a pctH(2) gap. Total is exact:
-    // Core's media.browse returns directories only on page 1 and
-    // always before files, so dir_count + total_files is the precise
-    // entry count for the path.
+    // The screen Item fills the whole window, so the strip clears the
+    // MainLayout HeaderBar (Sizing.headerBottom) with a small gap.
+    // Total is exact: Core's media.browse returns directories only on
+    // page 1 and always before files, so dir_count + total_files is
+    // the precise entry count for the path.
     TopStatusStrip {
         id: topStrip
         visible: !games.transitioning && !games.coverGateLoading
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
-        anchors.topMargin: Sizing.pctH(11)
+        anchors.topMargin: Sizing.headerBottom + Sizing.pctH(1)
         height: Sizing.pctH(7)
         title: {
             const sid = Browse.GamesModel.current_system_id
@@ -256,6 +255,8 @@ Item {
         anchors.bottomMargin: Sizing.pctH(8)
         width: Sizing.pctW(45)
         model: Browse.GamesModel
+        totalItemsOverride: Browse.GamesModel.dir_count
+                            + Browse.GamesModel.total_files
         currentIndex: gamesGrid.currentIndex
         onItemHovered: (index) => games._focusIndex(index)
         onItemClicked: (index) => {
@@ -267,6 +268,8 @@ Item {
             games.handleAction("write_card")
         }
         onEmptyRightClicked: games.handleAction("cancel")
+        onPageWheelRequested: (delta) => games.handleAction(
+            delta > 0 ? "page_next" : "page_prev")
     }
 
     BrowseDetailPane {
@@ -313,6 +316,13 @@ Item {
             games._focusIndex(index)
             games.handleAction("accept")
         }
+        onItemRightClicked: (index) => {
+            games._focusIndex(index)
+            games.handleAction("write_card")
+        }
+        onEmptyRightClicked: games.handleAction("cancel")
+        onPageWheelRequested: (delta) => games.handleAction(
+            delta > 0 ? "page_next" : "page_prev")
     }
 
     // Active game caption — single big line just under the grid. Same

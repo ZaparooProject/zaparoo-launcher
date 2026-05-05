@@ -33,6 +33,7 @@ ApplicationWindow {
     readonly property string screenFavorites: ScreenManager.screenFavorites
     readonly property string screenRecents: ScreenManager.screenRecents
     readonly property string screenSettings: ScreenManager.screenSettings
+    readonly property string screenAbout: ScreenManager.screenAbout
 
     // Runtime state. `activeScreen` mirrors ScreenManager's property
     // (two-way synced below so direct assignment from tests still
@@ -45,6 +46,8 @@ ApplicationWindow {
     // Screen.height, so the live launcher still fills the screen.
     width: 1280
     height: 720
+    minimumWidth: 426
+    minimumHeight: 240
     visible: true
     visibility: root.fullScreen ? Window.FullScreen : Window.Windowed
     title: qsTr("Zaparoo Launcher")
@@ -65,15 +68,20 @@ ApplicationWindow {
     property alias favoritesScreen: favoritesScreen
     property alias recentsScreen: recentsScreen
     property alias settingsScreen: settingsScreen
+    property alias aboutScreen: aboutScreen
     property alias contextMenu: contextMenu
+    property alias commercialNoticeModal: commercialNoticeModal
     property alias firstRunIndexModal: firstRunIndexModal
     property alias logUploadModal: logUploadModal
+    property alias quitConfirmModal: quitConfirmModal
 
     property bool cardWriteModalVisible: false
     property bool cardWriteFailed: false
     property bool qrCodeModalVisible: false
+    property bool commercialNoticeModalVisible: false
     property bool firstRunIndexModalVisible: false
     property bool logUploadModalVisible: false
+    property bool quitConfirmModalVisible: false
     property bool contextMenuVisible: false
     property rect contextMenuAnchor: Qt.rect(0, 0, 0, 0)
     // Owner-aware. Written by Main.qml at openContextMenu time; each entry
@@ -138,8 +146,11 @@ ApplicationWindow {
 
     signal cancelCardWriteRequested()
     signal closeQrCodeRequested()
+    signal closeCommercialNoticeRequested()
     signal closeFirstRunIndexRequested()
     signal closeLogUploadRequested()
+    signal closeQuitConfirmRequested()
+    signal quitConfirmAccepted()
 
     // Two-way sync between root.activeScreen and ScreenManager.activeScreen.
     // Binding-breaking assignments (tests setting root.activeScreen = "games")
@@ -187,16 +198,20 @@ ApplicationWindow {
         asynchronous: false
     }
 
-    // ── Logo ──────────────────────────────────────────────────────────────────
+    // ── Top header (logo + status row + status pill) ───────────────────────────
 
-    Image {
+    // Single component owning the brand mark, host status icons +
+    // clock, and Core status pill. Height is fixed (Sizing.headerHeight)
+    // so the pill's slot stays reserved when idle and the logo always
+    // matches the stacked rows. Screens clear `Sizing.headerBottom`.
+    HeaderBar {
+        id: headerBar
+
         anchors.left: parent.left
+        anchors.right: parent.right
         anchors.top: parent.top
-        anchors.leftMargin: Sizing.pctW(2)
-        anchors.topMargin: Sizing.pctH(2)
-        height: Sizing.pctH(7)
-        fillMode: Image.PreserveAspectFit
-        source: "qrc:/qt/qml/Zaparoo/App/resources/images/logo.png"
+        anchors.topMargin: Sizing.headerTopMargin
+        z: 200
     }
 
     // ── Screen containers ─────────────────────────────────────────────────────
@@ -279,6 +294,13 @@ ApplicationWindow {
             visible: root.activeScreen === root.screenSettings
             transitioning: root.pendingTransition !== ""
         }
+
+        AboutScreen {
+            id: aboutScreen
+            anchors.fill: parent
+            visible: root.activeScreen === root.screenAbout
+            transitioning: root.pendingTransition !== ""
+        }
     }
 
     // ── Boot overlay ─────────────────────────────────────────────────────────
@@ -339,6 +361,18 @@ ApplicationWindow {
         onCloseRequested: root.closeFirstRunIndexRequested()
     }
 
+    // Commercial-use notice. Sits above every other modal (z: 310) so
+    // it always paints first on a fresh install. Once the user acks,
+    // `Browse.Notice.commercial_ack` flips to true on disk and the
+    // modal stays closed for the rest of this install.
+    CommercialNoticeModal {
+        id: commercialNoticeModal
+
+        anchors.fill: parent
+        open: root.commercialNoticeModalVisible
+        onCloseRequested: root.closeCommercialNoticeRequested()
+    }
+
     // Log-upload modal. Pushed by Main.qml when the user triggers the
     // "Upload log" action in Settings. Owns its own three-phase view
     // (uploading / success / error) — the router only sees open / close.
@@ -350,103 +384,19 @@ ApplicationWindow {
         onCloseRequested: root.closeLogUploadRequested()
     }
 
-    // ── Top-right HUD ─────────────────────────────────────────────────────────
-    //
-    // Host status icons plus clock. The Row is right-anchored so icons
-    // can appear/disappear without moving the clock away from the edge.
+    // Quit-confirm modal. Pushed by Main.qml when the user presses
+    // cancel on Hub. Default focus is "No" so an accidental press
+    // can't quit; "Yes" routes through `quitConfirmAccepted` and the
+    // router calls Qt.quit().
+    Modal {
+        id: quitConfirmModal
 
-    Row {
-        id: topHud
-
-        anchors.top: parent.top
-        anchors.right: parent.right
-        anchors.topMargin: Sizing.pctH(2)
-        anchors.rightMargin: Sizing.pctW(2)
-        spacing: Sizing.pctW(1)
-        z: 200
-        // Explicit row height matches StatusIcon's square size so every
-        // child can verticalCenter against the row and the icons + clock
-        // sit on a single line. Without this Row height tracks the
-        // tallest child, which is the Text element (font ascender +
-        // descender) — that pushes icons up and out of alignment.
-        // Clock pixelSize runs larger than the icon box because a font's
-        // cap-height is ~0.7× pixelSize, so matching pixelSize to icon
-        // height makes glyphs look small next to the square SVGs; bumping
-        // the clock font to ~1.4× the icon size lands their visual weight
-        // on par. Row height takes the max so neither child clips.
-        readonly property real _iconSize: Sizing.fontSize(2.4)
-        readonly property real _clockFontSize: Sizing.fontSize(3.4)
-        height: Math.max(topHud._iconSize, topHud._clockFontSize)
-
-        StatusIcon {
-            anchors.verticalCenter: parent.verticalCenter
-            visible: Browse.SystemStatus.has_nfc
-            source: Resources.statusIconUrl("NFC")
-            name: "NFC"
-        }
-
-        StatusIcon {
-            anchors.verticalCenter: parent.verticalCenter
-            visible: Browse.SystemStatus.has_wifi_internet
-            source: Resources.statusIconUrl("WiFi")
-            name: "Wi-Fi"
-        }
-
-        StatusIcon {
-            anchors.verticalCenter: parent.verticalCenter
-            visible: Browse.SystemStatus.has_lan_internet
-            source: Resources.statusIconUrl("WiredNetwork")
-            name: "LAN"
-        }
-
-        StatusIcon {
-            anchors.verticalCenter: parent.verticalCenter
-            visible: Browse.SystemStatus.has_bluetooth
-            source: Resources.statusIconUrl("Bluetooth")
-            name: "Bluetooth"
-        }
-
-        Text {
-            id: clockLabel
-
-            // 30s tick keeps the displayed minute fresh without per-second
-            // wakeups; minutes-only display means we never need finer.
-            // Fixed width avoids reflow on the minute boundary because
-            // proportional digits make "11:11" narrower than "10:00".
-            property string currentTime: Qt.formatDateTime(new Date(), "HH:mm")
-
-            anchors.verticalCenter: parent.verticalCenter
-            height: parent.height
-            width: topHud._clockFontSize * 3
-            verticalAlignment: Text.AlignVCenter
-            horizontalAlignment: Text.AlignRight
-            text: clockLabel.currentTime
-            font.family: Theme.fontUi
-            font.pixelSize: topHud._clockFontSize
-            color: Theme.textPrimary
-            renderType: Text.NativeRendering
-
-            Timer {
-                interval: 30000
-                running: true
-                repeat: true
-                triggeredOnStart: true
-                onTriggered: clockLabel.currentTime =
-                    Qt.formatDateTime(new Date(), "HH:mm")
-            }
-        }
-    }
-
-    // Mutually-exclusive Core/indexing/scraper status surface. Sits on
-    // its own line directly under `topHud`, right-aligned to the same
-    // edge as the clock. When the pill is idle (no connection issue,
-    // no indexing, no scraping) it collapses to zero size and the
-    // second line takes no visual space.
-    CoreStatusPill {
-        anchors.top: topHud.bottom
-        anchors.right: topHud.right
-        anchors.topMargin: Sizing.pctH(0.8)
-        z: 200
+        open: root.quitConfirmModalVisible
+        kind: "confirm"
+        title: qsTr("Quit Zaparoo Launcher?")
+        body: qsTr("Are you sure you want to exit?")
+        onConfirmed: root.quitConfirmAccepted()
+        onCancelRequested: root.closeQuitConfirmRequested()
     }
 
     // ── Instructions bar ──────────────────────────────────────────────────────
@@ -458,6 +408,12 @@ ApplicationWindow {
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         height: Sizing.pctH(6)
+        // Sits above every modal scrim (modals max out at z: 310 — see
+        // CommercialNoticeModal) so the help cue stays readable while a
+        // dialog is open. The bar's content is already modal-aware
+        // (helpEntries above branches per topModal), so the cue under
+        // the modal is the right one.
+        z: 400
         color: Theme.bgBar
         border.width: 1
         border.color: Theme.borderSubtle
@@ -515,6 +471,14 @@ ApplicationWindow {
                 // Idle / uploading: only Cancel.
                 return [{ button: "ButtonB", label: qsTr("Cancel") }];
             }
+            if (root.commercialNoticeModalVisible)
+                return [{ button: "ButtonA", label: qsTr("I understand") }];
+            if (root.quitConfirmModalVisible)
+                return [
+                    { button: "Dpad", label: qsTr("Move") },
+                    { button: "ButtonA", label: qsTr("Select") },
+                    { button: "ButtonB", label: qsTr("Cancel") }
+                ];
             if (!root.bootComplete)
                 return [];
             if (root.firstRunIndexModalVisible) {
@@ -619,8 +583,20 @@ ApplicationWindow {
                          && !root.settingsScreen.focusedActionDisabled)
                     row.push({
                         button: "ButtonA",
-                        label: root.settingsScreen.focusedActionBusy
-                               ? qsTr("Cancel") : qsTr("Start")
+                        label: root.settingsScreen.focusedActionLabel
+                    });
+                row.push({ button: "ButtonB", label: qsTr("Back") });
+                return row;
+            }
+            if (root.activeScreen === root.screenAbout) {
+                let row = [];
+                // Up/Down only meaningful when the body actually
+                // overflows the viewport (per the minimal help-bar
+                // policy — never advertise a press that no-ops).
+                if (root.aboutScreen.contentOverflows)
+                    row.push({
+                        buttons: ["DpadUp", "DpadDown"],
+                        label: qsTr("Scroll")
                     });
                 row.push({ button: "ButtonB", label: qsTr("Back") });
                 return row;

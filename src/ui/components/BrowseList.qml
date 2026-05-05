@@ -13,21 +13,47 @@ Item {
     property int currentIndex: 0
     property string currentName: ""
     property string currentCoverKey: ""
+    property int totalItemsOverride: -1
     readonly property int itemCount: listView.count
+    readonly property int totalItems:
+        totalItemsOverride >= 0 ? totalItemsOverride : itemCount
     readonly property int rowHeight: Sizing.pctH(6)
+    readonly property int rowSpacing: Sizing.pctH(0.7)
+    readonly property int rowStride: rowHeight + rowSpacing
+    readonly property int visibleRowCount:
+        Math.max(1, Math.floor((height + rowSpacing) / rowStride))
+    readonly property int _centerSlot:
+        Math.max(0, Math.floor((visibleRowCount - 1) / 2))
+    readonly property int _maxTopIndex:
+        Math.max(0, totalItems - visibleRowCount)
+    readonly property int _topIndex:
+        Math.max(0, Math.min(_maxTopIndex, currentIndex - _centerSlot))
+    readonly property int _gutterWidth: Sizing.pctW(3)
+    readonly property int _gutterGap: Sizing.pctW(1.5)
 
     signal itemHovered(int index)
     signal itemClicked(int index)
     signal itemRightClicked(int index)
     signal emptyRightClicked()
+    signal pageWheelRequested(int delta)
+
+    function _handleWheel(wheel): void {
+        const amount = wheel.angleDelta.y !== 0
+            ? wheel.angleDelta.y : wheel.pixelDelta.y
+        if (amount === 0)
+            return
+        root.pageWheelRequested(amount < 0 ? 1 : -1)
+        wheel.accepted = true
+    }
 
     function currentCellRectIn(target: Item): rect {
         if (root.itemCount <= 0)
             return Qt.rect(0, 0, 0, 0)
-        const y = (root.currentIndex - listView.contentY / root.rowHeight)
-                  * root.rowHeight
-        const p = root.mapToItem(target, 0, y)
-        return Qt.rect(p.x, p.y, root.width, root.rowHeight)
+        const item = listView.currentItem
+        if (item === null)
+            return Qt.rect(0, 0, 0, 0)
+        const p = listView.mapToItem(target, 0, item.y - listView.contentY)
+        return Qt.rect(p.x, p.y, listView.width, root.rowHeight)
     }
 
     clip: true
@@ -43,23 +69,30 @@ Item {
         anchors.fill: parent
         acceptedButtons: Qt.RightButton
         onClicked: root.emptyRightClicked()
+        onWheel: (wheel) => root._handleWheel(wheel)
     }
 
     ListView {
         id: listView
 
-        anchors.fill: parent
+        anchors.left: parent.left
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        anchors.right: parent.right
+        anchors.rightMargin: root.totalItems > root.visibleRowCount
+                             ? root._gutterWidth + root._gutterGap
+                             : 0
         model: root.model
         currentIndex: root.currentIndex
         boundsBehavior: Flickable.StopAtBounds
         interactive: false
-        spacing: Sizing.pctH(0.7)
+        spacing: root.rowSpacing
         highlightFollowsCurrentItem: false
-
-        onCurrentIndexChanged: {
-            if (currentIndex >= 0)
-                positionViewAtIndex(currentIndex, ListView.Contain)
-        }
+        highlightRangeMode: ListView.StrictlyEnforceRange
+        preferredHighlightBegin:
+            Math.max(0, Math.floor((height - root.rowHeight) / 2))
+        preferredHighlightEnd:
+            listView.preferredHighlightBegin + root.rowHeight
 
         delegate: Item {
             id: row
@@ -151,6 +184,95 @@ Item {
                     else
                         root.itemClicked(row.index)
                 }
+                onWheel: (wheel) => root._handleWheel(wheel)
+            }
+        }
+    }
+
+    // ── Left-half scroll indicator ────────────────────────────────────────
+    Item {
+        id: scrollGutter
+
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        width: root._gutterWidth
+        visible: root.totalItems > root.visibleRowCount
+
+        readonly property int arrowSize:
+            Math.min(width, Sizing.pctH(4))
+
+        Image {
+            id: upArrow
+            source: Resources.iconUrl("ScrollUp")
+            width: scrollGutter.arrowSize
+            height: scrollGutter.arrowSize
+            anchors.top: parent.top
+            anchors.horizontalCenter: parent.horizontalCenter
+            fillMode: Image.PreserveAspectFit
+            smooth: true
+            visible: root.currentIndex > 0
+
+            MouseArea {
+                anchors.fill: parent
+                acceptedButtons: Qt.LeftButton
+                cursorShape: Qt.PointingHandCursor
+                enabled: upArrow.visible
+                onClicked: root.pageWheelRequested(-1)
+            }
+        }
+
+        Image {
+            id: downArrow
+            source: Resources.iconUrl("ScrollDown")
+            width: scrollGutter.arrowSize
+            height: scrollGutter.arrowSize
+            anchors.bottom: parent.bottom
+            anchors.horizontalCenter: parent.horizontalCenter
+            fillMode: Image.PreserveAspectFit
+            smooth: true
+            visible: root.currentIndex < root.totalItems - 1
+
+            MouseArea {
+                anchors.fill: parent
+                acceptedButtons: Qt.LeftButton
+                cursorShape: Qt.PointingHandCursor
+                enabled: downArrow.visible
+                onClicked: root.pageWheelRequested(1)
+            }
+        }
+
+        Item {
+            id: scrollRegion
+            anchors.top: parent.top
+            anchors.topMargin: scrollGutter.arrowSize + Sizing.pctH(1)
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: scrollGutter.arrowSize + Sizing.pctH(1)
+            anchors.horizontalCenter: parent.horizontalCenter
+
+            readonly property int _minThumbHeight: Sizing.pctH(4)
+            readonly property int _thumbHeight:
+                root.totalItems <= 0
+                    ? 0
+                    : Math.min(scrollRegion.height,
+                               Math.max(_minThumbHeight,
+                                        Math.round(scrollRegion.height
+                                                   * root.visibleRowCount
+                                                   / root.totalItems)))
+            readonly property real _thumbY:
+                root._maxTopIndex <= 0
+                    ? 0
+                    : (root._topIndex / root._maxTopIndex)
+                      * (scrollRegion.height - _thumbHeight)
+
+            Rectangle {
+                id: scrollThumb
+                width: Sizing.pctW(1.2)
+                height: scrollRegion._thumbHeight
+                anchors.horizontalCenter: parent.horizontalCenter
+                y: scrollRegion._thumbY
+                color: Theme.textPrimary
+                radius: width / 2
             }
         }
     }

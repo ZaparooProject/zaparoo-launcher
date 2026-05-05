@@ -20,6 +20,18 @@ build-release:
     cmake --preset desktop-release
     cmake --build --preset desktop-release
 
+# Release build with provenance markers baked in. Sets
+# ZAPAROO_OFFICIAL_BUILD=1 so the launcher reports
+# `channel = "official"` in About / License and the startup log,
+# distinguishing distributed packages from local dev builds. Use this
+# (not `build-release`) when producing binaries you intend to ship.
+# Produces both shippable artifacts: desktop release in build-release/bin
+# and the MiSTer ARM32 binary in output/launcher.
+release:
+    ZAPAROO_OFFICIAL_BUILD=1 cmake --preset desktop-release
+    ZAPAROO_OFFICIAL_BUILD=1 cmake --build --preset desktop-release
+    ZAPAROO_OFFICIAL_BUILD=1 ./scripts/build-arm32.sh
+
 build-dev:
     cmake --preset desktop-dev
     cmake --build --preset desktop-dev
@@ -36,7 +48,7 @@ run: build
     ./build/bin/launcher
 
 run-dev: build-dev
-    ./build-dev/bin/launcher
+    ZAPAROO_CORE_ENDPOINT=ws://127.0.0.1:27497/api/v0.1 ./build-dev/bin/launcher
 
 # Run a local mock Zaparoo Core (ws://127.0.0.1:27497/api/v0.1).
 # Deliberately offset from the real Core's 7497 so dev never collides
