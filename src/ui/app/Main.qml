@@ -64,10 +64,10 @@ MainLayout {
     // page_size. That made the first cursor page misaligned with the
     // visual grid pageSize and produced half-loaded pages on every
     // subsequent cursor advance.
-    readonly property int _gamesListPageSize: 10
+    readonly property int _gamesListFetchSize: 30
     readonly property int _gamesPageSize:
         Browse.Settings.current_browse_layout === "list"
-            ? root._gamesListPageSize
+            ? root._gamesListFetchSize
             : Sizing.gamesGridColumns * Sizing.gamesGridRows
     on_GamesPageSizeChanged: Browse.GamesModel.page_size = root._gamesPageSize
 

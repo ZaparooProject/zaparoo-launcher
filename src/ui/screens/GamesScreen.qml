@@ -89,7 +89,7 @@ Item {
         else if (next >= count) {
             const knownTotal = Browse.GamesModel.dir_count
                                + Browse.GamesModel.total_files
-            if (Browse.GamesModel.has_next_page || knownTotal > count) {
+            if (games._listHasMore(count, knownTotal)) {
                 Browse.GamesModel.fetch_more()
                 return
             }
@@ -108,6 +108,7 @@ Item {
         if (next >= count - 2
             && Browse.GamesModel.has_next_page)
             Browse.GamesModel.fetch_more()
+        games._prefetchListTail(next)
     }
 
     function _scheduleMetadataLoad(isRepeat): void {
@@ -128,8 +129,23 @@ Item {
         if (!games._listLayout)
             return
         const count = games.gamesGrid.itemCount
-        if (count > 0 && count < games._listPageSize
+        if (count > 0 && count <= games._listPageSize
             && Browse.GamesModel.has_next_page)
+            Browse.GamesModel.fetch_more()
+    }
+
+    function _listHasMore(count: int, knownTotal: int): bool {
+        return Browse.GamesModel.has_next_page || knownTotal > count
+    }
+
+    function _prefetchListTail(index: int): void {
+        if (!games._listLayout || Browse.GamesModel.loading_more)
+            return
+        const count = games.gamesGrid.itemCount
+        const knownTotal = Browse.GamesModel.dir_count
+                           + Browse.GamesModel.total_files
+        if (index >= count - games._listPageSize
+            && games._listHasMore(count, knownTotal))
             Browse.GamesModel.fetch_more()
     }
 

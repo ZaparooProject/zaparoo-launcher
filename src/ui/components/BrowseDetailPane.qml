@@ -108,6 +108,8 @@ Item {
                                  tagValue.paintedHeight)
 
                 readonly property var parts: modelData.split("\t")
+                readonly property bool isFilename:
+                    parts.length > 0 && parts[0] === "Filename"
 
                 Text {
                     id: tagType
@@ -136,8 +138,8 @@ Item {
                     font.family: Theme.fontUi
                     font.pixelSize: Sizing.fontSize(2.1)
                     wrapMode: Text.Wrap
-                    maximumLineCount: 2
-                    elide: Text.ElideRight
+                    maximumLineCount: tagRow.isFilename ? 8 : 2
+                    elide: tagRow.isFilename ? Text.ElideNone : Text.ElideRight
                     horizontalAlignment: Text.AlignLeft
                     renderType: Text.NativeRendering
                 }

@@ -651,6 +651,7 @@ impl ffi::GamesModel {
         let title = entry.name.clone();
         let system = entry_system_id(entry);
         let path = entry.path.clone();
+        let filename = file_stem_or_name(&path, &title);
         if !description.is_empty() {
             self.as_mut()
                 .set_current_description(QString::from(description.as_str()));
@@ -694,7 +695,7 @@ impl ffi::GamesModel {
                             } else {
                                 meta_description
                             },
-                            tags: detail_tags_from_meta(&result.media, &title),
+                            tags: detail_tags_from_meta(&result.media, &title, &filename),
                             image_keys: detail_image_keys_from_meta(&result.media, &system, &path),
                         })
                     }
@@ -916,7 +917,11 @@ fn description_from_meta(meta: &MediaMeta) -> String {
         .unwrap_or_default()
 }
 
-fn detail_tags_from_meta<'a>(meta: &'a MediaMeta, fallback_title: &'a str) -> String {
+fn detail_tags_from_meta<'a>(
+    meta: &'a MediaMeta,
+    fallback_title: &'a str,
+    filename: &'a str,
+) -> String {
     let source = if meta.title.tags.is_empty() {
         meta.tags.as_slice()
     } else {
@@ -931,6 +936,10 @@ fn detail_tags_from_meta<'a>(meta: &'a MediaMeta, fallback_title: &'a str) -> St
     };
     if !title.is_empty() {
         rows.push(("title", title));
+    }
+    let filename = filename.trim();
+    if !filename.is_empty() {
+        rows.push(("filename", filename));
     }
     for tag_type in ["genre", "year", "rating"] {
         rows.extend(
