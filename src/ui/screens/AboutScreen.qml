@@ -214,6 +214,29 @@ Item {
             }
 
             Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                horizontalAlignment: Text.AlignHCenter
+                text: qsTr("Translations")
+                color: Theme.textLabel
+                font.family: Theme.fontUi
+                font.pixelSize: Sizing.fontSize(2.4)
+                renderType: Text.NativeRendering
+            }
+
+            // Translator names are not translated, they're proper
+            // names. Native-language labels (Italiano, Español) read
+            // correctly in any UI locale.
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                horizontalAlignment: Text.AlignHCenter
+                text: "Italiano - Andrea Bogazzi\nEspañol - Carlos R."
+                color: Theme.textPrimary
+                font.family: Theme.fontUi
+                font.pixelSize: Sizing.fontSize(2.6)
+                renderType: Text.NativeRendering
+            }
+
+            Text {
                 width: parent.width
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.Wrap
