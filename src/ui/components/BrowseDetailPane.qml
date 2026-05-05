@@ -11,6 +11,9 @@ Item {
     property string title: ""
     property string coverKey: ""
     property string description: ""
+    property bool showDescription: true
+    property bool showTitle: true
+    property string detailTags: ""
     property bool canPreviousImage: false
     property bool canNextImage: false
 
@@ -77,6 +80,69 @@ Item {
         elide: Text.ElideRight
         horizontalAlignment: Text.AlignHCenter
         renderType: Text.NativeRendering
+        visible: root.showTitle && root.title !== ""
+    }
+
+    Column {
+        id: tagTable
+
+        visible: root.detailTags !== ""
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: imageSlot.bottom
+        anchors.topMargin: Sizing.pctH(3)
+        anchors.bottom: parent.bottom
+        spacing: Sizing.pctH(0.8)
+        clip: true
+
+        Repeater {
+            model: root.detailTags === "" ? [] : root.detailTags.split("\n")
+
+            delegate: Item {
+                id: tagRow
+
+                required property string modelData
+
+                width: tagTable.width
+                height: Math.max(Sizing.pctH(3),
+                                 tagValue.paintedHeight)
+
+                readonly property var parts: modelData.split("\t")
+
+                Text {
+                    id: tagType
+
+                    anchors.left: parent.left
+                    anchors.top: parent.top
+                    width: Sizing.pctW(9)
+                    text: tagRow.parts.length > 0 ? tagRow.parts[0] : ""
+                    color: Theme.textLabel
+                    font.family: Theme.fontUi
+                    font.pixelSize: Sizing.fontSize(1.9)
+                    elide: Text.ElideRight
+                    horizontalAlignment: Text.AlignRight
+                    renderType: Text.NativeRendering
+                }
+
+                Text {
+                    id: tagValue
+
+                    anchors.left: tagType.right
+                    anchors.leftMargin: Sizing.pctW(1.4)
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    text: tagRow.parts.length > 1 ? tagRow.parts[1] : ""
+                    color: Theme.textPrimary
+                    font.family: Theme.fontUi
+                    font.pixelSize: Sizing.fontSize(2.1)
+                    wrapMode: Text.Wrap
+                    maximumLineCount: 2
+                    elide: Text.ElideRight
+                    horizontalAlignment: Text.AlignLeft
+                    renderType: Text.NativeRendering
+                }
+            }
+        }
     }
 
     Text {
@@ -94,6 +160,6 @@ Item {
         horizontalAlignment: Text.AlignLeft
         verticalAlignment: Text.AlignTop
         renderType: Text.NativeRendering
-        visible: root.description !== ""
+        visible: root.showDescription && root.description !== ""
     }
 }

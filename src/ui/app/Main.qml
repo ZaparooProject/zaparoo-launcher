@@ -64,8 +64,11 @@ MainLayout {
     // page_size. That made the first cursor page misaligned with the
     // visual grid pageSize and produced half-loaded pages on every
     // subsequent cursor advance.
+    readonly property int _gamesListPageSize: 10
     readonly property int _gamesPageSize:
-        Sizing.gamesGridColumns * Sizing.gamesGridRows
+        Browse.Settings.current_browse_layout === "list"
+            ? root._gamesListPageSize
+            : Sizing.gamesGridColumns * Sizing.gamesGridRows
     on_GamesPageSizeChanged: Browse.GamesModel.page_size = root._gamesPageSize
 
     onWidthChanged: {
@@ -1067,7 +1070,7 @@ MainLayout {
             return
         }
         if (root.activeScreen === root.screenGames) {
-            root.gamesScreen.handleAction(action)
+            root.gamesScreen.handleAction(action, root._dispatchingRepeat)
         } else if (root.activeScreen === root.screenSystems) {
             root.systemsScreen.handleAction(action)
         } else if (root.activeScreen === root.screenFavorites) {
@@ -1096,6 +1099,7 @@ MainLayout {
     readonly property int _repeatTickMs: 90
     property string _heldAction: ""
     property int _heldKey: 0
+    property bool _dispatchingRepeat: false
     // Aliased so tst_navigation.qml can observe the repeat state machine
     // — child Timer ids are file-scoped and aren't reachable otherwise.
     property alias _repeatPending: repeatInitial.running
@@ -1146,6 +1150,12 @@ MainLayout {
             root._stopRepeat()
     }
 
+    function _handleRepeatAction(): void {
+        root._dispatchingRepeat = true
+        root.handleAction(root._heldAction)
+        root._dispatchingRepeat = false
+    }
+
     Timer {
         id: cardWriteFailureTimer
         interval: 1500
@@ -1160,7 +1170,7 @@ MainLayout {
         onTriggered: {
             if (root._heldAction === "")
                 return
-            root.handleAction(root._heldAction)
+            root._handleRepeatAction()
             repeatTick.start()
         }
     }
@@ -1174,7 +1184,7 @@ MainLayout {
                 repeatTick.stop()
                 return
             }
-            root.handleAction(root._heldAction)
+            root._handleRepeatAction()
         }
     }
 

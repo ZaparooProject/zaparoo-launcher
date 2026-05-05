@@ -36,8 +36,7 @@ use cxx_qt::{CxxQtType, Threading};
 use cxx_qt_lib::{
     QByteArray, QHash, QHashPair_i32_QByteArray, QList, QModelIndex, QString, QVariant,
 };
-use std::collections::BTreeSet;
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -72,12 +71,21 @@ const ENTRY_TYPE_ROLE: i32 = 256 + 6;
 const FILE_COUNT_ROLE: i32 = 256 + 7;
 const FAVORITE_ROLE: i32 = 256 + 8;
 const DESCRIPTION_ROLE: i32 = 256 + 9;
+const FILE_STEM_ROLE: i32 = 256 + 10;
 
 // Default API page size before QML binds the model's `page_size` to the
 // grid's `pageSize`. 15 = 5 columns × 3 rows, the desktop default. The
 // test harness sees this until it overrides explicitly. Server cap is
 // 1000; grid page sizes top out at ~30 so we stay well inside bounds.
 const DEFAULT_PAGE_SIZE: i32 = 15;
+const DETAIL_METADATA_CACHE_CAP: usize = 256;
+
+#[derive(Clone)]
+struct DetailMetadata {
+    description: String,
+    tags: String,
+    image_keys: Vec<MediaKey>,
+}
 
 #[allow(
     clippy::struct_excessive_bools,
@@ -112,12 +120,15 @@ pub struct GamesModelRust {
     card_write_pending: bool,
     card_write_error: QString,
     current_description: QString,
+    current_detail_tags: QString,
     current_detail_image_key: QString,
     current_detail_image_index: i32,
     current_detail_image_count: i32,
     current_detail_image_can_prev: bool,
     current_detail_image_can_next: bool,
     detail_image_keys: Vec<MediaKey>,
+    detail_metadata_cache: HashMap<MediaKey, DetailMetadata>,
+    detail_metadata_lru: VecDeque<MediaKey>,
     // Watcher for the current initial-page subscription. Aborted on
     // every path swap so the prior watcher stops enqueuing callbacks
     // for the old `BrowseArgs`. Callbacks already in the Qt queue are
@@ -186,12 +197,15 @@ impl Default for GamesModelRust {
             card_write_pending: false,
             card_write_error: QString::default(),
             current_description: QString::default(),
+            current_detail_tags: QString::default(),
             current_detail_image_key: QString::default(),
             current_detail_image_index: 0,
             current_detail_image_count: 0,
             current_detail_image_can_prev: false,
             current_detail_image_can_next: false,
             detail_image_keys: Vec::new(),
+            detail_metadata_cache: HashMap::new(),
+            detail_metadata_lru: VecDeque::new(),
             watcher: None,
             seq: Arc::new(AtomicU64::new(0)),
             auto_nav_eligible: false,
@@ -240,6 +254,7 @@ pub mod ffi {
         #[qproperty(bool, card_write_pending)]
         #[qproperty(QString, card_write_error)]
         #[qproperty(QString, current_description)]
+        #[qproperty(QString, current_detail_tags)]
         #[qproperty(QString, current_detail_image_key)]
         #[qproperty(i32, current_detail_image_index)]
         #[qproperty(i32, current_detail_image_count)]
@@ -282,6 +297,9 @@ pub mod ffi {
 
         #[qinvokable]
         fn load_description_at(self: Pin<&mut GamesModel>, index: i32);
+
+        #[qinvokable]
+        fn clear_current_detail(self: Pin<&mut GamesModel>);
 
         #[qinvokable]
         fn cycle_detail_image(self: Pin<&mut GamesModel>, delta: i32);
@@ -368,6 +386,10 @@ impl ffi::GamesModel {
             FILE_COUNT_ROLE => QVariant::from(&i32::try_from(entry.file_count).unwrap_or(i32::MAX)),
             FAVORITE_ROLE => QVariant::from(&favorite_role_value(&entry.tags)),
             DESCRIPTION_ROLE => QVariant::from(&QString::from(entry.description.as_str())),
+            FILE_STEM_ROLE => QVariant::from(&QString::from(file_stem_or_name(
+                &entry.path,
+                &entry.name,
+            ))),
             _ => QVariant::default(),
         }
     }
@@ -383,6 +405,7 @@ impl ffi::GamesModel {
         h.insert(FILE_COUNT_ROLE, QByteArray::from("fileCount"));
         h.insert(FAVORITE_ROLE, QByteArray::from("favorite"));
         h.insert(DESCRIPTION_ROLE, QByteArray::from("description"));
+        h.insert(FILE_STEM_ROLE, QByteArray::from("fileStem"));
         h
     }
 
@@ -613,28 +636,38 @@ impl ffi::GamesModel {
         self.as_mut().rust_mut().description_seq.fetch_add(1, Ordering::SeqCst);
         if index < 0 || index >= self.count {
             self.as_mut().set_current_description(QString::default());
+            self.as_mut().set_current_detail_tags(QString::default());
             clear_detail_images(self.as_mut());
             return;
         }
         let entry = &self.entries[index as usize];
         if entry.is_folder() {
             self.as_mut().set_current_description(QString::default());
+            self.as_mut().set_current_detail_tags(QString::default());
             clear_detail_images(self.as_mut());
             return;
         }
         let description = entry.description.clone();
+        let title = entry.name.clone();
+        let system = entry_system_id(entry);
+        let path = entry.path.clone();
         if !description.is_empty() {
             self.as_mut()
                 .set_current_description(QString::from(description.as_str()));
         }
-        let system = entry_system_id(entry);
-        let path = entry.path.clone();
         if system.is_empty() || path.is_empty() {
             self.as_mut().set_current_description(QString::default());
+            self.as_mut().set_current_detail_tags(QString::default());
             clear_detail_images(self.as_mut());
             return;
         }
+        let cache_key = MediaKey::new(system.clone(), path.clone());
+        if let Some(metadata) = detail_metadata_cache_hit(self.as_mut(), &cache_key) {
+            apply_detail_metadata(self.as_mut(), metadata);
+            return;
+        }
         clear_detail_images(self.as_mut());
+        self.as_mut().set_current_detail_tags(QString::default());
         if description.is_empty() {
             self.as_mut().set_current_description(QString::default());
         }
@@ -652,29 +685,44 @@ impl ffi::GamesModel {
                 if seq.load(Ordering::SeqCst) != ticket {
                     return;
                 }
-                let (description, keys) = match result {
+                let metadata = match result {
                     Ok(result) => {
                         let meta_description = description_from_meta(&result.media);
-                        (
-                            if meta_description.is_empty() {
+                        Some(DetailMetadata {
+                            description: if meta_description.is_empty() {
                                 fallback_description
                             } else {
                                 meta_description
                             },
-                            detail_image_keys_from_meta(&result.media, &system, &path),
-                        )
+                            tags: detail_tags_from_meta(&result.media, &title),
+                            image_keys: detail_image_keys_from_meta(&result.media, &system, &path),
+                        })
                     }
                     Err(e) => {
                         debug!("description fetch failed for {path}: {}", e.message);
-                        (String::new(), Vec::new())
+                        None
                     }
                 };
-                model
-                    .as_mut()
-                    .set_current_description(QString::from(description.as_str()));
-                install_detail_images(model.as_mut(), keys);
+                if let Some(metadata) = metadata {
+                    cache_detail_metadata(model.as_mut(), cache_key, metadata.clone());
+                    apply_detail_metadata(model.as_mut(), metadata);
+                } else {
+                    model.as_mut().set_current_description(QString::default());
+                    model.as_mut().set_current_detail_tags(QString::default());
+                    clear_detail_images(model.as_mut());
+                }
             });
         });
+    }
+
+    fn clear_current_detail(mut self: Pin<&mut Self>) {
+        self.as_mut()
+            .rust_mut()
+            .description_seq
+            .fetch_add(1, Ordering::SeqCst);
+        self.as_mut().set_current_description(QString::default());
+        self.as_mut().set_current_detail_tags(QString::default());
+        clear_detail_images(self);
     }
 
     fn cycle_detail_image(self: Pin<&mut Self>, delta: i32) {
@@ -766,6 +814,7 @@ impl ffi::GamesModel {
         self.as_mut().set_loading(true);
         self.as_mut().set_error_message(QString::default());
         self.as_mut().set_current_description(QString::default());
+        self.as_mut().set_current_detail_tags(QString::default());
         self.as_mut()
             .rust()
             .description_seq
@@ -865,6 +914,109 @@ fn description_from_meta(meta: &MediaMeta) -> String {
         .map(|property| property.text.trim().to_string())
         .filter(|text| !text.is_empty())
         .unwrap_or_default()
+}
+
+fn detail_tags_from_meta<'a>(meta: &'a MediaMeta, fallback_title: &'a str) -> String {
+    let source = if meta.title.tags.is_empty() {
+        meta.tags.as_slice()
+    } else {
+        meta.title.tags.as_slice()
+    };
+    let mut rows: Vec<(&str, &str)> = Vec::new();
+    let meta_title = meta.title.name.trim();
+    let title = if meta_title.is_empty() {
+        fallback_title.trim()
+    } else {
+        meta_title
+    };
+    if !title.is_empty() {
+        rows.push(("title", title));
+    }
+    for tag_type in ["genre", "year", "rating"] {
+        rows.extend(
+            source
+                .iter()
+                .filter(|tag| tag.tag_type == tag_type && !tag.tag.trim().is_empty())
+                .map(|tag| (tag.tag_type.as_str(), tag.tag.trim())),
+        );
+    }
+    rows.extend(
+        source
+            .iter()
+            .filter(|tag| {
+                !matches!(tag.tag_type.as_str(), "genre" | "year" | "rating")
+                    && !tag.tag_type.trim().is_empty()
+                    && !tag.tag.trim().is_empty()
+            })
+            .map(|tag| (tag.tag_type.as_str(), tag.tag.trim())),
+    );
+    rows.into_iter()
+        .map(|(tag_type, value)| {
+            let mut label = tag_type.to_string();
+            if let Some(first) = label.get_mut(0..1) {
+                first.make_ascii_uppercase();
+            }
+            format!("{label}\t{value}")
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn file_stem_or_name(path: &str, name: &str) -> String {
+    let file = path
+        .trim_end_matches(['/', '\\'])
+        .rsplit(['/', '\\'])
+        .next()
+        .unwrap_or_default();
+    let stem = file.rsplit_once('.').map_or(file, |(stem, _)| stem).trim();
+    if stem.is_empty() {
+        name.to_string()
+    } else {
+        stem.to_string()
+    }
+}
+
+fn detail_metadata_cache_hit(
+    mut model: Pin<&mut ffi::GamesModel>,
+    key: &MediaKey,
+) -> Option<DetailMetadata> {
+    let mut rust = model.as_mut().rust_mut();
+    let metadata = rust.detail_metadata_cache.get(key).cloned();
+    if metadata.is_some() {
+        rust.detail_metadata_lru.retain(|cached| cached != key);
+        rust.detail_metadata_lru.push_back(key.clone());
+    }
+    metadata
+}
+
+fn cache_detail_metadata(
+    mut model: Pin<&mut ffi::GamesModel>,
+    key: MediaKey,
+    metadata: DetailMetadata,
+) {
+    let mut rust = model.as_mut().rust_mut();
+    if !rust.detail_metadata_cache.contains_key(&key) {
+        rust.detail_metadata_lru.push_back(key.clone());
+    } else {
+        rust.detail_metadata_lru.retain(|cached| cached != &key);
+        rust.detail_metadata_lru.push_back(key.clone());
+    }
+    rust.detail_metadata_cache.insert(key, metadata);
+    while rust.detail_metadata_lru.len() > DETAIL_METADATA_CACHE_CAP {
+        if let Some(oldest) = rust.detail_metadata_lru.pop_front() {
+            rust.detail_metadata_cache.remove(&oldest);
+        }
+    }
+}
+
+fn apply_detail_metadata(mut model: Pin<&mut ffi::GamesModel>, metadata: DetailMetadata) {
+    model
+        .as_mut()
+        .set_current_description(QString::from(metadata.description.as_str()));
+    model
+        .as_mut()
+        .set_current_detail_tags(QString::from(metadata.tags.as_str()));
+    install_detail_images(model, metadata.image_keys);
 }
 
 fn image_type_from_property_key(key: &str) -> Option<String> {

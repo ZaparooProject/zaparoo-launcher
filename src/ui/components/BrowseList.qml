@@ -14,14 +14,24 @@ Item {
     property string currentName: ""
     property string currentCoverKey: ""
     property int totalItemsOverride: -1
+    property int targetVisibleRowCount: 0
+    property bool showFileStem: false
     readonly property int itemCount: listView.count
     readonly property int totalItems:
         totalItemsOverride >= 0 ? totalItemsOverride : itemCount
-    readonly property int rowHeight: Sizing.pctH(6)
     readonly property int rowSpacing: Sizing.pctH(0.7)
+    readonly property int rowHeight:
+        targetVisibleRowCount > 0
+            ? Math.max(Sizing.pctH(3),
+                       Math.floor((height - (rowSpacing
+                                             * (targetVisibleRowCount - 1)))
+                                  / targetVisibleRowCount))
+            : Sizing.pctH(6)
     readonly property int rowStride: rowHeight + rowSpacing
     readonly property int visibleRowCount:
-        Math.max(1, Math.floor((height + rowSpacing) / rowStride))
+        targetVisibleRowCount > 0
+            ? targetVisibleRowCount
+            : Math.max(1, Math.floor((height + rowSpacing) / rowStride))
     readonly property int _centerSlot:
         Math.max(0, Math.floor((visibleRowCount - 1) / 2))
     readonly property int _maxViewTopIndex:
@@ -99,6 +109,7 @@ Item {
 
             required property int index
             required property string name
+            required property string fileStem
             required property string coverKey
             required property int favorite
 
@@ -147,7 +158,9 @@ Item {
                                      ? Sizing.pctW(5.2)
                                      : Sizing.pctW(1.6)
                 anchors.verticalCenter: parent.verticalCenter
-                text: row.name
+                text: root.showFileStem && row.fileStem !== ""
+                      ? row.fileStem
+                      : row.name
                 color: row.selected ? Theme.textPrimary : Theme.textLabel
                 font.family: Theme.fontUi
                 font.pixelSize: Sizing.fontSize(2.9)
