@@ -36,6 +36,7 @@ use cxx_qt::{CxxQtType, Threading};
 use cxx_qt_lib::{
     QByteArray, QHash, QHashPair_i32_QByteArray, QList, QModelIndex, QString, QVariant,
 };
+use std::collections::BTreeSet;
 use std::collections::HashSet;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -50,8 +51,8 @@ use zaparoo_core::endpoints::media_tags_update::MediaTagsUpdateMutation;
 use zaparoo_core::endpoints::readers_write::ReadersWriteMutation;
 use zaparoo_core::endpoints::run::RunMutation;
 use zaparoo_core::media_types::{
-    BrowseEntry, MediaBrowseParams, MediaBrowseResult, MediaTagsUpdateParams, ReadersWriteParams,
-    RunParams, TagInfo,
+    BrowseEntry, MediaBrowseParams, MediaBrowseResult, MediaMeta, MediaMetaParams,
+    MediaTagsUpdateParams, ReadersWriteParams, RunParams, TagInfo,
 };
 use zaparoo_core::platform::{self, Platform};
 use zaparoo_core::remote_resource::ResourceStatus;
@@ -70,6 +71,7 @@ const COVER_KEY_ROLE: i32 = 256 + 5;
 const ENTRY_TYPE_ROLE: i32 = 256 + 6;
 const FILE_COUNT_ROLE: i32 = 256 + 7;
 const FAVORITE_ROLE: i32 = 256 + 8;
+const DESCRIPTION_ROLE: i32 = 256 + 9;
 
 // Default API page size before QML binds the model's `page_size` to the
 // grid's `pageSize`. 15 = 5 columns × 3 rows, the desktop default. The
@@ -109,6 +111,13 @@ pub struct GamesModelRust {
     next_cursor: Option<String>,
     card_write_pending: bool,
     card_write_error: QString,
+    current_description: QString,
+    current_detail_image_key: QString,
+    current_detail_image_index: i32,
+    current_detail_image_count: i32,
+    current_detail_image_can_prev: bool,
+    current_detail_image_can_next: bool,
+    detail_image_keys: Vec<MediaKey>,
     // Watcher for the current initial-page subscription. Aborted on
     // every path swap so the prior watcher stops enqueuing callbacks
     // for the old `BrowseArgs`. Callbacks already in the Qt queue are
@@ -156,6 +165,7 @@ pub struct GamesModelRust {
     // doesn't cancel a callback that was already queued onto the Qt
     // thread between sleep-completion and abort.
     cover_gate_seq: Arc<AtomicU64>,
+    description_seq: Arc<AtomicU64>,
 }
 
 impl Default for GamesModelRust {
@@ -175,6 +185,13 @@ impl Default for GamesModelRust {
             next_cursor: None,
             card_write_pending: false,
             card_write_error: QString::default(),
+            current_description: QString::default(),
+            current_detail_image_key: QString::default(),
+            current_detail_image_index: 0,
+            current_detail_image_count: 0,
+            current_detail_image_can_prev: false,
+            current_detail_image_can_next: false,
+            detail_image_keys: Vec::new(),
             watcher: None,
             seq: Arc::new(AtomicU64::new(0)),
             auto_nav_eligible: false,
@@ -184,6 +201,7 @@ impl Default for GamesModelRust {
             pending_first_paint_keys: HashSet::new(),
             cover_gate_timer: None,
             cover_gate_seq: Arc::new(AtomicU64::new(0)),
+            description_seq: Arc::new(AtomicU64::new(0)),
         }
     }
 }
@@ -221,6 +239,12 @@ pub mod ffi {
         #[qproperty(QString, current_path)]
         #[qproperty(bool, card_write_pending)]
         #[qproperty(QString, card_write_error)]
+        #[qproperty(QString, current_description)]
+        #[qproperty(QString, current_detail_image_key)]
+        #[qproperty(i32, current_detail_image_index)]
+        #[qproperty(i32, current_detail_image_count)]
+        #[qproperty(bool, current_detail_image_can_prev)]
+        #[qproperty(bool, current_detail_image_can_next)]
         type GamesModel = super::GamesModelRust;
 
         #[qinvokable]
@@ -252,6 +276,15 @@ pub mod ffi {
 
         #[qinvokable]
         fn name_at(self: &GamesModel, index: i32) -> QString;
+
+        #[qinvokable]
+        fn description_at(self: &GamesModel, index: i32) -> QString;
+
+        #[qinvokable]
+        fn load_description_at(self: Pin<&mut GamesModel>, index: i32);
+
+        #[qinvokable]
+        fn cycle_detail_image(self: Pin<&mut GamesModel>, delta: i32);
 
         #[qinvokable]
         fn path_at(self: &GamesModel, index: i32) -> QString;
@@ -334,6 +367,7 @@ impl ffi::GamesModel {
             ENTRY_TYPE_ROLE => QVariant::from(&QString::from(entry.entry_type.as_str())),
             FILE_COUNT_ROLE => QVariant::from(&i32::try_from(entry.file_count).unwrap_or(i32::MAX)),
             FAVORITE_ROLE => QVariant::from(&favorite_role_value(&entry.tags)),
+            DESCRIPTION_ROLE => QVariant::from(&QString::from(entry.description.as_str())),
             _ => QVariant::default(),
         }
     }
@@ -348,6 +382,7 @@ impl ffi::GamesModel {
         h.insert(ENTRY_TYPE_ROLE, QByteArray::from("entryType"));
         h.insert(FILE_COUNT_ROLE, QByteArray::from("fileCount"));
         h.insert(FAVORITE_ROLE, QByteArray::from("favorite"));
+        h.insert(DESCRIPTION_ROLE, QByteArray::from("description"));
         h
     }
 
@@ -567,6 +602,93 @@ impl ffi::GamesModel {
         QString::from(self.entries[index as usize].name.as_str())
     }
 
+    fn description_at(&self, index: i32) -> QString {
+        if index < 0 || index >= self.count {
+            return QString::default();
+        }
+        QString::from(self.entries[index as usize].description.as_str())
+    }
+
+    fn load_description_at(mut self: Pin<&mut Self>, index: i32) {
+        self.as_mut().rust_mut().description_seq.fetch_add(1, Ordering::SeqCst);
+        if index < 0 || index >= self.count {
+            self.as_mut().set_current_description(QString::default());
+            clear_detail_images(self.as_mut());
+            return;
+        }
+        let entry = &self.entries[index as usize];
+        if entry.is_folder() {
+            self.as_mut().set_current_description(QString::default());
+            clear_detail_images(self.as_mut());
+            return;
+        }
+        let description = entry.description.clone();
+        if !description.is_empty() {
+            self.as_mut()
+                .set_current_description(QString::from(description.as_str()));
+        }
+        let system = entry_system_id(entry);
+        let path = entry.path.clone();
+        if system.is_empty() || path.is_empty() {
+            self.as_mut().set_current_description(QString::default());
+            clear_detail_images(self.as_mut());
+            return;
+        }
+        clear_detail_images(self.as_mut());
+        if description.is_empty() {
+            self.as_mut().set_current_description(QString::default());
+        }
+        let fallback_description = description;
+        let seq = self.rust().description_seq.clone();
+        let ticket = seq.load(Ordering::SeqCst);
+        let store = global_store();
+        let qt_thread = self.qt_thread();
+        global_runtime().spawn(async move {
+            let result = store
+                .client()
+                .media_meta(MediaMetaParams::for_media(system.clone(), path.clone()))
+                .await;
+            let _ = qt_thread.queue(move |mut model| {
+                if seq.load(Ordering::SeqCst) != ticket {
+                    return;
+                }
+                let (description, keys) = match result {
+                    Ok(result) => {
+                        let meta_description = description_from_meta(&result.media);
+                        (
+                            if meta_description.is_empty() {
+                                fallback_description
+                            } else {
+                                meta_description
+                            },
+                            detail_image_keys_from_meta(&result.media, &system, &path),
+                        )
+                    }
+                    Err(e) => {
+                        debug!("description fetch failed for {path}: {}", e.message);
+                        (String::new(), Vec::new())
+                    }
+                };
+                model
+                    .as_mut()
+                    .set_current_description(QString::from(description.as_str()));
+                install_detail_images(model.as_mut(), keys);
+            });
+        });
+    }
+
+    fn cycle_detail_image(self: Pin<&mut Self>, delta: i32) {
+        if delta == 0 || self.current_detail_image_count <= 1 {
+            return;
+        }
+        let current = self.current_detail_image_index;
+        let next = (current + delta).clamp(0, self.current_detail_image_count - 1);
+        if next == current {
+            return;
+        }
+        set_detail_image_index(self, next);
+    }
+
     fn path_at(&self, index: i32) -> QString {
         if index < 0 || index >= self.count {
             return QString::default();
@@ -643,6 +765,11 @@ impl ffi::GamesModel {
         self.as_mut().set_current_path(QString::from(path.as_str()));
         self.as_mut().set_loading(true);
         self.as_mut().set_error_message(QString::default());
+        self.as_mut().set_current_description(QString::default());
+        self.as_mut()
+            .rust()
+            .description_seq
+            .fetch_add(1, Ordering::SeqCst);
         self.as_mut().set_has_next_page(false);
         self.as_mut().set_loading_more(false);
         self.as_mut().rust_mut().auto_nav_eligible = eligible_for_auto_nav;
@@ -728,6 +855,96 @@ fn entry_system_id(entry: &BrowseEntry) -> String {
         return entry.system_id.clone();
     }
     entry.system_ids.first().cloned().unwrap_or_default()
+}
+
+fn description_from_meta(meta: &MediaMeta) -> String {
+    meta.title
+        .properties
+        .get("property:description")
+        .or_else(|| meta.properties.get("property:description"))
+        .map(|property| property.text.trim().to_string())
+        .filter(|text| !text.is_empty())
+        .unwrap_or_default()
+}
+
+fn image_type_from_property_key(key: &str) -> Option<String> {
+    let suffix = key.strip_prefix("property:image")?;
+    if suffix.is_empty() {
+        return Some("image".to_string());
+    }
+    Some(suffix.trim_start_matches('-').to_string())
+        .filter(|image_type| !image_type.is_empty())
+}
+
+fn detail_image_keys_from_meta(meta: &MediaMeta, system: &str, path: &str) -> Vec<MediaKey> {
+    let mut types = BTreeSet::<String>::new();
+    for key in meta
+        .title
+        .properties
+        .keys()
+        .chain(meta.properties.keys())
+        .filter_map(|key| image_type_from_property_key(key))
+    {
+        types.insert(key);
+    }
+    let mut ordered = Vec::new();
+    if types.remove("image") {
+        ordered.push("image".to_string());
+    }
+    ordered.extend(types);
+    ordered
+        .into_iter()
+        .map(|image_type| MediaKey::with_image_type(system, path, image_type))
+        .collect()
+}
+
+fn clear_detail_images(mut model: Pin<&mut ffi::GamesModel>) {
+    model.as_mut().rust_mut().detail_image_keys.clear();
+    model.as_mut().set_current_detail_image_key(QString::default());
+    model.as_mut().set_current_detail_image_index(0);
+    model.as_mut().set_current_detail_image_count(0);
+    model.as_mut().set_current_detail_image_can_prev(false);
+    model.as_mut().set_current_detail_image_can_next(false);
+}
+
+fn install_detail_images(mut model: Pin<&mut ffi::GamesModel>, keys: Vec<MediaKey>) {
+    model.as_mut().rust_mut().detail_image_keys = keys;
+    set_detail_image_index(model, 0);
+}
+
+fn set_detail_image_index(mut model: Pin<&mut ffi::GamesModel>, index: i32) {
+    let count = i32::try_from(model.detail_image_keys.len()).unwrap_or(i32::MAX);
+    let clamped = if count <= 0 { 0 } else { index.clamp(0, count - 1) };
+    model.as_mut().set_current_detail_image_index(clamped);
+    model.as_mut().set_current_detail_image_count(count);
+    model.as_mut().set_current_detail_image_can_prev(clamped > 0);
+    model
+        .as_mut()
+        .set_current_detail_image_can_next(count > 0 && clamped < count - 1);
+    sync_current_detail_image_key(model);
+}
+
+fn sync_current_detail_image_key(mut model: Pin<&mut ffi::GamesModel>) {
+    let index = model.current_detail_image_index;
+    if index < 0 {
+        model.as_mut().set_current_detail_image_key(QString::default());
+        return;
+    }
+    let Some(key) = model.detail_image_keys.get(index as usize).cloned() else {
+        model.as_mut().set_current_detail_image_key(QString::default());
+        return;
+    };
+    let cache = global_media_image_cache();
+    if cache.is_cached(&key) {
+        model.as_mut().set_current_detail_image_key(QString::from(
+            MediaImageCache::image_key_for(&key).as_str(),
+        ));
+    } else {
+        if !cache.is_negative(&key) {
+            cache.enqueue_with_media_id(key, None);
+        }
+        model.as_mut().set_current_detail_image_key(QString::default());
+    }
 }
 
 fn cover_key_for(entry: &BrowseEntry) -> String {
@@ -900,7 +1117,10 @@ fn notify_cover_update(mut model: Pin<&mut ffi::GamesModel>, key: &MediaKey) {
         .iter()
         .enumerate()
         .filter(|(_, e)| {
-            !e.is_folder() && e.path == *key.path && entry_system_id(e) == *key.system_id
+            key.image_type.is_none()
+                && !e.is_folder()
+                && e.path == *key.path
+                && entry_system_id(e) == *key.system_id
         })
         .filter_map(|(i, _)| i32::try_from(i).ok())
         .collect();
@@ -912,6 +1132,13 @@ fn notify_cover_update(mut model: Pin<&mut ffi::GamesModel>, key: &MediaKey) {
             let idx = model.index(row, 0, &parent);
             model.as_mut().data_changed(&idx, &idx, &roles);
         }
+    }
+    if model
+        .detail_image_keys
+        .get(model.current_detail_image_index.max(0) as usize)
+        .is_some_and(|current| current == key)
+    {
+        sync_current_detail_image_key(model.as_mut());
     }
     // Tick the gate's pending set down. `remove` returns false if the
     // key wasn't gated (broadcast events fire for every cache update,

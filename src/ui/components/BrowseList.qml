@@ -24,10 +24,13 @@ Item {
         Math.max(1, Math.floor((height + rowSpacing) / rowStride))
     readonly property int _centerSlot:
         Math.max(0, Math.floor((visibleRowCount - 1) / 2))
-    readonly property int _maxTopIndex:
+    readonly property int _maxViewTopIndex:
+        Math.max(0, itemCount - visibleRowCount)
+    readonly property int _viewTopIndex:
+        Math.max(0, Math.min(_maxViewTopIndex, currentIndex - _centerSlot))
+    readonly property int _targetContentY: _viewTopIndex * rowStride
+    readonly property int _maxScrollTopIndex:
         Math.max(0, totalItems - visibleRowCount)
-    readonly property int _topIndex:
-        Math.max(0, Math.min(_maxTopIndex, currentIndex - _centerSlot))
     readonly property int _gutterWidth: Sizing.pctW(3)
     readonly property int _gutterGap: Sizing.pctW(1.5)
 
@@ -84,15 +87,12 @@ Item {
                              : 0
         model: root.model
         currentIndex: root.currentIndex
+        contentY: Math.min(root._targetContentY,
+                           Math.max(0, contentHeight - height))
         boundsBehavior: Flickable.StopAtBounds
         interactive: false
         spacing: root.rowSpacing
         highlightFollowsCurrentItem: false
-        highlightRangeMode: ListView.StrictlyEnforceRange
-        preferredHighlightBegin:
-            Math.max(0, Math.floor((height - root.rowHeight) / 2))
-        preferredHighlightEnd:
-            listView.preferredHighlightBegin + root.rowHeight
 
         delegate: Item {
             id: row
@@ -260,9 +260,9 @@ Item {
                                                    * root.visibleRowCount
                                                    / root.totalItems)))
             readonly property real _thumbY:
-                root._maxTopIndex <= 0
+                root._maxScrollTopIndex <= 0
                     ? 0
-                    : (root._topIndex / root._maxTopIndex)
+                    : (root._viewTopIndex / root._maxScrollTopIndex)
                       * (scrollRegion.height - _thumbHeight)
 
             Rectangle {

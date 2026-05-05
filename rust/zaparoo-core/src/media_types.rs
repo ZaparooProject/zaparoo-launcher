@@ -201,6 +201,8 @@ pub struct BrowseEntry {
     pub relative_path: String,
     #[serde(default)]
     pub group: String,
+    #[serde(default)]
+    pub description: String,
     /// Tags attached to a media entry. Empty for non-media (`directory`,
     /// `root`) entries. Core only populates this on media leaves.
     #[serde(default)]
@@ -1081,7 +1083,7 @@ mod tests {
             "path": "/games",
             "entries": [
                 {"name":"NES","path":"/games/NES","type":"directory","fileCount":42},
-                {"name":"SMB","path":"/games/NES/smb.nes","type":"media","systemId":"NES","zapScript":"@NES/smb","relativePath":"NES/smb.nes"}
+                {"name":"SMB","path":"/games/NES/smb.nes","type":"media","systemId":"NES","zapScript":"@NES/smb","relativePath":"NES/smb.nes","description":"A platformer."}
             ],
             "totalFiles": 150,
             "pagination": {"hasNextPage": true, "pageSize": 100, "nextCursor": "x"}
@@ -1093,6 +1095,7 @@ mod tests {
         assert!(!result.entries[1].is_folder());
         assert_eq!(result.entries[1].system_id, "NES");
         assert_eq!(result.entries[1].relative_path, "NES/smb.nes");
+        assert_eq!(result.entries[1].description, "A platformer.");
         assert_eq!(result.total_files, 150);
         let pagination = result.pagination.expect("pagination present");
         assert!(pagination.has_next_page);

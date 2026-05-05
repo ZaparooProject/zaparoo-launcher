@@ -10,12 +10,20 @@ Item {
 
     property string title: ""
     property string coverKey: ""
+    property string description: ""
+    property bool canPreviousImage: false
+    property bool canNextImage: false
+
+    readonly property int _carouselGutter:
+        (canPreviousImage || canNextImage) ? Sizing.pctW(4) : 0
 
     Item {
         id: imageSlot
 
         anchors.left: parent.left
+        anchors.leftMargin: root._carouselGutter
         anchors.right: parent.right
+        anchors.rightMargin: root._carouselGutter
         anchors.top: parent.top
         height: parent.height * 0.5
 
@@ -31,7 +39,31 @@ Item {
         }
     }
 
+    Image {
+        source: Resources.iconUrl("NavLeft")
+        width: Sizing.pctH(4)
+        height: width
+        anchors.left: parent.left
+        anchors.verticalCenter: imageSlot.verticalCenter
+        fillMode: Image.PreserveAspectFit
+        smooth: true
+        visible: root.canPreviousImage
+    }
+
+    Image {
+        source: Resources.iconUrl("NavRight")
+        width: Sizing.pctH(4)
+        height: width
+        anchors.right: parent.right
+        anchors.verticalCenter: imageSlot.verticalCenter
+        fillMode: Image.PreserveAspectFit
+        smooth: true
+        visible: root.canNextImage
+    }
+
     Text {
+        id: titleText
+
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: imageSlot.bottom
@@ -45,5 +77,23 @@ Item {
         elide: Text.ElideRight
         horizontalAlignment: Text.AlignHCenter
         renderType: Text.NativeRendering
+    }
+
+    Text {
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: titleText.bottom
+        anchors.topMargin: Sizing.pctH(2)
+        anchors.bottom: parent.bottom
+        text: root.description
+        color: Theme.textLabel
+        font.family: Theme.fontUi
+        font.pixelSize: Sizing.fontSize(2.1)
+        wrapMode: Text.Wrap
+        elide: Text.ElideRight
+        horizontalAlignment: Text.AlignLeft
+        verticalAlignment: Text.AlignTop
+        renderType: Text.NativeRendering
+        visible: root.description !== ""
     }
 }

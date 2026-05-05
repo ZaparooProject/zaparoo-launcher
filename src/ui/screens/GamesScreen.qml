@@ -37,6 +37,11 @@ Item {
     // `ScreenStateOverlay` paints alone in both cases.
     readonly property bool coverGateLoading: Browse.GamesModel.loading
 
+    on_ListLayoutChanged: {
+        if (games._listLayout)
+            Browse.GamesModel.load_description_at(gamesGrid.currentIndex)
+    }
+
     // Emitted when the user presses Escape — Main.qml flips the
     // active screen back to SystemsScreen (one peer up the back-stack;
     // a second Escape from there pops to Hub).
@@ -125,9 +130,15 @@ Item {
 
     function handleAction(action: string): void {
         if (action === "left") {
-            games._performMove(-1, 0)
+            if (games._listLayout)
+                Browse.GamesModel.cycle_detail_image(-1)
+            else
+                games._performMove(-1, 0)
         } else if (action === "right") {
-            games._performMove(1, 0)
+            if (games._listLayout)
+                Browse.GamesModel.cycle_detail_image(1)
+            else
+                games._performMove(1, 0)
         } else if (action === "up") {
             games._performMove(0, -1)
         } else if (action === "down") {
@@ -281,7 +292,16 @@ Item {
         anchors.top: gamesList.top
         anchors.bottom: gamesList.bottom
         title: gamesList.currentName
-        coverKey: gamesList.currentCoverKey
+        coverKey: Browse.GamesModel.current_detail_image_key !== ""
+                  ? Browse.GamesModel.current_detail_image_key
+                  : gamesList.currentCoverKey
+        description: Browse.GamesModel.current_description
+        canPreviousImage: Browse.GamesModel.current_detail_image_can_prev
+        canNextImage: Browse.GamesModel.current_detail_image_can_next
+        onVisibleChanged: {
+            if (visible)
+                Browse.GamesModel.load_description_at(gamesGrid.currentIndex)
+        }
     }
 
     // Grid fills the safe zone between the top strip and the active
@@ -311,6 +331,10 @@ Item {
         totalItemsOverride: Browse.GamesModel.dir_count
                             + Browse.GamesModel.total_files
         onLoadMoreRequested: Browse.GamesModel.fetch_more()
+        onCurrentIndexChanged: {
+            if (games._listLayout)
+                Browse.GamesModel.load_description_at(gamesGrid.currentIndex)
+        }
         onItemHovered: (index) => games._focusIndex(index)
         onItemClicked: (index) => {
             games._focusIndex(index)
