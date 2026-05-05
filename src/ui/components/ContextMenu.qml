@@ -1,9 +1,16 @@
 // Zaparoo Launcher
 // Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+pragma ComponentBehavior: Bound
 
 import QtQuick
 import Zaparoo.Theme
+
+// `entries` is a `var` array of plain JS objects (`{ id, label }`). The
+// AOT compiler can't infer the shape of `var`, so every binding that
+// reads `entries.length` or `modelData.label` falls back to the JS
+// interpreter and trips the compiler category. Suppress file-wide.
+// qmllint disable compiler
 
 // Software-rendering safe contextual menu. It positions itself next to an
 // anchor rectangle and clamps to the window bounds so edge tiles never push
@@ -30,8 +37,13 @@ Item {
     readonly property int panelWidth:
         Math.min(Math.max(Sizing.pctW(26), Sizing.pctH(44)),
                  Math.max(0, width - 2 * margin))
+    // Top/bottom margins inside the panel are sized to the panel
+    // radius so a focused row's square background never intersects
+    // the rounded corners — see the panel `Rectangle` below.
+    readonly property int panelRadius: Sizing.cornerRadius / 2
     readonly property int panelHeight:
-        Math.min(entries.length * rowHeight + 2, Math.max(0, height - 2 * margin))
+        Math.min(entries.length * rowHeight + 2 * panelRadius,
+                 Math.max(0, height - 2 * margin))
     readonly property bool preferRight:
         anchorRect.x + anchorRect.width + gap + panelWidth <= width - margin
     readonly property int preferredX:
@@ -90,10 +102,14 @@ Item {
         color: Theme.bgPanel
         border.width: 2
         border.color: Theme.textPrimary
+        radius: menu.panelRadius
 
         Column {
             anchors.fill: parent
-            anchors.margins: 1
+            anchors.topMargin: menu.panelRadius
+            anchors.bottomMargin: menu.panelRadius
+            anchors.leftMargin: 1
+            anchors.rightMargin: 1
 
             Repeater {
                 model: menu.entries

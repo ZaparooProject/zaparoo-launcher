@@ -31,7 +31,9 @@ import Zaparoo.Browse as Browse
 // The component is purely presentational; routing and the modal stack
 // are owned by `Main.qml`. We emit `closeRequested` and trust the
 // router to actually pop. `handleAction(accept|cancel)` is the input
-// hook called from `Main.qml`'s modal-dispatch branch.
+// hook called from `Main.qml`'s modal-dispatch branch. Chrome (scrim,
+// panel, border, radius, title) comes from the shared `Modal` shell so
+// every dialog in the app reads as the same surface.
 Item {
     id: modal
 
@@ -114,57 +116,18 @@ Item {
         }
     }
 
-    // Scrim. Eats clicks so they don't reach the screen tree underneath.
-    Rectangle {
-        anchors.fill: parent
-        color: "#cc000000"
+    Modal {
+        id: shell
 
-        MouseArea {
-            anchors.fill: parent
-        }
-    }
-
-    Rectangle {
-        id: panel
-
-        anchors.centerIn: parent
-        width: Math.min(parent.width * 0.78, Sizing.pctH(90))
-        // Fit current contents. Column drops invisible children from
-        // its layout, so the panel shrinks for the short idle body and
-        // grows for the running progress block.
-        height: contentColumn.height + Sizing.pctH(12)
-        color: Theme.bgPanel
-        border.width: 2
-        border.color: Theme.textPrimary
-        radius: Sizing.cornerRadius
+        open: modal.open
+        kind: "shell"
+        title: qsTr("First-time setup")
 
         Column {
-            id: contentColumn
-
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.top: parent.top
-            anchors.topMargin: Sizing.pctH(6)
-            anchors.leftMargin: Sizing.pctW(6)
-            anchors.rightMargin: Sizing.pctW(6)
+            width: parent.width
             spacing: Sizing.pctH(3)
 
             Text {
-                id: titleText
-
-                width: parent.width
-                text: qsTr("First-time setup")
-                font.family: Theme.fontUi
-                font.pixelSize: Sizing.fontSize(3.2)
-                color: Theme.textPrimary
-                wrapMode: Text.WordWrap
-                horizontalAlignment: Text.AlignHCenter
-                renderType: Text.NativeRendering
-            }
-
-            Text {
-                id: bodyIdle
-
                 width: parent.width
                 visible: modal.phase === "idle"
                 text: qsTr("Zaparoo needs to scan your games before you can use the launcher. This usually takes a few minutes.")
@@ -262,8 +225,6 @@ Item {
             }
 
             Text {
-                id: completionMessage
-
                 width: parent.width
                 visible: modal.phase === "completed"
                 text: qsTr("Done. %1 files indexed.").arg(Browse.MediaStatus.total_files)
@@ -276,15 +237,11 @@ Item {
             }
 
             Item {
-                id: actionButtonSlot
-
                 width: parent.width
                 height: Sizing.pctH(7)
                 visible: modal.phase !== "completed"
 
                 Rectangle {
-                    id: actionButton
-
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.verticalCenter: parent.verticalCenter
                     width: Sizing.pctW(28)

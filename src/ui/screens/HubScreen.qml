@@ -52,6 +52,15 @@ Item {
     property int currentRow: 0
     // Index within the active row.
     property int currentIndex: 0
+    // Source-row index from the most recent cross. Used to make a
+    // Down → Up (or Up → Down) round-trip return to the originating
+    // tile, which the centered visual-nearest mapping in `_mapCrossRow`
+    // can't deliver when `sourceCount !== destCount`. -1 means no
+    // round-trip is armed: either no cross has happened yet, or the
+    // user moved horizontally on the destination row since the last
+    // cross — at which point the saved index represents stale state
+    // and the next cross falls back to `_mapCrossRow`.
+    property int _crossSavedIndex: -1
 
     signal requestAccept(category: string)
     signal requestQuit()
@@ -60,12 +69,12 @@ Item {
     signal requestSettingsScreen()
 
     // Vertically center the (categories row + actions row + activeLabel)
-    // block in the band between the logo bottom (pctH(9)) and the help
-    // bar top (hub.height - pctH(6)). `_blockHeight` mirrors the
-    // anchor chain below: each row is `cellHeight + 2*verticalPadding`,
-    // the gap between them collapses the focus-bleed padding (see
-    // `actionsRow.anchors.topMargin`), and the label sits pctH(3) below
-    // the actions row at pctH(7) tall.
+    // block in the band between the HeaderBar bottom (Sizing.headerBottom)
+    // and the help bar top (hub.height - pctH(6)). `_blockHeight`
+    // mirrors the anchor chain below: each row is
+    // `cellHeight + 2*verticalPadding`, the gap between them collapses
+    // the focus-bleed padding (see `actionsRow.anchors.topMargin`),
+    // and the label sits pctH(3) below the actions row at pctH(7) tall.
     readonly property int _blockHeight:
         2 * (categoriesRow.cellHeight + 2 * categoriesRow.verticalPadding)
         + (categoriesRow.spacing
@@ -74,7 +83,7 @@ Item {
         + Sizing.pctH(3)
         + Sizing.pctH(7)
     readonly property int _blockY:
-        Math.round((Sizing.pctH(9) + hub.height - Sizing.pctH(6)
+        Math.round((Sizing.headerBottom + hub.height - Sizing.pctH(6)
                     - hub._blockHeight) / 2)
 
     // Static action-row data. Three fixed entries; order matches
@@ -102,6 +111,7 @@ Item {
     function resetFocus(): void {
         hub.currentRow = 0
         hub.currentIndex = 0
+        hub._crossSavedIndex = -1
     }
 
     // Restore the hub from the persisted `Browse.HubState`. Always
@@ -145,6 +155,11 @@ Item {
             hub.currentRow = 0
             hub.currentIndex = chosenCategoryIndex
         }
+        // A reseat from disk or from a category-list refresh makes any
+        // armed round-trip context meaningless (the user might be on a
+        // different row entirely now, and the saved source-index could
+        // point past the new category list).
+        hub._crossSavedIndex = -1
 
         if (Browse.SystemsModel.current_category === chosenCategory
             && Browse.SystemsModel.count > 0)
@@ -166,6 +181,10 @@ Item {
         if (next === hub.currentIndex)
             return false
         hub.currentIndex = next
+        // Horizontal motion on the destination row invalidates the
+        // round-trip context — the user's intent is now to navigate
+        // within this row, not bounce back to where they came from.
+        hub._crossSavedIndex = -1
         return true
     }
 
@@ -184,25 +203,47 @@ Item {
         return Math.max(0, Math.min(destCount - 1, target))
     }
 
-    // Cross-row jump. Up and Down both flip to the *other* row at the
-    // visually-nearest cell — there is no "off the top" or "off the
-    // bottom" since the two rows form a closed two-row loop. Returns
-    // false only when the destination row is empty (no categories
-    // loaded yet, etc.).
+    // Cross-row jump. Up and Down both flip to the *other* row — the
+    // two rows form a closed two-row loop, there is no "off the top"
+    // or "off the bottom".
+    //
+    // The destination index has two sources:
+    //
+    //   1. If `_crossSavedIndex` is armed (>= 0) and within the
+    //      destination row's bounds, restore it. This is the round-trip
+    //      path: the user pressed Down, then Up without horizontal
+    //      input in between, so the originating tile is the natural
+    //      target. With unequal row counts the centered visual mapping
+    //      can't return there on its own.
+    //
+    //   2. Otherwise fall back to `_mapCrossRow` (visually-nearest
+    //      cell in the centered row). This fires on the very first
+    //      cross of a session and after any horizontal input on the
+    //      destination row clears the armed index.
+    //
+    // Returns false only when the destination row is empty (no
+    // categories loaded yet, etc.).
     function _crossRow(): bool {
         const topCount = Browse.CategoriesModel.count
         const bottomCount = hub.actionEntries.length
-        if (hub.currentRow === 0) {
-            if (bottomCount <= 0)
-                return false
-            hub.currentRow = 1
-            hub.currentIndex = hub._mapCrossRow(hub.currentIndex, topCount, bottomCount)
-            return true
-        }
-        if (topCount <= 0)
+        const sourceCount = hub.currentRow === 0 ? topCount : bottomCount
+        const destCount = hub.currentRow === 0 ? bottomCount : topCount
+        if (destCount <= 0)
             return false
-        hub.currentRow = 0
-        hub.currentIndex = hub._mapCrossRow(hub.currentIndex, bottomCount, topCount)
+
+        const sourceIdx = hub.currentIndex
+        const restored = hub._crossSavedIndex >= 0
+                         && hub._crossSavedIndex < destCount
+        const destIdx = restored
+                        ? hub._crossSavedIndex
+                        : hub._mapCrossRow(sourceIdx, sourceCount, destCount)
+
+        // Save the source-row index BEFORE flipping so the next cross
+        // can return here. Reading `currentIndex` after the flip would
+        // capture the destination index instead.
+        hub._crossSavedIndex = sourceIdx
+        hub.currentRow = 1 - hub.currentRow
+        hub.currentIndex = destIdx
         return true
     }
 
@@ -237,6 +278,9 @@ Item {
             return
         hub.currentRow = 0
         hub.currentIndex = index
+        // Mouse focus is a deliberate landing on a specific tile — any
+        // armed cross-row round-trip is no longer what the user wants.
+        hub._crossSavedIndex = -1
         hub._commitCategorySelection()
     }
 
@@ -245,6 +289,7 @@ Item {
             return
         hub.currentRow = 1
         hub.currentIndex = index
+        hub._crossSavedIndex = -1
         hub._commitActionSelection()
     }
 

@@ -136,9 +136,8 @@ Item {
     // and the old bottom-of-grid PaginationStatus band so the screen's
     // "where am I" context all sits at the top in one row.
     //
-    // The screen Item fills the whole window, so the strip has to
-    // clear the MainLayout logo (topMargin pctH(2) + height pctH(7) —
-    // bottom edge at pctH(9)) with a pctH(2) gap.
+    // The screen Item fills the whole window, so the strip clears the
+    // MainLayout HeaderBar (Sizing.headerBottom) with a small gap.
     //
     // SystemsModel is non-paginated (every row loads eagerly on
     // category switch) — the page counter still reads off
@@ -151,7 +150,7 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
-        anchors.topMargin: Sizing.pctH(11)
+        anchors.topMargin: Sizing.headerBottom + Sizing.pctH(1)
         height: Sizing.pctH(7)
         title: Browse.SystemsModel.current_category
         currentPage: systemsGrid.currentPage

@@ -1,6 +1,7 @@
 // Zaparoo Launcher
 // Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+pragma ComponentBehavior: Bound
 
 import QtQuick
 import Zaparoo.Theme
@@ -26,7 +27,9 @@ import Zaparoo.Browse as Browse
 //
 // Routing and the modal stack are owned by `Main.qml`. We emit
 // `closeRequested` and trust the router to pop. `handleAction` is the
-// input hook called from `Main.qml`'s modal-dispatch branch.
+// input hook called from `Main.qml`'s modal-dispatch branch. Chrome
+// (scrim, panel, border, radius, title) comes from the shared `Modal`
+// shell so every dialog in the app reads as the same surface.
 Item {
     id: modal
 
@@ -76,48 +79,17 @@ Item {
         }
     }
 
-    // Scrim. Eats clicks so they don't reach the screen tree underneath.
-    Rectangle {
-        anchors.fill: parent
-        color: "#cc000000"
+    Modal {
+        id: shell
 
-        MouseArea {
-            anchors.fill: parent
-        }
-    }
-
-    Rectangle {
-        id: panel
-
-        anchors.centerIn: parent
-        width: Math.min(parent.width * 0.78, Sizing.pctH(110))
-        height: contentColumn.height + Sizing.pctH(12)
-        color: Theme.bgPanel
-        border.width: 2
-        border.color: Theme.textPrimary
-        radius: Sizing.cornerRadius
+        open: modal.open
+        kind: "shell"
+        title: qsTr("Upload log file")
+        panelMaxWidth: Sizing.pctH(110)
 
         Column {
-            id: contentColumn
-
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.top: parent.top
-            anchors.topMargin: Sizing.pctH(6)
-            anchors.leftMargin: Sizing.pctW(6)
-            anchors.rightMargin: Sizing.pctW(6)
+            width: parent.width
             spacing: Sizing.pctH(3)
-
-            Text {
-                width: parent.width
-                text: qsTr("Upload log file")
-                font.family: Theme.fontUi
-                font.pixelSize: Sizing.fontSize(3.2)
-                color: Theme.textPrimary
-                wrapMode: Text.WordWrap
-                horizontalAlignment: Text.AlignHCenter
-                renderType: Text.NativeRendering
-            }
 
             Text {
                 width: parent.width
@@ -247,8 +219,6 @@ Item {
                          || modal.phase === modal._stateError
 
                 Rectangle {
-                    id: actionButton
-
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.verticalCenter: parent.verticalCenter
                     width: Sizing.pctW(28)

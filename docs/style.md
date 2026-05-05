@@ -28,11 +28,35 @@ Toggle controls (`SettingsField.qml` track + thumb) use `height/2` and
 shape for binary on/off controls (same convention as iOS toggles). They do
 not use `Sizing.cornerRadius` and shouldn't be made to.
 
-## Sharp corners
+## Modal chrome
 
-`Modal.qml` is intentionally sharp. Modals are attention-demanding and the
-visual contrast against rounded surfaces is part of the design. Don't add
-radius unless the design changes.
+Every modal panel and the context menu use `Sizing.cornerRadius`. They join
+the rounded-square family with tile cards, settings rows, and focus rings —
+one shape, one radius across the app. `Modal.qml` is the canonical shell;
+the first-run, commercial-notice, and log-upload modals all wrap it via
+`kind: "shell"` rather than hand-rolling their own panel.
+
+| Surface | Token |
+|---|---|
+| Background | `Theme.bgPanel` |
+| Border | `2px`, `Theme.textPrimary` |
+| Corner radius | `Sizing.cornerRadius` |
+| Scrim | `#cc000000` |
+| Column top margin | `Sizing.pctH(6)` |
+| Column side margins | `Sizing.pctW(6)` |
+| Column spacing | `Sizing.pctH(3)` |
+| Title | `Sizing.fontSize(3.2)`, `Theme.textPrimary` |
+| Body | `Sizing.fontSize(2.5)`, `Theme.textPrimary` |
+| Button slot height | `Sizing.pctH(7)` |
+| Button width | `Sizing.pctW(28)` |
+| Button background | `Theme.bgBar` |
+| Button border | `1px`, `Theme.borderMid` (focus: `2px`, `Theme.accent`) |
+| Button radius | `Sizing.cornerRadius` |
+| Button text | `Sizing.fontSize(2.5)`, `Theme.textPrimary` |
+
+When adding a new modal, prefer extending `Modal.qml` (a new `kind`, or the
+shell content slot) over a bespoke panel — the chrome should never need to
+be hand-rolled twice.
 
 ## Tile aspect
 

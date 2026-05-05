@@ -660,22 +660,30 @@ fn release_cover_gate_after_timeout(mut model: Pin<&mut ffi::RecentsModel>) {
 
 /// Build the `text` payload sent to Core's `run` for a history entry.
 /// History entries don't carry a synthesised `zap_script` (Core surfaces
-/// only the raw fields), so compose `**launch:<path>` from the row's
+/// only the raw fields), so compose `**launch:"<path>"` from the row's
 /// `mediaPath`, with `?launcher=<id>` appended when `launcherId` is known
 /// so Core picks the same launcher the entry originally ran under. An
 /// empty path yields an empty string, suppressing the run entirely —
 /// `**launch.system:<id>` would just boot the core without a game.
+///
+/// The path is always wrapped in double quotes so spaces and shell
+/// metacharacters (parens, commas) survive Core's argument parsing —
+/// real-world paths like
+/// `/media/fat/cifs/games/Genesis/1 US - A-F/B.O.B. (USA,Europe) (Rev A).md`
+/// fail to launch unquoted. Embedded backslashes and double quotes are
+/// escaped per `ZapScript`'s `parseQuotedArg` rules (backslash first so
+/// the quote-escape's leading `\` doesn't get re-escaped) — Windows-host
+/// paths and the rare filename containing a literal `"` would otherwise
+/// produce a malformed token.
 fn launch_text_for(entry: &MediaHistoryEntry) -> String {
     if entry.media_path.is_empty() {
         return String::new();
     }
+    let escaped = entry.media_path.replace('\\', "\\\\").replace('"', "\\\"");
     if entry.launcher_id.is_empty() {
-        format!("**launch:{}", entry.media_path)
+        format!("**launch:\"{escaped}\"")
     } else {
-        format!(
-            "**launch:{}?launcher={}",
-            entry.media_path, entry.launcher_id
-        )
+        format!("**launch:\"{escaped}\"?launcher={}", entry.launcher_id)
     }
 }
 
@@ -795,13 +803,43 @@ mod tests {
     #[test]
     fn launch_text_uses_launch_with_launcher_override_when_known() {
         let e = entry("smb", "/p/smb.nes", "NES", "NES");
-        assert_eq!(launch_text_for(&e), "**launch:/p/smb.nes?launcher=NES");
+        assert_eq!(launch_text_for(&e), "**launch:\"/p/smb.nes\"?launcher=NES");
     }
 
     #[test]
     fn launch_text_falls_back_to_bare_launch_when_launcher_missing() {
         let e = entry("smb", "/p/smb.nes", "NES", "");
-        assert_eq!(launch_text_for(&e), "**launch:/p/smb.nes");
+        assert_eq!(launch_text_for(&e), "**launch:\"/p/smb.nes\"");
+    }
+
+    #[test]
+    fn launch_text_quotes_path_with_spaces_and_metacharacters() {
+        // Real-world path that fails to launch unquoted because of
+        // spaces, parens, and commas — exactly the regression the
+        // user reported when running from Recently Played.
+        let e = entry(
+            "bob",
+            "/media/fat/cifs/games/Genesis/1 US - A-F/B.O.B. (USA,Europe) (Rev A).md",
+            "Genesis",
+            "Genesis",
+        );
+        assert_eq!(
+            launch_text_for(&e),
+            "**launch:\"/media/fat/cifs/games/Genesis/1 US - A-F/B.O.B. (USA,Europe) (Rev A).md\"?launcher=Genesis"
+        );
+    }
+
+    #[test]
+    fn launch_text_escapes_backslashes_and_quotes_in_path() {
+        // Windows-host paths reach Core with backslash separators, and
+        // a stray `"` in a filename would otherwise close the quoted
+        // arg early. Both must be ZapScript-escaped so
+        // `parseQuotedArg` decodes them back to the original path.
+        let e = entry("weird", r#"C:\Games\say "hi".rom"#, "DOS", "DOS");
+        assert_eq!(
+            launch_text_for(&e),
+            r#"**launch:"C:\\Games\\say \"hi\".rom"?launcher=DOS"#
+        );
     }
 
     #[test]

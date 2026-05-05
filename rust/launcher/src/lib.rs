@@ -284,6 +284,10 @@ pub extern "C" fn zaparoo_rust_init() -> c_int {
     install_crash_signal_handler();
 
     tracing::info!("Zaparoo Launcher starting");
+    tracing::info!(
+        "build {}",
+        models::build_info::provenance_string(env!("CARGO_PKG_VERSION"))
+    );
 
     let runtime = match tokio::runtime::Builder::new_multi_thread()
         .enable_all()

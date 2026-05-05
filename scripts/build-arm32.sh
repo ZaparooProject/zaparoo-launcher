@@ -83,6 +83,7 @@ docker buildx build \
     --platform "${DOCKER_PLATFORM}" \
     -f "${PROJECT_ROOT}/Dockerfile.arm32" \
     --build-arg "TOOLCHAIN_IMAGE=${TOOLCHAIN_IMAGE}" \
+    --build-arg "ZAPAROO_OFFICIAL_BUILD=${ZAPAROO_OFFICIAL_BUILD:-}" \
     --output "type=local,dest=${OUTPUT_DIR}" \
     --target export \
     "${PROJECT_ROOT}"

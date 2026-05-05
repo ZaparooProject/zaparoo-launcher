@@ -20,6 +20,7 @@ QtObject {
     readonly property string screenFavorites: "favorites"
     readonly property string screenRecents: "recents"
     readonly property string screenSettings: "settings"
+    readonly property string screenAbout: "about"
 
     // Currently-focused root screen. Persistence lives in
     // Browse.AppState — write there via Main.qml's orchestration, not

@@ -25,14 +25,20 @@ import Zaparoo.Browse as Browse
 MainLayout {
     id: root
 
-    width: Screen.width
-    height: Screen.height
+    // Fullscreen builds (MiSTer) fill the screen; desktop windowed
+    // builds inherit MainLayout's 1280x720 design defaults so the user
+    // can resize freely. The fullscreen override is a one-shot in
+    // Component.onCompleted (below) rather than a binding — a binding
+    // here would re-assert 1280 after any user resize, fighting the
+    // OS resize gesture.
 
     readonly property string modalCardWrite: "card_write"
     readonly property string modalContextMenu: "context_menu"
     readonly property string modalQrCode: "qr_code"
+    readonly property string modalCommercialNotice: "commercial_notice"
     readonly property string modalFirstRunIndex: "first_run_index"
     readonly property string modalLogUpload: "log_upload"
+    readonly property string modalQuitConfirm: "quit_confirm"
     // One-shot session flag: the first-run modal is shown at most
     // once per launcher process, even if the WS link drops and the
     // mediadb-empty condition would otherwise be satisfied again.
@@ -71,6 +77,13 @@ MainLayout {
         Sizing.screenWidth = width
     }
     Component.onCompleted: {
+        // One-shot fullscreen sizing for embedded builds. Done as an
+        // imperative write rather than a binding so a user resize on
+        // a windowed build can never be undone by a re-evaluation.
+        if (root.fullScreen) {
+            root.width = Screen.width
+            root.height = Screen.height
+        }
         Sizing.screenWidth = width
         Sizing.screenHeight = height
         Browse.GamesModel.page_size = root._gamesPageSize
@@ -85,7 +98,8 @@ MainLayout {
             || savedScreen === root.screenHub
             || savedScreen === root.screenFavorites
             || savedScreen === root.screenRecents
-            || savedScreen === root.screenSettings)
+            || savedScreen === root.screenSettings
+            || savedScreen === root.screenAbout)
             root.activeScreen = savedScreen
         // If the catalog is already ready, fire the restore here so
         // the cascade (set_category → SystemsModel reset → seed
@@ -116,6 +130,12 @@ MainLayout {
                 root.recentsScreen.restoreSelection()
             }
         }
+        // Open the commercial-use notice on first paint of an unacked
+        // install. Sits in front of the media-DB first-run modal in the
+        // routing order — `_maybeOpenFirstRunIndex` early-returns until
+        // `Browse.Notice.commercial_ack` flips true, at which point the
+        // notice's close handler retriggers the media-DB check.
+        root._maybeOpenCommercialNotice()
         // Kick the first-run check in case both READY and a seeded
         // empty-mediadb snapshot landed before our Connections wired up
         // (e.g. an unusually fast warm-cache reconnect).
@@ -201,7 +221,66 @@ MainLayout {
             const sels = Browse.GamesState.selected_at_level
             const savedPath = sels.length > 0 ? sels[sels.length - 1] : ""
             const idx = savedPath === "" ? -1 : Browse.GamesModel.index_for_game_path(savedPath)
-            root.gamesScreen.gamesGrid.setCurrentIndexImmediate(idx >= 0 ? idx : 0)
+            if (idx >= 0) {
+                root.gamesScreen.gamesGrid.setCurrentIndexImmediate(idx)
+                root._pendingGameRestorePath = ""
+                return
+            }
+            // Saved entry isn't on page 1. If there are more pages,
+            // keep paginating until it shows up or we exhaust the
+            // folder; the count-watcher below drives the loop.
+            // Otherwise (entry truly gone, or single-page folder)
+            // fall back to row 0.
+            if (savedPath !== "" && Browse.GamesModel.has_next_page) {
+                root._pendingGameRestorePath = savedPath
+                root.gamesScreen.gamesGrid.setCurrentIndexImmediate(0)
+                Browse.GamesModel.fetch_more()
+                return
+            }
+            root._pendingGameRestorePath = ""
+            root.gamesScreen.gamesGrid.setCurrentIndexImmediate(0)
+        }
+        // Pages 2+ append rows via begin_insert_rows / end_insert_rows
+        // (no model reset), so we can't piggy-back on onModelReset to
+        // retry the lookup. `count` bumps on every append, giving us a
+        // stable per-page edge to resume the deep-page restore on.
+        function onCountChanged(): void {
+            const path = root._pendingGameRestorePath
+            if (path === "")
+                return
+            // User backed out to Hub/Systems before pagination caught
+            // up — selected_at_level isn't touched by a peer-screen
+            // exit, so without this gate the loop would keep hammering
+            // fetch_more in the background until the folder exhausts.
+            if (root.activeScreen !== root.screenGames) {
+                root._pendingGameRestorePath = ""
+                return
+            }
+            // User input updates `selected_at_level` on every move,
+            // so a divergence between the pending path and the top
+            // of stack means the user navigated during the restore
+            // — drop the auto-restore and let them stay where they
+            // landed.
+            const sels = Browse.GamesState.selected_at_level
+            const currentTop = sels.length > 0 ? sels[sels.length - 1] : ""
+            if (currentTop !== path) {
+                root._pendingGameRestorePath = ""
+                return
+            }
+            const idx = Browse.GamesModel.index_for_game_path(path)
+            if (idx >= 0) {
+                root.gamesScreen.gamesGrid.setCurrentIndexImmediate(idx)
+                root._pendingGameRestorePath = ""
+                return
+            }
+            if (Browse.GamesModel.has_next_page) {
+                // fetch_more is itself debounced by `loading_more` and
+                // `has_next_page`, so a redundant call here is a cheap
+                // no-op rather than a duplicate request.
+                Browse.GamesModel.fetch_more()
+                return
+            }
+            root._pendingGameRestorePath = ""
         }
     }
 
@@ -229,6 +308,13 @@ MainLayout {
     property var _systemReadyCallback: null
     property var _favoritesReadyCallback: null
     property var _recentsReadyCallback: null
+    // Saved games-screen entry path that wasn't on the freshly seeded
+    // page 1 of MediaBrowse. The GamesModel.onCountChanged watcher
+    // below paginates forward via fetch_more until the path is found
+    // or `has_next_page` goes false. Cleared on resolution and on
+    // any navigation that starts a new browse target so a stale
+    // restore can't keep paginating after the user moves on.
+    property string _pendingGameRestorePath: ""
 
     // Listen for SystemsModel fills owned by an in-flight transition.
     // `loading` flips true at the start of set_category and false when
@@ -411,6 +497,12 @@ MainLayout {
         root._goto(root.screenSettings)
     }
 
+    // Settings → About transition. Static info screen, no async data,
+    // so the flip is instant — same shape as _navigateToSettings above.
+    function _navigateToAbout(): void {
+        root._goto(root.screenAbout)
+    }
+
     // Systems Accept routing. Pin destination to Games, fill the
     // chosen system, then flip. The Games→back routing decision is
     // re-evaluated live from current state at B-press time (see
@@ -478,7 +570,7 @@ MainLayout {
         function onRequestAccept(category: string): void {
             root._navigateFromHub(category)
         }
-        function onRequestQuit(): void { Qt.quit() }
+        function onRequestQuit(): void { root.openQuitConfirmModal() }
         function onRequestFavoritesScreen(): void { root._navigateToFavorites() }
         function onRequestRecentsScreen(): void { root._navigateToRecents() }
         function onRequestSettingsScreen(): void { root._navigateToSettings() }
@@ -503,7 +595,13 @@ MainLayout {
         function onRequestAccept(actionId: string): void {
             if (actionId === "uploadLog")
                 root.openLogUploadModal()
+            else if (actionId === "aboutLicense")
+                root._navigateToAbout()
         }
+    }
+    Connections {
+        target: root.aboutScreen
+        function onRequestSettingsScreen(): void { root._goto(root.screenSettings) }
     }
     Connections {
         target: root.systemsScreen
@@ -596,8 +694,7 @@ MainLayout {
     // static QML build coerces the JS array through `list<var>` and the
     // caller saw `entries.length === 0` despite the function pushing 3
     // items in. Plain `var` round-trips cleanly and silences the
-    // qmllint "insufficiently annotated" coercion warning at the call
-    // site.
+    // "insufficiently annotated" coercion warning at the call site.
     function buildContextMenuEntries(
             owner: string, entryType: string, hasNfc: bool, isFavorite: bool) {
         if (owner === "systems") {
@@ -743,6 +840,11 @@ MainLayout {
     function _maybeOpenFirstRunIndex(): void {
         if (root._firstRunIndexShown)
             return
+        // Defer to the commercial-use notice. The notice's close handler
+        // calls back into here once acked, so chaining is automatic and
+        // we avoid stacking two modals at the same time.
+        if (!Browse.Notice.commercial_ack)
+            return
         if (Browse.AppStatus.connection_state !== 2 /* READY */)
             return
         if (!Browse.CategoriesModel.loaded)
@@ -759,6 +861,40 @@ MainLayout {
         root.firstRunIndexModalVisible = false
         if (ScreenManager.topModal === root.modalFirstRunIndex)
             ScreenManager.popModal()
+    }
+
+    // Commercial-use first-run notice. Persisted ack lives in
+    // `launcher.toml` (not state.toml — MiSTer's tmpfs would re-show
+    // the notice on every reboot). The router opens the modal on first
+    // paint when the flag is false, and the modal's close handler is
+    // what advances to the next first-run gate (mediadb index).
+    function _maybeOpenCommercialNotice(): void {
+        if (Browse.Notice.commercial_ack)
+            return
+        if (root.commercialNoticeModalVisible)
+            return
+        // Defer until the cold-launch curtain has lifted. Otherwise
+        // the modal paints over the BootOverlay's "Connecting…" cue,
+        // and the user perceives the launcher as stuck — they can't
+        // tell whether dismissing the notice will reveal a working
+        // app or an actual connection failure. Waiting for boot means
+        // every "I understand" press lands on a hub that's already
+        // ready to use.
+        if (!root.bootComplete)
+            return
+        root.commercialNoticeModalVisible = true
+        if (ScreenManager.topModal !== root.modalCommercialNotice)
+            ScreenManager.pushModal(root.modalCommercialNotice)
+    }
+
+    function closeCommercialNoticeModal(): void {
+        root.commercialNoticeModalVisible = false
+        if (ScreenManager.topModal === root.modalCommercialNotice)
+            ScreenManager.popModal()
+        // Now that the notice is dismissed, re-check the media-DB gate
+        // — if the catalog had already settled empty behind the notice,
+        // this opens that modal as the next step in the chain.
+        root._maybeOpenFirstRunIndex()
     }
 
     // Log-upload modal lifecycle. Triggered from the Settings "Upload
@@ -783,6 +919,24 @@ MainLayout {
 
     onCloseLogUploadRequested: root.closeLogUploadModal()
 
+    // Quit-confirm lifecycle. Hub's cancel signal lands on
+    // `openQuitConfirmModal` instead of `Qt.quit()` so a stray B / Esc
+    // can't kill the launcher; the modal owns the actual decision.
+    function openQuitConfirmModal(): void {
+        root.quitConfirmModalVisible = true
+        if (ScreenManager.topModal !== root.modalQuitConfirm)
+            ScreenManager.pushModal(root.modalQuitConfirm)
+    }
+
+    function closeQuitConfirmModal(): void {
+        root.quitConfirmModalVisible = false
+        if (ScreenManager.topModal === root.modalQuitConfirm)
+            ScreenManager.popModal()
+    }
+
+    onCloseQuitConfirmRequested: root.closeQuitConfirmModal()
+    onQuitConfirmAccepted: Qt.quit()
+
     Connections {
         target: Browse.AppStatus
         function onConnection_stateChanged(): void {
@@ -798,8 +952,13 @@ MainLayout {
     function _maybeCompleteBoot(): void {
         if (root.bootComplete)
             return
-        if (Browse.AppStatus.connection_state === 2 /* READY */)
+        if (Browse.AppStatus.connection_state === 2 /* READY */) {
             root.bootComplete = true
+            // Curtain just lifted — fire the notice gate now that the
+            // hub is paintable. _maybeOpenCommercialNotice early-returns
+            // until bootComplete is true, so this is the natural edge.
+            root._maybeOpenCommercialNotice()
+        }
     }
 
     Connections {
@@ -813,6 +972,7 @@ MainLayout {
     }
 
     onCloseFirstRunIndexRequested: root.closeFirstRunIndexModal()
+    onCloseCommercialNoticeRequested: root.closeCommercialNoticeModal()
 
     function beginCardWrite(owner: string): void {
         if (owner === "systems")
@@ -895,8 +1055,12 @@ MainLayout {
                 root.contextMenu.handleAction(action)
             } else if (ScreenManager.topModal === root.modalFirstRunIndex) {
                 root.firstRunIndexModal.handleAction(action)
+            } else if (ScreenManager.topModal === root.modalCommercialNotice) {
+                root.commercialNoticeModal.handleAction(action)
             } else if (ScreenManager.topModal === root.modalLogUpload) {
                 root.logUploadModal.handleAction(action)
+            } else if (ScreenManager.topModal === root.modalQuitConfirm) {
+                root.quitConfirmModal.handleAction(action)
             }
             // While a modal owns input, swallow everything not handled
             // above rather than leak it to the root screen.
@@ -912,6 +1076,8 @@ MainLayout {
             root.recentsScreen.handleAction(action)
         } else if (root.activeScreen === root.screenSettings) {
             root.settingsScreen.handleAction(action)
+        } else if (root.activeScreen === root.screenAbout) {
+            root.aboutScreen.handleAction(action)
         } else {
             root.hubScreen.handleAction(action)
         }
