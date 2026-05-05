@@ -154,7 +154,7 @@ int main(int argc, char* argv[])
     qInfo("QImageReader supportedImageFormats: %s",
           qUtf8Printable(formatNames.join(QStringLiteral(", "))));
 
-#ifndef ZAPAROO_DEV_BUILD
+#ifdef ZAPAROO_EMBEDDED_BUILD
     engine.setInitialProperties({{"fullScreen", true}});
 #endif
 

@@ -123,6 +123,15 @@ pub struct GamesModelRust {
     // intermediate state, so the flag is consumed by the apply
     // function and reset once the decision has been made.
     auto_nav_eligible: bool,
+    // Set once `apply_initial_page` has installed a result for the
+    // current browse target; cleared on every `start_initial_browse`.
+    // Subsequent Ready transitions on the same target (cache
+    // invalidation refetches, e.g. after `MediaTagsUpdateMutation`)
+    // skip the full reset so the user's pagination position and
+    // appended pages aren't clobbered. Local mutations
+    // (`apply_favorite_tags`) keep the visible model in sync without
+    // needing the refetch.
+    is_seeded: bool,
     // Invalidates stale card-write completions after the user cancels
     // or starts another write before the previous RPC returns.
     card_write_seq: Arc<AtomicU64>,
@@ -169,6 +178,7 @@ impl Default for GamesModelRust {
             watcher: None,
             seq: Arc::new(AtomicU64::new(0)),
             auto_nav_eligible: false,
+            is_seeded: false,
             card_write_seq: Arc::new(AtomicU64::new(0)),
             cover_subscription: None,
             pending_first_paint_keys: HashSet::new(),
@@ -636,6 +646,12 @@ impl ffi::GamesModel {
         self.as_mut().set_has_next_page(false);
         self.as_mut().set_loading_more(false);
         self.as_mut().rust_mut().auto_nav_eligible = eligible_for_auto_nav;
+        // Cleared on every browse target swap: a new path needs the
+        // full `apply_initial_page` reset to install fresh entries.
+        // The flag is set back to true at the end of that function
+        // so subsequent refetches (cache invalidations) skip the
+        // reset and preserve appended pages + selection.
+        self.as_mut().rust_mut().is_seeded = false;
         self.as_mut().rust_mut().next_cursor = None;
         if !self.entries.is_empty() {
             self.as_mut().begin_reset_model();
@@ -1202,7 +1218,13 @@ fn apply_status(mut model: Pin<&mut ffi::GamesModel>, status: ResourceStatus<Med
             if !model.error_message.is_empty() {
                 model.as_mut().set_error_message(QString::default());
             }
-            if model.has_next_page {
+            // Pagination state is only stale on a fresh browse target;
+            // a transient Pending (connection blip, post-error retry)
+            // on a seeded model must preserve `has_next_page` so the
+            // user's paginated view stays usable once Ready arrives —
+            // the early-return in `apply_initial_page` won't restore
+            // it.
+            if !model.is_seeded && model.has_next_page {
                 model.as_mut().set_has_next_page(false);
             }
         }
@@ -1303,6 +1325,22 @@ fn apply_status(mut model: Pin<&mut ffi::GamesModel>, status: ResourceStatus<Med
 }
 
 fn apply_initial_page(mut model: Pin<&mut ffi::GamesModel>, result: MediaBrowseResult) {
+    // Already seeded: this Ready is a cache invalidation refetch on
+    // the same browse target (e.g. `MediaTagsUpdateMutation`'s
+    // `MediaBrowseEndpoint` invalidation after a favorite toggle, or
+    // a Loading→Ready cycle from a connection blip / post-error
+    // retry). The full reset below would clobber any pages the user
+    // paginated to and reset the grid to row 0; the local mutation
+    // paths (`apply_favorite_tags`) keep the visible model in sync.
+    // Loading was set true by the preceding Pending — clear it so a
+    // transient blip doesn't leave the spinner stuck on after the
+    // refetch lands.
+    if model.is_seeded {
+        if model.loading {
+            model.as_mut().set_loading(false);
+        }
+        return;
+    }
     let has_next_page = result.has_next_page();
     let next_cursor = result.next_cursor();
     let total = i32::try_from(result.total_files).unwrap_or(i32::MAX);
@@ -1355,6 +1393,10 @@ fn apply_initial_page(mut model: Pin<&mut ffi::GamesModel>, result: MediaBrowseR
     if has_next_page && !model.loading_more {
         model.as_mut().fetch_more();
     }
+    // Mark seeded last so any early-return from this function leaves
+    // the flag in its previous state. Subsequent Ready transitions
+    // on the same browse target now skip the reset above.
+    model.as_mut().rust_mut().is_seeded = true;
 }
 
 fn apply_append_page(

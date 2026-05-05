@@ -86,11 +86,17 @@ Item {
     // Recents) flip this on at the delegate template.
     property bool showCaption: false
 
-    readonly property int _padding: Sizing.pctH(3)
+    // Equal cover padding on top, left, and right — the bottom is
+    // owned by the caption strip in caption mode and matches `_padding`
+    // visually in non-caption mode. pctH(2) is enough to read as
+    // deliberate breathing room without giving back much cover area.
+    // Below the cover sits the caption flush against the card's
+    // bottom edge, separated from the cover by `_captionGap`.
+    readonly property int _padding: Sizing.pctH(2)
     readonly property int _outlineGap: Sizing.pctH(0.4)
     readonly property int _outlineWidth: Sizing.pctH(0.6)
-    readonly property int _captionHeight: Sizing.pctH(3.5)
-    readonly property int _captionGap: Sizing.pctH(0.8)
+    readonly property int _captionHeight: Sizing.pctH(5.5)
+    readonly property int _captionGap: Sizing.pctH(0.4)
 
     readonly property bool _focusedSelection:
         root.delegateIsSelected && root.delegateIsFocused
@@ -177,11 +183,13 @@ Item {
             top: parent.top
             topMargin: root._padding
             bottom: parent.bottom
-            // In caption mode the cover slot shrinks to leave a strip
-            // for the bottom caption; otherwise it fills body-padding.
+            // In caption mode the cover sits above the bottom caption
+            // strip with only `_captionGap` of breathing room. The
+            // caption is flush against the card's bottom edge, so the
+            // cover's lower bound is just (caption height + gap) —
+            // there is no second layer of card padding below.
             bottomMargin: root.showCaption
-                          ? root._padding + root._captionHeight
-                            + root._captionGap
+                          ? root._captionHeight + root._captionGap
                           : root._padding
             horizontalCenter: parent.horizontalCenter
         }
@@ -273,21 +281,32 @@ Item {
     // selection reads at a glance even when the focus outline ring is
     // outside the eye's centre — matches the procedural fallback's
     // focus tint above.
+    //
+    // The strip sits flush at the card's bottom edge so the title
+    // visually owns the bottom of the tile rather than hovering above
+    // a band of card padding. Horizontal margins clear `cornerRadius`
+    // so glyph descenders never enter the rounded-corner region (the
+    // card's surfaceCard fill curves away there, so a glyph past the
+    // inset would paint against whatever sits behind the tile).
+    // Vertically, the centred glyph lands well inside the focus
+    // ring's inner mask zone (which extends `_outlineGap +
+    // _outlineWidth` from the bottom edge), so the text background
+    // remains surfaceCard even on a focused tile.
     Text {
         id: caption
         anchors {
             left: parent.left
             right: parent.right
             bottom: parent.bottom
-            leftMargin: root._padding
-            rightMargin: root._padding
-            bottomMargin: root._padding
+            leftMargin: Sizing.cornerRadius
+            rightMargin: Sizing.cornerRadius
+            bottomMargin: 0
         }
         height: root._captionHeight
         visible: root.showCaption
         text: root.delegateName
         font.family: Theme.fontUi
-        font.pixelSize: Sizing.fontSize(1.7)
+        font.pixelSize: Sizing.fontSize(2.2)
         color: root._focusedSelection ? Theme.textPrimary : Theme.textLabel
         elide: Text.ElideRight
         horizontalAlignment: Text.AlignHCenter

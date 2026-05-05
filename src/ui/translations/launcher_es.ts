@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE TS>
-<TS version="2.1" language="en" sourcelanguage="en">
+<TS version="2.1" language="es_ES" sourcelanguage="en">
 <context>
     <name>AboutScreen</name>
     <message>
@@ -11,7 +11,7 @@
     <message>
         <location filename="../screens/AboutScreen.qml" line="117"/>
         <source>Zaparoo Launcher</source>
-        <translation type="unfinished">Zaparoo Launcher</translation>
+        <translation type="unfinished">Cargador de Zaparoo</translation>
     </message>
     <message>
         <location filename="../screens/AboutScreen.qml" line="128"/>
@@ -64,22 +64,22 @@
     <message>
         <location filename="../components/BootOverlay.qml" line="74"/>
         <source>Can&apos;t reach Zaparoo Core. Check your connection.</source>
-        <translation>Can&apos;t reach Zaparoo Core. Check your connection.</translation>
+        <translation>No se puede acceder a Zaparoo Core. Comprueba tu conexión.</translation>
     </message>
     <message>
         <location filename="../components/BootOverlay.qml" line="76"/>
         <source>Reconnecting…</source>
-        <translation>Reconnecting…</translation>
+        <translation>Reconectando…</translation>
     </message>
     <message>
         <location filename="../components/BootOverlay.qml" line="78"/>
         <source>Loading library…</source>
-        <translation>Loading library…</translation>
+        <translation>Cargando biblioteca…</translation>
     </message>
     <message>
         <location filename="../components/BootOverlay.qml" line="83"/>
         <source>Connecting to Zaparoo Core…</source>
-        <translation>Connecting to Zaparoo Core…</translation>
+        <translation>Conectando al Core de Zaparoo…</translation>
     </message>
 </context>
 <context>
@@ -126,57 +126,65 @@
         <location filename="../components/CoreStatusPill.qml" line="48"/>
         <location filename="../components/CoreStatusPill.qml" line="50"/>
         <source>Disconnected</source>
-        <translation>Disconnected</translation>
+        <translation>Desconectado</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="49"/>
         <source>Reconnecting…</source>
-        <translation>Reconnecting…</translation>
+        <translation>Reconectando…</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="51"/>
         <source>Connecting…</source>
-        <translation>Connecting…</translation>
+        <translation>Conectando…</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="52"/>
         <source>Core error</source>
-        <translation>Core error</translation>
+        <translation>Error del Core</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="54"/>
         <source>Optimizing database</source>
-        <translation>Optimizing database</translation>
+        <translation>Optimizando base de datos</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="60"/>
         <source>Indexing paused</source>
-        <translation>Indexing paused</translation>
+        <translation>Indexación en pausa</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="62"/>
         <source>Indexing %1/%2 - %3</source>
-        <translation>Indexing %1/%2 - %3</translation>
-    </message>
-    <message>
-        <location filename="../components/CoreStatusPill.qml" line="64"/>
-        <source>Indexing %1/%2</source>
-        <translation>Indexing %1/%2</translation>
-    </message>
-    <message>
-        <location filename="../components/CoreStatusPill.qml" line="65"/>
-        <source>Indexing…</source>
-        <translation>Indexing…</translation>
-    </message>
-    <message>
-        <location filename="../components/CoreStatusPill.qml" line="73"/>
-        <source>Scrape paused</source>
-        <translation>Scrape paused</translation>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="75"/>
         <source>Scraping %1/%2 - %3</source>
-        <translation>Scraping %1/%2 - %3</translation>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Indexing %1/%2 — %3</source>
+        <translation type="vanished">Indexando %1/%2 — %3</translation>
+    </message>
+    <message>
+        <location filename="../components/CoreStatusPill.qml" line="64"/>
+        <source>Indexing %1/%2</source>
+        <translation>Indexando %1/%2</translation>
+    </message>
+    <message>
+        <location filename="../components/CoreStatusPill.qml" line="65"/>
+        <source>Indexing…</source>
+        <translation>Indexando…</translation>
+    </message>
+    <message>
+        <location filename="../components/CoreStatusPill.qml" line="73"/>
+        <source>Scrape paused</source>
+        <translation>Scraping en pausa</translation>
+    </message>
+    <message>
+        <source>Scraping %1/%2 — %3</source>
+        <translation type="vanished">Scraping %1/%2 — %3</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="77"/>
@@ -194,22 +202,22 @@
     <message>
         <location filename="../screens/FavoritesScreen.qml" line="150"/>
         <source>Favorites</source>
-        <translation>Favorites</translation>
+        <translation>Favoritos</translation>
     </message>
     <message>
         <location filename="../screens/FavoritesScreen.qml" line="155"/>
         <source>%1 entries</source>
-        <translation>%1 entries</translation>
+        <translation>%1 entradas</translation>
     </message>
     <message>
         <location filename="../screens/FavoritesScreen.qml" line="207"/>
         <source>No favorites yet</source>
-        <translation>No favorites yet</translation>
+        <translation>Aún no hay favoritos</translation>
     </message>
     <message>
         <location filename="../screens/FavoritesScreen.qml" line="208"/>
         <source>Loading favorites…</source>
-        <translation>Loading favorites…</translation>
+        <translation>Cargando favoritos…</translation>
     </message>
 </context>
 <context>
@@ -217,52 +225,60 @@
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="124"/>
         <source>First-time setup</source>
-        <translation>First-time setup</translation>
+        <translation>Configuración inicial</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="133"/>
         <source>Zaparoo needs to scan your games before you can use the launcher. This usually takes a few minutes.</source>
-        <translation>Zaparoo needs to scan your games before you can use the launcher. This usually takes a few minutes.</translation>
+        <translation>Zaparoo necesita escanear tus juegos antes de que puedas usar el lanzador. Esto suele tardar unos minutos.</translation>
     </message>
     <message>
-        <location filename="../components/FirstRunIndexModal.qml" line="155"/>
-        <source>Optimizing database - almost done</source>
-        <translation>Optimizing database - almost done</translation>
+        <source>Optimizing database — almost done</source>
+        <translation type="vanished">Optimizando la base de datos — ya casi hemos terminado</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="208"/>
         <source>Indexing paused</source>
-        <translation>Indexing paused</translation>
+        <translation>Indexación en pausa</translation>
+    </message>
+    <message>
+        <source>Step %1 of %2 — %3</source>
+        <translation type="vanished">Paso %1 de %2 — %3</translation>
+    </message>
+    <message>
+        <location filename="../components/FirstRunIndexModal.qml" line="155"/>
+        <source>Optimizing database - almost done</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="210"/>
         <source>Step %1 of %2 - %3</source>
-        <translation>Step %1 of %2 - %3</translation>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="212"/>
         <source>Step %1 of %2</source>
-        <translation>Step %1 of %2</translation>
+        <translation>Paso %1 de %2</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="213"/>
         <source>Preparing…</source>
-        <translation>Preparing…</translation>
+        <translation>Preparando…</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="230"/>
         <source>Done. %1 files indexed.</source>
-        <translation>Done. %1 files indexed.</translation>
+        <translation>Hecho. %1 archivos indexados.</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="257"/>
         <source>Cancel</source>
-        <translation>Cancel</translation>
+        <translation>Cancelar</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="258"/>
         <source>Start scan</source>
-        <translation>Start scan</translation>
+        <translation>Iniciar escaneo</translation>
     </message>
 </context>
 <context>
@@ -270,17 +286,17 @@
     <message>
         <location filename="../screens/GamesScreen.qml" line="213"/>
         <source>%1 files</source>
-        <translation>%1 files</translation>
-    </message>
-    <message>
-        <location filename="../screens/GamesScreen.qml" line="281"/>
-        <source>No games in this system</source>
-        <translation>No games in this system</translation>
+        <translation>%1 archivos</translation>
     </message>
     <message>
         <location filename="../screens/GamesScreen.qml" line="282"/>
         <source>Loading games…</source>
-        <translation>Loading games…</translation>
+        <translation>Cargando juegos…</translation>
+    </message>
+    <message>
+        <location filename="../screens/GamesScreen.qml" line="281"/>
+        <source>No games in this system</source>
+        <translation>No hay juegos en este sistema</translation>
     </message>
 </context>
 <context>
@@ -288,22 +304,22 @@
     <message>
         <location filename="../screens/HubScreen.qml" line="96"/>
         <source>Favorites</source>
-        <translation>Favorites</translation>
+        <translation>Favoritos</translation>
     </message>
     <message>
         <location filename="../screens/HubScreen.qml" line="97"/>
         <source>Recently Played</source>
-        <translation>Recently Played</translation>
+        <translation>Recientemente Jugados</translation>
     </message>
     <message>
         <location filename="../screens/HubScreen.qml" line="98"/>
         <source>Settings</source>
-        <translation>Settings</translation>
+        <translation>Ajustes</translation>
     </message>
     <message>
         <location filename="../screens/HubScreen.qml" line="555"/>
         <source>No systems available. Run Update media database from Settings.</source>
-        <translation>No systems available. Run Update media database from Settings.</translation>
+        <translation>No hay sistemas disponibles. Ejecuta Actualizar la base de datos de medios desde Ajustes.</translation>
     </message>
 </context>
 <context>
@@ -311,7 +327,7 @@
     <message>
         <location filename="../components/LoadingIndicator.qml" line="28"/>
         <source>Loading…</source>
-        <translation>Loading…</translation>
+        <translation>Cargando…</translation>
     </message>
 </context>
 <context>
@@ -319,32 +335,32 @@
     <message>
         <location filename="../components/LogUploadModal.qml" line="87"/>
         <source>Upload log file</source>
-        <translation>Upload log file</translation>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../components/LogUploadModal.qml" line="98"/>
         <source>Uploading log file - this may take a moment.</source>
-        <translation>Uploading log file - this may take a moment.</translation>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../components/LogUploadModal.qml" line="205"/>
         <source>Upload failed: %1</source>
-        <translation>Upload failed: %1</translation>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../components/LogUploadModal.qml" line="206"/>
         <source>Upload failed.</source>
-        <translation>Upload failed.</translation>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../components/LogUploadModal.qml" line="234"/>
         <source>Retry</source>
-        <translation>Retry</translation>
+        <translation type="unfinished">Reintentar</translation>
     </message>
     <message>
         <location filename="../components/LogUploadModal.qml" line="235"/>
         <source>Done</source>
-        <translation>Done</translation>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -352,58 +368,58 @@
     <message>
         <location filename="../app/Main.qml" line="701"/>
         <source>Launch core</source>
-        <translation>Launch core</translation>
+        <translation>Lanzar core</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="711"/>
         <source>Remove from favorites</source>
-        <translation>Remove from favorites</translation>
+        <translation>Eliminar de favoritos</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="711"/>
         <source>Add to favorites</source>
-        <translation>Add to favorites</translation>
+        <translation>Agregar a favoritos</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="714"/>
         <source>Write to NFC token</source>
-        <translation>Write to NFC token</translation>
+        <translation>Escribir en token NFC</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="715"/>
         <source>QR code</source>
-        <translation>QR code</translation>
+        <translation>Código QR</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="704"/>
         <location filename="../app/Main.qml" line="716"/>
         <source>Launch game</source>
-        <translation>Launch game</translation>
+        <translation>Iniciar juego</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="1227"/>
         <source>Loading systems…</source>
-        <translation>Loading systems…</translation>
-    </message>
-    <message>
-        <location filename="../app/Main.qml" line="1228"/>
-        <source>Loading games…</source>
-        <translation>Loading games…</translation>
+        <translation>Cargando sistemas…</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="1229"/>
         <source>Loading favorites…</source>
-        <translation>Loading favorites…</translation>
+        <translation>Cargando favoritos…</translation>
+    </message>
+    <message>
+        <location filename="../app/Main.qml" line="1228"/>
+        <source>Loading games…</source>
+        <translation>Cargando juegos…</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="1230"/>
         <source>Loading recently played…</source>
-        <translation>Loading recently played…</translation>
+        <translation>Cargando jugados recientemente…</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="1231"/>
         <source>Loading…</source>
-        <translation>Loading…</translation>
+        <translation>Cargando…</translation>
     </message>
 </context>
 <context>
@@ -411,17 +427,17 @@
     <message>
         <location filename="../app/MainLayout.qml" line="53"/>
         <source>Zaparoo Launcher</source>
-        <translation>Zaparoo Launcher</translation>
+        <translation>Cargador de Zaparoo</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="330"/>
         <source>Writing failed</source>
-        <translation>Writing failed</translation>
+        <translation>Error de escritura</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="331"/>
         <source>Put a writable card near the reader</source>
-        <translation>Put a writable card near the reader</translation>
+        <translation>Pon una tarjeta escribible junto al lector</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="396"/>
@@ -434,21 +450,10 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/MainLayout.qml" line="450"/>
-        <location filename="../app/MainLayout.qml" line="478"/>
-        <location filename="../app/MainLayout.qml" line="502"/>
-        <location filename="../app/MainLayout.qml" line="517"/>
-        <location filename="../app/MainLayout.qml" line="545"/>
-        <location filename="../app/MainLayout.qml" line="567"/>
-        <location filename="../app/MainLayout.qml" line="617"/>
-        <source>Move</source>
-        <translation>Move</translation>
-    </message>
-    <message>
         <location filename="../app/MainLayout.qml" line="451"/>
         <location filename="../app/MainLayout.qml" line="479"/>
         <source>Select</source>
-        <translation>Select</translation>
+        <translation>Seleccionar</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="452"/>
@@ -457,7 +462,7 @@
         <location filename="../app/MainLayout.qml" line="464"/>
         <location filename="../app/MainLayout.qml" line="469"/>
         <source>Close</source>
-        <translation>Close</translation>
+        <translation>Cerrar</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="456"/>
@@ -465,20 +470,12 @@
         <location filename="../app/MainLayout.qml" line="480"/>
         <location filename="../app/MainLayout.qml" line="487"/>
         <source>Cancel</source>
-        <translation>Cancel</translation>
+        <translation>Cancelar</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="463"/>
         <source>Done</source>
-        <translation>Done</translation>
-    </message>
-    <message>
-        <location filename="../app/MainLayout.qml" line="468"/>
-        <location filename="../app/MainLayout.qml" line="527"/>
-        <location filename="../app/MainLayout.qml" line="556"/>
-        <location filename="../app/MainLayout.qml" line="628"/>
-        <source>Retry</source>
-        <translation>Retry</translation>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="475"/>
@@ -488,7 +485,23 @@
     <message>
         <location filename="../app/MainLayout.qml" line="490"/>
         <source>Start</source>
-        <translation>Start</translation>
+        <translation>Iniciar</translation>
+    </message>
+    <message>
+        <location filename="../app/MainLayout.qml" line="599"/>
+        <source>Scroll</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app/MainLayout.qml" line="450"/>
+        <location filename="../app/MainLayout.qml" line="478"/>
+        <location filename="../app/MainLayout.qml" line="502"/>
+        <location filename="../app/MainLayout.qml" line="517"/>
+        <location filename="../app/MainLayout.qml" line="545"/>
+        <location filename="../app/MainLayout.qml" line="567"/>
+        <location filename="../app/MainLayout.qml" line="617"/>
+        <source>Move</source>
+        <translation>Mover</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="503"/>
@@ -496,12 +509,12 @@
         <location filename="../app/MainLayout.qml" line="549"/>
         <location filename="../app/MainLayout.qml" line="621"/>
         <source>Open</source>
-        <translation>Open</translation>
+        <translation>Abrir</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="504"/>
         <source>Quit</source>
-        <translation>Quit</translation>
+        <translation>Salir</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="509"/>
@@ -516,36 +529,39 @@
         <location filename="../app/MainLayout.qml" line="624"/>
         <location filename="../app/MainLayout.qml" line="629"/>
         <source>Back</source>
-        <translation>Back</translation>
+        <translation>Atrás</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="520"/>
         <location filename="../app/MainLayout.qml" line="548"/>
         <location filename="../app/MainLayout.qml" line="620"/>
         <source>Page</source>
-        <translation>Page</translation>
+        <translation>Página</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="522"/>
         <location filename="../app/MainLayout.qml" line="551"/>
         <location filename="../app/MainLayout.qml" line="623"/>
         <source>Options</source>
-        <translation>Options</translation>
+        <translation>Opciones</translation>
+    </message>
+    <message>
+        <location filename="../app/MainLayout.qml" line="468"/>
+        <location filename="../app/MainLayout.qml" line="527"/>
+        <location filename="../app/MainLayout.qml" line="556"/>
+        <location filename="../app/MainLayout.qml" line="628"/>
+        <source>Retry</source>
+        <translation>Reintentar</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="577"/>
         <source>Change</source>
-        <translation>Change</translation>
+        <translation>Cambiar</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="581"/>
         <source>Toggle</source>
-        <translation>Toggle</translation>
-    </message>
-    <message>
-        <location filename="../app/MainLayout.qml" line="599"/>
-        <source>Scroll</source>
-        <translation type="unfinished"></translation>
+        <translation>Alternar</translation>
     </message>
 </context>
 <context>
@@ -553,7 +569,7 @@
     <message>
         <location filename="../components/Modal.qml" line="49"/>
         <source>OK</source>
-        <translation>OK</translation>
+        <translation>Aceptar</translation>
     </message>
     <message>
         <location filename="../components/Modal.qml" line="50"/>
@@ -568,7 +584,7 @@
     <message>
         <location filename="../components/Modal.qml" line="190"/>
         <source>Cancel</source>
-        <translation>Cancel</translation>
+        <translation>Cancelar</translation>
     </message>
 </context>
 <context>
@@ -576,22 +592,22 @@
     <message>
         <location filename="../screens/RecentsScreen.qml" line="151"/>
         <source>Recently Played</source>
-        <translation>Recently Played</translation>
+        <translation>Jugados Recientemente</translation>
     </message>
     <message>
         <location filename="../screens/RecentsScreen.qml" line="156"/>
         <source>%1 entries</source>
-        <translation>%1 entries</translation>
-    </message>
-    <message>
-        <location filename="../screens/RecentsScreen.qml" line="210"/>
-        <source>Nothing played yet</source>
-        <translation>Nothing played yet</translation>
+        <translation>%1 entradas</translation>
     </message>
     <message>
         <location filename="../screens/RecentsScreen.qml" line="211"/>
         <source>Loading recently played…</source>
-        <translation>Loading recently played…</translation>
+        <translation>Cargando jugados recientemente…</translation>
+    </message>
+    <message>
+        <location filename="../screens/RecentsScreen.qml" line="210"/>
+        <source>Nothing played yet</source>
+        <translation>No se ha jugado a nada todavía</translation>
     </message>
 </context>
 <context>
@@ -599,17 +615,17 @@
     <message>
         <location filename="../components/ScreenStateOverlay.qml" line="28"/>
         <source>Nothing here</source>
-        <translation>Nothing here</translation>
+        <translation>Nada aquí</translation>
     </message>
     <message>
         <location filename="../components/ScreenStateOverlay.qml" line="29"/>
         <source>Loading…</source>
-        <translation>Loading…</translation>
+        <translation>Cargando…</translation>
     </message>
     <message>
         <location filename="../components/ScreenStateOverlay.qml" line="61"/>
         <source>Failed to load</source>
-        <translation>Failed to load</translation>
+        <translation>Fallo al cargar</translation>
     </message>
 </context>
 <context>
@@ -617,27 +633,27 @@
     <message>
         <location filename="../screens/SettingsScreen.qml" line="71"/>
         <source>Language</source>
-        <translation>Language</translation>
-    </message>
-    <message>
-        <location filename="../screens/SettingsScreen.qml" line="76"/>
-        <source>Button style</source>
-        <translation>Button style</translation>
+        <translation>Idioma</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="93"/>
         <source>Mouse support</source>
-        <translation>Mouse support</translation>
+        <translation>Soporte a ratón</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="82"/>
         <source>Update media database</source>
-        <translation>Update media database</translation>
+        <translation>Actualizar base de datos de medios</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="55"/>
         <source>General</source>
         <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../screens/SettingsScreen.qml" line="76"/>
+        <source>Button style</source>
+        <translation>Estilo de botón</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="78"/>
@@ -647,7 +663,7 @@
     <message>
         <location filename="../screens/SettingsScreen.qml" line="87"/>
         <source>Scrape metadata</source>
-        <translation>Scrape metadata</translation>
+        <translation>Extraer metadatos</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="89"/>
@@ -657,12 +673,12 @@
     <message>
         <location filename="../screens/SettingsScreen.qml" line="98"/>
         <source>Debug logging</source>
-        <translation>Debug logging</translation>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="103"/>
         <source>Upload log file</source>
-        <translation>Upload log file</translation>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="108"/>
@@ -672,65 +688,60 @@
     <message>
         <location filename="../screens/SettingsScreen.qml" line="120"/>
         <source>Optimizing</source>
-        <translation>Optimizing</translation>
+        <translation>Optimizando</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="122"/>
         <location filename="../screens/SettingsScreen.qml" line="128"/>
         <source>Paused</source>
-        <translation>Paused</translation>
+        <translation>Pausado</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="122"/>
         <location filename="../screens/SettingsScreen.qml" line="128"/>
         <source>In progress</source>
-        <translation>In progress</translation>
+        <translation>En progreso</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="220"/>
         <source>Cancel</source>
-        <translation type="unfinished">Cancel</translation>
+        <translation type="unfinished">Cancelar</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="220"/>
         <location filename="../screens/SettingsScreen.qml" line="222"/>
         <source>Start</source>
-        <translation type="unfinished">Start</translation>
+        <translation type="unfinished">Iniciar</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="224"/>
         <source>Open</source>
-        <translation type="unfinished">Open</translation>
-    </message>
-    <message>
-        <location filename="../screens/SettingsScreen.qml" line="276"/>
-        <source>Default</source>
-        <translation>Default</translation>
+        <translation type="unfinished">Abrir</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="316"/>
         <source>English</source>
-        <translation>English</translation>
+        <translation>Inglés</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="318"/>
         <source>Italian</source>
-        <translation>Italian</translation>
+        <translation>Italiano</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="320"/>
         <source>Slovak</source>
-        <translation>Slovak</translation>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="322"/>
         <source>Romanian</source>
-        <translation>Romanian</translation>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="324"/>
         <source>Dutch</source>
-        <translation>Dutch</translation>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="325"/>
@@ -740,12 +751,12 @@
     <message>
         <location filename="../screens/SettingsScreen.qml" line="350"/>
         <source>Style B</source>
-        <translation>Style B</translation>
+        <translation>Estilo B</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="352"/>
         <source>Style C</source>
-        <translation>Style C</translation>
+        <translation>Estilo C</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="354"/>
@@ -755,17 +766,22 @@
     <message>
         <location filename="../screens/SettingsScreen.qml" line="355"/>
         <source>Style A</source>
-        <translation>Style A</translation>
+        <translation>Estilo A</translation>
+    </message>
+    <message>
+        <location filename="../screens/SettingsScreen.qml" line="276"/>
+        <source>Default</source>
+        <translation>Por defecto</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="458"/>
         <source>Settings</source>
-        <translation>Settings</translation>
+        <translation>Ajustes</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="643"/>
         <source>No settings available on this platform</source>
-        <translation>No settings available on this platform</translation>
+        <translation>No hay ajustes en esta plataforma</translation>
     </message>
 </context>
 <context>
@@ -773,17 +789,17 @@
     <message>
         <location filename="../screens/SystemsScreen.qml" line="160"/>
         <source>%1 systems</source>
-        <translation>%1 systems</translation>
+        <translation>%1 sistemas</translation>
     </message>
     <message>
         <location filename="../screens/SystemsScreen.qml" line="221"/>
         <source>No systems in this category</source>
-        <translation>No systems in this category</translation>
+        <translation>No hay sistemas en esta categoría</translation>
     </message>
     <message>
         <location filename="../screens/SystemsScreen.qml" line="222"/>
         <source>Loading systems…</source>
-        <translation>Loading systems…</translation>
+        <translation>Cargando sistemas…</translation>
     </message>
 </context>
 <context>
@@ -791,7 +807,7 @@
     <message>
         <location filename="../components/TopStatusStrip.qml" line="77"/>
         <source>Page %1 / %2</source>
-        <translation>Page %1 / %2</translation>
+        <translation>Página %1 / %2</translation>
     </message>
 </context>
 </TS>

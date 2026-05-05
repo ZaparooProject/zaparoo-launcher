@@ -28,12 +28,22 @@ pub struct Config {
     /// Durable mirror of launcher-owned settings. These stay in
     /// `launcher.toml` so they survive `MiSTer`'s `/tmp` lifecycle.
     pub settings: SettingsConfig,
+    /// First-run notices the user has acknowledged. Stored in
+    /// `launcher.toml` (not `state.toml`) because `MiSTer`'s `/tmp`
+    /// state is wiped on reboot — using state would re-show the notice
+    /// every cold boot.
+    pub notice: NoticeConfig,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SettingsConfig {
     pub button_layout: Option<String>,
     pub mouse_enabled: Option<bool>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct NoticeConfig {
+    pub commercial_ack: bool,
 }
 
 impl Default for Config {
@@ -46,6 +56,7 @@ impl Default for Config {
             language: String::new(),
             key_to_action: input_actions::invert(&input_actions::default_bindings()),
             settings: SettingsConfig::default(),
+            notice: NoticeConfig::default(),
         }
     }
 }
@@ -64,6 +75,8 @@ struct RawConfig {
     input: RawInput,
     #[serde(default)]
     settings: RawSettings,
+    #[serde(default)]
+    notice: RawNotice,
 }
 
 #[derive(Deserialize, Default)]
@@ -99,17 +112,29 @@ struct RawSettings {
     mouse_enabled: Option<bool>,
 }
 
+#[derive(Deserialize, Default)]
+struct RawNotice {
+    commercial_ack: Option<bool>,
+}
+
 pub fn load_config(path: &Path) -> Config {
     let mut cfg = Config::default();
-    let Ok(src) = std::fs::read_to_string(path) else {
-        return cfg;
-    };
-    let raw: RawConfig = match toml::from_str(&src) {
-        Ok(r) => r,
-        Err(e) => {
-            warn!("config parse error in {}: {e}", path.display());
-            return cfg;
-        }
+    let raw: RawConfig = match std::fs::read_to_string(path) {
+        Ok(src) => match toml::from_str(&src) {
+            Ok(r) => r,
+            Err(e) => {
+                warn!("config parse error in {}: {e}", path.display());
+                // Fall through with defaults so the env-var override
+                // below still applies on a malformed file.
+                RawConfig::default()
+            }
+        },
+        // Missing file is the first-run case. Don't early-return — the
+        // env-var override below must still apply, otherwise an invocation
+        // like `ZAPAROO_CORE_ENDPOINT=… just run` with no launcher.toml
+        // silently falls back to the localhost default and the launcher
+        // sits in CONNECTING forever.
+        Err(_) => RawConfig::default(),
     };
     if let Some(lang) = raw.general.language {
         // "auto" is the documented opt-in to system-locale detection; treat
@@ -154,6 +179,9 @@ pub fn load_config(path: &Path) -> Config {
             .button_layout
             .map(|value| value.trim().to_string()),
         mouse_enabled: raw.settings.mouse_enabled,
+    };
+    cfg.notice = NoticeConfig {
+        commercial_ack: raw.notice.commercial_ack.unwrap_or(false),
     };
     cfg
 }
@@ -220,6 +248,40 @@ pub fn save_settings_mirror(
         .map_err(|e| format!("could not write {}: {e}", path.display()))
 }
 
+/// Persist a first-run notice acknowledgement into `launcher.toml`.
+/// Mirrors `save_settings_mirror`'s atomic-write + section-preserving
+/// pattern so unrelated keys in the file (core endpoint, video, input
+/// bindings) survive untouched.
+pub fn save_notice_ack(path: &Path, commercial_ack: bool) -> Result<(), String> {
+    let mut table = if path.exists() {
+        let src = std::fs::read_to_string(path)
+            .map_err(|e| format!("could not read {}: {e}", path.display()))?;
+        toml::from_str::<toml::Table>(&src)
+            .map_err(|e| format!("config parse error in {}: {e}", path.display()))?
+    } else {
+        toml::Table::new()
+    };
+
+    let notice_value = table
+        .entry("notice")
+        .or_insert_with(|| toml::Value::Table(toml::Table::new()));
+    let Some(notice) = notice_value.as_table_mut() else {
+        return Err(format!(
+            "config key [notice] in {} is not a table",
+            path.display()
+        ));
+    };
+    notice.insert(
+        "commercial_ack".into(),
+        toml::Value::Boolean(commercial_ack),
+    );
+
+    let serialized =
+        toml::to_string(&table).map_err(|e| format!("config serialisation failed: {e}"))?;
+    write_atomic(path, serialized.as_bytes())
+        .map_err(|e| format!("could not write {}: {e}", path.display()))
+}
+
 fn normalize_language_override(value: &str) -> String {
     let trimmed = value.trim();
     if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("auto") {
@@ -269,7 +331,7 @@ mod tests {
         reason = "tests should fail-fast on unexpected errors"
     )]
 
-    use super::{load_config, save_settings_mirror, Config};
+    use super::{load_config, save_notice_ack, save_settings_mirror, Config};
     use std::io::Write;
 
     fn write_tmp(contents: &str) -> tempfile::NamedTempFile {
@@ -288,8 +350,36 @@ mod tests {
         assert_eq!(cfg.language, "");
         assert_eq!(cfg.settings.button_layout, None);
         assert_eq!(cfg.settings.mouse_enabled, None);
+        assert!(!cfg.notice.commercial_ack);
         // Default keyboard bindings populate the map.
         assert!(!cfg.key_to_action.is_empty());
+    }
+
+    #[test]
+    fn notice_commercial_ack_round_trips() {
+        let f = write_tmp("[notice]\ncommercial_ack = true\n");
+        let cfg = load_config(f.path());
+        assert!(cfg.notice.commercial_ack);
+    }
+
+    #[test]
+    fn save_notice_ack_creates_section_and_preserves_others() {
+        let f = write_tmp(
+            "[core]\nendpoint = \"ws://example.com/api\"\n[settings]\nbutton_layout = \"b\"\n",
+        );
+        save_notice_ack(f.path(), true).expect("save");
+        let cfg = load_config(f.path());
+        assert!(cfg.notice.commercial_ack);
+        assert_eq!(cfg.core_endpoint, "ws://example.com/api");
+        assert_eq!(cfg.settings.button_layout.as_deref(), Some("b"));
+    }
+
+    #[test]
+    fn save_notice_ack_can_unset() {
+        let f = write_tmp("[notice]\ncommercial_ack = true\n");
+        save_notice_ack(f.path(), false).expect("save");
+        let cfg = load_config(f.path());
+        assert!(!cfg.notice.commercial_ack);
     }
 
     #[test]
@@ -463,6 +553,24 @@ mod tests {
         // out the user's launcher.toml.
         std::env::set_var(KEY, "");
         assert_eq!(load_config(f.path()).core_endpoint, "ws://example.com/api");
+
+        // Regression: missing file used to early-return defaults before
+        // the env-var override applied, so a first-run invocation like
+        // `ZAPAROO_CORE_ENDPOINT=… just run` silently fell back to the
+        // localhost default and the launcher sat in CONNECTING forever.
+        std::env::set_var(KEY, "ws://10.0.0.115:7497/api/v0.1");
+        assert_eq!(
+            load_config(std::path::Path::new("/definitely/does/not/exist.toml")).core_endpoint,
+            "ws://10.0.0.115:7497/api/v0.1"
+        );
+
+        // Same regression on a malformed file — fall through to the env
+        // override rather than freezing on the localhost default.
+        let bad = write_tmp("this is not = valid toml [[[");
+        assert_eq!(
+            load_config(bad.path()).core_endpoint,
+            "ws://10.0.0.115:7497/api/v0.1"
+        );
 
         match prior {
             Some(v) => std::env::set_var(KEY, v),

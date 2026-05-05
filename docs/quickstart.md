@@ -88,9 +88,9 @@ In a second terminal:
 just run-dev
 ```
 
-`run-dev` is windowed and points at the mock. `just run` is the
-production-style runner: it respects `~/.config/zaparoo/launcher.toml` and
-starts fullscreen.
+`run-dev` points at the mock through `ZAPAROO_CORE_ENDPOINT`. `just run` is
+the production-style runner: it reads `~/.config/zaparoo/launcher.toml`
+instead.
 
 ## 5. Check the result
 
@@ -105,12 +105,13 @@ starts fullscreen.
 - Pressing Enter on a system opens the **paged games grid** (five
   entries per system).
 - Pressing Enter on a game sends a `run` RPC to the mock. The mock logs the
-  selected game's zap script, but the launcher keeps running because nothing is
+  selected game's ZapScript, but the launcher keeps running because nothing is
   actually launched.
 - Pressing Tab on a system or game sends a `readers.write` RPC with the
-  selected entry's zap script. The launcher shows a card-write modal while the
+  selected entry's ZapScript. The launcher shows a card-write modal while the
   request is pending; the mock logs the write request.
-- Escape backs out; Escape on the top level quits.
+- Escape backs out; Escape on the top level opens a quit-confirm modal —
+  confirm to exit.
 
 The FPS counter in the corner should stay green (≥ 55). Red means the UI fell
 below 30 FPS and needs investigation.

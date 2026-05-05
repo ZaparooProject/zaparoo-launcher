@@ -1,0 +1,174 @@
+// Zaparoo Launcher
+// Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+
+import QtQuick
+import Zaparoo.Theme
+import Zaparoo.Browse as Browse
+
+// cxx-qt 0.8 patches `isFinal: true` on singleton properties but the
+// qmltypes schema has no `isFinal` slot, so every read trips qmllint's
+// "Member can be shadowed" check. Until the schema grows the slot,
+// suppress the compiler category file-wide.
+// qmllint disable compiler
+
+// Blocking first-run notice. Shown once per install before the launcher
+// becomes usable, then never again — `Browse.Notice.commercial_ack`
+// persists in `launcher.toml` (not `state.toml`, which is tmpfs on
+// MiSTer). Routed in front of the media-DB first-run modal so the user
+// sees this prose first, then the indexing prompt.
+//
+// Pure presentation: input is dispatched by `Main.qml`, the only
+// interactive surface is the "I understand" action, and dismiss runs
+// through the `closeRequested` signal so the router owns the modal
+// stack. Chrome (scrim, panel, border, radius, title) comes from the
+// shared `Modal` shell so every dialog in the app reads as the same
+// surface.
+Item {
+    id: modal
+
+    property bool open: false
+
+    signal closeRequested()
+
+    visible: modal.open
+    anchors.fill: parent
+    z: 310
+
+    function handleAction(action: string): void {
+        if (action === "accept") {
+            // Persist before signalling close so the next Component
+            // construction (warm-restart on MiSTer) sees the ack flag
+            // already written. The Rust slot is synchronous on the Qt
+            // thread; if the disk write fails it logs and still flips
+            // the in-memory flag for this session.
+            Browse.Notice.acknowledge_commercial()
+            modal.closeRequested()
+        }
+        // No cancel path. The notice is informational, not a license
+        // condition — but it must be acknowledged once so the user has
+        // demonstrably seen the non-commercial-use message before the
+        // launcher becomes interactive.
+    }
+
+    Modal {
+        id: shell
+
+        open: modal.open
+        kind: "shell"
+        title: qsTr("Welcome to Zaparoo Launcher")
+        panelMaxWidth: Sizing.pctH(110)
+
+        Column {
+            width: parent.width
+            spacing: Sizing.pctH(3)
+
+            Text {
+                width: parent.width
+                text: qsTr("Copyright 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.")
+                font.family: Theme.fontUi
+                font.pixelSize: Sizing.fontSize(2.5)
+                color: Theme.textPrimary
+                wrapMode: Text.WordWrap
+                horizontalAlignment: Text.AlignHCenter
+                renderType: Text.NativeRendering
+            }
+
+            Text {
+                width: parent.width
+                text: qsTr("This free source-available build is for personal and non-commercial use only. Commercial use or redistribution requires a license.")
+                font.family: Theme.fontUi
+                font.pixelSize: Sizing.fontSize(2.5)
+                color: Theme.textPrimary
+                wrapMode: Text.WordWrap
+                horizontalAlignment: Text.AlignHCenter
+                renderType: Text.NativeRendering
+            }
+
+            Text {
+                width: parent.width
+                text: qsTr("Contact: legal@zaparoo.org")
+                font.family: Theme.fontUi
+                font.pixelSize: Sizing.fontSize(2.5)
+                color: Theme.textLabel
+                wrapMode: Text.WordWrap
+                horizontalAlignment: Text.AlignHCenter
+                renderType: Text.NativeRendering
+            }
+
+            Text {
+                width: parent.width
+                text: qsTr("Full details available any time under Settings > About / License.")
+                font.family: Theme.fontUi
+                font.pixelSize: Sizing.fontSize(2.3)
+                color: Theme.textLabel
+                wrapMode: Text.WordWrap
+                horizontalAlignment: Text.AlignHCenter
+                renderType: Text.NativeRendering
+            }
+
+            // Tight inner Column so the "Created by" caption sits
+            // directly above the names without inheriting the outer
+            // Column's paragraph spacing.
+            Column {
+                width: parent.width
+                spacing: Sizing.pctH(0.4)
+
+                Text {
+                    width: parent.width
+                    text: qsTr("Created by")
+                    font.family: Theme.fontUi
+                    font.pixelSize: Sizing.fontSize(2.3)
+                    color: Theme.textLabel
+                    horizontalAlignment: Text.AlignHCenter
+                    renderType: Text.NativeRendering
+                }
+
+                // Contributor names are not translated — they're
+                // proper names.
+                Text {
+                    width: parent.width
+                    text: "Andrea Bogazzi, BossRighteous, Tim Wilsie, Wizzo"
+                    font.family: Theme.fontUi
+                    font.pixelSize: Sizing.fontSize(2.5)
+                    color: Theme.textPrimary
+                    wrapMode: Text.WordWrap
+                    horizontalAlignment: Text.AlignHCenter
+                    renderType: Text.NativeRendering
+                }
+            }
+
+            Item {
+                id: understandSlot
+                width: parent.width
+                height: Sizing.pctH(7)
+
+                Rectangle {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: Math.min(Sizing.pctW(28), understandSlot.width)
+                    height: parent.height
+                    color: Theme.bgBar
+                    border.width: 1
+                    border.color: Theme.borderMid
+                    radius: Sizing.cornerRadius
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: qsTr("I understand")
+                        font.family: Theme.fontUi
+                        font.pixelSize: Sizing.fontSize(2.5)
+                        color: Theme.textPrimary
+                        renderType: Text.NativeRendering
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        acceptedButtons: Qt.LeftButton
+                        onClicked: modal.handleAction("accept")
+                    }
+                }
+            }
+        }
+    }
+}

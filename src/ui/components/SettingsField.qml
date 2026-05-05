@@ -37,6 +37,7 @@ Item {
 
     signal hovered()
     signal clicked()
+    signal rightClicked()
     // Emitted when the action-control row receives an accept press.
     // The screen wires this to the matching invokable (start/cancel
     // index, start/cancel scrape) and gates by `actionStatus`.
@@ -145,26 +146,43 @@ Item {
         }
     }
 
-    // Right-side caption for `control: "action"`. No `< >` arrows, no
-    // toggle pill — just a single muted-when-idle string showing the
-    // current operation state. Empty `actionStatus` collapses to no
-    // text, matching the visual quietness of an idle row.
-    Text {
+    // Right-side cluster for `control: "action"`. The chevron is the
+    // affordance — it always paints so an idle action row reads as
+    // pressable. The status caption to its left only paints while the
+    // operation is in flight ("In progress" / "Paused" / "Optimizing");
+    // it's a status, not the label of the action.
+    Row {
         visible: root.control === "action"
         anchors.right: parent.right
         anchors.rightMargin: Sizing.pctW(3)
         anchors.verticalCenter: parent.verticalCenter
-        text: root.actionStatus
-        color: Theme.textPrimary
-        font.family: Theme.fontUi
-        font.pixelSize: Sizing.fontSize(2.4)
-        renderType: Text.NativeRendering
+        spacing: Sizing.pctW(1.5)
+
+        Text {
+            anchors.verticalCenter: parent.verticalCenter
+            visible: root.actionStatus !== ""
+            text: root.actionStatus
+            color: Theme.textLabel
+            font.family: Theme.fontUi
+            font.pixelSize: Sizing.fontSize(2.4)
+            renderType: Text.NativeRendering
+        }
+
+        Text {
+            anchors.verticalCenter: parent.verticalCenter
+            text: "›"
+            color: Theme.textPrimary
+            font.family: Theme.fontUi
+            font.pixelSize: Sizing.fontSize(3.0)
+            renderType: Text.NativeRendering
+        }
     }
 
     MouseArea {
         anchors.fill: parent
         hoverEnabled: true
-        acceptedButtons: Qt.LeftButton
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        cursorShape: Qt.PointingHandCursor
 
         onEntered: root.hovered()
         // Action rows fire `accepted()` (the screen runs start/cancel
@@ -172,11 +190,14 @@ Item {
         // moves focus and toggles a value). Emitting both for action
         // rows used to make `onClicked` and `onAccepted` race over
         // the same press.
-        onClicked: {
-            if (root.control === "action")
+        onClicked: (mouse) => {
+            if (mouse.button === Qt.RightButton) {
+                root.rightClicked()
+            } else if (root.control === "action") {
                 root.accepted();
-            else
+            } else {
                 root.clicked();
+            }
         }
     }
 }

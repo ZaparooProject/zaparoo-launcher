@@ -21,9 +21,14 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 option(BUILD_SHARED_LIBS "Build shared libraries (required for LGPL desktop builds)" ON)
 option(ZAPAROO_BUILD_TESTS "Build unit/smoke tests" ON)
 option(ZAPAROO_DEV "Development mode: windowed window and dev core endpoint" OFF)
+option(ZAPAROO_EMBEDDED "Embedded device build (MiSTer): default fullscreen, no window chrome" OFF)
 
 if(ZAPAROO_DEV)
     add_compile_definitions(ZAPAROO_DEV_BUILD)
+endif()
+
+if(ZAPAROO_EMBEDDED)
+    add_compile_definitions(ZAPAROO_EMBEDDED_BUILD)
 endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
