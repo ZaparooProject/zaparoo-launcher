@@ -41,6 +41,19 @@ QtObject {
     // are intentionally a different shape. See docs/style.md.
     readonly property int cornerRadius: pctH(3.5)
 
+    // ── Top header (logo + status row + status pill) ──────────────────
+    // Single source of truth for the header bar that sits at the top of
+    // every screen. The logo's height is locked to the stacked-row
+    // total so the brand mark sits flush with the top of the status
+    // row and the bottom of the pill row, even when the pill is idle
+    // (its space is reserved). Screen content clears `headerBottom`.
+    readonly property int headerRowHeight: fontSize(3.4)
+    readonly property int headerStackGap: pctH(0.8)
+    readonly property int headerTopMargin: pctH(2)
+    readonly property int headerSideMargin: pctW(2)
+    readonly property int headerHeight: 2 * headerRowHeight + headerStackGap
+    readonly property int headerBottom: headerTopMargin + headerHeight
+
     function pctH(percent: real): int {
         return Math.round(screenHeight * percent / 100)
     }

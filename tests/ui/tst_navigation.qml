@@ -204,6 +204,89 @@ TestCase {
         compare(main.hubScreen.currentIndex, 2,
                 "Left at first bottom-row index wraps to last")
     }
+
+    // Cross-row round-trip. With 4 categories on top vs 3 actions on
+    // bottom, the centered visual-nearest map can't return Up to the
+    // tile a previous Down originated from — every Down→Up shifts
+    // right by one cell. The fix is `_crossSavedIndex`: each cross
+    // saves the source-row index, the next cross restores it, any
+    // horizontal input on the destination row invalidates it.
+
+    // After Down from top[0], the saved index must hold 0 so the next
+    // Up can return there. `_mapCrossRow(0, topCount=0, 3)` puts us at
+    // bottom[2] regardless — that part is unchanged.
+    function test_cross_row_arms_saved_source_index(): void {
+        main.handleKey(Qt.Key_Down)
+        compare(main.hubScreen.currentRow, 1)
+        compare(main.hubScreen._crossSavedIndex, 0,
+                "Down from top[0] must save 0 for the round-trip back")
+    }
+
+    // Horizontal input on the destination row clears the saved index
+    // — the user has now committed to navigating within the new row,
+    // so the next cross should fall back to the centered visual map.
+    function test_cross_row_horizontal_input_clears_saved_index(): void {
+        main.handleKey(Qt.Key_Down)
+        compare(main.hubScreen._crossSavedIndex, 0)
+        main.handleKey(Qt.Key_Left)
+        compare(main.hubScreen._crossSavedIndex, -1,
+                "Left on the destination row must invalidate the round-trip")
+    }
+
+    // Mouse focus is a deliberate landing on a specific tile, same
+    // intent as a horizontal arrow press — clear the saved index so a
+    // later Up doesn't snap back to a row the user already left.
+    function test_cross_row_mouse_focus_clears_saved_index(): void {
+        main.handleKey(Qt.Key_Down)
+        compare(main.hubScreen._crossSavedIndex, 0)
+        main.hubScreen._focusAction(0)
+        compare(main.hubScreen._crossSavedIndex, -1,
+                "Mouse focus on an action tile must invalidate the round-trip")
+    }
+
+    // Restore path: when `_crossSavedIndex` is armed and within the
+    // destination row's bounds, `_crossRow` uses it directly instead
+    // of the centered visual map. The test harness has no live
+    // categories, so we drive `_crossRow` synthetically with a
+    // pretend top index whose visual map would land somewhere
+    // unrelated, then verify the restore won.
+    function test_cross_row_uses_saved_index_over_visual_map(): void {
+        main.hubScreen.currentRow = 0
+        main.hubScreen.currentIndex = 7
+        main.hubScreen._crossSavedIndex = 1
+        const moved = main.hubScreen._crossRow()
+        verify(moved, "_crossRow with non-empty destination must move")
+        compare(main.hubScreen.currentRow, 1,
+                "Cross flips to the other row")
+        compare(main.hubScreen.currentIndex, 1,
+                "Saved index 1 wins over the visual map")
+        compare(main.hubScreen._crossSavedIndex, 7,
+                "After the cross, the saved index points back to the source")
+    }
+
+    // Saved index that points past the destination row's count is
+    // ignored — the destination layout may have changed since we
+    // crossed away. Falls back to the visual map.
+    function test_cross_row_out_of_range_saved_index_falls_back(): void {
+        main.hubScreen.currentRow = 0
+        main.hubScreen.currentIndex = 0
+        main.hubScreen._crossSavedIndex = 99
+        const moved = main.hubScreen._crossRow()
+        verify(moved)
+        compare(main.hubScreen.currentRow, 1)
+        // _mapCrossRow(0, topCount=0, 3) lands at bottom[2].
+        compare(main.hubScreen.currentIndex, 2,
+                "Out-of-range saved index falls back to the visual map")
+    }
+
+    // resetFocus is the test-harness reset and the cold-launch state.
+    // It must clear the round-trip arm so a prior test's saved index
+    // can't leak into the next case.
+    function test_reset_focus_clears_saved_index(): void {
+        main.hubScreen._crossSavedIndex = 2
+        main.hubScreen.resetFocus()
+        compare(main.hubScreen._crossSavedIndex, -1)
+    }
     // qmllint enable compiler
 
     // Hold-to-repeat (dpad). The repeat state machine is driven by
@@ -296,12 +379,14 @@ TestCase {
     // test isolation rule — no real menu opening, no handleAction.
     // Compares only the entry id sequence; labels are qsTr() and asserted
     // separately so the tests stay translation-friendly.
-    function _idsOf(entries) {
+    // qmllint disable compiler
+    function _idsOf(entries: var): var {
         const out = []
         for (let i = 0; i < entries.length; ++i)
             out.push(entries[i].id)
         return out
     }
+    // qmllint enable compiler
 
     function test_context_menu_systems_owner_is_single_launch_core(): void {
         // qmllint disable compiler

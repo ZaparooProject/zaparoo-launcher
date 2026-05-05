@@ -498,17 +498,22 @@
         <translation>Automatico</translation>
     </message>
     <message>
-        <location filename="../screens/SettingsScreen.qml" line="244"/>
+        <location filename="../screens/SettingsScreen.qml" line="264"/>
         <source>Style B</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../screens/SettingsScreen.qml" line="246"/>
+        <location filename="../screens/SettingsScreen.qml" line="266"/>
         <source>Style C</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../screens/SettingsScreen.qml" line="247"/>
+        <location filename="../screens/SettingsScreen.qml" line="268"/>
+        <source>Style D</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../screens/SettingsScreen.qml" line="269"/>
         <source>Style A</source>
         <translation type="unfinished"></translation>
     </message>

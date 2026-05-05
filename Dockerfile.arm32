@@ -21,6 +21,11 @@
 ARG TOOLCHAIN_IMAGE=zaparoo/qt6-arm32-mister:unset
 FROM ${TOOLCHAIN_IMAGE} AS app-build
 
+# Forwarded by scripts/build-arm32.sh when invoked through `just release`.
+# Empty by default so dev builds report channel = "dev". The build.rs check is
+# presence-only, so we only export the env var when the ARG is non-empty.
+ARG ZAPAROO_OFFICIAL_BUILD=
+
 # cxx-qt's build script resolves Qt paths via qmake, which returns
 # sysroot-prefixed paths (e.g. {sysroot}/opt/qt6-arm32/...). Symlink Qt
 # into the sysroot so those paths resolve on the build host.
@@ -37,11 +42,15 @@ COPY resources/ resources/
 COPY rust/ rust/
 
 RUN mkdir build && cd build && \
+    if [ -n "${ZAPAROO_OFFICIAL_BUILD}" ]; then \
+        export ZAPAROO_OFFICIAL_BUILD="${ZAPAROO_OFFICIAL_BUILD}"; \
+    fi && \
     /opt/qt6-arm32/bin/qt-cmake .. \
         -G Ninja \
         -DCMAKE_BUILD_TYPE=Release \
         -DBUILD_SHARED_LIBS=OFF \
         -DZAPAROO_BUILD_TESTS=OFF \
+        -DZAPAROO_EMBEDDED=ON \
         -DQt6LinguistTools_DIR=/opt/qt6-host/lib/cmake/Qt6LinguistTools \
     && ninja
 
