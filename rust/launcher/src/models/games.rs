@@ -77,6 +77,20 @@ const FAVORITE_ROLE: i32 = 256 + 8;
 // 1000; grid page sizes top out at ~30 so we stay well inside bounds.
 const DEFAULT_PAGE_SIZE: i32 = 15;
 
+// `media.browse` `max_results` for cursor follow-ups. Held separate
+// from `page_size` (which dictates grid layout, scroll-thumb sizing,
+// and the initial-page cover gate) so wire chunks can be larger than a
+// single visual page without changing the grid math. Server caps
+// `max_results` at 1000; 500 stays well inside that, costs ~100 KB on
+// the wire (~200 B per `BrowseEntry`), and brings a 1402-entry Amiga
+// catalog down to ~3 round-trips. Even a 15,000-entry Arcade dump
+// holds the full per-system entry list in ~3 MB — orders of magnitude
+// under MiSTer's headroom — so the cap is wire size and Core's own
+// limit, not launcher memory. Initial browse keeps the smaller
+// `page_size` so the cover gate doesn't have to wait for a big first
+// decode.
+const FETCH_MORE_CHUNK_SIZE: i32 = 500;
+
 #[allow(
     clippy::struct_excessive_bools,
     reason = "the bools are independent qproperties surfaced to QML; collapsing them \
@@ -382,10 +396,18 @@ impl ffi::GamesModel {
     fn fetch_more(mut self: Pin<&mut Self>) {
         // Debounce: PagedGrid fires `loadMoreRequested` once per page
         // turn, but a fast spinner on the last loaded page can fire
-        // twice before the first follow-up returns. Both guards
+        // twice before the first follow-up returns. All three guards
         // matter: `loading_more` covers in-flight, `has_next_page`
-        // covers terminal pages.
-        if self.loading_more || !self.has_next_page {
+        // covers terminal pages, and `next_cursor.is_none()` covers
+        // the in-between window in `apply_append_page` where the final
+        // chunk has cleared the cursor before flipping
+        // `has_next_page` (the flip is intentionally deferred so the
+        // pending-target watchdog reads a fresh `itemCount`). Without
+        // this third guard, a `_commitPendingTarget` re-fire from
+        // `onItemCountChanged` would dispatch `media.browse` with
+        // `cursor=None`, re-fetching from page 1 and splicing
+        // duplicates onto the loaded slice.
+        if self.loading_more || !self.has_next_page || self.next_cursor.is_none() {
             return;
         }
         let cursor = self.next_cursor.clone();
@@ -401,7 +423,8 @@ impl ffi::GamesModel {
         // `set_path` invalidate the prior cursor sequence.
         let seq = self.seq.clone();
         let ticket = seq.load(Ordering::SeqCst);
-        let max_results = u32::try_from(self.page_size.max(1)).unwrap_or(u32::from(u16::MAX));
+        let max_results =
+            u32::try_from(FETCH_MORE_CHUNK_SIZE.max(1)).unwrap_or(u32::from(u16::MAX));
         self.as_mut().set_loading_more(true);
         let qt_thread = self.qt_thread();
         let store = global_store();
@@ -1423,6 +1446,30 @@ fn apply_append_page(
             let entries = transform_entries(result.entries, platform.as_ref());
             let new_count = i32::try_from(entries.len()).unwrap_or(i32::MAX - model.count);
             enqueue_cover_fetches(&entries);
+            // Order matters for the pending-target chain in PagedGrid:
+            //
+            // 1. `next_cursor` and `loading_more=false` MUST happen
+            //    before `end_insert_rows`. The Repeater reacts
+            //    synchronously to `rowsInserted`; PagedGrid's
+            //    `onItemCountChanged` runs `_commitPendingTarget`,
+            //    which can re-fire `loadMoreRequested` -> `fetch_more`.
+            //    If `loading_more` is still true at that moment the
+            //    fetch_more guard early-returns and the chain stalls
+            //    after one append.
+            //
+            // 2. `has_next_page` MUST happen after `end_insert_rows`.
+            //    On the final chunk the value flips true -> false; if
+            //    we set it first, PagedGrid's `onHasMorePagesChanged`
+            //    fires `_commitPendingTarget` while `itemCount` is
+            //    still stale (pre-insert), the watchdog sees a too-low
+            //    itemCount, and settles the pending target on whatever
+            //    was loaded BEFORE this chunk landed -- the wrap
+            //    appears to land ~1 chunk short of the real last page.
+            //    Setting it after the insert lets the watchdog read
+            //    the fresh itemCount and clamp to the actual last
+            //    item.
+            model.as_mut().rust_mut().next_cursor = next_cursor;
+            model.as_mut().set_loading_more(false);
             if new_count > 0 {
                 let first = model.count;
                 let last = first.saturating_add(new_count).saturating_sub(1);
@@ -1433,25 +1480,26 @@ fn apply_append_page(
                 model.as_mut().end_insert_rows();
                 model.as_mut().count_changed();
             }
-            model.as_mut().rust_mut().next_cursor = next_cursor;
             model.as_mut().set_has_next_page(has_next_page);
-            // total_files isn't strictly required to update — Core
-            // returns the same value for every page of the same path —
-            // but Core may revise it under us if files appear/disappear
-            // between cursor advances; keep it fresh.
+            // total_files isn't strictly required to update -- Core
+            // returns the same value for every page of the same path
+            // -- but Core may revise it under us if files
+            // appear/disappear between cursor advances; keep it
+            // fresh.
             let total = i32::try_from(result.total_files).unwrap_or(i32::MAX);
             if model.total_files != total {
                 model.as_mut().set_total_files(total);
             }
             // dir_count intentionally not touched: Core only returns
             // directory entries on page 1 (cursor == nil).
-            model.as_mut().set_loading_more(false);
+            //
             // No auto-prefetch here. apply_initial_page pre-warms
-            // page 2 once; subsequent pages are driven by the grid's
-            // onLoadMoreRequested as the user scrolls. Chaining a
-            // fetch_more here turned the look-ahead into a self-driving
-            // cascade that downloaded every page back-to-back, tripping
-            // Core's WebSocket rate limit on huge folders (Arcade).
+            // chunk 2 once; subsequent chunks are driven by the
+            // grid's onLoadMoreRequested as the user scrolls.
+            // Chaining a fetch_more here turned the look-ahead into a
+            // self-driving cascade that downloaded every page
+            // back-to-back, tripping Core's WebSocket rate limit on
+            // huge folders (Arcade).
         }
         Err(e) => {
             warn!("media.browse follow-up page failed: {}", e.message);

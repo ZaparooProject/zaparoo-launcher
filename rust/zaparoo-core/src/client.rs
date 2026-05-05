@@ -44,6 +44,22 @@ const RETRY_ERROR_THRESHOLD: u32 = 10;
 /// after hours still reconnects within half a minute.
 const MAX_BACKOFF_SECS: u64 = 30;
 
+/// Cold-boot window during which we retry the WebSocket every
+/// `BOOT_RETRY` instead of using the exponential curve. Sized to cover
+/// the worst observed Core cold-start on `MiSTer` (~22 s service-binary
+/// prep + database open with a large media DB) plus headroom. While the
+/// window is open and we have never connected, connect failures don't
+/// count toward `RETRY_ERROR_THRESHOLD` — they're expected, not a
+/// reachability problem.
+const BOOT_WINDOW: Duration = Duration::from_secs(45);
+
+/// Retry interval inside the boot window. A connect-refused on a
+/// not-yet-bound port is one TCP SYN + RST, so 250 ms × 180 attempts
+/// across the window is negligible CPU/network on `MiSTer` and lets the
+/// launcher pick up Core within a quarter-second of HTTP bind instead
+/// of waiting up to 16 s for the next exponential backoff slot.
+const BOOT_RETRY: Duration = Duration::from_millis(250);
+
 /// Rolling state of the WebSocket link, published via `watch` so late
 /// subscribers (QML singletons whose `initialize()` runs after the QML
 /// engine boots, post-connect) read the current value rather than
@@ -226,8 +242,17 @@ impl ConnectionFsm {
 
     /// Records a failed connect attempt and returns the state to publish,
     /// or `None` if the failure shouldn't change the published state
-    /// (below threshold, or already `Unreachable`).
-    fn on_attempt_failed(&mut self, err: String) -> Option<ConnectionState> {
+    /// (below threshold, already `Unreachable`, or still inside the
+    /// cold-boot window before the first successful connect).
+    ///
+    /// `boot_window` is true while we have never connected and the
+    /// process is younger than [`BOOT_WINDOW`]. During that period
+    /// connect failures are expected (Core is starting), so they don't
+    /// increment the failure counter or escalate to `Unreachable`.
+    fn on_attempt_failed(&mut self, err: String, boot_window: bool) -> Option<ConnectionState> {
+        if boot_window {
+            return None;
+        }
         self.failures = self.failures.saturating_add(1);
         if self.failures >= RETRY_ERROR_THRESHOLD && !self.unreachable_published {
             self.unreachable_published = true;
@@ -239,6 +264,10 @@ impl ConnectionFsm {
 
     fn current_failures(&self) -> u32 {
         self.failures
+    }
+
+    fn ever_connected(&self) -> bool {
+        self.ever_connected
     }
 }
 
@@ -271,8 +300,17 @@ impl Client {
 
         runtime.spawn(async move {
             let mut fsm = ConnectionFsm::default();
+            let process_start = std::time::Instant::now();
 
             loop {
+                // Cold-boot fast-retry window: while we have never
+                // connected and the process is young, Core is probably
+                // still starting up. Retry tightly so we pick up Core's
+                // HTTP bind within ~250 ms instead of waiting up to
+                // 16 s for the next exponential slot.
+                let boot_window =
+                    !fsm.ever_connected() && process_start.elapsed() < BOOT_WINDOW;
+
                 // Bind the borrow to a local so it's dropped before
                 // `send_replace` — temporaries in the scrutinee of an
                 // `if let` outlive the body, so inlining the borrow
@@ -352,16 +390,16 @@ impl Client {
                         }
                     }
                     Err(e) => {
-                        if let Some(next) = fsm.on_attempt_failed(e.to_string()) {
+                        if let Some(next) = fsm.on_attempt_failed(e.to_string(), boot_window) {
                             connection_clone.send_replace(next);
                         }
                         debug!(
-                            "ws connect failed (attempt {}): {e}",
+                            "ws connect failed (attempt {}, boot_window={boot_window}): {e}",
                             fsm.current_failures()
                         );
                     }
                 }
-                tokio::time::sleep(backoff_delay(fsm.current_failures())).await;
+                tokio::time::sleep(backoff_delay(fsm.current_failures(), boot_window)).await;
             }
         });
 
@@ -673,17 +711,32 @@ impl Client {
     }
 }
 
-/// Exponential backoff between connect attempts, capped at
-/// `MAX_BACKOFF_SECS`. `failures == 0` represents "we just disconnected
-/// from a successful session" and yields a 1 s retry so a brief drop
-/// doesn't feel sluggish; each subsequent consecutive failure doubles
-/// the delay until the cap.
+/// Delay before the next connect attempt.
 ///
-/// Sequence: 0→1, 1→1, 2→2, 3→4, 4→8, 5→16, 6→30, 7+→30 (seconds).
+/// Two regimes:
+///
+/// - **Boot window** (`boot_window == true`): fixed [`BOOT_RETRY`].
+///   Used while the launcher has never successfully connected and the
+///   process is younger than [`BOOT_WINDOW`]. Lets us pick up Core
+///   within ~250 ms of its HTTP bind on cold `MiSTer` boots, instead of
+///   waiting up to 16 s for the next exponential slot.
+///
+/// - **Steady state**: exponential backoff capped at
+///   `MAX_BACKOFF_SECS`. `failures == 0` represents "we just
+///   disconnected from a successful session" and yields a 1 s retry so
+///   a brief drop doesn't feel sluggish; each subsequent consecutive
+///   failure doubles the delay until the cap.
+///
+///   Sequence: 0→1, 1→1, 2→2, 3→4, 4→8, 5→16, 6→30, 7+→30 (seconds).
 ///
 /// `pub(crate)` so `remote_resource` can reuse the same curve for
-/// in-session RPC retry without duplicating the math.
-pub(crate) fn backoff_delay(failures: u32) -> Duration {
+/// in-session RPC retry without duplicating the math. Callers in the
+/// RPC retry path always pass `boot_window: false` — that fast-retry
+/// regime applies only to the connect loop.
+pub(crate) fn backoff_delay(failures: u32, boot_window: bool) -> Duration {
+    if boot_window {
+        return BOOT_RETRY;
+    }
     let exp = failures.saturating_sub(1).min(5);
     let secs = 1u64 << exp;
     Duration::from_secs(secs.min(MAX_BACKOFF_SECS))
@@ -695,30 +748,58 @@ mod tests {
 
     #[test]
     fn backoff_follows_exponential_curve_then_caps() {
-        assert_eq!(backoff_delay(0), Duration::from_secs(1));
-        assert_eq!(backoff_delay(1), Duration::from_secs(1));
-        assert_eq!(backoff_delay(2), Duration::from_secs(2));
-        assert_eq!(backoff_delay(3), Duration::from_secs(4));
-        assert_eq!(backoff_delay(4), Duration::from_secs(8));
-        assert_eq!(backoff_delay(5), Duration::from_secs(16));
-        assert_eq!(backoff_delay(6), Duration::from_secs(MAX_BACKOFF_SECS));
-        assert_eq!(backoff_delay(7), Duration::from_secs(MAX_BACKOFF_SECS));
+        assert_eq!(backoff_delay(0, false), Duration::from_secs(1));
+        assert_eq!(backoff_delay(1, false), Duration::from_secs(1));
+        assert_eq!(backoff_delay(2, false), Duration::from_secs(2));
+        assert_eq!(backoff_delay(3, false), Duration::from_secs(4));
+        assert_eq!(backoff_delay(4, false), Duration::from_secs(8));
+        assert_eq!(backoff_delay(5, false), Duration::from_secs(16));
         assert_eq!(
-            backoff_delay(u32::MAX),
+            backoff_delay(6, false),
             Duration::from_secs(MAX_BACKOFF_SECS)
         );
+        assert_eq!(
+            backoff_delay(7, false),
+            Duration::from_secs(MAX_BACKOFF_SECS)
+        );
+        assert_eq!(
+            backoff_delay(u32::MAX, false),
+            Duration::from_secs(MAX_BACKOFF_SECS)
+        );
+    }
+
+    #[test]
+    fn backoff_uses_boot_retry_inside_boot_window_regardless_of_failures() {
+        // While `boot_window` is true, the failure count is ignored and
+        // we always return the fast-retry interval. This is what lets
+        // the launcher pick up Core within ~250 ms of HTTP bind on a
+        // cold MiSTer boot, instead of being stuck in a 16 s
+        // exponential slot.
+        assert_eq!(backoff_delay(0, true), BOOT_RETRY);
+        assert_eq!(backoff_delay(1, true), BOOT_RETRY);
+        assert_eq!(backoff_delay(5, true), BOOT_RETRY);
+        assert_eq!(backoff_delay(u32::MAX, true), BOOT_RETRY);
     }
 
     /// Replays a scripted sequence of connect outcomes through
     /// `ConnectionFsm` and returns the distinct sequence of states
     /// published to the watch — i.e. the public-visible transitions.
     /// `outcomes` is `Ok(())` for a successful connect or `Err(msg)` for
-    /// a failed connect attempt.
+    /// a failed connect attempt. Models the post-boot-window steady
+    /// state; for boot-window scenarios use [`replay_with_window`].
     fn replay(outcomes: &[Result<(), &str>]) -> Vec<ConnectionState> {
+        replay_with_window(&outcomes.iter().map(|o| (false, *o)).collect::<Vec<_>>())
+    }
+
+    /// Like [`replay`] but each outcome carries an explicit
+    /// `boot_window` flag, so tests can model the cold-boot fast-retry
+    /// regime (where failures don't escalate to `Unreachable`) and the
+    /// transition out of it.
+    fn replay_with_window(outcomes: &[(bool, Result<(), &str>)]) -> Vec<ConnectionState> {
         let mut fsm = ConnectionFsm::default();
         let mut current = ConnectionState::Disconnected;
         let mut log = Vec::new();
-        for outcome in outcomes {
+        for (boot_window, outcome) in outcomes {
             if let Some(next) = fsm.before_attempt(&current) {
                 current = next.clone();
                 log.push(next);
@@ -730,7 +811,7 @@ mod tests {
                     log.push(next);
                 }
                 Err(e) => {
-                    if let Some(next) = fsm.on_attempt_failed((*e).to_string()) {
+                    if let Some(next) = fsm.on_attempt_failed((*e).to_string(), *boot_window) {
                         current = next.clone();
                         log.push(next);
                     }
@@ -818,6 +899,57 @@ mod tests {
                 ConnectionState::Unreachable("flaky".into()),
                 ConnectionState::Connected,
             ],
+        );
+    }
+
+    #[test]
+    fn boot_window_failures_do_not_escalate_to_unreachable() {
+        // Many failed attempts entirely inside the boot window. We
+        // should publish `Connecting` once and then stay silent —
+        // boot-window failures are expected (Core is starting up) and
+        // must not flip the UI to "Core unreachable".
+        let script: Vec<(bool, Result<(), &str>)> = (0..(RETRY_ERROR_THRESHOLD * 2) as usize)
+            .map(|_| (true, Err("conn refused")))
+            .collect();
+        let log = replay_with_window(&script);
+        assert_eq!(log, vec![ConnectionState::Connecting]);
+    }
+
+    #[test]
+    fn boot_window_fast_path_then_steady_state_unreachable() {
+        // Boot-window fast retries fail without escalating. Once we
+        // exit the boot window (timer expired without a successful
+        // connect), the steady-state regime takes over and the next
+        // RETRY_ERROR_THRESHOLD failures publish Unreachable.
+        let mut script: Vec<(bool, Result<(), &str>)> =
+            (0..50).map(|_| (true, Err("conn refused"))).collect();
+        for _ in 0..RETRY_ERROR_THRESHOLD {
+            script.push((false, Err("conn refused")));
+        }
+        let log = replay_with_window(&script);
+        assert_eq!(
+            log,
+            vec![
+                ConnectionState::Connecting,
+                ConnectionState::Unreachable("conn refused".into()),
+            ],
+        );
+    }
+
+    #[test]
+    fn boot_window_then_successful_connect_is_clean() {
+        // The expected MiSTer cold-boot path: a burst of refused
+        // connects while Core's HTTP server is still binding, then a
+        // successful connect once it's up. The launcher should publish
+        // exactly Connecting → Connected with no Unreachable in
+        // between.
+        let mut script: Vec<(bool, Result<(), &str>)> =
+            (0..30).map(|_| (true, Err("conn refused"))).collect();
+        script.push((true, Ok(())));
+        let log = replay_with_window(&script);
+        assert_eq!(
+            log,
+            vec![ConnectionState::Connecting, ConnectionState::Connected],
         );
     }
 }

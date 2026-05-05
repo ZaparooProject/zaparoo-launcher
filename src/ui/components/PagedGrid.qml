@@ -78,7 +78,21 @@ Item {
     readonly property int rows:
         rowsOverride > 0 ? rowsOverride : Sizing.gridRows
     readonly property int pageSize: columns * rows
-    readonly property int pageCount: Math.max(1, Math.ceil(itemCount / pageSize))
+    // Snap to the last fully-loaded page boundary while more chunks are
+    // still on the way. Otherwise the user reaches a half-full trailing
+    // page, sees "Loading more…", then watches the rest pop in mid-page
+    // when the chunk lands. Once `hasMorePages` flips false the partial
+    // last page becomes legitimate (it's the real end of the dataset)
+    // and we ceil to include it. The `Math.max(1, ...)` floor guard
+    // keeps the very first sub-page-sized load from collapsing pageCount
+    // to 0 while the initial chunk is still landing.
+    readonly property int pageCount: {
+        if (itemCount <= 0)
+            return 1
+        if (root.hasMorePages)
+            return Math.max(1, Math.floor(itemCount / pageSize))
+        return Math.ceil(itemCount / pageSize)
+    }
     readonly property int currentPage: Math.floor(currentIndex / pageSize)
     readonly property int currentColumn: (currentIndex % pageSize) % columns
     readonly property int currentRow: Math.floor((currentIndex % pageSize) / columns)
@@ -104,6 +118,25 @@ Item {
         totalItemsOverride >= 0 ? totalItemsOverride : itemCount
     readonly property int totalPageCount:
         Math.max(1, Math.ceil(totalItems / pageSize))
+
+    // Caller-supplied "more pages exist" flag for paginated models.
+    // Drives the pending-target watchdog: if the model says no more pages
+    // are coming but the pending target still isn't loaded, we settle on
+    // whatever's loaded rather than spinning forever. Non-paginated
+    // callers leave this false; their pending targets always resolve
+    // immediately because totalPageCount === pageCount.
+    property bool hasMorePages: false
+
+    // Pending wrap-target state. Set by Up-at-page-0, Down-past-last-
+    // loaded, and pageBy when the destination page hasn't been fetched
+    // yet. The grid fires `loadMoreRequested` and waits for `itemCount`
+    // to grow; once the target page is loaded, it commits the move and
+    // clears these. Cleared on any directional move that doesn't match
+    // the pending intent (Left/Right, opposite-direction Up/Down) and on
+    // model resets (itemCount shrink). -1 means "no pending jump".
+    property int _pendingTargetPage: -1
+    property int _pendingTargetRow: 0
+    property int _pendingTargetCol: 0
 
     // Reserved chrome around the cell area. Vertical insets must be
     // large enough to contain the focused tile's 1.06× scale bleed
@@ -172,21 +205,34 @@ Item {
     }
 
     // Jump the selection by `delta` whole pages. Wraps in both
-    // directions to mirror moveSelection's column-edge behavior:
-    // - delta > 0 past the last page wraps to page 0
-    // - delta < 0 from page 0 wraps to the last page
-    // The target lands on (targetPage, currentRow, currentColumn) when
-    // that slot exists; on a partial last page it clamps to the last
-    // existing item on that page so the user always moves rather than
-    // sticking on a hole. Returns true if the index actually changed.
-    // No-op (returns false) on a single-page dataset since wrap on
-    // page 0 ↔ page 0 wouldn't move anything.
+    // directions over the dataset's `totalPageCount`, not just the
+    // loaded slice, so paginated callers (Games) wrap to the true last
+    // page rather than the last *loaded* page. If the target page
+    // isn't loaded yet, the move is deferred via `_pendingTargetPage`:
+    // the grid fires `loadMoreRequested` and commits the jump once
+    // `itemCount` grows enough to cover the target. The target lands on
+    // (targetPage, currentRow, currentColumn) when that slot exists;
+    // on a partial last page it clamps to the last existing item.
+    // Returns true if the index changed synchronously, false if a
+    // pending-jump was stashed or the dataset is single-page.
     function pageBy(delta: int): bool {
-        if (root.itemCount <= 0 || root.pageCount <= 1 || delta === 0)
+        if (root.itemCount <= 0 || root.totalPageCount <= 1 || delta === 0)
             return false
-        const total = root.pageCount
+        const total = root.totalPageCount
         // JS `%` keeps sign on negatives — normalise into [0, total).
         const targetPage = ((root.currentPage + delta) % total + total) % total
+        if (targetPage === root.currentPage)
+            return false
+        if (targetPage > root.pageCount - 1) {
+            // Target page hasn't been fetched yet. Stash the intent and
+            // let the itemCount-change watcher commit it.
+            root._pendingTargetPage = targetPage
+            root._pendingTargetRow = root.currentRow
+            root._pendingTargetCol = root.currentColumn
+            root.loadMoreRequested()
+            return false
+        }
+        root._pendingTargetPage = -1
         const targetSlot =
             targetPage * root.pageSize
             + root.currentRow * root.columns
@@ -205,6 +251,63 @@ Item {
         if (root.currentPage >= root.pageCount - 2)
             root.loadMoreRequested()
         return true
+    }
+
+    // Commit the pending target move once the destination slot is
+    // loaded, or settle on the loaded last when the model says no more
+    // pages are coming. Wired into `onItemCountChanged` so every
+    // fetch-more append re-evaluates it; also fires from the
+    // `hasMorePages` watcher so a final empty append still resolves
+    // a chain. Waiting on the exact target index (not just `pageCount`
+    // catching up) avoids an early commit while the Repeater is mid-
+    // materialisation: the target page may report `pageCount` reached
+    // while the row/col slot itself isn't realised yet.
+    function _commitPendingTarget(): void {
+        if (root._pendingTargetPage < 0)
+            return
+        // Total may have shrunk under us (e.g. Core revised total_files
+        // downward); clamp the target to whatever the dataset reports
+        // now so we never overshoot.
+        const totalLast = root.totalPageCount - 1
+        const targetPage = Math.min(root._pendingTargetPage, totalLast)
+        if (targetPage < 0) {
+            root._pendingTargetPage = -1
+            return
+        }
+        const targetIdx = targetPage * root.pageSize
+                          + root._pendingTargetRow * root.columns
+                          + root._pendingTargetCol
+        if (targetIdx >= root.itemCount) {
+            // Specific (page, row, col) slot not realised yet.
+            if (root.hasMorePages) {
+                // Keep the chain going; `fetch_more` is debounced
+                // model-side via `loading_more`, so a redundant emit
+                // is cheap.
+                root.loadMoreRequested()
+                return
+            }
+            // Model says no more pages are coming. Settle on the
+            // target page's last loaded item if it has any; otherwise
+            // fall back to the dataset's overall loaded last so the
+            // user's "go to end" intent isn't ignored.
+            root._pendingTargetPage = -1
+            const pageStart = targetPage * root.pageSize
+            const lastLoadedOnPage =
+                Math.min((targetPage + 1) * root.pageSize,
+                         root.itemCount) - 1
+            if (lastLoadedOnPage >= pageStart) {
+                if (lastLoadedOnPage !== root.currentIndex)
+                    root.currentIndex = lastLoadedOnPage
+                return
+            }
+            const overall = root.itemCount - 1
+            if (overall >= 0 && overall !== root.currentIndex)
+                root.currentIndex = overall
+            return
+        }
+        root._pendingTargetPage = -1
+        if (targetIdx !== root.currentIndex)
+            root.currentIndex = targetIdx
     }
 
     // Step the selection by (dCol, dRow). Returns true if the index
@@ -242,6 +345,9 @@ Item {
         // to the row's actual filled span so a partial last row cycles
         // among its own items rather than walking through a hole.
         if (dCol !== 0) {
+            // Sideways step changes the user's intent — drop any
+            // pending wrap-target chain we were waiting on.
+            root._pendingTargetPage = -1
             const rowFirstIndex =
                 root.currentPage * root.pageSize
                 + root.currentRow * root.columns
@@ -258,9 +364,14 @@ Item {
                 newCol = colCandidate
         }
 
-        // Vertical wrap crosses page boundaries; the partial-page hole
-        // clamp below covers the case where the target column doesn't
-        // exist on the destination page.
+        // Vertical wrap crosses page boundaries against the dataset's
+        // `totalPageCount`, not the loaded slice. When the destination
+        // page hasn't been fetched yet (Up at page 0 with partial load,
+        // Down past last-loaded but more pages exist), stash a
+        // pending-target jump and ask the model to fetch — the
+        // `onItemCountChanged` handler commits the jump once the page
+        // lands. The partial-page hole clamp below covers the column-
+        // doesn't-exist-on-destination case once the data is present.
         //
         // A Down step that lands in an empty row of a partial last
         // page (rowCandidate fits inside `rows` but is past the page's
@@ -276,15 +387,32 @@ Item {
             const lastFilledRowOnPage =
                 Math.floor((itemsOnPage - 1) / root.columns)
             if (rowCandidate < 0) {
-                newPage = root.currentPage === 0
-                          ? root.pageCount - 1
-                          : root.currentPage - 1
+                const targetPage = root.currentPage === 0
+                                   ? root.totalPageCount - 1
+                                   : root.currentPage - 1
+                if (targetPage > root.pageCount - 1) {
+                    root._pendingTargetPage = targetPage
+                    root._pendingTargetRow = root.rows - 1
+                    root._pendingTargetCol = root.currentColumn
+                    root.loadMoreRequested()
+                    return false
+                }
+                newPage = targetPage
                 newRow = root.rows - 1
             } else if (rowCandidate >= root.rows
                        || rowCandidate > lastFilledRowOnPage) {
-                newPage = root.currentPage === root.pageCount - 1
-                          ? 0
-                          : root.currentPage + 1
+                const lastPage = root.totalPageCount - 1
+                const targetPage = root.currentPage === lastPage
+                                   ? 0
+                                   : root.currentPage + 1
+                if (targetPage > root.pageCount - 1) {
+                    root._pendingTargetPage = targetPage
+                    root._pendingTargetRow = 0
+                    root._pendingTargetCol = root.currentColumn
+                    root.loadMoreRequested()
+                    return false
+                }
+                newPage = targetPage
                 newRow = 0
             } else {
                 newRow = rowCandidate
@@ -312,6 +440,9 @@ Item {
                 root.loadMoreRequested()
             return false
         }
+        // Successful directional move clears any pending wrap-target;
+        // the user is no longer waiting on it.
+        root._pendingTargetPage = -1
         root.currentIndex = newIndex
         // Pre-fetch one page early — when the user enters the
         // second-to-last loaded page, kick off the next fetch so the
@@ -330,10 +461,32 @@ Item {
     // currentIndex untouched.
     property int _previousItemCount: 0
 
+    // If `hasMorePages` flips false while a pending target is still
+    // ahead of the loaded slice, the watchdog branch in
+    // `_commitPendingTarget` settles us on the loaded last item.
+    // itemCount-change usually fires this path first, but this handler
+    // covers the case where the flag is updated without an item delta
+    // (e.g. a final empty append).
+    onHasMorePagesChanged: {
+        if (root._pendingTargetPage >= 0)
+            root._commitPendingTarget()
+    }
+
     onItemCountChanged: {
-        if (root.itemCount < root._previousItemCount &&
-            root.currentIndex >= root.itemCount) {
-            root.currentIndex = Math.max(0, root.itemCount - 1)
+        if (root.itemCount < root._previousItemCount) {
+            // Model shed rows (reset, system change, path change). The
+            // pending-target context no longer applies — drop it before
+            // the row-count check below moves currentIndex.
+            root._pendingTargetPage = -1
+            if (root.currentIndex >= root.itemCount)
+                root.currentIndex = Math.max(0, root.itemCount - 1)
+        } else if (root.itemCount > root._previousItemCount) {
+            // Pages were appended. If a wrap-target jump is pending,
+            // try to commit it now; the helper chains another
+            // `loadMoreRequested` if the target is still ahead, or
+            // settles on the loaded last item if `hasMorePages`
+            // says no more pages are coming.
+            root._commitPendingTarget()
         }
         root._previousItemCount = root.itemCount
     }

@@ -51,13 +51,57 @@ Item {
     // pops one level off the stack and rebrowses the parent.
     signal requestNavigateOutOfFolder()
 
+    // Persist debounce. Writing `state.toml` is an atomic
+    // write+sync_all+rename (`rust/zaparoo-core/src/persist.rs`); on
+    // MiSTer's SD card that's a real disk hit, and the hold-repeat tick
+    // in `Main.qml` (`_repeatTickMs = 90`) means a long Down-hold would
+    // fire ~11 of these per second. We coalesce them: each move stamps
+    // `_pendingSelectedPath` and restarts the timer; the final flush
+    // lands on hold release / Accept / Cancel via the helpers below
+    // (`Main.qml`'s `_stopRepeat` calls `flushSelectedPersist`). The
+    // 250 ms interval is shorter than a deliberate single tap → hold
+    // gap, so isolated presses still persist quickly.
+    property string _pendingSelectedPath: ""
+
+    Timer {
+        id: persistDebounce
+        interval: 250
+        repeat: false
+        onTriggered: {
+            if (games._pendingSelectedPath !== "")
+                Browse.GamesState.set_selected_at_top(
+                    games._pendingSelectedPath)
+            games._pendingSelectedPath = ""
+        }
+    }
+
+    function _scheduleSelectedPersist(path: string): void {
+        games._pendingSelectedPath = path
+        persistDebounce.restart()
+    }
+
+    // Force any pending persist to land synchronously. Called from the
+    // Accept path (we hand control off to launch and the kill-resume
+    // guarantee depends on the latest selection being on disk), from
+    // Cancel/Escape (about to flip screens), and from `Main.qml`'s
+    // `_stopRepeat` so dpad release commits the latest cell.
+    function flushSelectedPersist(): void {
+        if (!persistDebounce.running && games._pendingSelectedPath === "")
+            return
+        persistDebounce.stop()
+        if (games._pendingSelectedPath !== "")
+            Browse.GamesState.set_selected_at_top(
+                games._pendingSelectedPath)
+        games._pendingSelectedPath = ""
+    }
+
     // Move selection by (dx, dy) and commit the new selection on
     // success. Unlike HubScreen's _handleSystems, none of the games-grid
     // directions have a row-edge escape branch, so all four cardinal
     // actions share this exact body.
     function _performMove(dx: int, dy: int): void {
         if (games.gamesGrid.moveSelection(dx, dy))
-            Browse.GamesState.set_selected_at_top(
+            games._scheduleSelectedPersist(
                 Browse.GamesModel.path_at(games.gamesGrid.currentIndex))
     }
 
@@ -66,7 +110,7 @@ Item {
     // tracks whichever item the user lands on.
     function _performPage(delta: int): void {
         if (games.gamesGrid.pageBy(delta))
-            Browse.GamesState.set_selected_at_top(
+            games._scheduleSelectedPersist(
                 Browse.GamesModel.path_at(games.gamesGrid.currentIndex))
     }
 
@@ -74,7 +118,7 @@ Item {
         if (index < 0 || index >= games.gamesGrid.itemCount)
             return
         games.gamesGrid.currentIndex = index
-        Browse.GamesState.set_selected_at_top(
+        games._scheduleSelectedPersist(
             Browse.GamesModel.path_at(games.gamesGrid.currentIndex))
     }
 
@@ -151,9 +195,11 @@ Item {
             // without navigating, leaving the saved selection stale
             // from a prior system. Writing here makes the commit
             // explicit so a kill during launch resumes on the correct
-            // entry.
-            Browse.GamesState.set_selected_at_top(
+            // entry. Schedule + flush so the debounced timer doesn't
+            // strand a later move past launch handoff.
+            games._scheduleSelectedPersist(
                 Browse.GamesModel.path_at(idx))
+            games.flushSelectedPersist()
             Browse.GamesModel.launch_at(idx)
         } else if (action === "write_card") {
             if (games.gamesGrid.itemCount > 0) {
@@ -162,12 +208,14 @@ Item {
                 const entryType = Browse.GamesModel.entry_type_at(idx)
                 if (entryType === "directory" || entryType === "root")
                     return
-                Browse.GamesState.set_selected_at_top(
+                games._scheduleSelectedPersist(
                     Browse.GamesModel.path_at(idx))
+                games.flushSelectedPersist()
                 const rect = games.gamesGrid.currentCellRectIn(games)
                 games.requestContextMenu(idx, rect)
             }
         } else if (action === "cancel") {
+            games.flushSelectedPersist()
             if (games._atFolderLevel())
                 games.requestNavigateOutOfFolder()
             else
@@ -240,6 +288,13 @@ Item {
         // (same expression the top strip uses for `totalPages`).
         totalItemsOverride: Browse.GamesModel.dir_count
                             + Browse.GamesModel.total_files
+        // Drives the pending-target watchdog inside PagedGrid: while
+        // this is true, an Up-at-page-1 (or Down-past-last-loaded)
+        // wrap-target chains additional `loadMoreRequested` emissions
+        // until the destination page lands. When it flips false with
+        // a target still ahead of the loaded slice, the grid settles
+        // on the loaded last item rather than spinning forever.
+        hasMorePages: Browse.GamesModel.has_next_page
         onLoadMoreRequested: Browse.GamesModel.fetch_more()
         onItemHovered: (index) => games._focusIndex(index)
         onItemClicked: (index) => {
@@ -280,5 +335,26 @@ Item {
         count: Browse.GamesModel.count
         emptyText: qsTr("No games in this system")
         loadingText: qsTr("Loading games…")
+    }
+
+    // In-flight pagination cue. Sits on the ActiveLabel row at the
+    // same horizontal position as the grid's left content edge, so it
+    // never overlaps the bottom row of tiles and reads as part of the
+    // status band underneath the grid. Visible whenever `loading_more`
+    // is true and the screen body is otherwise on-screen — covers the
+    // hold-Down stall on the last loaded page, the wrap-to-last fetch
+    // chain when Up is pressed at page 0 with incomplete data, and the
+    // L/R shoulder jump-to-unloaded case. Hidden during transition or
+    // initial cover-gate so it never paints over the global "Loading…"
+    // overlay.
+    LoadingIndicator {
+        id: pageLoadingCue
+        visible: !games.transitioning
+                 && !games.coverGateLoading
+                 && Browse.GamesModel.loading_more
+        anchors.left: activeLabel.left
+        anchors.leftMargin: gamesGrid.leftInset
+        anchors.verticalCenter: activeLabel.verticalCenter
+        text: qsTr("Loading more…")
     }
 }

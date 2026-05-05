@@ -262,7 +262,11 @@ async fn run_connected<T, F, Fut>(
                     message: e.message,
                     retrying: true,
                 });
-                let delay = backoff_delay(rpc_failures);
+                // RPC-level retries always use the steady-state curve;
+                // the connect-loop's boot-window fast retry doesn't
+                // apply here because we only reach this path after a
+                // successful WebSocket session is up.
+                let delay = backoff_delay(rpc_failures, false);
                 // refetch wins over the backoff timer: explicit
                 // invalidation should retry immediately, not wait out
                 // the existing schedule. Falling through either of the
