@@ -24,10 +24,13 @@ build-release:
 # ZAPAROO_OFFICIAL_BUILD=1 so the launcher reports
 # `channel = "official"` in About / License and the startup log,
 # distinguishing distributed packages from local dev builds. Use this
-# (not `build-release`) when producing a binary you intend to ship.
+# (not `build-release`) when producing binaries you intend to ship.
+# Produces both shippable artifacts: desktop release in build-release/bin
+# and the MiSTer ARM32 binary in output/launcher.
 release:
     ZAPAROO_OFFICIAL_BUILD=1 cmake --preset desktop-release
     ZAPAROO_OFFICIAL_BUILD=1 cmake --build --preset desktop-release
+    ZAPAROO_OFFICIAL_BUILD=1 ./scripts/build-arm32.sh
 
 build-dev:
     cmake --preset desktop-dev
