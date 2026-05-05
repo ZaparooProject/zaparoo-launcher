@@ -83,8 +83,10 @@ Item {
     function handleAction(action: string): void {
         if (modal.kind !== "confirm")
             return
-        if (action === "left" || action === "right") {
-            modal._focusYes = !modal._focusYes
+        if (action === "left") {
+            modal._focusYes = false
+        } else if (action === "right") {
+            modal._focusYes = true
         } else if (action === "accept") {
             if (modal._focusYes)
                 modal.confirmed()

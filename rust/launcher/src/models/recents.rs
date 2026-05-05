@@ -670,18 +670,20 @@ fn release_cover_gate_after_timeout(mut model: Pin<&mut ffi::RecentsModel>) {
 /// metacharacters (parens, commas) survive Core's argument parsing —
 /// real-world paths like
 /// `/media/fat/cifs/games/Genesis/1 US - A-F/B.O.B. (USA,Europe) (Rev A).md`
-/// fail to launch unquoted.
+/// fail to launch unquoted. Embedded backslashes and double quotes are
+/// escaped per `ZapScript`'s `parseQuotedArg` rules (backslash first so
+/// the quote-escape's leading `\` doesn't get re-escaped) — Windows-host
+/// paths and the rare filename containing a literal `"` would otherwise
+/// produce a malformed token.
 fn launch_text_for(entry: &MediaHistoryEntry) -> String {
     if entry.media_path.is_empty() {
         return String::new();
     }
+    let escaped = entry.media_path.replace('\\', "\\\\").replace('"', "\\\"");
     if entry.launcher_id.is_empty() {
-        format!("**launch:\"{}\"", entry.media_path)
+        format!("**launch:\"{escaped}\"")
     } else {
-        format!(
-            "**launch:\"{}\"?launcher={}",
-            entry.media_path, entry.launcher_id
-        )
+        format!("**launch:\"{escaped}\"?launcher={}", entry.launcher_id)
     }
 }
 
@@ -824,6 +826,19 @@ mod tests {
         assert_eq!(
             launch_text_for(&e),
             "**launch:\"/media/fat/cifs/games/Genesis/1 US - A-F/B.O.B. (USA,Europe) (Rev A).md\"?launcher=Genesis"
+        );
+    }
+
+    #[test]
+    fn launch_text_escapes_backslashes_and_quotes_in_path() {
+        // Windows-host paths reach Core with backslash separators, and
+        // a stray `"` in a filename would otherwise close the quoted
+        // arg early. Both must be ZapScript-escaped so
+        // `parseQuotedArg` decodes them back to the original path.
+        let e = entry("weird", r#"C:\Games\say "hi".rom"#, "DOS", "DOS");
+        assert_eq!(
+            launch_text_for(&e),
+            r#"**launch:"C:\\Games\\say \"hi\".rom"?launcher=DOS"#
         );
     }
 

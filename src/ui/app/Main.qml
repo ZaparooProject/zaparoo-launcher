@@ -248,6 +248,14 @@ MainLayout {
             const path = root._pendingGameRestorePath
             if (path === "")
                 return
+            // User backed out to Hub/Systems before pagination caught
+            // up — selected_at_level isn't touched by a peer-screen
+            // exit, so without this gate the loop would keep hammering
+            // fetch_more in the background until the folder exhausts.
+            if (root.activeScreen !== root.screenGames) {
+                root._pendingGameRestorePath = ""
+                return
+            }
             // User input updates `selected_at_level` on every move,
             // so a divergence between the pending path and the top
             // of stack means the user navigated during the restore

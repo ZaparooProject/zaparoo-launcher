@@ -1218,7 +1218,13 @@ fn apply_status(mut model: Pin<&mut ffi::GamesModel>, status: ResourceStatus<Med
             if !model.error_message.is_empty() {
                 model.as_mut().set_error_message(QString::default());
             }
-            if model.has_next_page {
+            // Pagination state is only stale on a fresh browse target;
+            // a transient Pending (connection blip, post-error retry)
+            // on a seeded model must preserve `has_next_page` so the
+            // user's paginated view stays usable once Ready arrives —
+            // the early-return in `apply_initial_page` won't restore
+            // it.
+            if !model.is_seeded && model.has_next_page {
                 model.as_mut().set_has_next_page(false);
             }
         }
@@ -1321,11 +1327,18 @@ fn apply_status(mut model: Pin<&mut ffi::GamesModel>, status: ResourceStatus<Med
 fn apply_initial_page(mut model: Pin<&mut ffi::GamesModel>, result: MediaBrowseResult) {
     // Already seeded: this Ready is a cache invalidation refetch on
     // the same browse target (e.g. `MediaTagsUpdateMutation`'s
-    // `MediaBrowseEndpoint` invalidation after a favorite toggle).
-    // The full reset below would clobber any pages the user
+    // `MediaBrowseEndpoint` invalidation after a favorite toggle, or
+    // a Loading→Ready cycle from a connection blip / post-error
+    // retry). The full reset below would clobber any pages the user
     // paginated to and reset the grid to row 0; the local mutation
     // paths (`apply_favorite_tags`) keep the visible model in sync.
+    // Loading was set true by the preceding Pending — clear it so a
+    // transient blip doesn't leave the spinner stuck on after the
+    // refetch lands.
     if model.is_seeded {
+        if model.loading {
+            model.as_mut().set_loading(false);
+        }
         return;
     }
     let has_next_page = result.has_next_page();
