@@ -149,6 +149,7 @@ fn ext_from_extension_field(raw: &str) -> Option<&'static str> {
 pub struct MediaKey {
     pub system_id: Arc<str>,
     pub path: Arc<str>,
+    pub image_type: Option<Arc<str>>,
 }
 
 impl MediaKey {
@@ -156,6 +157,19 @@ impl MediaKey {
         Self {
             system_id: system_id.into(),
             path: path.into(),
+            image_type: None,
+        }
+    }
+
+    pub fn with_image_type(
+        system_id: impl Into<Arc<str>>,
+        path: impl Into<Arc<str>>,
+        image_type: impl Into<Arc<str>>,
+    ) -> Self {
+        Self {
+            system_id: system_id.into(),
+            path: path.into(),
+            image_type: Some(image_type.into()),
         }
     }
 
@@ -163,6 +177,28 @@ impl MediaKey {
     /// base64url-no-pad over `system_id || 0x1F || path`. Reversible
     /// via `decode`; lossless even for paths containing slashes.
     pub fn encode(&self) -> String {
+        if let Some(image_type) = self.image_type.as_ref() {
+            let sys = self.system_id.as_bytes();
+            let typ = image_type.as_bytes();
+            let path = self.path.as_bytes();
+            let sys_len = sys.len().to_string();
+            let typ_len = typ.len().to_string();
+            let mut buf = Vec::with_capacity(
+                4 + sys_len.len() + typ_len.len() + sys.len() + typ.len() + path.len(),
+            );
+            buf.extend_from_slice(b"v2");
+            buf.push(KEY_SEPARATOR);
+            buf.extend_from_slice(sys_len.as_bytes());
+            buf.push(KEY_SEPARATOR);
+            buf.extend_from_slice(sys);
+            buf.push(KEY_SEPARATOR);
+            buf.extend_from_slice(typ_len.as_bytes());
+            buf.push(KEY_SEPARATOR);
+            buf.extend_from_slice(typ);
+            buf.push(KEY_SEPARATOR);
+            buf.extend_from_slice(path);
+            return URL_SAFE_NO_PAD.encode(&buf);
+        }
         let mut buf = Vec::with_capacity(self.system_id.len() + 1 + self.path.len());
         buf.extend_from_slice(self.system_id.as_bytes());
         buf.push(KEY_SEPARATOR);
@@ -172,6 +208,9 @@ impl MediaKey {
 
     pub fn decode(encoded: &str) -> Option<Self> {
         let bytes = URL_SAFE_NO_PAD.decode(encoded.as_bytes()).ok()?;
+        if bytes.starts_with(b"v2") && bytes.get(2) == Some(&KEY_SEPARATOR) {
+            return Self::decode_v2(&bytes);
+        }
         let sep = bytes.iter().position(|b| *b == KEY_SEPARATOR)?;
         let (sys, rest) = bytes.split_at(sep);
         let path = &rest[1..]; // skip the separator
@@ -179,11 +218,46 @@ impl MediaKey {
         let path = std::str::from_utf8(path).ok()?;
         Some(Self::new(system_id.to_string(), path.to_string()))
     }
+
+    fn decode_v2(bytes: &[u8]) -> Option<Self> {
+        let mut pos = 3; // "v2" + separator
+        let sys_len_end = bytes[pos..].iter().position(|b| *b == KEY_SEPARATOR)? + pos;
+        let sys_len = std::str::from_utf8(&bytes[pos..sys_len_end])
+            .ok()?
+            .parse::<usize>()
+            .ok()?;
+        pos = sys_len_end + 1;
+        let sys_end = pos.checked_add(sys_len)?;
+        let system_id = std::str::from_utf8(bytes.get(pos..sys_end)?).ok()?;
+        if bytes.get(sys_end) != Some(&KEY_SEPARATOR) {
+            return None;
+        }
+        pos = sys_end + 1;
+        let type_len_end = bytes[pos..].iter().position(|b| *b == KEY_SEPARATOR)? + pos;
+        let type_len = std::str::from_utf8(&bytes[pos..type_len_end])
+            .ok()?
+            .parse::<usize>()
+            .ok()?;
+        pos = type_len_end + 1;
+        let type_end = pos.checked_add(type_len)?;
+        let image_type = std::str::from_utf8(bytes.get(pos..type_end)?).ok()?;
+        if bytes.get(type_end) != Some(&KEY_SEPARATOR) {
+            return None;
+        }
+        let path = std::str::from_utf8(bytes.get(type_end + 1..)?).ok()?;
+        Some(Self::with_image_type(
+            system_id.to_string(),
+            path.to_string(),
+            image_type.to_string(),
+        ))
+    }
 }
 
 impl PartialEq for MediaKey {
     fn eq(&self, other: &Self) -> bool {
-        *self.system_id == *other.system_id && *self.path == *other.path
+        *self.system_id == *other.system_id
+            && *self.path == *other.path
+            && self.image_type == other.image_type
     }
 }
 impl Eq for MediaKey {}
@@ -192,6 +266,7 @@ impl std::hash::Hash for MediaKey {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         (*self.system_id).hash(state);
         (*self.path).hash(state);
+        self.image_type.hash(state);
     }
 }
 
@@ -737,12 +812,15 @@ async fn fetch_batch(
         let guard = state.read().unwrap();
         batch
             .iter()
-            .map(|k| match guard.media_ids.get(k) {
-                Some(id) => (MediaImageBulkItem::for_media_id(*id), true),
-                None => (
-                    MediaImageBulkItem::for_media(k.system_id.as_ref(), k.path.as_ref()),
-                    false,
-                ),
+            .map(|k| {
+                let mut item = match guard.media_ids.get(k) {
+                    Some(id) => MediaImageBulkItem::for_media_id(*id),
+                    None => MediaImageBulkItem::for_media(k.system_id.as_ref(), k.path.as_ref()),
+                };
+                if let Some(image_type) = k.image_type.as_ref() {
+                    item.image_types.push(image_type.to_string());
+                }
+                (item, guard.media_ids.contains_key(k))
             })
             .collect()
     };
@@ -797,8 +875,8 @@ async fn fetch_batch(
     batch
         .iter()
         .cloned()
-        .zip(response.items.into_iter())
-        .zip(id_hinted.into_iter())
+        .zip(response.items)
+        .zip(id_hinted)
         .map(|((key, item), had_id_hint)| {
             let outcome = classify_bulk_item(&key, item, had_id_hint);
             if matches!(outcome, FetchOutcome::Transient) && had_id_hint {
@@ -1149,6 +1227,14 @@ mod tests {
         let encoded = &s["media-image/".len()..];
         let back = MediaKey::decode(encoded).expect("decode");
         assert_eq!(back, key);
+    }
+
+    #[test]
+    fn media_key_round_trips_image_type() {
+        let key = MediaKey::with_image_type("SNES", "/p", "screenshot");
+        let decoded = MediaKey::decode(&key.encode()).expect("round-trip");
+        assert_eq!(decoded, key);
+        assert_eq!(decoded.image_type.as_deref(), Some("screenshot"));
     }
 
     fn key(s: &str, p: &str) -> MediaKey {

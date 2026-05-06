@@ -25,6 +25,7 @@ const COVER_KEY_ROLE: i32 = 256 + 1;
 const NAME_ROLE: i32 = 256 + 2;
 const CATEGORY_ROLE: i32 = 256 + 3;
 const FAVORITE_ROLE: i32 = 256 + 4;
+const FILE_STEM_ROLE: i32 = 256 + 5;
 
 pub struct SystemInfo {
     pub id: String,
@@ -264,7 +265,7 @@ impl ffi::SystemsModel {
                 // category, system and game tiles share one URL builder.
                 QVariant::from(&QString::from(format!("systems/{}", s.id).as_str()))
             }
-            NAME_ROLE => QVariant::from(&QString::from(s.name.as_str())),
+            NAME_ROLE | FILE_STEM_ROLE => QVariant::from(&QString::from(s.name.as_str())),
             CATEGORY_ROLE => QVariant::from(&QString::from(s.category.as_str())),
             FAVORITE_ROLE => QVariant::from(&0_i32),
             _ => QVariant::default(),
@@ -277,6 +278,7 @@ impl ffi::SystemsModel {
         h.insert(NAME_ROLE, QByteArray::from("name"));
         h.insert(CATEGORY_ROLE, QByteArray::from("category"));
         h.insert(FAVORITE_ROLE, QByteArray::from("favorite"));
+        h.insert(FILE_STEM_ROLE, QByteArray::from("fileStem"));
         h
     }
 

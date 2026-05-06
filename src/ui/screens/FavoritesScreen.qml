@@ -33,6 +33,7 @@ Item {
     // screens so the convention holds when a future routing change adds
     // a Favorites-as-source path.
     property bool transitioning: false
+    readonly property bool _listLayout: Browse.Settings.current_browse_layout === "list"
 
     // True while either the cross-screen router is mid-flip
     // (`transitioning`) or the in-screen cover gate is holding
@@ -83,6 +84,26 @@ Item {
         favorites._persistFocus()
     }
 
+    function _performLinearMove(delta: int): void {
+        const count = favorites.favoritesGrid.itemCount
+        if (count <= 0)
+            return
+        let next = favorites.favoritesGrid.currentIndex + delta
+        if (next < 0)
+            next = count - 1
+        else if (next >= count)
+            next = 0
+        if (next === favorites.favoritesGrid.currentIndex) {
+            if (next >= count - 2)
+                Browse.FavoritesModel.fetch_more()
+            return
+        }
+        favorites.favoritesGrid.currentIndex = next
+        favorites._persistFocus()
+        if (next >= count - 2)
+            Browse.FavoritesModel.fetch_more()
+    }
+
     function _state(): string {
         if (Browse.FavoritesModel.loading)
             return "loading"
@@ -95,13 +116,21 @@ Item {
 
     function handleAction(action: string): void {
         if (action === "left") {
-            favorites.favoritesGrid.moveSelection(-1, 0)
+            if (!favorites._listLayout)
+                favorites.favoritesGrid.moveSelection(-1, 0)
         } else if (action === "right") {
-            favorites.favoritesGrid.moveSelection(1, 0)
+            if (!favorites._listLayout)
+                favorites.favoritesGrid.moveSelection(1, 0)
         } else if (action === "up") {
-            favorites.favoritesGrid.moveSelection(0, -1)
+            if (favorites._listLayout)
+                favorites._performLinearMove(-1)
+            else
+                favorites.favoritesGrid.moveSelection(0, -1)
         } else if (action === "down") {
-            favorites.favoritesGrid.moveSelection(0, 1)
+            if (favorites._listLayout)
+                favorites._performLinearMove(1)
+            else
+                favorites.favoritesGrid.moveSelection(0, 1)
         } else if (action === "page_prev") {
             if (favorites._state() === "ready")
                 favorites.favoritesGrid.pageBy(-1)
@@ -125,7 +154,9 @@ Item {
             if (favorites.favoritesGrid.itemCount > 0) {
                 const idx = favorites.favoritesGrid.currentIndex
                 favorites._persistFocus()
-                const rect = favorites.favoritesGrid.currentCellRectIn(favorites)
+                const rect = favorites._listLayout
+                             ? favoritesList.currentCellRectIn(favorites)
+                             : favorites.favoritesGrid.currentCellRectIn(favorites)
                 favorites.requestContextMenu(idx, rect)
             }
         } else if (action === "cancel") {
@@ -156,15 +187,54 @@ Item {
                    : ""
     }
 
+    BrowseList {
+        id: favoritesList
+
+        visible: !favorites._gateHide && favorites._listLayout
+        anchors.left: parent.left
+        anchors.leftMargin: Sizing.pctW(5)
+        anchors.top: topStrip.bottom
+        anchors.topMargin: Sizing.pctH(2)
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: Sizing.pctH(8)
+        width: Sizing.pctW(45)
+        model: Browse.FavoritesModel
+        currentIndex: favoritesGrid.currentIndex
+        onItemHovered: (index) => favorites._focusIndex(index)
+        onItemClicked: (index) => {
+            favorites._focusIndex(index)
+            favorites.handleAction("accept")
+        }
+        onItemRightClicked: (index) => {
+            favorites._focusIndex(index)
+            favorites.handleAction("write_card")
+        }
+        onEmptyRightClicked: favorites.handleAction("cancel")
+        onPageWheelRequested: (delta) => favorites.handleAction(
+            delta > 0 ? "page_next" : "page_prev")
+    }
+
+    BrowseDetailPane {
+        visible: !favorites._gateHide && favorites._listLayout
+        anchors.left: favoritesList.right
+        anchors.leftMargin: Sizing.pctW(5)
+        anchors.right: parent.right
+        anchors.rightMargin: Sizing.pctW(5)
+        anchors.top: favoritesList.top
+        anchors.bottom: favoritesList.bottom
+        title: favoritesList.currentName
+        coverKey: favoritesList.currentCoverKey
+    }
+
     PagedGrid {
         id: favoritesGrid
 
-        visible: !favorites._gateHide
+        visible: !favorites._gateHide && !favorites._listLayout
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: topStrip.bottom
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: Sizing.pctH(15)
+        anchors.bottomMargin: Sizing.pctH(8)
         model: Browse.FavoritesModel
         delegate: Tile { showCaption: true }
         // Match games-grid layout (taller cover-art tiles); the systems
@@ -187,7 +257,7 @@ Item {
 
     ActiveLabel {
         id: activeLabel
-        visible: !favorites._gateHide
+        visible: false
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: favoritesGrid.bottom
@@ -198,9 +268,9 @@ Item {
     }
 
     ScreenStateOverlay {
-        anchors.centerIn: favoritesGrid
-        width: favoritesGrid.width
-        height: favoritesGrid.height
+        anchors.centerIn: favorites._listLayout ? favoritesList : favoritesGrid
+        width: favorites._listLayout ? favoritesList.width : favoritesGrid.width
+        height: favorites._listLayout ? favoritesList.height : favoritesGrid.height
         loading: Browse.FavoritesModel.loading
         errorMessage: Browse.FavoritesModel.error_message ?? ""
         count: Browse.FavoritesModel.count

@@ -1,0 +1,19 @@
+#!/bin/bash
+# Zaparoo Launcher
+# Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+LAUNCHER="${PROJECT_ROOT}/build-macos/bin/launcher"
+
+if [ ! -x "${LAUNCHER}" ]; then
+    echo "Error: macOS launcher not found or not executable: ${LAUNCHER}" >&2
+    echo "Build it first with: cmake --build build-macos" >&2
+    exit 1
+fi
+
+export ZAPAROO_CORE_ENDPOINT="ws://192.168.1.176:7497/api/v0.1"
+exec "${LAUNCHER}"

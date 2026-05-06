@@ -79,11 +79,20 @@ echo "Using toolchain image: ${TOOLCHAIN_IMAGE}"
 echo "Docker platform: ${DOCKER_PLATFORM}"
 mkdir -p "${OUTPUT_DIR}"
 
+# Resolve build provenance on the host. The Dockerfile only COPYs source
+# dirs (no `.git/`), so without forwarding these the in-container build.rs
+# falls back to commit = "unknown". Empty values fall back to build.rs's
+# own defaults inside the container.
+ZAPAROO_BUILD_COMMIT="${ZAPAROO_BUILD_COMMIT:-$(git -C "${PROJECT_ROOT}" rev-parse --short=7 HEAD 2>/dev/null || true)}"
+ZAPAROO_BUILD_DATE="${ZAPAROO_BUILD_DATE:-$(date -u +%Y-%m-%d)}"
+
 docker buildx build \
     --platform "${DOCKER_PLATFORM}" \
     -f "${PROJECT_ROOT}/Dockerfile.arm32" \
     --build-arg "TOOLCHAIN_IMAGE=${TOOLCHAIN_IMAGE}" \
     --build-arg "ZAPAROO_OFFICIAL_BUILD=${ZAPAROO_OFFICIAL_BUILD:-}" \
+    --build-arg "ZAPAROO_BUILD_COMMIT=${ZAPAROO_BUILD_COMMIT}" \
+    --build-arg "ZAPAROO_BUILD_DATE=${ZAPAROO_BUILD_DATE}" \
     --output "type=local,dest=${OUTPUT_DIR}" \
     --target export \
     "${PROJECT_ROOT}"

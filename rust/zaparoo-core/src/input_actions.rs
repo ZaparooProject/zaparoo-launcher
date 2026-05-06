@@ -84,7 +84,7 @@ where
 {
     let mut out: HashMap<i32, String> = HashMap::new();
     let mut ordered: Vec<(&String, &Vec<String>)> = bindings.iter().collect();
-    ordered.sort_unstable_by(|(a, _), (b, _)| a.cmp(b));
+    ordered.sort_unstable_by_key(|(a, _)| *a);
     for (action, keys) in ordered {
         for name in keys {
             if let Some(code) = qt_key_code(name) {

@@ -33,6 +33,7 @@ Item {
     // screens so the convention holds when a future routing change adds
     // a Recents-as-source path.
     property bool transitioning: false
+    readonly property bool _listLayout: Browse.Settings.current_browse_layout === "list"
 
     // True while either the cross-screen router is mid-flip
     // (`transitioning`) or the in-screen cover gate is holding
@@ -84,6 +85,26 @@ Item {
         recents._persistFocus()
     }
 
+    function _performLinearMove(delta: int): void {
+        const count = recents.recentsGrid.itemCount
+        if (count <= 0)
+            return
+        let next = recents.recentsGrid.currentIndex + delta
+        if (next < 0)
+            next = count - 1
+        else if (next >= count)
+            next = 0
+        if (next === recents.recentsGrid.currentIndex) {
+            if (next >= count - 2)
+                Browse.RecentsModel.fetch_more()
+            return
+        }
+        recents.recentsGrid.currentIndex = next
+        recents._persistFocus()
+        if (next >= count - 2)
+            Browse.RecentsModel.fetch_more()
+    }
+
     function _state(): string {
         if (Browse.RecentsModel.loading)
             return "loading"
@@ -96,13 +117,21 @@ Item {
 
     function handleAction(action: string): void {
         if (action === "left") {
-            recents.recentsGrid.moveSelection(-1, 0)
+            if (!recents._listLayout)
+                recents.recentsGrid.moveSelection(-1, 0)
         } else if (action === "right") {
-            recents.recentsGrid.moveSelection(1, 0)
+            if (!recents._listLayout)
+                recents.recentsGrid.moveSelection(1, 0)
         } else if (action === "up") {
-            recents.recentsGrid.moveSelection(0, -1)
+            if (recents._listLayout)
+                recents._performLinearMove(-1)
+            else
+                recents.recentsGrid.moveSelection(0, -1)
         } else if (action === "down") {
-            recents.recentsGrid.moveSelection(0, 1)
+            if (recents._listLayout)
+                recents._performLinearMove(1)
+            else
+                recents.recentsGrid.moveSelection(0, 1)
         } else if (action === "page_prev") {
             if (recents._state() === "ready")
                 recents.recentsGrid.pageBy(-1)
@@ -126,7 +155,9 @@ Item {
             if (recents.recentsGrid.itemCount > 0) {
                 const idx = recents.recentsGrid.currentIndex
                 recents._persistFocus()
-                const rect = recents.recentsGrid.currentCellRectIn(recents)
+                const rect = recents._listLayout
+                             ? recentsList.currentCellRectIn(recents)
+                             : recents.recentsGrid.currentCellRectIn(recents)
                 recents.requestContextMenu(idx, rect)
             }
         } else if (action === "cancel") {
@@ -157,15 +188,50 @@ Item {
                    : ""
     }
 
+    BrowseList {
+        id: recentsList
+
+        visible: !recents._gateHide && recents._listLayout
+        anchors.left: parent.left
+        anchors.leftMargin: Sizing.pctW(5)
+        anchors.top: topStrip.bottom
+        anchors.topMargin: Sizing.pctH(2)
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: Sizing.pctH(8)
+        width: Sizing.pctW(45)
+        model: Browse.RecentsModel
+        currentIndex: recentsGrid.currentIndex
+        onItemHovered: (index) => recents._focusIndex(index)
+        onItemClicked: (index) => {
+            recents._focusIndex(index)
+            recents.handleAction("accept")
+        }
+        onEmptyRightClicked: recents.handleAction("cancel")
+        onPageWheelRequested: (delta) => recents.handleAction(
+            delta > 0 ? "page_next" : "page_prev")
+    }
+
+    BrowseDetailPane {
+        visible: !recents._gateHide && recents._listLayout
+        anchors.left: recentsList.right
+        anchors.leftMargin: Sizing.pctW(5)
+        anchors.right: parent.right
+        anchors.rightMargin: Sizing.pctW(5)
+        anchors.top: recentsList.top
+        anchors.bottom: recentsList.bottom
+        title: recentsList.currentName
+        coverKey: recentsList.currentCoverKey
+    }
+
     PagedGrid {
         id: recentsGrid
 
-        visible: !recents._gateHide
+        visible: !recents._gateHide && !recents._listLayout
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: topStrip.bottom
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: Sizing.pctH(15)
+        anchors.bottomMargin: Sizing.pctH(8)
         model: Browse.RecentsModel
         delegate: Tile { showCaption: true }
         // Match games-grid layout (taller cover-art tiles); the systems
@@ -190,7 +256,7 @@ Item {
 
     ActiveLabel {
         id: activeLabel
-        visible: !recents._gateHide
+        visible: false
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: recentsGrid.bottom
@@ -201,9 +267,9 @@ Item {
     }
 
     ScreenStateOverlay {
-        anchors.centerIn: recentsGrid
-        width: recentsGrid.width
-        height: recentsGrid.height
+        anchors.centerIn: recents._listLayout ? recentsList : recentsGrid
+        width: recents._listLayout ? recentsList.width : recentsGrid.width
+        height: recents._listLayout ? recentsList.height : recentsGrid.height
         loading: Browse.RecentsModel.loading
         errorMessage: Browse.RecentsModel.error_message ?? ""
         count: Browse.RecentsModel.count

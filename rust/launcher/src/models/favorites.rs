@@ -52,6 +52,7 @@ const SYSTEM_ID_ROLE: i32 = 256 + 3;
 const COVER_KEY_ROLE: i32 = 256 + 4;
 const ZAP_SCRIPT_ROLE: i32 = 256 + 5;
 const FAVORITE_ROLE: i32 = 256 + 6;
+const FILE_STEM_ROLE: i32 = 256 + 7;
 
 // Page size for the initial load and every cursor follow-up. Core caps
 // `maxResults` at 100; search rows are tiny (one tile + one caption per
@@ -342,6 +343,9 @@ impl ffi::FavoritesModel {
             COVER_KEY_ROLE => QVariant::from(&QString::from(cover_key_for(entry).as_str())),
             ZAP_SCRIPT_ROLE => QVariant::from(&QString::from(entry.zap_script.as_str())),
             FAVORITE_ROLE => QVariant::from(&favorite_role_value(&entry.tags)),
+            FILE_STEM_ROLE => {
+                QVariant::from(&QString::from(file_stem_or_name(&entry.path, &entry.name)))
+            }
             _ => QVariant::default(),
         }
     }
@@ -354,6 +358,7 @@ impl ffi::FavoritesModel {
         h.insert(COVER_KEY_ROLE, QByteArray::from("coverKey"));
         h.insert(ZAP_SCRIPT_ROLE, QByteArray::from("zapScript"));
         h.insert(FAVORITE_ROLE, QByteArray::from("favorite"));
+        h.insert(FILE_STEM_ROLE, QByteArray::from("fileStem"));
         h
     }
 
@@ -606,6 +611,20 @@ fn has_favorite_tag(tags: &[TagInfo]) -> bool {
 
 fn favorite_role_value(tags: &[TagInfo]) -> i32 {
     i32::from(has_favorite_tag(tags))
+}
+
+fn file_stem_or_name(path: &str, name: &str) -> String {
+    let file = path
+        .trim_end_matches(['/', '\\'])
+        .rsplit(['/', '\\'])
+        .next()
+        .unwrap_or_default();
+    let stem = file.rsplit_once('.').map_or(file, |(stem, _)| stem).trim();
+    if stem.is_empty() {
+        name.to_string()
+    } else {
+        stem.to_string()
+    }
 }
 
 fn favorite_params_for_entry(entry: &MediaItem, add: bool) -> Option<MediaTagsUpdateParams> {

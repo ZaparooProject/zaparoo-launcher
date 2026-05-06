@@ -97,6 +97,8 @@ pub struct FavoritesState {
 pub struct SettingsState {
     pub resolution: String,
     pub language: String,
+    #[serde(default = "default_browse_layout")]
+    pub browse_layout: String,
     #[serde(default = "default_button_layout")]
     pub button_layout: String,
     #[serde(default = "default_mouse_enabled")]
@@ -110,11 +112,16 @@ impl Default for SettingsState {
         Self {
             resolution: String::new(),
             language: String::new(),
+            browse_layout: default_browse_layout(),
             button_layout: default_button_layout(),
             mouse_enabled: default_mouse_enabled(),
             debug_logging: false,
         }
     }
+}
+
+fn default_browse_layout() -> String {
+    "grid".into()
 }
 
 fn default_button_layout() -> String {
@@ -253,6 +260,7 @@ mod tests {
             settings: SettingsState {
                 resolution: "1920x1080".into(),
                 language: "it_IT".into(),
+                browse_layout: "list".into(),
                 button_layout: "b".into(),
                 mouse_enabled: false,
                 debug_logging: true,
@@ -347,6 +355,7 @@ mod tests {
         let state = load_from(&path);
         assert_eq!(state.settings.resolution, "1920x1080");
         assert_eq!(state.settings.language, "");
+        assert_eq!(state.settings.browse_layout, "grid");
         assert_eq!(state.settings.button_layout, "a");
         assert!(state.settings.mouse_enabled);
         assert!(!state.settings.debug_logging);

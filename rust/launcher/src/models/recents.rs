@@ -50,6 +50,7 @@ const SYSTEM_ID_ROLE: i32 = 256 + 3;
 const COVER_KEY_ROLE: i32 = 256 + 4;
 const LAUNCHER_ID_ROLE: i32 = 256 + 5;
 const FAVORITE_ROLE: i32 = 256 + 6;
+const FILE_STEM_ROLE: i32 = 256 + 7;
 
 // Page size for the initial load and every cursor follow-up. Core caps
 // `limit` at 100; history rows are tiny (one tile + one caption per row)
@@ -313,6 +314,10 @@ impl ffi::RecentsModel {
             COVER_KEY_ROLE => QVariant::from(&QString::from(cover_key_for(entry).as_str())),
             LAUNCHER_ID_ROLE => QVariant::from(&QString::from(entry.launcher_id.as_str())),
             FAVORITE_ROLE => QVariant::from(&0_i32),
+            FILE_STEM_ROLE => QVariant::from(&QString::from(file_stem_or_name(
+                &entry.media_path,
+                &entry.media_name,
+            ))),
             _ => QVariant::default(),
         }
     }
@@ -325,6 +330,7 @@ impl ffi::RecentsModel {
         h.insert(COVER_KEY_ROLE, QByteArray::from("coverKey"));
         h.insert(LAUNCHER_ID_ROLE, QByteArray::from("launcherId"));
         h.insert(FAVORITE_ROLE, QByteArray::from("favorite"));
+        h.insert(FILE_STEM_ROLE, QByteArray::from("fileStem"));
         h
     }
 
@@ -475,6 +481,20 @@ fn cover_key_for_with(entry: &MediaHistoryEntry, key: Option<&MediaKey>, cached:
     match key {
         Some(k) if cached => MediaImageCache::image_key_for(k),
         _ => format!("systems/{}", entry.system_id),
+    }
+}
+
+fn file_stem_or_name(path: &str, name: &str) -> String {
+    let file = path
+        .trim_end_matches(['/', '\\'])
+        .rsplit(['/', '\\'])
+        .next()
+        .unwrap_or_default();
+    let stem = file.rsplit_once('.').map_or(file, |(stem, _)| stem).trim();
+    if stem.is_empty() {
+        name.to_string()
+    } else {
+        stem.to_string()
     }
 }
 

@@ -47,6 +47,12 @@ TestCase {
         delegate: cellDelegate
     }
 
+    SignalSpy {
+        id: loadMoreSpy
+        target: grid
+        signalName: "loadMoreRequested"
+    }
+
     function fillModel(count: int): void {
         model.clear()
         for (let i = 0; i < count; i++)
@@ -58,8 +64,14 @@ TestCase {
     function init(): void {
         Sizing.screenWidth = testCase.width
         Sizing.screenHeight = testCase.height
+        // Reset paginated-state knobs so a leak from a failed test
+        // (which skips its cleanup) doesn't poison the next case's
+        // pageCount/totalPageCount math.
+        grid.hasMorePages = false
+        grid.totalItemsOverride = -1
         fillModel(0)
         grid.setCurrentIndexImmediate(0)
+        loadMoreSpy.clear()
     }
 
     function test_geometry_matches_pinned_resolution(): void {
@@ -340,5 +352,259 @@ TestCase {
         compare(grid.totalPageCount, 5)
         grid.totalItemsOverride = -1
         compare(grid.totalPageCount, 2)
+    }
+
+    // ── Pending wrap-target (paginated dataset, partial load) ───────────
+    //
+    // GamesScreen sets `totalItemsOverride` to the dataset's true entry
+    // count and `hasMorePages` to `GamesModel.has_next_page`. When the
+    // user wraps onto an unloaded page, PagedGrid must:
+    //   - stash the (page, row, col) target,
+    //   - fire `loadMoreRequested` (the screen wires this to fetch_more),
+    //   - leave `currentIndex` untouched,
+    //   - commit the jump on the next `itemCount` growth that covers
+    //     the target,
+    //   - drop the pending intent on a sideways move,
+    //   - settle on the loaded last item if `hasMorePages` flips false
+    //     before the target is reached.
+    //
+    // Tests below set `totalItemsOverride = 60` (5 pages) but seed the
+    // model with 24 items (2 pages loaded) to mimic the partial-load
+    // state the user repro'd on Genesis "1 US - A-F".
+
+    function _setupPartialLoad(loaded: int, total: int): void {
+        fillModel(loaded)
+        grid.totalItemsOverride = total
+        grid.hasMorePages = true
+        grid.setCurrentIndexImmediate(0)
+        compare(grid.pageCount, Math.ceil(loaded / grid.pageSize))
+        compare(grid.totalPageCount, Math.ceil(total / grid.pageSize))
+    }
+
+    function _resetPartialLoadState(): void {
+        grid.totalItemsOverride = -1
+        grid.hasMorePages = false
+    }
+
+    function test_up_at_page_zero_unloaded_target_stashes_pending(): void {
+        // 24/60 — Up at index 0 targets the dataset's last page (page 4),
+        // which isn't loaded. Selection must not move; pending state set.
+        _setupPartialLoad(24, 60)
+        loadMoreSpy.clear()
+        compare(grid.moveSelection(0, -1), false)
+        compare(grid.currentIndex, 0,
+                "selection must not move while waiting for fetch")
+        compare(grid._pendingTargetPage, 4,
+                "pending target page should be the dataset's last")
+        compare(grid._pendingTargetRow, grid.rows - 1)
+        compare(grid._pendingTargetCol, 0)
+        verify(loadMoreSpy.count >= 1,
+               "expected loadMoreRequested to fire at least once")
+        _resetPartialLoadState()
+    }
+
+    function test_pending_target_commits_when_pages_load(): void {
+        // Set up the partial-load wrap, then grow the model to cover
+        // the target page. The itemCount-change handler must commit
+        // the jump.
+        _setupPartialLoad(24, 60)
+        compare(grid.moveSelection(0, -1), false)
+        compare(grid._pendingTargetPage, 4)
+        // Append the rest of the dataset in one go — pageCount jumps
+        // to 5, target page 4 is now loaded, jump commits.
+        for (let i = 24; i < 60; i++)
+            model.append({ "name": "item-" + i, "coverKey": "", "favorite": 0 })
+        tryCompare(grid, "itemCount", 60)
+        // Pending target row was rows-1 (=2), col 0; target index is
+        // page 4 base (48) + row 2 * 4 + col 0 = 56.
+        compare(grid.currentIndex, 56)
+        compare(grid._pendingTargetPage, -1,
+                "pending should clear after commit")
+        _resetPartialLoadState()
+    }
+
+    function test_pending_target_clamps_when_target_partial_page(): void {
+        // 24/50 — totalPageCount is 5 (last page partial: indices 48,49).
+        // Up wraps to (page 4, row 2, col 0) = 56, which doesn't exist.
+        // Selection waits while data loads; the model declares no more
+        // pages once total is in, and the watchdog settles us on the
+        // partial page's last existing item (49).
+        fillModel(24)
+        grid.totalItemsOverride = 50
+        grid.hasMorePages = true
+        grid.setCurrentIndexImmediate(0)
+        compare(grid.totalPageCount, 5)
+        compare(grid.moveSelection(0, -1), false)
+        compare(grid._pendingTargetPage, 4)
+        for (let i = 24; i < 50; i++)
+            model.append({ "name": "item-" + i, "coverKey": "", "favorite": 0 })
+        tryCompare(grid, "itemCount", 50)
+        // Target slot (idx 56) doesn't exist on the partial last page,
+        // so selection is still parked while we wait for "more". Real
+        // models flip `has_next_page` false at the end of pagination;
+        // the watchdog inside _commitPendingTarget then clamps to the
+        // last loaded item on the target page.
+        compare(grid.currentIndex, 0,
+                "still pending — target slot 56 doesn't exist yet")
+        grid.hasMorePages = false
+        compare(grid.currentIndex, 49,
+                "clamp to last existing item on the partial page")
+        _resetPartialLoadState()
+    }
+
+    function test_pending_target_chains_fetch_when_still_short(): void {
+        // 24/60 — Up at index 0 stashes target page 4. Append only one
+        // more page (12 items → 36 loaded, pageCount=3). Target still
+        // unreached; the handler must fire another loadMoreRequested
+        // and leave currentIndex untouched.
+        _setupPartialLoad(24, 60)
+        compare(grid.moveSelection(0, -1), false)
+        loadMoreSpy.clear()
+        for (let i = 24; i < 36; i++)
+            model.append({ "name": "item-" + i, "coverKey": "", "favorite": 0 })
+        tryCompare(grid, "itemCount", 36)
+        compare(grid.currentIndex, 0,
+                "still waiting on target page, selection unchanged")
+        compare(grid._pendingTargetPage, 4)
+        verify(loadMoreSpy.count >= 1,
+               "expected another loadMoreRequested after partial append")
+        _resetPartialLoadState()
+    }
+
+    function test_pending_target_settles_when_hasMorePages_clears(): void {
+        // 24/60 — but the model later reports no more pages without
+        // ever reaching pageCount=5. The watchdog branch in
+        // _commitPendingTarget must settle on the loaded last item
+        // (idx 23) so the user isn't stuck on the source cell.
+        _setupPartialLoad(24, 60)
+        compare(grid.moveSelection(0, -1), false)
+        compare(grid._pendingTargetPage, 4)
+        grid.hasMorePages = false
+        // No itemCount change is needed — the hasMorePages watcher
+        // fires _commitPendingTarget itself.
+        compare(grid._pendingTargetPage, -1,
+                "pending should clear once hasMorePages goes false")
+        compare(grid.currentIndex, grid.itemCount - 1,
+                "settle on the loaded last item")
+        _resetPartialLoadState()
+    }
+
+    function test_pending_target_cancels_on_horizontal_move(): void {
+        // After stashing a pending wrap target, a sideways move means
+        // the user changed intent — drop the pending jump.
+        _setupPartialLoad(24, 60)
+        grid.setCurrentIndexImmediate(1)
+        compare(grid.moveSelection(0, -1), false)
+        compare(grid._pendingTargetPage, 4)
+        // Right step within row should clear pending.
+        compare(grid.moveSelection(1, 0), true)
+        compare(grid._pendingTargetPage, -1)
+        _resetPartialLoadState()
+    }
+
+    function test_pending_target_clears_on_model_shrink(): void {
+        // A model reset (system change, path change) shrinks itemCount.
+        // The pending intent belongs to the previous dataset — drop it.
+        _setupPartialLoad(24, 60)
+        compare(grid.moveSelection(0, -1), false)
+        compare(grid._pendingTargetPage, 4)
+        model.clear()
+        tryCompare(grid, "itemCount", 0)
+        compare(grid._pendingTargetPage, -1)
+        _resetPartialLoadState()
+    }
+
+    function test_down_past_last_loaded_stashes_pending(): void {
+        // 24/60 — sit on the last filled row of the loaded slice
+        // (page 1 row 2 col 0 = idx 20). Down would advance to page 2,
+        // which isn't loaded. Stash, don't move.
+        _setupPartialLoad(24, 60)
+        grid.setCurrentIndexImmediate(20)
+        loadMoreSpy.clear()
+        compare(grid.moveSelection(0, 1), false)
+        compare(grid.currentIndex, 20)
+        compare(grid._pendingTargetPage, 2)
+        compare(grid._pendingTargetRow, 0)
+        compare(grid._pendingTargetCol, 0)
+        verify(loadMoreSpy.count >= 1)
+        _resetPartialLoadState()
+    }
+
+    function test_pageBy_past_loaded_stashes_pending(): void {
+        // 24/60 — pageBy(2) targets page 2, unloaded. Stash, don't move.
+        _setupPartialLoad(24, 60)
+        grid.setCurrentIndexImmediate(2)
+        compare(grid.pageBy(2), false)
+        compare(grid.currentIndex, 2,
+                "pageBy past loaded must not move synchronously")
+        compare(grid._pendingTargetPage, 2)
+        compare(grid._pendingTargetRow, 0)
+        compare(grid._pendingTargetCol, 2)
+        _resetPartialLoadState()
+    }
+
+    function test_loadAheadPages_default_is_two(): void {
+        // The default `loadAheadPages` keeps two pages of buffer ahead
+        // of the user before firing the prefetch. GamesScreen relies
+        // on this default and overrides it only if the trade-off
+        // changes.
+        compare(grid.loadAheadPages, 2)
+    }
+
+    function test_loadAheadPages_two_fires_at_pageCount_minus_three(): void {
+        // 60 items at pageSize 12 = 5 pages loaded. With
+        // loadAheadPages=2, the trigger fires when `currentPage >=
+        // pageCount - loadAheadPages - 1` = page 2. Start at idx 20
+        // (page 1, row 2, col 0) and step Down: the move advances to
+        // (page 2, row 0, col 0) = idx 24, which sits exactly on the
+        // threshold — loadMoreRequested must fire so the next chunk is
+        // in flight before the user reaches the loaded edge.
+        fillModel(60)
+        grid.hasMorePages = true
+        grid.setCurrentIndexImmediate(20)
+        loadMoreSpy.clear()
+        compare(grid.moveSelection(0, 1), true)
+        compare(grid.currentPage, 2)
+        verify(loadMoreSpy.count >= 1,
+               "loadAheadPages=2 must fire prefetch on entering pageCount-3")
+        grid.hasMorePages = false
+    }
+
+    function test_loadAheadPages_two_does_not_fire_below_threshold(): void {
+        // Same 60-item / 5-page setup. Step from idx 8 (page 0, row 2,
+        // col 0) Down to idx 12 (page 1, row 0, col 0). currentPage=1
+        // sits below the threshold (pageCount-3 = 2), so no prefetch
+        // should fire yet.
+        fillModel(60)
+        grid.hasMorePages = true
+        grid.setCurrentIndexImmediate(8)
+        loadMoreSpy.clear()
+        compare(grid.moveSelection(0, 1), true)
+        compare(grid.currentPage, 1)
+        compare(loadMoreSpy.count, 0,
+                "loadAheadPages=2 must not fire below pageCount-3 threshold")
+        grid.hasMorePages = false
+    }
+
+    function test_hasPendingTarget_tracks_pending_state(): void {
+        // GamesScreen gates the "Loading more..." indicator on this
+        // property so background prefetches stay silent. It must
+        // mirror `_pendingTargetPage >= 0` exactly: false at rest,
+        // true while a wrap/shoulder/hold-Down move is parked, false
+        // once the target commits or the user changes intent.
+        _setupPartialLoad(24, 60)
+        compare(grid.hasPendingTarget, false,
+                "no pending target at rest")
+        compare(grid.moveSelection(0, -1), false)
+        compare(grid._pendingTargetPage, 4)
+        compare(grid.hasPendingTarget, true,
+                "Up wrap to unloaded page must arm hasPendingTarget")
+        for (let i = 24; i < 60; i++)
+            model.append({ "name": "item-" + i, "coverKey": "", "favorite": 0 })
+        tryCompare(grid, "itemCount", 60)
+        compare(grid._pendingTargetPage, -1)
+        compare(grid.hasPendingTarget, false,
+                "commit must clear hasPendingTarget")
+        _resetPartialLoadState()
     }
 }

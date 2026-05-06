@@ -28,6 +28,7 @@ Item {
 
     property alias systemsGrid: systemsGrid
     property bool transitioning: false
+    readonly property bool _listLayout: Browse.Settings.current_browse_layout === "list"
 
     signal requestAccept(systemId: string)
     signal requestHubScreen()
@@ -38,12 +39,34 @@ Item {
     // within the grid (no row-edge escape), so callers don't need to
     // act on the false branch — Esc is the only back path.
     function _performMove(dx: int, dy: int): bool {
+        if (systems._listLayout) {
+            if (dy === 0)
+                return false
+            return systems._performLinearMove(dy)
+        }
         if (systems.systemsGrid.moveSelection(dx, dy)) {
             Browse.SystemsState.system_id =
                 Browse.SystemsModel.system_id_at(systems.systemsGrid.currentIndex)
             return true
         }
         return false
+    }
+
+    function _performLinearMove(delta: int): bool {
+        const count = systems.systemsGrid.itemCount
+        if (count <= 0)
+            return false
+        let next = systems.systemsGrid.currentIndex + delta
+        if (next < 0)
+            next = count - 1
+        else if (next >= count)
+            next = 0
+        if (next === systems.systemsGrid.currentIndex)
+            return false
+        systems.systemsGrid.currentIndex = next
+        Browse.SystemsState.system_id =
+            Browse.SystemsModel.system_id_at(systems.systemsGrid.currentIndex)
+        return true
     }
 
     // Page jump (L/R shoulder buttons). Wraps in both directions; same
@@ -122,7 +145,10 @@ Item {
                 Browse.SystemsState.system_id =
                     Browse.SystemsModel.system_id_at(idx)
                 systems.requestContextMenu(
-                    idx, systems.systemsGrid.currentCellRectIn(systems))
+                    idx,
+                    systems._listLayout
+                        ? systemsList.currentCellRectIn(systems)
+                        : systems.systemsGrid.currentCellRectIn(systems))
             }
         } else if (action === "cancel") {
             systems.requestHubScreen()
@@ -162,6 +188,45 @@ Item {
         visible: !systems.transitioning
     }
 
+    BrowseList {
+        id: systemsList
+
+        visible: !systems.transitioning && systems._listLayout
+        anchors.left: parent.left
+        anchors.leftMargin: Sizing.pctW(5)
+        anchors.top: topStrip.bottom
+        anchors.topMargin: Sizing.pctH(2)
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: Sizing.pctH(8)
+        width: Sizing.pctW(45)
+        model: Browse.SystemsModel
+        currentIndex: systemsGrid.currentIndex
+        onItemHovered: (index) => systems._focusIndex(index)
+        onItemClicked: (index) => {
+            systems._focusIndex(index)
+            systems.handleAction("accept")
+        }
+        onItemRightClicked: (index) => {
+            systems._focusIndex(index)
+            systems.handleAction("write_card")
+        }
+        onEmptyRightClicked: systems.handleAction("cancel")
+        onPageWheelRequested: (delta) => systems.handleAction(
+            delta > 0 ? "page_next" : "page_prev")
+    }
+
+    BrowseDetailPane {
+        visible: !systems.transitioning && systems._listLayout
+        anchors.left: systemsList.right
+        anchors.leftMargin: Sizing.pctW(5)
+        anchors.right: parent.right
+        anchors.rightMargin: Sizing.pctW(5)
+        anchors.top: systemsList.top
+        anchors.bottom: systemsList.bottom
+        title: systemsList.currentName
+        coverKey: systemsList.currentCoverKey
+    }
+
     // Grid fills the safe zone between the top strip and the active
     // label. bottomMargin = MainLayout's instructionsBar height
     // (pctH(6)) + pctH(2) gap + the active label's pctH(7). If you
@@ -173,7 +238,7 @@ Item {
         anchors.right: parent.right
         anchors.top: topStrip.bottom
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: Sizing.pctH(15)
+        anchors.bottomMargin: Sizing.pctH(8)
         model: Browse.SystemsModel
         delegate: Tile {}
         onItemHovered: (index) => systems._focusIndex(index)
@@ -192,7 +257,7 @@ Item {
         // Hide the tiles while the router holds us here on a forward
         // transition (Systems → Games) so the centred "Loading…" cue
         // (painted from Main.qml) reads alone over the cleared grid.
-        visible: !systems.transitioning
+        visible: !systems.transitioning && !systems._listLayout
     }
 
     // Active system caption — single big line just under the grid.
@@ -208,13 +273,13 @@ Item {
         text: systemsGrid.itemCount > 0
               ? Browse.SystemsModel.system_name_at(systemsGrid.currentIndex)
               : ""
-        visible: !systems.transitioning
+        visible: false
     }
 
     ScreenStateOverlay {
-        anchors.centerIn: systemsGrid
-        width: systemsGrid.width
-        height: systemsGrid.height
+        anchors.centerIn: systems._listLayout ? systemsList : systemsGrid
+        width: systems._listLayout ? systemsList.width : systemsGrid.width
+        height: systems._listLayout ? systemsList.height : systemsGrid.height
         loading: Browse.SystemsModel.loading
         errorMessage: Browse.SystemsModel.error_message ?? ""
         count: Browse.SystemsModel.count

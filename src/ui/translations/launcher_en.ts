@@ -620,7 +620,12 @@
         <translation>Language</translation>
     </message>
     <message>
-        <location filename="../screens/SettingsScreen.qml" line="93"/>
+        <location filename="../screens/SettingsScreen.qml" line="66"/>
+        <source>Browsing layout</source>
+        <translation>Browsing layout</translation>
+    </message>
+    <message>
+        <location filename="../screens/SettingsScreen.qml" line="70"/>
         <source>Mouse support</source>
         <translation>Mouse support</translation>
     </message>
@@ -718,7 +723,17 @@
         <translation>Auto</translation>
     </message>
     <message>
-        <location filename="../screens/SettingsScreen.qml" line="351"/>
+        <location filename="../screens/SettingsScreen.qml" line="272"/>
+        <source>Detailed list view</source>
+        <translation>Detailed list view</translation>
+    </message>
+    <message>
+        <location filename="../screens/SettingsScreen.qml" line="273"/>
+        <source>Grid view</source>
+        <translation>Grid view</translation>
+    </message>
+    <message>
+        <location filename="../screens/SettingsScreen.qml" line="264"/>
         <source>Style B</source>
         <translation type="unfinished"></translation>
     </message>

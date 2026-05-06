@@ -64,8 +64,11 @@ MainLayout {
     // page_size. That made the first cursor page misaligned with the
     // visual grid pageSize and produced half-loaded pages on every
     // subsequent cursor advance.
+    readonly property int _gamesListFetchSize: 30
     readonly property int _gamesPageSize:
-        Sizing.gamesGridColumns * Sizing.gamesGridRows
+        Browse.Settings.current_browse_layout === "list"
+            ? root._gamesListFetchSize
+            : Sizing.gamesGridColumns * Sizing.gamesGridRows
     on_GamesPageSizeChanged: Browse.GamesModel.page_size = root._gamesPageSize
 
     onWidthChanged: {
@@ -1067,7 +1070,7 @@ MainLayout {
             return
         }
         if (root.activeScreen === root.screenGames) {
-            root.gamesScreen.handleAction(action)
+            root.gamesScreen.handleAction(action, root._dispatchingRepeat)
         } else if (root.activeScreen === root.screenSystems) {
             root.systemsScreen.handleAction(action)
         } else if (root.activeScreen === root.screenFavorites) {
@@ -1096,6 +1099,7 @@ MainLayout {
     readonly property int _repeatTickMs: 90
     property string _heldAction: ""
     property int _heldKey: 0
+    property bool _dispatchingRepeat: false
     // Aliased so tst_navigation.qml can observe the repeat state machine
     // — child Timer ids are file-scoped and aren't reachable otherwise.
     property alias _repeatPending: repeatInitial.running
@@ -1106,6 +1110,14 @@ MainLayout {
         repeatTick.stop()
         root._heldAction = ""
         root._heldKey = 0
+        // Hold-release commits whatever cell the user landed on. Games
+        // screen debounces its `set_selected_at_top` writes (one atomic
+        // disk write per move would batter MiSTer's SD card on a Down-
+        // hold through 20+ pages); the flush here lands the final
+        // selection so a kill during launch resumes on the right entry.
+        // No-op when no persist is pending or when another screen is
+        // active.
+        root.gamesScreen.flushSelectedPersist()
     }
 
     function _isRepeatableAction(action: string): bool {
@@ -1146,6 +1158,12 @@ MainLayout {
             root._stopRepeat()
     }
 
+    function _handleRepeatAction(): void {
+        root._dispatchingRepeat = true
+        root.handleAction(root._heldAction)
+        root._dispatchingRepeat = false
+    }
+
     Timer {
         id: cardWriteFailureTimer
         interval: 1500
@@ -1160,7 +1178,7 @@ MainLayout {
         onTriggered: {
             if (root._heldAction === "")
                 return
-            root.handleAction(root._heldAction)
+            root._handleRepeatAction()
             repeatTick.start()
         }
     }
@@ -1174,7 +1192,7 @@ MainLayout {
                 repeatTick.stop()
                 return
             }
-            root.handleAction(root._heldAction)
+            root._handleRepeatAction()
         }
     }
 

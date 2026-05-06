@@ -82,7 +82,8 @@ pub fn parse_resolution(value: &str) -> Option<(u32, u32)> {
 pub fn ensure_core_service_running() {
     #[cfg(zaparoo_runtime = "mister")]
     {
-        use tracing::warn;
+        use tracing::{info, warn};
+        info!("spawning core service wrapper: zaparoo.sh -service start");
         if let Err(e) = std::process::Command::new("/media/fat/Scripts/zaparoo.sh")
             .args(["-service", "start"])
             .spawn()
