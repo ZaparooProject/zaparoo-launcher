@@ -26,6 +26,14 @@ FROM ${TOOLCHAIN_IMAGE} AS app-build
 # presence-only, so we only export the env var when the ARG is non-empty.
 ARG ZAPAROO_OFFICIAL_BUILD=
 
+# Build provenance forwarded from the host. The container has no `.git/` in
+# its context (we only COPY source dirs below), so build.rs cannot resolve
+# the commit itself — without these args it falls back to "unknown".
+# Computed by scripts/build-arm32.sh on the host and exported into the
+# build environment so build.rs picks them up.
+ARG ZAPAROO_BUILD_COMMIT=
+ARG ZAPAROO_BUILD_DATE=
+
 # cxx-qt's build script resolves Qt paths via qmake, which returns
 # sysroot-prefixed paths (e.g. {sysroot}/opt/qt6-arm32/...). Symlink Qt
 # into the sysroot so those paths resolve on the build host.
@@ -44,6 +52,12 @@ COPY rust/ rust/
 RUN mkdir build && cd build && \
     if [ -n "${ZAPAROO_OFFICIAL_BUILD}" ]; then \
         export ZAPAROO_OFFICIAL_BUILD="${ZAPAROO_OFFICIAL_BUILD}"; \
+    fi && \
+    if [ -n "${ZAPAROO_BUILD_COMMIT}" ]; then \
+        export ZAPAROO_BUILD_COMMIT="${ZAPAROO_BUILD_COMMIT}"; \
+    fi && \
+    if [ -n "${ZAPAROO_BUILD_DATE}" ]; then \
+        export ZAPAROO_BUILD_DATE="${ZAPAROO_BUILD_DATE}"; \
     fi && \
     /opt/qt6-arm32/bin/qt-cmake .. \
         -G Ninja \
