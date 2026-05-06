@@ -444,10 +444,9 @@ impl ffi::GamesModel {
             FILE_COUNT_ROLE => QVariant::from(&i32::try_from(entry.file_count).unwrap_or(i32::MAX)),
             FAVORITE_ROLE => QVariant::from(&favorite_role_value(&entry.tags)),
             DESCRIPTION_ROLE => QVariant::from(&QString::from(entry.description.as_str())),
-            FILE_STEM_ROLE => QVariant::from(&QString::from(file_stem_or_name(
-                &entry.path,
-                &entry.name,
-            ))),
+            FILE_STEM_ROLE => {
+                QVariant::from(&QString::from(file_stem_or_name(&entry.path, &entry.name)))
+            }
             _ => QVariant::default(),
         }
     }
@@ -700,7 +699,10 @@ impl ffi::GamesModel {
     }
 
     fn load_description_at(mut self: Pin<&mut Self>, index: i32) {
-        self.as_mut().rust_mut().description_seq.fetch_add(1, Ordering::SeqCst);
+        self.as_mut()
+            .rust_mut()
+            .description_seq
+            .fetch_add(1, Ordering::SeqCst);
         if index < 0 || index >= self.count {
             self.as_mut().set_current_description(QString::default());
             self.as_mut().set_current_detail_tags(QString::default());
@@ -1084,10 +1086,10 @@ fn cache_detail_metadata(
     metadata: DetailMetadata,
 ) {
     let mut rust = model.as_mut().rust_mut();
-    if !rust.detail_metadata_cache.contains_key(&key) {
+    if rust.detail_metadata_cache.contains_key(&key) {
+        rust.detail_metadata_lru.retain(|cached| cached != &key);
         rust.detail_metadata_lru.push_back(key.clone());
     } else {
-        rust.detail_metadata_lru.retain(|cached| cached != &key);
         rust.detail_metadata_lru.push_back(key.clone());
     }
     rust.detail_metadata_cache.insert(key, metadata);
@@ -1113,8 +1115,7 @@ fn image_type_from_property_key(key: &str) -> Option<String> {
     if suffix.is_empty() {
         return Some("image".to_string());
     }
-    Some(suffix.trim_start_matches('-').to_string())
-        .filter(|image_type| !image_type.is_empty())
+    Some(suffix.trim_start_matches('-').to_string()).filter(|image_type| !image_type.is_empty())
 }
 
 fn detail_image_keys_from_meta(meta: &MediaMeta, system: &str, path: &str) -> Vec<MediaKey> {
@@ -1141,7 +1142,9 @@ fn detail_image_keys_from_meta(meta: &MediaMeta, system: &str, path: &str) -> Ve
 
 fn clear_detail_images(mut model: Pin<&mut ffi::GamesModel>) {
     model.as_mut().rust_mut().detail_image_keys.clear();
-    model.as_mut().set_current_detail_image_key(QString::default());
+    model
+        .as_mut()
+        .set_current_detail_image_key(QString::default());
     model.as_mut().set_current_detail_image_index(0);
     model.as_mut().set_current_detail_image_count(0);
     model.as_mut().set_current_detail_image_can_prev(false);
@@ -1155,10 +1158,16 @@ fn install_detail_images(mut model: Pin<&mut ffi::GamesModel>, keys: Vec<MediaKe
 
 fn set_detail_image_index(mut model: Pin<&mut ffi::GamesModel>, index: i32) {
     let count = i32::try_from(model.detail_image_keys.len()).unwrap_or(i32::MAX);
-    let clamped = if count <= 0 { 0 } else { index.clamp(0, count - 1) };
+    let clamped = if count <= 0 {
+        0
+    } else {
+        index.clamp(0, count - 1)
+    };
     model.as_mut().set_current_detail_image_index(clamped);
     model.as_mut().set_current_detail_image_count(count);
-    model.as_mut().set_current_detail_image_can_prev(clamped > 0);
+    model
+        .as_mut()
+        .set_current_detail_image_can_prev(clamped > 0);
     model
         .as_mut()
         .set_current_detail_image_can_next(count > 0 && clamped < count - 1);
@@ -1168,11 +1177,15 @@ fn set_detail_image_index(mut model: Pin<&mut ffi::GamesModel>, index: i32) {
 fn sync_current_detail_image_key(mut model: Pin<&mut ffi::GamesModel>) {
     let index = model.current_detail_image_index;
     if index < 0 {
-        model.as_mut().set_current_detail_image_key(QString::default());
+        model
+            .as_mut()
+            .set_current_detail_image_key(QString::default());
         return;
     }
     let Some(key) = model.detail_image_keys.get(index as usize).cloned() else {
-        model.as_mut().set_current_detail_image_key(QString::default());
+        model
+            .as_mut()
+            .set_current_detail_image_key(QString::default());
         return;
     };
     let cache = global_media_image_cache();
@@ -1184,7 +1197,9 @@ fn sync_current_detail_image_key(mut model: Pin<&mut ffi::GamesModel>) {
         if !cache.is_negative(&key) {
             cache.enqueue_with_media_id(key, None);
         }
-        model.as_mut().set_current_detail_image_key(QString::default());
+        model
+            .as_mut()
+            .set_current_detail_image_key(QString::default());
     }
 }
 

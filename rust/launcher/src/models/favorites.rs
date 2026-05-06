@@ -343,10 +343,9 @@ impl ffi::FavoritesModel {
             COVER_KEY_ROLE => QVariant::from(&QString::from(cover_key_for(entry).as_str())),
             ZAP_SCRIPT_ROLE => QVariant::from(&QString::from(entry.zap_script.as_str())),
             FAVORITE_ROLE => QVariant::from(&favorite_role_value(&entry.tags)),
-            FILE_STEM_ROLE => QVariant::from(&QString::from(file_stem_or_name(
-                &entry.path,
-                &entry.name,
-            ))),
+            FILE_STEM_ROLE => {
+                QVariant::from(&QString::from(file_stem_or_name(&entry.path, &entry.name)))
+            }
             _ => QVariant::default(),
         }
     }

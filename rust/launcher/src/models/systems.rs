@@ -265,8 +265,7 @@ impl ffi::SystemsModel {
                 // category, system and game tiles share one URL builder.
                 QVariant::from(&QString::from(format!("systems/{}", s.id).as_str()))
             }
-            NAME_ROLE => QVariant::from(&QString::from(s.name.as_str())),
-            FILE_STEM_ROLE => QVariant::from(&QString::from(s.name.as_str())),
+            NAME_ROLE | FILE_STEM_ROLE => QVariant::from(&QString::from(s.name.as_str())),
             CATEGORY_ROLE => QVariant::from(&QString::from(s.category.as_str())),
             FAVORITE_ROLE => QVariant::from(&0_i32),
             _ => QVariant::default(),

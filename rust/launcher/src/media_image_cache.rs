@@ -875,8 +875,8 @@ async fn fetch_batch(
     batch
         .iter()
         .cloned()
-        .zip(response.items.into_iter())
-        .zip(id_hinted.into_iter())
+        .zip(response.items)
+        .zip(id_hinted)
         .map(|((key, item), had_id_hint)| {
             let outcome = classify_bulk_item(&key, item, had_id_hint);
             if matches!(outcome, FetchOutcome::Transient) && had_id_hint {

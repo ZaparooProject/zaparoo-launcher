@@ -229,9 +229,7 @@ fn classify_interface(iface: &str) -> Option<InterfaceKind> {
 
 fn interface_is_up(iface: &str) -> bool {
     let path = Path::new("/sys/class/net").join(iface).join("operstate");
-    fs::read_to_string(path)
-        .map(|state| matches!(state.trim(), "up" | "unknown"))
-        .unwrap_or(false)
+    fs::read_to_string(path).is_ok_and(|state| matches!(state.trim(), "up" | "unknown"))
 }
 
 fn is_wireless_interface(iface: &str) -> bool {
