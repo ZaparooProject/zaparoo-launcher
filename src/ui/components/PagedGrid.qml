@@ -646,13 +646,20 @@ Item {
                     // binding cost stays roughly constant as the
                     // dataset grows.
                     active: cellItem._coverInRetentionRange
-                    // Incubate Tile construction on background frames
-                    // so a retention-edge crossing (10 cells flipping
-                    // active) doesn't block the main thread. The
-                    // newly-revealed cells fill in over the next
-                    // frame or two; the user's selection move lands
-                    // immediately.
-                    asynchronous: true
+                    // Visible page loads synchronously so all of its
+                    // tiles appear in the same frame instead of
+                    // streaming in via the QQmlIncubator queue (whose
+                    // traversal order looks "reverse-of-creation" to
+                    // the eye). The cover gate already hides this
+                    // ~pageSize x ~7ms block during cold start.
+                    //
+                    // Off-page cells (within retention but cellPage
+                    // != currentPage) stay asynchronous so a
+                    // retention-edge crossing (10 cells flipping
+                    // active in one frame) doesn't block the main
+                    // thread. They fill in over the next few frames;
+                    // the user's selection move lands immediately.
+                    asynchronous: cellItem.cellPage !== root.currentPage
                     isSelected: cellItem.isSelected
                     isFocused: root.focused
                     name: cellItem.name
