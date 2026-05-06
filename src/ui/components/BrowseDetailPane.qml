@@ -28,7 +28,7 @@ Item {
         anchors.right: parent.right
         anchors.rightMargin: root._carouselGutter
         anchors.top: parent.top
-        height: parent.height * 0.5
+        height: Sizing.px(parent.height * 0.5)
 
         Image {
             id: cover

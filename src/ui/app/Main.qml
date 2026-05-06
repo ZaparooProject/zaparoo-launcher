@@ -1239,7 +1239,8 @@ MainLayout {
         z: 100
 
         LoadingIndicator {
-            anchors.centerIn: parent
+            x: Sizing.center(parent.width, width)
+            y: Sizing.center(parent.height, height)
             text: {
                 switch (root.pendingTransition) {
                 case "systems": return qsTr("Loading systems…")

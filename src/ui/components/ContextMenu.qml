@@ -40,7 +40,7 @@ Item {
     // Top/bottom margins inside the panel are sized to the panel
     // radius so a focused row's square background never intersects
     // the rounded corners — see the panel `Rectangle` below.
-    readonly property int panelRadius: Sizing.cornerRadius / 2
+    readonly property int panelRadius: Sizing.half(Sizing.cornerRadius)
     readonly property int panelHeight:
         Math.min(entries.length * rowHeight + 2 * panelRadius,
                  Math.max(0, height - 2 * margin))
@@ -48,10 +48,10 @@ Item {
         anchorRect.x + anchorRect.width + gap + panelWidth <= width - margin
     readonly property int preferredX:
         preferRight
-        ? anchorRect.x + anchorRect.width + gap
-        : anchorRect.x - gap - panelWidth
+        ? Sizing.px(anchorRect.x + anchorRect.width + gap)
+        : Sizing.px(anchorRect.x - gap - panelWidth)
     readonly property int preferredY:
-        anchorRect.y + Math.floor((anchorRect.height - panelHeight) / 2)
+        Sizing.px(anchorRect.y + Sizing.center(anchorRect.height, panelHeight))
 
     visible: open
     enabled: visible
@@ -93,14 +93,16 @@ Item {
     Rectangle {
         id: panel
 
-        x: Math.max(menu.margin,
-                    Math.min(menu.preferredX, menu.width - menu.margin - menu.panelWidth))
-        y: Math.max(menu.margin,
-                    Math.min(menu.preferredY, menu.height - menu.margin - menu.panelHeight))
+        x: Sizing.px(Math.max(menu.margin,
+                              Math.min(menu.preferredX,
+                                       menu.width - menu.margin - menu.panelWidth)))
+        y: Sizing.px(Math.max(menu.margin,
+                              Math.min(menu.preferredY,
+                                       menu.height - menu.margin - menu.panelHeight)))
         width: menu.panelWidth
         height: menu.panelHeight
         color: Theme.bgPanel
-        border.width: 2
+        border.width: Sizing.stroke(2)
         border.color: Theme.textPrimary
         radius: menu.panelRadius
 
@@ -123,7 +125,7 @@ Item {
                     width: parent.width
                     height: menu.rowHeight
                     color: index === menu.currentIndex ? Theme.surfaceCard : "transparent"
-                    border.width: index === menu.currentIndex ? 1 : 0
+                    border.width: index === menu.currentIndex ? Sizing.stroke(1) : 0
                     border.color: Theme.accent
 
                     Text {

@@ -772,11 +772,11 @@ Item {
             readonly property int _thumbHeight:
                 Math.max(_minThumbHeight,
                          Math.round(scrollRegion.height / root.totalPageCount))
-            readonly property real _thumbY:
+            readonly property int _thumbY:
                 root.totalPageCount <= 1
                     ? 0
-                    : (root.currentPage / (root.totalPageCount - 1))
-                      * (scrollRegion.height - _thumbHeight)
+                    : Sizing.px((root.currentPage / (root.totalPageCount - 1))
+                                * (scrollRegion.height - _thumbHeight))
 
             Rectangle {
                 id: scrollThumb
@@ -785,7 +785,7 @@ Item {
                 anchors.horizontalCenter: parent.horizontalCenter
                 y: scrollRegion._thumbY
                 color: Theme.textPrimary
-                radius: width / 2
+                radius: Sizing.half(width)
             }
         }
     }

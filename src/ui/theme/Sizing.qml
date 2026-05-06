@@ -62,6 +62,22 @@ QtObject {
         return Math.round(screenWidth * percent / 100)
     }
 
+    function px(value: real): int {
+        return Math.round(value)
+    }
+
+    function stroke(value: real): int {
+        return Math.max(1, px(value))
+    }
+
+    function center(parentSize: real, childSize: real): int {
+        return px((parentSize - childSize) / 2)
+    }
+
+    function half(value: real): int {
+        return px(value / 2)
+    }
+
     // Minimum 8px to remain legible on CRT 240p displays.
     function fontSize(percent: real): int {
         return Math.max(8, pctH(percent))

@@ -137,7 +137,7 @@ Item {
             Rectangle {
                 anchors.fill: parent
                 color: row.selected ? Theme.surfaceCard : "transparent"
-                radius: Math.max(0, Sizing.cornerRadius / 3)
+                radius: Math.max(0, Sizing.px(Sizing.cornerRadius / 3))
             }
 
             Rectangle {
@@ -147,7 +147,7 @@ Item {
                 width: Sizing.pctW(0.45)
                 color: Theme.textPrimary
                 visible: row.selected
-                radius: Math.max(0, width / 3)
+                radius: Math.max(0, Sizing.px(width / 3))
             }
 
             Text {
@@ -176,8 +176,8 @@ Item {
                 width: Sizing.pctH(3.2)
                 height: width
                 source: Resources.iconUrl("Heart")
-                sourceSize.width: width
-                sourceSize.height: height
+                sourceSize.width: Sizing.px(width)
+                sourceSize.height: Sizing.px(height)
                 fillMode: Image.PreserveAspectFit
                 smooth: true
                 asynchronous: false
@@ -272,11 +272,11 @@ Item {
                                         Math.round(scrollRegion.height
                                                    * root.visibleRowCount
                                                    / root.totalItems)))
-            readonly property real _thumbY:
+            readonly property int _thumbY:
                 root._maxScrollTopIndex <= 0
                     ? 0
-                    : (root._viewTopIndex / root._maxScrollTopIndex)
-                      * (scrollRegion.height - _thumbHeight)
+                    : Sizing.px((root._viewTopIndex / root._maxScrollTopIndex)
+                                * (scrollRegion.height - _thumbHeight))
 
             Rectangle {
                 id: scrollThumb
@@ -285,7 +285,7 @@ Item {
                 anchors.horizontalCenter: parent.horizontalCenter
                 y: scrollRegion._thumbY
                 color: Theme.textPrimary
-                radius: width / 2
+                radius: Sizing.half(width)
             }
         }
     }

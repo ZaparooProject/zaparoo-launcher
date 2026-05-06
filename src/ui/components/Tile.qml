@@ -94,7 +94,7 @@ Item {
     // bottom edge, separated from the cover by `_captionGap`.
     readonly property int _padding: Sizing.pctH(2)
     readonly property int _outlineGap: Sizing.pctH(0.4)
-    readonly property int _outlineWidth: Sizing.pctH(0.6)
+    readonly property int _outlineWidth: Sizing.stroke(Sizing.pctH(0.6))
     readonly property int _captionHeight: Sizing.pctH(5.5)
     readonly property int _captionGap: Sizing.pctH(0.4)
 
@@ -154,7 +154,7 @@ Item {
         anchors.fill: parent
         anchors.margins: root._outlineGap
         color: Theme.textPrimary
-        radius: Sizing.cornerRadius - root._outlineGap
+        radius: Math.max(0, Sizing.cornerRadius - root._outlineGap)
         antialiasing: true
         visible: root._focusedSelection
     }
@@ -216,7 +216,8 @@ Item {
     // the tile. Bundled qrc asset, decode is cheap, no animation.
     Image {
         id: loadingGlyph
-        anchors.centerIn: cover
+        x: cover.x + Sizing.center(cover.width, width)
+        y: cover.y + Sizing.center(cover.height, height)
         width: Sizing.pctH(10)
         height: Sizing.pctH(10)
         source: Resources.iconUrl("Loading")
@@ -226,8 +227,8 @@ Item {
         // taller than ~240 px. Pinning sourceSize to the rendered
         // dimensions makes the SVG renderer rasterise at target size
         // — same pattern StatusIcon.qml and LoadingIndicator.qml use.
-        sourceSize.width: width
-        sourceSize.height: height
+        sourceSize.width: Sizing.px(width)
+        sourceSize.height: Sizing.px(height)
         fillMode: Image.PreserveAspectFit
         smooth: true
         asynchronous: false
@@ -238,13 +239,13 @@ Item {
         id: favoriteGlyph
         anchors.left: parent.left
         anchors.top: parent.top
-        anchors.leftMargin: parent.width / 12
-        anchors.topMargin: parent.width / 12
-        width: parent.width / 6
+        anchors.leftMargin: Sizing.px(parent.width / 12)
+        anchors.topMargin: Sizing.px(parent.width / 12)
+        width: Sizing.px(parent.width / 6)
         height: width
         source: Resources.iconUrl("Heart")
-        sourceSize.width: width
-        sourceSize.height: height
+        sourceSize.width: Sizing.px(width)
+        sourceSize.height: Sizing.px(height)
         fillMode: Image.PreserveAspectFit
         smooth: true
         asynchronous: false

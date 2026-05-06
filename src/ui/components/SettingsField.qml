@@ -58,7 +58,7 @@ Item {
         radius: Sizing.cornerRadius
         color: root.isFocused ? Theme.surfaceCard : "transparent"
         border.color: root.isFocused ? Theme.textPrimary : Theme.borderSubtle
-        border.width: root.isFocused ? Sizing.pctH(0.4) : 1
+        border.width: root.isFocused ? Sizing.stroke(Sizing.pctH(0.4)) : Sizing.stroke(1)
     }
 
     Text {
@@ -126,21 +126,23 @@ Item {
         // without leaving the long rail of empty pill the previous
         // pctW(8) (~3.7× height on a 16:9 panel) painted.
         height: Sizing.pctH(3.8)
-        width: height * 1.85
+        width: Sizing.px(height * 1.85)
 
         Rectangle {
             anchors.fill: parent
-            radius: height / 2
+            radius: Sizing.half(height)
             color: root.checked ? Theme.accent : Theme.borderMid
             border.color: root.isFocused ? Theme.textPrimary : Theme.borderSubtle
-            border.width: root.isFocused ? Sizing.pctH(0.25) : 1
+            border.width: root.isFocused ? Sizing.stroke(Sizing.pctH(0.25)) : Sizing.stroke(1)
         }
 
         Rectangle {
             width: toggle.height - Sizing.pctH(0.9)
             height: width
-            radius: width / 2
-            x: root.checked ? toggle.width - width - Sizing.pctH(0.45) : Sizing.pctH(0.45)
+            radius: Sizing.half(width)
+            x: root.checked
+               ? Sizing.px(toggle.width - width - Sizing.pctH(0.45))
+               : Sizing.pctH(0.45)
             anchors.verticalCenter: parent.verticalCenter
             color: Theme.textPrimary
         }

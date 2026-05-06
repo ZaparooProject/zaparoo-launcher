@@ -26,8 +26,8 @@ Item {
     property int totalPages: 1
     property string totalText: ""    // formatted; empty hides the slot
 
-    readonly property real _slotWidth: status.width / 3
-    readonly property real _slotMargin: Sizing.pctW(5)
+    readonly property int _slotWidth: Sizing.px(status.width / 3)
+    readonly property int _slotMargin: Sizing.pctW(5)
 
     // Page counter and total badge sit on the same baseline as the
     // title's lower edge — bottom-aligned to the strip — so the trio

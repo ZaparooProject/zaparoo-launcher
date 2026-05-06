@@ -538,7 +538,12 @@ Item {
     }
 
     ScreenStateOverlay {
-        anchors.centerIn: games._listLayout ? gamesList : gamesGrid
+        x: (games._listLayout ? gamesList.x : gamesGrid.x)
+           + Sizing.center(games._listLayout ? gamesList.width : gamesGrid.width,
+                           width)
+        y: (games._listLayout ? gamesList.y : gamesGrid.y)
+           + Sizing.center(games._listLayout ? gamesList.height : gamesGrid.height,
+                           height)
         width: games._listLayout ? gamesList.width : gamesGrid.width
         height: games._listLayout ? gamesList.height : gamesGrid.height
         loading: Browse.GamesModel.loading

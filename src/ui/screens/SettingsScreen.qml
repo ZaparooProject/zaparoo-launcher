@@ -676,7 +676,8 @@ Item {
     // expose. Centered in the body so it doesn't compete with the
     // top strip or help bar.
     Text {
-        anchors.centerIn: parent
+        x: Sizing.center(parent.width, width)
+        y: Sizing.center(parent.height, height)
         visible: settings.fieldCount === 0
         text: qsTr("No settings available on this platform")
         color: Theme.textLabel

@@ -108,7 +108,7 @@ Item {
                 sourceSize.width: 600
                 sourceSize.height: 135
                 width: Math.min(parent.width, Sizing.pctH(35))
-                height: width * 135 / 600
+                height: Sizing.px(width * 135 / 600)
             }
 
             Text {

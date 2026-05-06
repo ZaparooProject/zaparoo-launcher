@@ -144,17 +144,18 @@ Item {
                 height: Sizing.pctH(7)
 
                 Rectangle {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.verticalCenter: parent.verticalCenter
+                    x: Sizing.center(parent.width, width)
+                    y: Sizing.center(parent.height, height)
                     width: Math.min(Sizing.pctW(28), understandSlot.width)
                     height: parent.height
                     color: Theme.bgBar
-                    border.width: 1
+                    border.width: Sizing.stroke(1)
                     border.color: Theme.borderMid
                     radius: Sizing.cornerRadius
 
                     Text {
-                        anchors.centerIn: parent
+                        x: Sizing.center(parent.width, width)
+                        y: Sizing.center(parent.height, height)
                         text: qsTr("I understand")
                         font.family: Theme.fontUi
                         font.pixelSize: Sizing.fontSize(2.5)

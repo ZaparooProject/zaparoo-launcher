@@ -116,13 +116,13 @@ Item {
 
                 readonly property int matrixSize: Browse.QrCode.size
                 readonly property int quietZone: 4
-                readonly property real maxQrPixels:
+                readonly property int maxQrPixels:
                     Math.min(Sizing.pctW(38), Sizing.pctH(54))
-                readonly property real moduleSize: matrixSize > 0
+                readonly property int moduleSize: matrixSize > 0
                     ? Math.max(1,
                         Math.floor(maxQrPixels / (matrixSize + quietZone * 2)))
                     : 1
-                readonly property real qrPixels:
+                readonly property int qrPixels:
                     moduleSize * (matrixSize + quietZone * 2)
 
                 Rectangle {
@@ -133,14 +133,14 @@ Item {
                     width: successBlock.qrPixels
                     height: successBlock.qrPixels
                     color: "white"
-                    border.width: Math.max(1,
-                                           Math.round(successBlock.moduleSize * 0.18))
+                    border.width: Sizing.stroke(successBlock.moduleSize * 0.18)
                     border.color: Theme.borderSubtle
 
                     Item {
                         id: matrix
 
-                        anchors.centerIn: parent
+                        x: Sizing.center(parent.width, width)
+                        y: Sizing.center(parent.height, height)
                         width: successBlock.moduleSize * successBlock.matrixSize
                         height: successBlock.moduleSize * successBlock.matrixSize
                         visible: successBlock.matrixSize > 0
@@ -219,17 +219,18 @@ Item {
                          || modal.phase === modal._stateError
 
                 Rectangle {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.verticalCenter: parent.verticalCenter
+                    x: Sizing.center(parent.width, width)
+                    y: Sizing.center(parent.height, height)
                     width: Sizing.pctW(28)
                     height: parent.height
                     color: Theme.bgBar
-                    border.width: 1
+                    border.width: Sizing.stroke(1)
                     border.color: Theme.borderMid
                     radius: Sizing.cornerRadius
 
                     Text {
-                        anchors.centerIn: parent
+                        x: Sizing.center(parent.width, width)
+                        y: Sizing.center(parent.height, height)
                         text: modal.phase === modal._stateError
                               ? qsTr("Retry")
                               : qsTr("Done")

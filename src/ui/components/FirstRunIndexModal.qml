@@ -175,7 +175,7 @@ Item {
                         anchors.topMargin: Sizing.pctH(1)
                         height: Sizing.pctH(1.4)
                         color: Theme.borderSubtle
-                        radius: height / 2
+                        radius: Sizing.half(height)
 
                         Rectangle {
                             readonly property real _ratio: {
@@ -189,7 +189,7 @@ Item {
                             anchors.left: parent.left
                             anchors.top: parent.top
                             anchors.bottom: parent.bottom
-                            width: progressTrack.width * _ratio
+                            width: Sizing.px(progressTrack.width * _ratio)
                             color: Theme.accent
                             radius: parent.radius
                         }
@@ -242,17 +242,18 @@ Item {
                 visible: modal.phase !== "completed"
 
                 Rectangle {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.verticalCenter: parent.verticalCenter
+                    x: Sizing.center(parent.width, width)
+                    y: Sizing.center(parent.height, height)
                     width: Sizing.pctW(28)
                     height: parent.height
                     color: Theme.bgBar
-                    border.width: 1
+                    border.width: Sizing.stroke(1)
                     border.color: Theme.borderMid
                     radius: Sizing.cornerRadius
 
                     Text {
-                        anchors.centerIn: parent
+                        x: Sizing.center(parent.width, width)
+                        y: Sizing.center(parent.height, height)
                         text: modal.phase === "running"
                               ? qsTr("Cancel")
                               : qsTr("Start scan")

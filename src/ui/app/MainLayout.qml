@@ -415,7 +415,7 @@ ApplicationWindow {
         // the modal is the right one.
         z: 400
         color: Theme.bgBar
-        border.width: 1
+        border.width: Sizing.stroke(1)
         border.color: Theme.borderSubtle
 
         // (activeScreen, screenState, modal?)-keyed lookup. The modal
@@ -631,7 +631,8 @@ ApplicationWindow {
         }
 
         Row {
-            anchors.centerIn: parent
+            x: Sizing.center(parent.width, width)
+            y: Sizing.center(parent.height, height)
             spacing: Sizing.pctW(2)
 
             Repeater {
@@ -662,8 +663,8 @@ ApplicationWindow {
                             height: Sizing.pctH(4)
                             width: height
                             fillMode: Image.PreserveAspectFit
-                            sourceSize.height: height
-                            sourceSize.width: width
+                            sourceSize.height: Sizing.px(height)
+                            sourceSize.width: Sizing.px(width)
                             source: Resources.iconUrl(modelData)
                             smooth: true
                         }

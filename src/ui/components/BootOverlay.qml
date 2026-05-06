@@ -4,6 +4,7 @@
 
 import QtQuick
 import Zaparoo.Browse as Browse
+import Zaparoo.Theme
 
 // cxx-qt 0.8 patches `isFinal: true` on singleton properties but the
 // qmltypes schema has no `isFinal` slot, so every read trips qmllint's
@@ -67,7 +68,8 @@ Item {
     }
 
     LoadingIndicator {
-        anchors.centerIn: parent
+        x: Sizing.center(parent.width, width)
+        y: Sizing.center(parent.height, height)
         text: {
             const link = Browse.AppStatus.link_state ?? overlay._linkDisconnected
             if (link === overlay._linkUnreachable && overlay._unreachableLong)

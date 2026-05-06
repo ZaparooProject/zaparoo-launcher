@@ -267,7 +267,12 @@ Item {
     }
 
     ScreenStateOverlay {
-        anchors.centerIn: recents._listLayout ? recentsList : recentsGrid
+        x: (recents._listLayout ? recentsList.x : recentsGrid.x)
+           + Sizing.center(recents._listLayout ? recentsList.width : recentsGrid.width,
+                           width)
+        y: (recents._listLayout ? recentsList.y : recentsGrid.y)
+           + Sizing.center(recents._listLayout ? recentsList.height : recentsGrid.height,
+                           height)
         width: recents._listLayout ? recentsList.width : recentsGrid.width
         height: recents._listLayout ? recentsList.height : recentsGrid.height
         loading: Browse.RecentsModel.loading

@@ -39,8 +39,8 @@ Row {
         anchors.verticalCenter: parent.verticalCenter
         height: parent.height
         width: height
-        sourceSize.height: height
-        sourceSize.width: width
+        sourceSize.height: Sizing.px(height)
+        sourceSize.width: Sizing.px(width)
         source: Resources.iconUrl("Loading")
         fillMode: Image.PreserveAspectFit
         smooth: true

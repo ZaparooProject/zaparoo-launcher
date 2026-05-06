@@ -20,27 +20,29 @@ Item {
     property int quietZone: 4
 
     readonly property int matrixSize: Browse.QrCode.size
-    readonly property real maxQrPixels: Math.min(Sizing.pctW(42), Sizing.pctH(68))
-    readonly property real moduleSize: matrixSize > 0
+    readonly property int maxQrPixels: Math.min(Sizing.pctW(42), Sizing.pctH(68))
+    readonly property int moduleSize: matrixSize > 0
         ? Math.max(1, Math.floor(maxQrPixels / (matrixSize + quietZone * 2)))
         : 1
-    readonly property real qrPixels: moduleSize * (matrixSize + quietZone * 2)
+    readonly property int qrPixels: moduleSize * (matrixSize + quietZone * 2)
 
     visible: root.open
     z: 300
 
     Rectangle {
-        anchors.centerIn: parent
+        x: Sizing.center(parent.width, width)
+        y: Sizing.center(parent.height, height)
         width: root.qrPixels
         height: root.qrPixels
         color: "white"
-        border.width: Math.max(1, Math.round(root.moduleSize * 0.18))
+        border.width: Sizing.stroke(root.moduleSize * 0.18)
         border.color: Theme.borderSubtle
 
         Item {
             id: matrix
 
-            anchors.centerIn: parent
+            x: Sizing.center(parent.width, width)
+            y: Sizing.center(parent.height, height)
             width: root.moduleSize * root.matrixSize
             height: root.moduleSize * root.matrixSize
             visible: root.matrixSize > 0

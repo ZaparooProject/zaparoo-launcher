@@ -268,7 +268,12 @@ Item {
     }
 
     ScreenStateOverlay {
-        anchors.centerIn: favorites._listLayout ? favoritesList : favoritesGrid
+        x: (favorites._listLayout ? favoritesList.x : favoritesGrid.x)
+           + Sizing.center(favorites._listLayout ? favoritesList.width : favoritesGrid.width,
+                           width)
+        y: (favorites._listLayout ? favoritesList.y : favoritesGrid.y)
+           + Sizing.center(favorites._listLayout ? favoritesList.height : favoritesGrid.height,
+                           height)
         width: favorites._listLayout ? favoritesList.width : favoritesGrid.width
         height: favorites._listLayout ? favoritesList.height : favoritesGrid.height
         loading: Browse.FavoritesModel.loading

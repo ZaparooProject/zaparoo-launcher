@@ -108,11 +108,12 @@ Item {
         }
 
         Rectangle {
-            anchors.centerIn: parent
-            width: Math.min(parent.width * 0.78, modal.panelMaxWidth)
+            x: Sizing.center(parent.width, width)
+            y: Sizing.center(parent.height, height)
+            width: Sizing.px(Math.min(parent.width * 0.78, modal.panelMaxWidth))
             height: contentColumn.height + Sizing.pctH(12)
             color: Theme.bgPanel
-            border.width: 2
+            border.width: Sizing.stroke(2)
             border.color: Theme.textPrimary
             radius: Sizing.cornerRadius
 
@@ -172,8 +173,8 @@ Item {
                     visible: modal.kind === "transient" && !modal.failed
 
                     Rectangle {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        anchors.verticalCenter: parent.verticalCenter
+                        x: Sizing.center(parent.width, width)
+                        y: Sizing.center(parent.height, height)
                         // Cap at pctW(28) for the typical case but never
                         // exceed the slot width — the modal panel is
                         // height-bound on widescreen, so a screen-width
@@ -181,12 +182,13 @@ Item {
                         width: Math.min(Sizing.pctW(28), cancelSlot.width)
                         height: parent.height
                         color: Theme.bgBar
-                        border.width: 1
+                        border.width: Sizing.stroke(1)
                         border.color: Theme.borderMid
                         radius: Sizing.cornerRadius
 
                         Text {
-                            anchors.centerIn: parent
+                            x: Sizing.center(parent.width, width)
+                            y: Sizing.center(parent.height, height)
                             text: qsTr("Cancel")
                             font.family: Theme.fontUi
                             font.pixelSize: Sizing.fontSize(2.5)
@@ -210,17 +212,18 @@ Item {
                     visible: modal.kind === "action_error"
 
                     Rectangle {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        anchors.verticalCenter: parent.verticalCenter
+                        x: Sizing.center(parent.width, width)
+                        y: Sizing.center(parent.height, height)
                         width: Math.min(Sizing.pctW(28), acceptSlot.width)
                         height: parent.height
                         color: Theme.bgBar
-                        border.width: 1
+                        border.width: Sizing.stroke(1)
                         border.color: Theme.borderMid
                         radius: Sizing.cornerRadius
 
                         Text {
-                            anchors.centerIn: parent
+                            x: Sizing.center(parent.width, width)
+                            y: Sizing.center(parent.height, height)
                             text: modal.buttonLabel
                             font.family: Theme.fontUi
                             font.pixelSize: Sizing.fontSize(2.5)
@@ -254,25 +257,26 @@ Item {
                     readonly property int _gap: Sizing.pctW(2)
                     readonly property int _pillWidth:
                         Math.min(Sizing.pctW(28),
-                                 Math.max(0, (width - _gap) / 2))
+                                 Math.max(0, Sizing.px((width - _gap) / 2)))
 
                     Row {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        anchors.verticalCenter: parent.verticalCenter
+                        x: Sizing.center(parent.width, width)
+                        y: Sizing.center(parent.height, height)
                         spacing: confirmSlot._gap
 
                         Rectangle {
                             width: confirmSlot._pillWidth
                             height: Sizing.pctH(7)
                             color: Theme.bgBar
-                            border.width: modal._focusYes ? 1 : 2
+                            border.width: modal._focusYes ? Sizing.stroke(1) : Sizing.stroke(2)
                             border.color: modal._focusYes
                                           ? Theme.borderMid
                                           : Theme.accent
                             radius: Sizing.cornerRadius
 
                             Text {
-                                anchors.centerIn: parent
+                                x: Sizing.center(parent.width, width)
+                                y: Sizing.center(parent.height, height)
                                 text: modal.confirmNoLabel
                                 font.family: Theme.fontUi
                                 font.pixelSize: Sizing.fontSize(2.5)
@@ -294,14 +298,15 @@ Item {
                             width: confirmSlot._pillWidth
                             height: Sizing.pctH(7)
                             color: Theme.bgBar
-                            border.width: modal._focusYes ? 2 : 1
+                            border.width: modal._focusYes ? Sizing.stroke(2) : Sizing.stroke(1)
                             border.color: modal._focusYes
                                           ? Theme.accent
                                           : Theme.borderMid
                             radius: Sizing.cornerRadius
 
                             Text {
-                                anchors.centerIn: parent
+                                x: Sizing.center(parent.width, width)
+                                y: Sizing.center(parent.height, height)
                                 text: modal.confirmYesLabel
                                 font.family: Theme.fontUi
                                 font.pixelSize: Sizing.fontSize(2.5)

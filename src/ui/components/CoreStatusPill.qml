@@ -88,13 +88,13 @@ Item {
 
     visible: pill._label !== ""
     height: pill.visible ? Sizing.fontSize(3.4) : 0
-    width: pill.visible ? labelText.implicitWidth + Sizing.pctW(2.4) : 0
+    width: pill.visible ? Sizing.px(labelText.implicitWidth + Sizing.pctW(2.4)) : 0
 
     Rectangle {
         anchors.fill: parent
         color: Theme.surfaceCard
-        radius: pill.height / 2
-        border.width: 1
+        radius: Sizing.half(pill.height)
+        border.width: Sizing.stroke(1)
         border.color: pill._isError ? Theme.accent : Theme.borderMid
 
         Text {
