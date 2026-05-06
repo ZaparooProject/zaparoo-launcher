@@ -186,6 +186,12 @@ Item {
             const idx = games.gamesGrid.currentIndex
             const entryType = Browse.GamesModel.entry_type_at(idx)
             if (entryType === "directory" || entryType === "root") {
+                // Flush before push_level. The debounced timer writes to
+                // selected_at_level.last(); push_level appends a new ""
+                // entry for the child level, so a late flush would land
+                // the parent's selection on the just-pushed child level.
+                // Same handoff pattern as launch_at and cancel below.
+                games.flushSelectedPersist()
                 games.requestNavigateIntoFolder(Browse.GamesModel.path_at(idx))
                 return
             }
