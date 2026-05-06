@@ -39,6 +39,7 @@ ApplicationWindow {
     // (two-way synced below so direct assignment from tests still
     // works).
     property bool fullScreen: false
+    property bool crtNativePath: false
     property string activeScreen: ScreenManager.activeScreen
 
     // Defaults keep the design canvas at a sensible aspect for Design
@@ -56,6 +57,18 @@ ApplicationWindow {
         target: Resources
         property: "buttonLayout"
         value: Browse.Settings.current_button_layout
+    }
+
+    Binding {
+        target: Theme
+        property: "crtNativePath"
+        value: root.crtNativePath
+    }
+
+    Binding {
+        target: Sizing
+        property: "crtNativePath"
+        value: root.crtNativePath
     }
 
     // Screen plumbing exposed for Main.qml's orchestration. Anything

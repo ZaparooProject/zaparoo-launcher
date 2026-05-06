@@ -39,9 +39,19 @@ Item {
         source: "qrc:/qt/qml/Zaparoo/App/resources/images/logo.png"
     }
 
+    TextMetrics {
+        id: clockMetrics
+
+        text: "23:59"
+        font.family: Theme.fontUi
+        font.pixelSize: Sizing.headerRowHeight
+    }
+
     // Host status row — NFC / Wi-Fi / LAN / Bluetooth icons plus the
     // wall clock, right-anchored so badges can appear and disappear
-    // without nudging the clock away from the edge.
+    // without nudging the clock away from the edge. Clock width is
+    // measured from "23:59", the widest minutes-only value we care
+    // about for fixed CRT bitmap font sizing.
     Row {
         id: topHud
 
@@ -94,7 +104,7 @@ Item {
 
             anchors.verticalCenter: parent.verticalCenter
             height: parent.height
-            width: Sizing.headerRowHeight * 3
+            width: Sizing.px(clockMetrics.advanceWidth)
             verticalAlignment: Text.AlignVCenter
             horizontalAlignment: Text.AlignRight
             text: clockLabel.currentTime

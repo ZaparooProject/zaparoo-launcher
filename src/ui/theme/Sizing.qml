@@ -14,6 +14,7 @@ QtObject {
     // Reference window dimensions — updated by Main.qml on start and resize.
     property real screenWidth: 640
     property real screenHeight: 480
+    property bool crtNativePath: false
 
     // Visible tile-row covers: fewer at very low resolution to avoid crowding.
     readonly property int visibleCovers: screenHeight < 300 ? 3 : 5
@@ -80,6 +81,9 @@ QtObject {
 
     // Minimum 8px to remain legible on CRT 240p displays.
     function fontSize(percent: real): int {
-        return Math.max(8, pctH(percent))
+        const size = Math.max(8, pctH(percent))
+        if (!crtNativePath)
+            return size
+        return size < 12 ? 8 : 16
     }
 }

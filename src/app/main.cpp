@@ -20,10 +20,12 @@
 #include <QPixmapCache>
 #include <QQmlApplicationEngine>
 #include <QQuickStyle>
+#include <QQuickWindow>
 #include <QString>
 #include <QStringList>
 #include <QTranslator>
 #include <QUrl>
+#include <QVariantMap>
 #include <QtQml/qqmlextensionplugin.h>
 #include <cstddef>
 #include <cstdint>
@@ -118,17 +120,28 @@ int main(int argc, char* argv[])
     // unreadable file). Logging the failure mode keeps a refactor that
     // breaks the resource alias from silently degrading to the default
     // font with no clue in the logs.
-    const QString regularPath =
-        QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/AtkinsonHyperlegible-Regular.ttf");
-    const QString boldPath =
-        QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/AtkinsonHyperlegible-Bold.ttf");
-    if (QFontDatabase::addApplicationFont(regularPath) == -1)
+    const auto registerFont = [](const QString& path)
     {
-        qWarning("Failed to register font: %s", qUtf8Printable(regularPath));
-    }
-    if (QFontDatabase::addApplicationFont(boldPath) == -1)
+        const int fontId = QFontDatabase::addApplicationFont(path);
+        if (fontId == -1)
+        {
+            qWarning("Failed to register font: %s", qUtf8Printable(path));
+            return;
+        }
+        qInfo("Registered font %s: %s",
+              qUtf8Printable(path),
+              qUtf8Printable(QFontDatabase::applicationFontFamilies(fontId).join(", ")));
+    };
+    registerFont(QStringLiteral(
+        ":/qt/qml/Zaparoo/App/resources/fonts/AtkinsonHyperlegible-Regular.ttf"));
+    registerFont(QStringLiteral(
+        ":/qt/qml/Zaparoo/App/resources/fonts/AtkinsonHyperlegible-Bold.ttf"));
+    registerFont(
+        QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/Bongo-8 Mono.ttf"));
+    if (zaparoo_rust_crt_native_path_enabled())
     {
-        qWarning("Failed to register font: %s", qUtf8Printable(boldPath));
+        QQuickWindow::setTextRenderType(QQuickWindow::NativeTextRendering);
+        qInfo("CRT native path: using native text rendering");
     }
     QQuickStyle::setStyle("Basic");
 
@@ -178,9 +191,13 @@ int main(int argc, char* argv[])
     qInfo("QImageReader supportedImageFormats: %s",
           qUtf8Printable(formatNames.join(QStringLiteral(", "))));
 
+    QVariantMap initialProperties = {
+        {"crtNativePath", zaparoo_rust_crt_native_path_enabled()},
+    };
 #ifdef ZAPAROO_EMBEDDED_BUILD
-    engine.setInitialProperties({{"fullScreen", true}});
+    initialProperties.insert(QStringLiteral("fullScreen"), true);
 #endif
+    engine.setInitialProperties(initialProperties);
 
     // objectCreationFailed fires before loadFromModule returns when a QML
     // type fails to resolve or compile. Individual QML errors are already
