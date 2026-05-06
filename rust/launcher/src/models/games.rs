@@ -214,9 +214,7 @@ pub struct GamesModelRust {
     // doesn't cancel a callback that was already queued onto the Qt
     // thread between sleep-completion and abort.
     cover_gate_seq: Arc<AtomicU64>,
-<<<<<<< list-view
     description_seq: Arc<AtomicU64>,
-=======
     // Tagging ticket for in-flight append sub-batches scheduled by
     // `apply_append_page`. Bumped on every `start_initial_browse` so a
     // deferred batch from a stale dataset detects that the model has
@@ -235,7 +233,6 @@ pub struct GamesModelRust {
     // The 3 s safety timer is the bounded fall-through, so a stalled
     // prefetch can't park the user on the overlay forever.
     pending_initial_lookahead: bool,
->>>>>>> main
 }
 
 impl Default for GamesModelRust {
@@ -274,12 +271,9 @@ impl Default for GamesModelRust {
             pending_first_paint_keys: HashSet::new(),
             cover_gate_timer: None,
             cover_gate_seq: Arc::new(AtomicU64::new(0)),
-<<<<<<< list-view
             description_seq: Arc::new(AtomicU64::new(0)),
-=======
             append_seq: Arc::new(AtomicU64::new(0)),
             pending_initial_lookahead: false,
->>>>>>> main
         }
     }
 }
