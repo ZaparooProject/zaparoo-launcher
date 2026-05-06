@@ -63,6 +63,8 @@ fn main() {
     println!("cargo:rerun-if-env-changed=ZAPAROO_RUNTIME");
     println!("cargo:rerun-if-env-changed=ZAPAROO_DEV_BUILD");
     println!("cargo:rerun-if-env-changed=ZAPAROO_OFFICIAL_BUILD");
+    println!("cargo:rerun-if-env-changed=ZAPAROO_BUILD_COMMIT");
+    println!("cargo:rerun-if-env-changed=ZAPAROO_BUILD_DATE");
 
     // Rerun when HEAD or any branch ref moves so ZAPAROO_BUILD_COMMIT /
     // ZAPAROO_BUILD_DATE refresh after rebases, branch switches, and
@@ -93,25 +95,43 @@ fn main() {
     // "this binary is from this source tree at this date, and it is /
     // is not an official package", not DRM. Failures fall back to
     // "unknown" / "dev"; the build still succeeds.
-    let commit = std::process::Command::new("git")
-        .args(["rev-parse", "--short=7", "HEAD"])
-        .output()
+    //
+    // Prefer values supplied via env so cross-builds that don't have
+    // `.git/` in their build context (e.g. the ARM32 Docker build,
+    // which COPYs only source dirs) can be told the commit and date by
+    // the host. Fall back to running `git` / `date` when the env vars
+    // are absent or empty, which is the common path for host builds.
+    let commit = std::env::var("ZAPAROO_BUILD_COMMIT")
         .ok()
-        .filter(|o| o.status.success())
-        .and_then(|o| String::from_utf8(o.stdout).ok())
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
+        .or_else(|| {
+            std::process::Command::new("git")
+                .args(["rev-parse", "--short=7", "HEAD"])
+                .output()
+                .ok()
+                .filter(|o| o.status.success())
+                .and_then(|o| String::from_utf8(o.stdout).ok())
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+        })
         .unwrap_or_else(|| "unknown".to_string());
     println!("cargo:rustc-env=ZAPAROO_BUILD_COMMIT={commit}");
 
-    let build_date = std::process::Command::new("date")
-        .args(["-u", "+%Y-%m-%d"])
-        .output()
+    let build_date = std::env::var("ZAPAROO_BUILD_DATE")
         .ok()
-        .filter(|o| o.status.success())
-        .and_then(|o| String::from_utf8(o.stdout).ok())
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
+        .or_else(|| {
+            std::process::Command::new("date")
+                .args(["-u", "+%Y-%m-%d"])
+                .output()
+                .ok()
+                .filter(|o| o.status.success())
+                .and_then(|o| String::from_utf8(o.stdout).ok())
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+        })
         .unwrap_or_else(|| "unknown".to_string());
     println!("cargo:rustc-env=ZAPAROO_BUILD_DATE={build_date}");
 

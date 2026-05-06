@@ -1110,6 +1110,14 @@ MainLayout {
         repeatTick.stop()
         root._heldAction = ""
         root._heldKey = 0
+        // Hold-release commits whatever cell the user landed on. Games
+        // screen debounces its `set_selected_at_top` writes (one atomic
+        // disk write per move would batter MiSTer's SD card on a Down-
+        // hold through 20+ pages); the flush here lands the final
+        // selection so a kill during launch resumes on the right entry.
+        // No-op when no persist is pending or when another screen is
+        // active.
+        root.gamesScreen.flushSelectedPersist()
     }
 
     function _isRepeatableAction(action: string): bool {

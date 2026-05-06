@@ -77,8 +77,31 @@ Item {
         columnsOverride > 0 ? columnsOverride : Sizing.gridColumns
     readonly property int rows:
         rowsOverride > 0 ? rowsOverride : Sizing.gridRows
+
+    // Pages of buffer to keep ahead of the user's current page before
+    // firing `loadMoreRequested`. With `loadAheadPages: 2` the trigger
+    // fires when the user enters the second-to-last loaded page,
+    // overlapping the RPC + model insert with a full page of selection
+    // travel so the new chunk lands before they reach the loaded edge.
+    // The model's `loading_more` debounce collapses repeated emissions
+    // while a fetch is in flight, so firing earlier doesn't fan out.
+    property int loadAheadPages: 2
     readonly property int pageSize: columns * rows
-    readonly property int pageCount: Math.max(1, Math.ceil(itemCount / pageSize))
+    // Snap to the last fully-loaded page boundary while more chunks are
+    // still on the way. Otherwise the user reaches a half-full trailing
+    // page, sees "Loading more…", then watches the rest pop in mid-page
+    // when the chunk lands. Once `hasMorePages` flips false the partial
+    // last page becomes legitimate (it's the real end of the dataset)
+    // and we ceil to include it. The `Math.max(1, ...)` floor guard
+    // keeps the very first sub-page-sized load from collapsing pageCount
+    // to 0 while the initial chunk is still landing.
+    readonly property int pageCount: {
+        if (itemCount <= 0)
+            return 1
+        if (root.hasMorePages)
+            return Math.max(1, Math.floor(itemCount / pageSize))
+        return Math.ceil(itemCount / pageSize)
+    }
     readonly property int currentPage: Math.floor(currentIndex / pageSize)
     readonly property int currentColumn: (currentIndex % pageSize) % columns
     readonly property int currentRow: Math.floor((currentIndex % pageSize) / columns)
@@ -104,6 +127,32 @@ Item {
         totalItemsOverride >= 0 ? totalItemsOverride : itemCount
     readonly property int totalPageCount:
         Math.max(1, Math.ceil(totalItems / pageSize))
+
+    // Caller-supplied "more pages exist" flag for paginated models.
+    // Drives the pending-target watchdog: if the model says no more pages
+    // are coming but the pending target still isn't loaded, we settle on
+    // whatever's loaded rather than spinning forever. Non-paginated
+    // callers leave this false; their pending targets always resolve
+    // immediately because totalPageCount === pageCount.
+    property bool hasMorePages: false
+
+    // Pending wrap-target state. Set by Up-at-page-0, Down-past-last-
+    // loaded, and pageBy when the destination page hasn't been fetched
+    // yet. The grid fires `loadMoreRequested` and waits for `itemCount`
+    // to grow; once the target page is loaded, it commits the move and
+    // clears these. Cleared on any directional move that doesn't match
+    // the pending intent (Left/Right, opposite-direction Up/Down) and on
+    // model resets (itemCount shrink). -1 means "no pending jump".
+    property int _pendingTargetPage: -1
+    property int _pendingTargetRow: 0
+    property int _pendingTargetCol: 0
+
+    // True while a wrap / shoulder-jump / hold-Down-past-edge move is
+    // stashed waiting on a fetch. Screens use this to gate the
+    // "Loading more..." indicator so background prefetches stay
+    // silent — the indicator only paints when the user is genuinely
+    // waiting on input they've already given.
+    readonly property bool hasPendingTarget: _pendingTargetPage >= 0
 
     // Reserved chrome around the cell area. Vertical insets must be
     // large enough to contain the focused tile's 1.06× scale bleed
@@ -172,21 +221,34 @@ Item {
     }
 
     // Jump the selection by `delta` whole pages. Wraps in both
-    // directions to mirror moveSelection's column-edge behavior:
-    // - delta > 0 past the last page wraps to page 0
-    // - delta < 0 from page 0 wraps to the last page
-    // The target lands on (targetPage, currentRow, currentColumn) when
-    // that slot exists; on a partial last page it clamps to the last
-    // existing item on that page so the user always moves rather than
-    // sticking on a hole. Returns true if the index actually changed.
-    // No-op (returns false) on a single-page dataset since wrap on
-    // page 0 ↔ page 0 wouldn't move anything.
+    // directions over the dataset's `totalPageCount`, not just the
+    // loaded slice, so paginated callers (Games) wrap to the true last
+    // page rather than the last *loaded* page. If the target page
+    // isn't loaded yet, the move is deferred via `_pendingTargetPage`:
+    // the grid fires `loadMoreRequested` and commits the jump once
+    // `itemCount` grows enough to cover the target. The target lands on
+    // (targetPage, currentRow, currentColumn) when that slot exists;
+    // on a partial last page it clamps to the last existing item.
+    // Returns true if the index changed synchronously, false if a
+    // pending-jump was stashed or the dataset is single-page.
     function pageBy(delta: int): bool {
-        if (root.itemCount <= 0 || root.pageCount <= 1 || delta === 0)
+        if (root.itemCount <= 0 || root.totalPageCount <= 1 || delta === 0)
             return false
-        const total = root.pageCount
+        const total = root.totalPageCount
         // JS `%` keeps sign on negatives — normalise into [0, total).
         const targetPage = ((root.currentPage + delta) % total + total) % total
+        if (targetPage === root.currentPage)
+            return false
+        if (targetPage > root.pageCount - 1) {
+            // Target page hasn't been fetched yet. Stash the intent and
+            // let the itemCount-change watcher commit it.
+            root._pendingTargetPage = targetPage
+            root._pendingTargetRow = root.currentRow
+            root._pendingTargetCol = root.currentColumn
+            root.loadMoreRequested()
+            return false
+        }
+        root._pendingTargetPage = -1
         const targetSlot =
             targetPage * root.pageSize
             + root.currentRow * root.columns
@@ -199,12 +261,69 @@ Item {
         if (newIndex === root.currentIndex)
             return false
         root.currentIndex = newIndex
-        // Mirror moveSelection's pre-fetch: when we cross into the
-        // second-to-last loaded page, kick a fetch so the next page
-        // boundary lands on freshly loaded rows.
-        if (root.currentPage >= root.pageCount - 2)
+        // Mirror moveSelection's pre-fetch: when we cross within
+        // `loadAheadPages` of the loaded edge, kick a fetch so the next
+        // page boundary lands on freshly loaded rows.
+        if (root.currentPage >= root.pageCount - root.loadAheadPages - 1)
             root.loadMoreRequested()
         return true
+    }
+
+    // Commit the pending target move once the destination slot is
+    // loaded, or settle on the loaded last when the model says no more
+    // pages are coming. Wired into `onItemCountChanged` so every
+    // fetch-more append re-evaluates it; also fires from the
+    // `hasMorePages` watcher so a final empty append still resolves
+    // a chain. Waiting on the exact target index (not just `pageCount`
+    // catching up) avoids an early commit while the Repeater is mid-
+    // materialisation: the target page may report `pageCount` reached
+    // while the row/col slot itself isn't realised yet.
+    function _commitPendingTarget(): void {
+        if (root._pendingTargetPage < 0)
+            return
+        // Total may have shrunk under us (e.g. Core revised total_files
+        // downward); clamp the target to whatever the dataset reports
+        // now so we never overshoot.
+        const totalLast = root.totalPageCount - 1
+        const targetPage = Math.min(root._pendingTargetPage, totalLast)
+        if (targetPage < 0) {
+            root._pendingTargetPage = -1
+            return
+        }
+        const targetIdx = targetPage * root.pageSize
+                          + root._pendingTargetRow * root.columns
+                          + root._pendingTargetCol
+        if (targetIdx >= root.itemCount) {
+            // Specific (page, row, col) slot not realised yet.
+            if (root.hasMorePages) {
+                // Keep the chain going; `fetch_more` is debounced
+                // model-side via `loading_more`, so a redundant emit
+                // is cheap.
+                root.loadMoreRequested()
+                return
+            }
+            // Model says no more pages are coming. Settle on the
+            // target page's last loaded item if it has any; otherwise
+            // fall back to the dataset's overall loaded last so the
+            // user's "go to end" intent isn't ignored.
+            root._pendingTargetPage = -1
+            const pageStart = targetPage * root.pageSize
+            const lastLoadedOnPage =
+                Math.min((targetPage + 1) * root.pageSize,
+                         root.itemCount) - 1
+            if (lastLoadedOnPage >= pageStart) {
+                if (lastLoadedOnPage !== root.currentIndex)
+                    root.currentIndex = lastLoadedOnPage
+                return
+            }
+            const overall = root.itemCount - 1
+            if (overall >= 0 && overall !== root.currentIndex)
+                root.currentIndex = overall
+            return
+        }
+        root._pendingTargetPage = -1
+        if (targetIdx !== root.currentIndex)
+            root.currentIndex = targetIdx
     }
 
     // Step the selection by (dCol, dRow). Returns true if the index
@@ -242,6 +361,9 @@ Item {
         // to the row's actual filled span so a partial last row cycles
         // among its own items rather than walking through a hole.
         if (dCol !== 0) {
+            // Sideways step changes the user's intent — drop any
+            // pending wrap-target chain we were waiting on.
+            root._pendingTargetPage = -1
             const rowFirstIndex =
                 root.currentPage * root.pageSize
                 + root.currentRow * root.columns
@@ -258,9 +380,14 @@ Item {
                 newCol = colCandidate
         }
 
-        // Vertical wrap crosses page boundaries; the partial-page hole
-        // clamp below covers the case where the target column doesn't
-        // exist on the destination page.
+        // Vertical wrap crosses page boundaries against the dataset's
+        // `totalPageCount`, not the loaded slice. When the destination
+        // page hasn't been fetched yet (Up at page 0 with partial load,
+        // Down past last-loaded but more pages exist), stash a
+        // pending-target jump and ask the model to fetch — the
+        // `onItemCountChanged` handler commits the jump once the page
+        // lands. The partial-page hole clamp below covers the column-
+        // doesn't-exist-on-destination case once the data is present.
         //
         // A Down step that lands in an empty row of a partial last
         // page (rowCandidate fits inside `rows` but is past the page's
@@ -276,15 +403,32 @@ Item {
             const lastFilledRowOnPage =
                 Math.floor((itemsOnPage - 1) / root.columns)
             if (rowCandidate < 0) {
-                newPage = root.currentPage === 0
-                          ? root.pageCount - 1
-                          : root.currentPage - 1
+                const targetPage = root.currentPage === 0
+                                   ? root.totalPageCount - 1
+                                   : root.currentPage - 1
+                if (targetPage > root.pageCount - 1) {
+                    root._pendingTargetPage = targetPage
+                    root._pendingTargetRow = root.rows - 1
+                    root._pendingTargetCol = root.currentColumn
+                    root.loadMoreRequested()
+                    return false
+                }
+                newPage = targetPage
                 newRow = root.rows - 1
             } else if (rowCandidate >= root.rows
                        || rowCandidate > lastFilledRowOnPage) {
-                newPage = root.currentPage === root.pageCount - 1
-                          ? 0
-                          : root.currentPage + 1
+                const lastPage = root.totalPageCount - 1
+                const targetPage = root.currentPage === lastPage
+                                   ? 0
+                                   : root.currentPage + 1
+                if (targetPage > root.pageCount - 1) {
+                    root._pendingTargetPage = targetPage
+                    root._pendingTargetRow = 0
+                    root._pendingTargetCol = root.currentColumn
+                    root.loadMoreRequested()
+                    return false
+                }
+                newPage = targetPage
                 newRow = 0
             } else {
                 newRow = rowCandidate
@@ -305,21 +449,25 @@ Item {
         }
         if (newIndex === root.currentIndex) {
             // Selection didn't move because the user is at an edge with
-            // no data beyond it on this side. If they're at or past the
-            // penultimate loaded page, ask the model to fetch more so a
-            // subsequent press can land on freshly-loaded rows.
-            if (root.currentPage >= root.pageCount - 2)
+            // no data beyond it on this side. If they're within
+            // `loadAheadPages` of the loaded edge, ask the model to
+            // fetch more so a subsequent press can land on freshly-
+            // loaded rows.
+            if (root.currentPage >= root.pageCount - root.loadAheadPages - 1)
                 root.loadMoreRequested()
             return false
         }
+        // Successful directional move clears any pending wrap-target;
+        // the user is no longer waiting on it.
+        root._pendingTargetPage = -1
         root.currentIndex = newIndex
-        // Pre-fetch one page early — when the user enters the
-        // second-to-last loaded page, kick off the next fetch so the
-        // network round-trip overlaps with a full page of cell
-        // traversal and the new page lands before they cross the
-        // boundary. The model's own debounce (loading_more guard)
-        // collapses repeated emissions while a fetch is in flight.
-        if (root.currentPage >= root.pageCount - 2)
+        // Pre-fetch early - when the user enters within `loadAheadPages`
+        // of the loaded edge, kick off the next fetch so the network
+        // round-trip and model insert overlap with selection travel,
+        // and the new chunk lands before they cross the boundary. The
+        // model's own debounce (`loading_more` guard) collapses
+        // repeated emissions while a fetch is in flight.
+        if (root.currentPage >= root.pageCount - root.loadAheadPages - 1)
             root.loadMoreRequested()
         return true
     }
@@ -330,10 +478,32 @@ Item {
     // currentIndex untouched.
     property int _previousItemCount: 0
 
+    // If `hasMorePages` flips false while a pending target is still
+    // ahead of the loaded slice, the watchdog branch in
+    // `_commitPendingTarget` settles us on the loaded last item.
+    // itemCount-change usually fires this path first, but this handler
+    // covers the case where the flag is updated without an item delta
+    // (e.g. a final empty append).
+    onHasMorePagesChanged: {
+        if (root._pendingTargetPage >= 0)
+            root._commitPendingTarget()
+    }
+
     onItemCountChanged: {
-        if (root.itemCount < root._previousItemCount &&
-            root.currentIndex >= root.itemCount) {
-            root.currentIndex = Math.max(0, root.itemCount - 1)
+        if (root.itemCount < root._previousItemCount) {
+            // Model shed rows (reset, system change, path change). The
+            // pending-target context no longer applies — drop it before
+            // the row-count check below moves currentIndex.
+            root._pendingTargetPage = -1
+            if (root.currentIndex >= root.itemCount)
+                root.currentIndex = Math.max(0, root.itemCount - 1)
+        } else if (root.itemCount > root._previousItemCount) {
+            // Pages were appended. If a wrap-target jump is pending,
+            // try to commit it now; the helper chains another
+            // `loadMoreRequested` if the target is still ahead, or
+            // settles on the loaded last item if `hasMorePages`
+            // says no more pages are coming.
+            root._commitPendingTarget()
         }
         root._previousItemCount = root.itemCount
     }
@@ -379,42 +549,42 @@ Item {
                 readonly property int cellCol: cellLocal % root.columns
                 readonly property bool isSelected: index === root.currentIndex
 
-                // Cover-load gate. PagedGrid's Repeater materialises every
-                // model row at construction, so without a gate every loaded
-                // cell would fire its image-provider request immediately
-                // and saturate the async pool — visible-page covers then
-                // can't finish decoding before the cover gate releases,
-                // which produces the per-tile pop-in we tried to fix in
-                // v1.
+                // Cover-load gate AND delegate-materialisation gate.
+                // PagedGrid's Repeater creates one cellItem per model
+                // row at construction. Two-tier gate, both anchored on
+                // distance from `root.currentPage`:
                 //
-                // Two-tier gate:
-                //   - request range (±2 pages): cells inside this radius
-                //     fire image-provider requests. Bounds the initial
-                //     fanout to a fixed ~50 covers while still
+                //   - request range (±2 pages): cells inside this
+                //     radius fire image-provider requests. Bounds the
+                //     initial fanout to a fixed ~50 covers while still
                 //     pre-decoding pages N+1 and N+2 so a forward PgDn
                 //     lands on already-cached pixmaps.
-                //   - retention range (±5 pages): cells already requested
-                //     keep their TileLoader coverKey set so Tile's Image
-                //     keeps the decoded texture *referenced*. That
-                //     prevents QQuickPixmapCache from evicting it when
-                //     the user pages on, so a back-nav within the
-                //     retention window doesn't pay re-decode. Cells that
-                //     are in retention range but were never requested
-                //     stay gated to "" — retention doesn't get to trigger
-                //     new requests, only to keep already-loaded ones
-                //     alive.
+                //   - retention range (±5 pages): cells inside this
+                //     radius keep their TileLoader.active=true so the
+                //     Tile delegate stays materialised, AND cells that
+                //     have already requested keep their coverKey set
+                //     so Tile's Image keeps the decoded texture
+                //     referenced. The active gate is what prevents
+                //     per-press binding cost from growing with the
+                //     dataset - only ~110 Tile delegates exist at any
+                //     time regardless of N. Retention doesn't trigger
+                //     new cover requests; only the request range does.
                 //
-                // Off-radius cells (outside both ranges, or in retention
-                // range without ever having been requested) set their
-                // coverKey to "" so Tile's Image collapses to source: ""
-                // and the texture reference drops; Qt may evict.
+                // Off-radius cells (outside retention) set
+                // `TileLoader.active=false`, which destroys the
+                // loaded Tile delegate (Image, name Text, focus ring,
+                // favorite indicator) and detaches its binding tree.
+                // Cells inside retention but never requested keep the
+                // delegate alive but with coverKey="", so the cover
+                // collapses to the procedural fallback and the
+                // texture reference drops.
                 //
-                // Memory ceiling: ±5 around currentPage = up to 11 pages
-                // × pageSize covers ≈ 110 covers ≈ 40 MB decoded — OK on
-                // MiSTer's shared 512 MB. The decoders run at nice +10
-                // (see media_image_provider.cpp), so a re-decode after
-                // crossing past the retention edge is invisible to the
-                // renderer.
+                // Memory ceiling: ±5 around currentPage = up to 11
+                // pages × pageSize covers ≈ 110 covers ≈ 40 MB
+                // decoded - OK on MiSTer's shared 512 MB. Re-decode
+                // after crossing past the retention edge runs at
+                // nice +10 (see media_image_provider.cpp) and is
+                // invisible to the renderer.
                 readonly property bool _coverInRange:
                     Math.abs(cellPage - root.currentPage) <= 2
                 readonly property bool _coverInRetentionRange:
@@ -441,9 +611,48 @@ Item {
                 z: isSelected ? 1 : 0
                 visible: cellPage === root.currentPage
 
+                // Card-shaped placeholder painted behind the
+                // TileLoader. When the loader's `active` is false
+                // (cell is outside the retention window) or the Tile
+                // is still incubating asynchronously after a
+                // retention-edge crossing, the user sees this flat
+                // card slot instead of an empty pit. Once the Tile
+                // finishes incubating it paints opaque on top with
+                // the same color and radius, so the silhouette is
+                // hidden for free without an explicit visibility
+                // gate. No bindings on `root.currentPage` or
+                // `root.currentIndex` so it doesn't reintroduce the
+                // per-press fan-out we just bounded; the Repeater's
+                // visibility gate (cellPage === currentPage on the
+                // parent) means only ~pageSize silhouettes paint
+                // per frame.
+                Rectangle {
+                    anchors.fill: parent
+                    radius: Sizing.cornerRadius
+                    color: Theme.surfaceCard
+                }
+
                 TileLoader {
                     anchors.fill: parent
                     sourceComponent: root.delegate
+                    // Bound delegate materialisation to the retention
+                    // window. Cells outside +/-5 pages keep their
+                    // cellItem (Repeater contract - it owns one item
+                    // per model row) but don't construct a Tile, so
+                    // the loaded delegate's binding tree (cover Image,
+                    // focus ring, name Text, favorite indicator)
+                    // doesn't fan out on every selection move. With
+                    // ~110 active tiles instead of N, per-press
+                    // binding cost stays roughly constant as the
+                    // dataset grows.
+                    active: cellItem._coverInRetentionRange
+                    // Incubate Tile construction on background frames
+                    // so a retention-edge crossing (10 cells flipping
+                    // active) doesn't block the main thread. The
+                    // newly-revealed cells fill in over the next
+                    // frame or two; the user's selection move lands
+                    // immediately.
+                    asynchronous: true
                     isSelected: cellItem.isSelected
                     isFocused: root.focused
                     name: cellItem.name
