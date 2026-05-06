@@ -41,7 +41,6 @@
 //     Toggling it writes `[logging] debug = …` into launcher.toml; the
 //     tracing subscriber is built once at startup so the change only takes
 //     effect on the next launch (mirrors how `language` works).
-//
 // Launcher-owned durable settings are mirrored into both `state.toml`
 // and `launcher.toml`. `state.toml` keeps the in-process snapshot
 // coherent; `launcher.toml` is the durable copy that survives MiSTer's
@@ -230,6 +229,7 @@ impl ffi::Settings {
         self.as_mut().rust_mut().current_debug_logging = value;
         self.as_mut().current_debug_logging_changed();
     }
+
 }
 
 fn persist_settings<F: FnOnce(&mut SettingsState)>(mutator: F) -> persist::PersistedState {

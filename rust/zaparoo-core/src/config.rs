@@ -242,6 +242,10 @@ pub fn save_settings_mirror(
     };
     logging.insert("debug".into(), toml::Value::Boolean(debug_logging));
 
+    if let Some(video) = table.get_mut("video").and_then(toml::Value::as_table_mut) {
+        video.remove("backend");
+    }
+
     let serialized =
         toml::to_string(&table).map_err(|e| format!("config serialisation failed: {e}"))?;
     write_atomic(path, serialized.as_bytes())
@@ -505,9 +509,11 @@ mod tests {
     #[test]
     fn save_settings_mirror_preserves_other_sections() {
         let f = write_tmp(
-            "[core]\nendpoint = \"ws://example.com/api\"\n[video]\nwidth = 1280\nheight = 720\n",
+            "[core]\nendpoint = \"ws://example.com/api\"\n[video]\nbackend = \"native-core-poc\"\nwidth = 1280\nheight = 720\n",
         );
         save_settings_mirror(f.path(), "en", "a", true, false).expect("save");
+        let written = std::fs::read_to_string(f.path()).expect("read");
+        assert!(!written.contains("backend"));
         let cfg = load_config(f.path());
         assert_eq!(cfg.language, "en");
         assert_eq!(cfg.core_endpoint, "ws://example.com/api");
