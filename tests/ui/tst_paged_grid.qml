@@ -64,6 +64,11 @@ TestCase {
     function init(): void {
         Sizing.screenWidth = testCase.width
         Sizing.screenHeight = testCase.height
+        // Reset paginated-state knobs so a leak from a failed test
+        // (which skips its cleanup) doesn't poison the next case's
+        // pageCount/totalPageCount math.
+        grid.hasMorePages = false
+        grid.totalItemsOverride = -1
         fillModel(0)
         grid.setCurrentIndexImmediate(0)
         loadMoreSpy.clear()
@@ -535,6 +540,71 @@ TestCase {
         compare(grid._pendingTargetPage, 2)
         compare(grid._pendingTargetRow, 0)
         compare(grid._pendingTargetCol, 2)
+        _resetPartialLoadState()
+    }
+
+    function test_loadAheadPages_default_is_two(): void {
+        // The default `loadAheadPages` keeps two pages of buffer ahead
+        // of the user before firing the prefetch. GamesScreen relies
+        // on this default and overrides it only if the trade-off
+        // changes.
+        compare(grid.loadAheadPages, 2)
+    }
+
+    function test_loadAheadPages_two_fires_at_pageCount_minus_three(): void {
+        // 60 items at pageSize 12 = 5 pages loaded. With
+        // loadAheadPages=2, the trigger fires when `currentPage >=
+        // pageCount - loadAheadPages - 1` = page 2. Start at idx 20
+        // (page 1, row 2, col 0) and step Down: the move advances to
+        // (page 2, row 0, col 0) = idx 24, which sits exactly on the
+        // threshold — loadMoreRequested must fire so the next chunk is
+        // in flight before the user reaches the loaded edge.
+        fillModel(60)
+        grid.hasMorePages = true
+        grid.setCurrentIndexImmediate(20)
+        loadMoreSpy.clear()
+        compare(grid.moveSelection(0, 1), true)
+        compare(grid.currentPage, 2)
+        verify(loadMoreSpy.count >= 1,
+               "loadAheadPages=2 must fire prefetch on entering pageCount-3")
+        grid.hasMorePages = false
+    }
+
+    function test_loadAheadPages_two_does_not_fire_below_threshold(): void {
+        // Same 60-item / 5-page setup. Step from idx 8 (page 0, row 2,
+        // col 0) Down to idx 12 (page 1, row 0, col 0). currentPage=1
+        // sits below the threshold (pageCount-3 = 2), so no prefetch
+        // should fire yet.
+        fillModel(60)
+        grid.hasMorePages = true
+        grid.setCurrentIndexImmediate(8)
+        loadMoreSpy.clear()
+        compare(grid.moveSelection(0, 1), true)
+        compare(grid.currentPage, 1)
+        compare(loadMoreSpy.count, 0,
+                "loadAheadPages=2 must not fire below pageCount-3 threshold")
+        grid.hasMorePages = false
+    }
+
+    function test_hasPendingTarget_tracks_pending_state(): void {
+        // GamesScreen gates the "Loading more..." indicator on this
+        // property so background prefetches stay silent. It must
+        // mirror `_pendingTargetPage >= 0` exactly: false at rest,
+        // true while a wrap/shoulder/hold-Down move is parked, false
+        // once the target commits or the user changes intent.
+        _setupPartialLoad(24, 60)
+        compare(grid.hasPendingTarget, false,
+                "no pending target at rest")
+        compare(grid.moveSelection(0, -1), false)
+        compare(grid._pendingTargetPage, 4)
+        compare(grid.hasPendingTarget, true,
+                "Up wrap to unloaded page must arm hasPendingTarget")
+        for (let i = 24; i < 60; i++)
+            model.append({ "name": "item-" + i, "coverKey": "", "favorite": 0 })
+        tryCompare(grid, "itemCount", 60)
+        compare(grid._pendingTargetPage, -1)
+        compare(grid.hasPendingTarget, false,
+                "commit must clear hasPendingTarget")
         _resetPartialLoadState()
     }
 }

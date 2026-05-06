@@ -340,18 +340,22 @@ Item {
     // In-flight pagination cue. Sits on the ActiveLabel row at the
     // same horizontal position as the grid's left content edge, so it
     // never overlaps the bottom row of tiles and reads as part of the
-    // status band underneath the grid. Visible whenever `loading_more`
-    // is true and the screen body is otherwise on-screen — covers the
-    // hold-Down stall on the last loaded page, the wrap-to-last fetch
-    // chain when Up is pressed at page 0 with incomplete data, and the
-    // L/R shoulder jump-to-unloaded case. Hidden during transition or
-    // initial cover-gate so it never paints over the global "Loading…"
-    // overlay.
+    // status band underneath the grid. Visible only when the user is
+    // genuinely waiting on a fetch they triggered: a wrap-to-last,
+    // shoulder-jump, or hold-Down past the loaded edge stashes a
+    // pending target on PagedGrid, and that pending target is the
+    // signal that "the press did something, we're working on it".
+    // Background prefetches (look-ahead chunks the user hasn't
+    // bumped into yet) keep `loading_more` true but leave
+    // `hasPendingTarget` false, so the cue stays silent. Hidden
+    // during transition or initial cover-gate so it never paints
+    // over the global "Loading..." overlay.
     LoadingIndicator {
         id: pageLoadingCue
         visible: !games.transitioning
                  && !games.coverGateLoading
                  && Browse.GamesModel.loading_more
+                 && gamesGrid.hasPendingTarget
         anchors.left: activeLabel.left
         anchors.leftMargin: gamesGrid.leftInset
         anchors.verticalCenter: activeLabel.verticalCenter

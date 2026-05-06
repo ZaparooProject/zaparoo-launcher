@@ -77,6 +77,15 @@ Item {
         columnsOverride > 0 ? columnsOverride : Sizing.gridColumns
     readonly property int rows:
         rowsOverride > 0 ? rowsOverride : Sizing.gridRows
+
+    // Pages of buffer to keep ahead of the user's current page before
+    // firing `loadMoreRequested`. With `loadAheadPages: 2` the trigger
+    // fires when the user enters the second-to-last loaded page,
+    // overlapping the RPC + model insert with a full page of selection
+    // travel so the new chunk lands before they reach the loaded edge.
+    // The model's `loading_more` debounce collapses repeated emissions
+    // while a fetch is in flight, so firing earlier doesn't fan out.
+    property int loadAheadPages: 2
     readonly property int pageSize: columns * rows
     // Snap to the last fully-loaded page boundary while more chunks are
     // still on the way. Otherwise the user reaches a half-full trailing
@@ -137,6 +146,13 @@ Item {
     property int _pendingTargetPage: -1
     property int _pendingTargetRow: 0
     property int _pendingTargetCol: 0
+
+    // True while a wrap / shoulder-jump / hold-Down-past-edge move is
+    // stashed waiting on a fetch. Screens use this to gate the
+    // "Loading more..." indicator so background prefetches stay
+    // silent — the indicator only paints when the user is genuinely
+    // waiting on input they've already given.
+    readonly property bool hasPendingTarget: _pendingTargetPage >= 0
 
     // Reserved chrome around the cell area. Vertical insets must be
     // large enough to contain the focused tile's 1.06× scale bleed
@@ -245,10 +261,10 @@ Item {
         if (newIndex === root.currentIndex)
             return false
         root.currentIndex = newIndex
-        // Mirror moveSelection's pre-fetch: when we cross into the
-        // second-to-last loaded page, kick a fetch so the next page
-        // boundary lands on freshly loaded rows.
-        if (root.currentPage >= root.pageCount - 2)
+        // Mirror moveSelection's pre-fetch: when we cross within
+        // `loadAheadPages` of the loaded edge, kick a fetch so the next
+        // page boundary lands on freshly loaded rows.
+        if (root.currentPage >= root.pageCount - root.loadAheadPages - 1)
             root.loadMoreRequested()
         return true
     }
@@ -433,10 +449,11 @@ Item {
         }
         if (newIndex === root.currentIndex) {
             // Selection didn't move because the user is at an edge with
-            // no data beyond it on this side. If they're at or past the
-            // penultimate loaded page, ask the model to fetch more so a
-            // subsequent press can land on freshly-loaded rows.
-            if (root.currentPage >= root.pageCount - 2)
+            // no data beyond it on this side. If they're within
+            // `loadAheadPages` of the loaded edge, ask the model to
+            // fetch more so a subsequent press can land on freshly-
+            // loaded rows.
+            if (root.currentPage >= root.pageCount - root.loadAheadPages - 1)
                 root.loadMoreRequested()
             return false
         }
@@ -444,13 +461,13 @@ Item {
         // the user is no longer waiting on it.
         root._pendingTargetPage = -1
         root.currentIndex = newIndex
-        // Pre-fetch one page early — when the user enters the
-        // second-to-last loaded page, kick off the next fetch so the
-        // network round-trip overlaps with a full page of cell
-        // traversal and the new page lands before they cross the
-        // boundary. The model's own debounce (loading_more guard)
-        // collapses repeated emissions while a fetch is in flight.
-        if (root.currentPage >= root.pageCount - 2)
+        // Pre-fetch early - when the user enters within `loadAheadPages`
+        // of the loaded edge, kick off the next fetch so the network
+        // round-trip and model insert overlap with selection travel,
+        // and the new chunk lands before they cross the boundary. The
+        // model's own debounce (`loading_more` guard) collapses
+        // repeated emissions while a fetch is in flight.
+        if (root.currentPage >= root.pageCount - root.loadAheadPages - 1)
             root.loadMoreRequested()
         return true
     }
@@ -532,42 +549,42 @@ Item {
                 readonly property int cellCol: cellLocal % root.columns
                 readonly property bool isSelected: index === root.currentIndex
 
-                // Cover-load gate. PagedGrid's Repeater materialises every
-                // model row at construction, so without a gate every loaded
-                // cell would fire its image-provider request immediately
-                // and saturate the async pool — visible-page covers then
-                // can't finish decoding before the cover gate releases,
-                // which produces the per-tile pop-in we tried to fix in
-                // v1.
+                // Cover-load gate AND delegate-materialisation gate.
+                // PagedGrid's Repeater creates one cellItem per model
+                // row at construction. Two-tier gate, both anchored on
+                // distance from `root.currentPage`:
                 //
-                // Two-tier gate:
-                //   - request range (±2 pages): cells inside this radius
-                //     fire image-provider requests. Bounds the initial
-                //     fanout to a fixed ~50 covers while still
+                //   - request range (±2 pages): cells inside this
+                //     radius fire image-provider requests. Bounds the
+                //     initial fanout to a fixed ~50 covers while still
                 //     pre-decoding pages N+1 and N+2 so a forward PgDn
                 //     lands on already-cached pixmaps.
-                //   - retention range (±5 pages): cells already requested
-                //     keep their TileLoader coverKey set so Tile's Image
-                //     keeps the decoded texture *referenced*. That
-                //     prevents QQuickPixmapCache from evicting it when
-                //     the user pages on, so a back-nav within the
-                //     retention window doesn't pay re-decode. Cells that
-                //     are in retention range but were never requested
-                //     stay gated to "" — retention doesn't get to trigger
-                //     new requests, only to keep already-loaded ones
-                //     alive.
+                //   - retention range (±5 pages): cells inside this
+                //     radius keep their TileLoader.active=true so the
+                //     Tile delegate stays materialised, AND cells that
+                //     have already requested keep their coverKey set
+                //     so Tile's Image keeps the decoded texture
+                //     referenced. The active gate is what prevents
+                //     per-press binding cost from growing with the
+                //     dataset - only ~110 Tile delegates exist at any
+                //     time regardless of N. Retention doesn't trigger
+                //     new cover requests; only the request range does.
                 //
-                // Off-radius cells (outside both ranges, or in retention
-                // range without ever having been requested) set their
-                // coverKey to "" so Tile's Image collapses to source: ""
-                // and the texture reference drops; Qt may evict.
+                // Off-radius cells (outside retention) set
+                // `TileLoader.active=false`, which destroys the
+                // loaded Tile delegate (Image, name Text, focus ring,
+                // favorite indicator) and detaches its binding tree.
+                // Cells inside retention but never requested keep the
+                // delegate alive but with coverKey="", so the cover
+                // collapses to the procedural fallback and the
+                // texture reference drops.
                 //
-                // Memory ceiling: ±5 around currentPage = up to 11 pages
-                // × pageSize covers ≈ 110 covers ≈ 40 MB decoded — OK on
-                // MiSTer's shared 512 MB. The decoders run at nice +10
-                // (see media_image_provider.cpp), so a re-decode after
-                // crossing past the retention edge is invisible to the
-                // renderer.
+                // Memory ceiling: ±5 around currentPage = up to 11
+                // pages × pageSize covers ≈ 110 covers ≈ 40 MB
+                // decoded - OK on MiSTer's shared 512 MB. Re-decode
+                // after crossing past the retention edge runs at
+                // nice +10 (see media_image_provider.cpp) and is
+                // invisible to the renderer.
                 readonly property bool _coverInRange:
                     Math.abs(cellPage - root.currentPage) <= 2
                 readonly property bool _coverInRetentionRange:
@@ -594,9 +611,48 @@ Item {
                 z: isSelected ? 1 : 0
                 visible: cellPage === root.currentPage
 
+                // Card-shaped placeholder painted behind the
+                // TileLoader. When the loader's `active` is false
+                // (cell is outside the retention window) or the Tile
+                // is still incubating asynchronously after a
+                // retention-edge crossing, the user sees this flat
+                // card slot instead of an empty pit. Once the Tile
+                // finishes incubating it paints opaque on top with
+                // the same color and radius, so the silhouette is
+                // hidden for free without an explicit visibility
+                // gate. No bindings on `root.currentPage` or
+                // `root.currentIndex` so it doesn't reintroduce the
+                // per-press fan-out we just bounded; the Repeater's
+                // visibility gate (cellPage === currentPage on the
+                // parent) means only ~pageSize silhouettes paint
+                // per frame.
+                Rectangle {
+                    anchors.fill: parent
+                    radius: Sizing.cornerRadius
+                    color: Theme.surfaceCard
+                }
+
                 TileLoader {
                     anchors.fill: parent
                     sourceComponent: root.delegate
+                    // Bound delegate materialisation to the retention
+                    // window. Cells outside +/-5 pages keep their
+                    // cellItem (Repeater contract - it owns one item
+                    // per model row) but don't construct a Tile, so
+                    // the loaded delegate's binding tree (cover Image,
+                    // focus ring, name Text, favorite indicator)
+                    // doesn't fan out on every selection move. With
+                    // ~110 active tiles instead of N, per-press
+                    // binding cost stays roughly constant as the
+                    // dataset grows.
+                    active: cellItem._coverInRetentionRange
+                    // Incubate Tile construction on background frames
+                    // so a retention-edge crossing (10 cells flipping
+                    // active) doesn't block the main thread. The
+                    // newly-revealed cells fill in over the next
+                    // frame or two; the user's selection move lands
+                    // immediately.
+                    asynchronous: true
                     isSelected: cellItem.isSelected
                     isFocused: root.focused
                     name: cellItem.name
