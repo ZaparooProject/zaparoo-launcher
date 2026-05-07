@@ -120,7 +120,7 @@ Item {
                     text: tagRow.parts.length > 0 ? tagRow.parts[0] : ""
                     color: Theme.textLabel
                     font.family: Theme.fontUi
-                    font.pixelSize: Sizing.fontSize(1.9)
+                    font.pixelSize: Sizing.fontSize(2.2)
                     elide: Text.ElideRight
                     horizontalAlignment: Text.AlignRight
                     renderType: Text.NativeRendering
@@ -136,7 +136,7 @@ Item {
                     text: tagRow.parts.length > 1 ? tagRow.parts[1] : ""
                     color: Theme.textPrimary
                     font.family: Theme.fontUi
-                    font.pixelSize: Sizing.fontSize(2.1)
+                    font.pixelSize: Sizing.fontSize(2.2)
                     wrapMode: Text.Wrap
                     maximumLineCount: tagRow.isFilename ? 8 : 2
                     elide: tagRow.isFilename ? Text.ElideNone : Text.ElideRight
@@ -156,7 +156,7 @@ Item {
         text: root.description
         color: Theme.textLabel
         font.family: Theme.fontUi
-        font.pixelSize: Sizing.fontSize(2.1)
+        font.pixelSize: Sizing.fontSize(2.2)
         wrapMode: Text.Wrap
         elide: Text.ElideRight
         horizontalAlignment: Text.AlignLeft

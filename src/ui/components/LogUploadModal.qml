@@ -223,7 +223,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     width: Sizing.pctW(28)
                     height: parent.height
-                    color: Theme.bgBar
+                    color: Theme.surfaceCard
                     border.width: 1
                     border.color: Theme.borderMid
                     radius: Sizing.cornerRadius
@@ -234,7 +234,7 @@ Item {
                               ? qsTr("Retry")
                               : qsTr("Done")
                         font.family: Theme.fontUi
-                        font.pixelSize: Sizing.fontSize(2.5)
+                        font.pixelSize: Sizing.fontSize(2.6)
                         color: Theme.textPrimary
                         renderType: Text.NativeRendering
                     }

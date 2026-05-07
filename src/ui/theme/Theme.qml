@@ -10,7 +10,6 @@ import QtQuick
 QtObject {
     // Backgrounds
     readonly property color bgDeep: "#0f0f23"
-    readonly property color bgMid: "#252550"
     readonly property color bgPanel: "#1a1a35"
     readonly property color bgBar: "#0a0a15"
     // Card surface used for tile bodies in rows/grids. Sits a step
@@ -24,10 +23,7 @@ QtObject {
 
     // Borders
     readonly property color borderSubtle: "#1a1a2e"
-    readonly property color borderFaint: "#222"
-    readonly property color borderDim: "#333"
     readonly property color borderMid: "#404060"
-    readonly property color borderActive: "#2a2a3a"
 
     // Text
     readonly property color textPrimary: "#ffffff"

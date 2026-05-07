@@ -36,9 +36,14 @@ Item {
 
     signal requestHubScreen()
     // Forward signal carrying the focused action row's id. The router
-    // decides what the payload means — currently only "uploadLog" is
-    // wired, which opens the log-upload modal.
+    // decides what the payload means — `"uploadLog"` opens the log-
+    // upload modal, `"aboutLicense"` navigates to the About screen.
     signal requestAccept(actionId: string)
+    // Picker request. The router mounts `ListPickerModal` with these
+    // properties and dispatches the user's selection back through the
+    // matching `Browse.Settings` setter (keyed off `fieldId`).
+    signal requestListPicker(title: string, entries: var,
+                             initialId: string, fieldId: string)
 
     // Field registry. Each entry's `kind` is `"header"` (non-focusable
     // group label) or `"field"` (a navigable row). Field entries also
@@ -200,6 +205,18 @@ Item {
         const id = settings.fields[settings.currentIndex].id
         return id === "mouseEnabled" || id === "debugLogging"
     }
+    // True when the focused field is a list-picker row (Accept opens a
+    // modal; left/right is a no-op — pickers don't cycle inline). Drives
+    // the help-bar A: Open hint.
+    readonly property bool focusedFieldIsPicker: {
+        if (!settings._isField(settings.currentIndex))
+            return false
+        const id = settings.fields[settings.currentIndex].id
+        return id === "language"
+               || id === "browseLayout"
+               || id === "buttonLayout"
+               || id === "resolution"
+    }
     // True when the focused field is an action button (updateMediaDb,
     // runScraper, uploadLog, aboutLicense). Drives the help-bar Accept
     // hint and the SettingsField chevron.
@@ -214,9 +231,9 @@ Item {
     }
     // Verb shown on the help-bar Accept hint for the focused action
     // row. Index/scrape flip between Start and Cancel because the press
-    // toggles the in-flight operation; uploadLog and aboutLicense are
-    // single-press triggers, with aboutLicense reading "Open" because
-    // the press navigates rather than starts a job.
+    // toggles the in-flight operation; uploadLog reads "Upload" because
+    // the press opens the upload-flow modal rather than kicking off an
+    // in-row job; aboutLicense reads "Open" because the press navigates.
     readonly property string focusedActionLabel: {
         if (!settings._isField(settings.currentIndex))
             return ""
@@ -224,7 +241,7 @@ Item {
         if (id === "updateMediaDb" || id === "runScraper")
             return settings.focusedActionBusy ? qsTr("Cancel") : qsTr("Start")
         if (id === "uploadLog")
-            return qsTr("Start")
+            return qsTr("Upload")
         if (id === "aboutLicense")
             return qsTr("Open")
         return ""
@@ -281,31 +298,6 @@ Item {
         return value === "" ? qsTr("Default") : value
     }
 
-    function _currentResolutionIndex(): int {
-        const list = settings._resolutionList()
-        const cur = Browse.Settings.current_resolution
-        for (let i = 0; i < list.length; i++)
-            if (list[i] === cur)
-                return i
-        return -1
-    }
-
-    function _cycleResolution(direction: int): void {
-        const list = settings._resolutionList()
-        if (list.length === 0)
-            return
-        let idx = settings._currentResolutionIndex()
-        if (idx < 0) {
-            // Current value is off the curated list (custom value
-            // persisted from a previous build, or the empty "Default"
-            // sentinel). Snap to the first or last list entry depending
-            // on direction so the user sees an immediate change.
-            idx = direction > 0 ? -1 : 0
-        }
-        const next = ((idx + direction) % list.length + list.length) % list.length
-        Browse.Settings.set_resolution(list[next])
-    }
-
     function _buttonLayoutList(): list<string> {
         const raw = Browse.Settings.available_button_layouts
         return raw === undefined || raw === null ? [] : raw
@@ -329,50 +321,10 @@ Item {
         return qsTr("Auto")
     }
 
-    function _currentLanguageIndex(): int {
-        const list = settings._languageList()
-        const cur = Browse.Settings.current_language
-        for (let i = 0; i < list.length; i++)
-            if (list[i] === cur)
-                return i
-        return -1
-    }
-
-    function _cycleLanguage(direction: int): void {
-        const list = settings._languageList()
-        if (list.length === 0)
-            return
-        let idx = settings._currentLanguageIndex()
-        if (idx < 0)
-            idx = direction > 0 ? -1 : 0
-        const next = ((idx + direction) % list.length + list.length) % list.length
-        Browse.Settings.set_language(list[next])
-    }
-
     function _browseLayoutDisplay(value: string): string {
         if (value === "list")
             return qsTr("Detailed list view")
         return qsTr("Grid view")
-    }
-
-    function _currentBrowseLayoutIndex(): int {
-        const list = settings._browseLayoutList()
-        const cur = Browse.Settings.current_browse_layout
-        for (let i = 0; i < list.length; i++)
-            if (list[i] === cur)
-                return i
-        return -1
-    }
-
-    function _cycleBrowseLayout(direction: int): void {
-        const list = settings._browseLayoutList()
-        if (list.length === 0)
-            return
-        let idx = settings._currentBrowseLayoutIndex()
-        if (idx < 0)
-            idx = direction > 0 ? -1 : 0
-        const next = ((idx + direction) % list.length + list.length) % list.length
-        Browse.Settings.set_browse_layout(list[next])
     }
 
     function _buttonLayoutDisplay(value: string): string {
@@ -385,24 +337,45 @@ Item {
         return qsTr("Style A")
     }
 
-    function _currentButtonLayoutIndex(): int {
-        const list = settings._buttonLayoutList()
-        const cur = Browse.Settings.current_button_layout
-        for (let i = 0; i < list.length; i++)
-            if (list[i] === cur)
-                return i
-        return -1
-    }
-
-    function _cycleButtonLayout(direction: int): void {
-        const list = settings._buttonLayoutList()
-        if (list.length === 0)
+    // Build the picker entry list for a field. Each entry is
+    // `{ id: string, label: string }` — `id` is the canonical value
+    // the model stores, `label` is the localised display string.
+    // The router emits `requestListPicker` and `Main.qml` mounts the
+    // shared `ListPickerModal` with these.
+    function _openPickerForField(id: string): void {
+        let title = ""
+        let entries = []
+        let initialId = ""
+        if (id === "resolution") {
+            title = qsTr("Resolution")
+            const list = settings._resolutionList()
+            for (let i = 0; i < list.length; i++)
+                entries.push({ id: list[i], label: settings._resolutionDisplay(list[i]) })
+            initialId = Browse.Settings.current_resolution
+        } else if (id === "language") {
+            title = qsTr("Language")
+            const list = settings._languageList()
+            for (let i = 0; i < list.length; i++)
+                entries.push({ id: list[i], label: settings._languageDisplay(list[i]) })
+            initialId = Browse.Settings.current_language
+        } else if (id === "browseLayout") {
+            title = qsTr("Browsing layout")
+            const list = settings._browseLayoutList()
+            for (let i = 0; i < list.length; i++)
+                entries.push({ id: list[i], label: settings._browseLayoutDisplay(list[i]) })
+            initialId = Browse.Settings.current_browse_layout
+        } else if (id === "buttonLayout") {
+            title = qsTr("Button style")
+            const list = settings._buttonLayoutList()
+            for (let i = 0; i < list.length; i++)
+                entries.push({ id: list[i], label: settings._buttonLayoutDisplay(list[i]) })
+            initialId = Browse.Settings.current_button_layout
+        } else {
             return
-        let idx = settings._currentButtonLayoutIndex()
-        if (idx < 0)
-            idx = direction > 0 ? -1 : 0
-        const next = ((idx + direction) % list.length + list.length) % list.length
-        Browse.Settings.set_button_layout(list[next])
+        }
+        if (entries.length === 0)
+            return
+        settings.requestListPicker(title, entries, initialId, id)
     }
 
     function _setMouseEnabled(direction: int): void {
@@ -425,19 +398,13 @@ Item {
         if (!settings._isField(settings.currentIndex))
             return
         const id = settings.fields[settings.currentIndex].id
-        if (id === "resolution")
-            settings._cycleResolution(direction)
-        else if (id === "language")
-            settings._cycleLanguage(direction)
-        else if (id === "browseLayout")
-            settings._cycleBrowseLayout(direction)
-        else if (id === "buttonLayout")
-            settings._cycleButtonLayout(direction)
-        else if (id === "mouseEnabled")
+        // Picker fields ignore left/right — accept opens the
+        // list-picker modal instead. Only toggles still respond to
+        // direction presses (left = off, right = on).
+        if (id === "mouseEnabled")
             settings._setMouseEnabled(direction)
         else if (id === "debugLogging")
             settings._setDebugLogging(direction)
-        // Action fields ignore left/right — they only respond to accept.
     }
 
     function handleAction(action: string): void {
@@ -467,6 +434,8 @@ Item {
                 settings.requestAccept("uploadLog")
             else if (id === "aboutLicense")
                 settings.requestAccept("aboutLicense")
+            else
+                settings._openPickerForField(id)
         } else if (action === "cancel") {
             settings.requestHubScreen()
         }
@@ -601,11 +570,12 @@ Item {
                         control: row.modelData.id === "mouseEnabled"
                                  || row.modelData.id === "debugLogging"
                                  ? "toggle"
+                                 : row.modelData.id === "aboutLicense"
+                                 ? "navigate"
                                  : (row.modelData.id === "updateMediaDb"
                                     || row.modelData.id === "runScraper"
-                                    || row.modelData.id === "uploadLog"
-                                    || row.modelData.id === "aboutLicense") ? "action"
-                                 : "value"
+                                    || row.modelData.id === "uploadLog") ? "action"
+                                 : "picker"
                         checked: row.modelData.id === "debugLogging"
                                  ? Browse.Settings.current_debug_logging
                                  : Browse.Settings.current_mouse_enabled
@@ -614,33 +584,6 @@ Item {
                                       : row.modelData.id === "runScraper"
                                       ? settings._scrapeActionStatus()
                                       : ""
-                        // Pickers wrap modulo, so both arrows apply
-                        // when the focused field has a populated
-                        // option list.
-                        canCyclePrev: (row.modelData.id === "resolution"
-                                       && settings._resolutionList().length > 0)
-                                      || (row.modelData.id === "language"
-                                          && settings._languageList().length > 1)
-                                      || (row.modelData.id === "browseLayout"
-                                          && settings._browseLayoutList().length > 1)
-                                      || (row.modelData.id === "buttonLayout"
-                                          && settings._buttonLayoutList().length > 1)
-                                      || (row.modelData.id === "mouseEnabled"
-                                          && Browse.Settings.current_mouse_enabled)
-                                      || (row.modelData.id === "debugLogging"
-                                          && Browse.Settings.current_debug_logging)
-                        canCycleNext: (row.modelData.id === "resolution"
-                                       && settings._resolutionList().length > 0)
-                                      || (row.modelData.id === "language"
-                                          && settings._languageList().length > 1)
-                                      || (row.modelData.id === "browseLayout"
-                                          && settings._browseLayoutList().length > 1)
-                                      || (row.modelData.id === "buttonLayout"
-                                          && settings._buttonLayoutList().length > 1)
-                                      || (row.modelData.id === "mouseEnabled"
-                                          && !Browse.Settings.current_mouse_enabled)
-                                      || (row.modelData.id === "debugLogging"
-                                          && !Browse.Settings.current_debug_logging)
                         onHovered: settings.currentIndex = row.index
                         onClicked: {
                             settings.currentIndex = row.index
@@ -650,11 +593,11 @@ Item {
                                 settings._toggleDebugLogging()
                         }
                         onRightClicked: settings.requestHubScreen()
-                        // Action rows route through `onAccepted` only
-                        // (see `SettingsField.qml`'s MouseArea), so
-                        // the focus commit lives here too — clicking
-                        // an action row moves focus before firing the
-                        // action.
+                        // Picker, action, and navigate rows route
+                        // through `onAccepted` (see SettingsField's
+                        // MouseArea), so the focus commit lives here
+                        // too — clicking commits focus before firing
+                        // the action.
                         onAccepted: {
                             settings.currentIndex = row.index
                             if (row.modelData.id === "updateMediaDb")
@@ -665,6 +608,8 @@ Item {
                                 settings.requestAccept("uploadLog")
                             else if (row.modelData.id === "aboutLicense")
                                 settings.requestAccept("aboutLicense")
+                            else
+                                settings._openPickerForField(row.modelData.id)
                         }
                     }
                 }

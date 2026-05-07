@@ -29,6 +29,21 @@ Item {
     visible: root.open
     z: 300
 
+    // Full-screen scrim. Joins QrCodeModal to the modal family for now
+    // (full panel chrome — title, padding, close affordance — is a
+    // future round). The MouseArea below eats clicks/hover so the
+    // dimmed screens beneath don't track focus under the modal.
+    Rectangle {
+        anchors.fill: parent
+        color: Theme.scrim
+
+        MouseArea {
+            anchors.fill: parent
+            hoverEnabled: true
+            acceptedButtons: Qt.AllButtons
+        }
+    }
+
     Rectangle {
         anchors.centerIn: parent
         width: root.qrPixels

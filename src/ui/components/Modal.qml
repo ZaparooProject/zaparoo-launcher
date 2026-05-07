@@ -27,9 +27,9 @@ import Zaparoo.Theme
 //                    dismissal.
 //
 // All four kinds share the same chrome — rounded corners
-// (`Sizing.cornerRadius`), 2px `Theme.textPrimary` border, `Theme.bgPanel`
-// fill, dark scrim — so every modal in the app reads as the same surface.
-// See `docs/style.md` → "Modal chrome".
+// (`Sizing.cornerRadius`), `Theme.bgPanel` fill, dark scrim — so every
+// modal in the app reads as the same surface. See `docs/style.md` →
+// "Modal chrome".
 //
 // Pure presentation: input routing for the prebaked kinds lives in
 // Main.qml, persistence in Browse.AppState. The component renders,
@@ -101,19 +101,22 @@ Item {
         anchors.fill: parent
         color: Theme.scrim
 
-        // Eat clicks on the scrim so they don't reach the screens
-        // underneath.
+        // Eat clicks AND hover on the scrim so they don't reach the
+        // screens underneath. Without `hoverEnabled`, mouse-mode hover
+        // events fall through to the screen, and the screen's
+        // `onHovered` handlers keep moving its `currentIndex` while
+        // a modal is on top — focus tracks the cursor under the scrim.
         MouseArea {
             anchors.fill: parent
+            hoverEnabled: true
+            acceptedButtons: Qt.AllButtons
         }
 
         Rectangle {
             anchors.centerIn: parent
             width: Math.min(parent.width * 0.78, modal.panelMaxWidth)
-            height: contentColumn.height + Sizing.pctH(12)
+            height: contentColumn.height + Sizing.pctH(8)
             color: Theme.bgPanel
-            border.width: 2
-            border.color: Theme.textPrimary
             radius: Sizing.cornerRadius
 
             Column {
@@ -122,9 +125,9 @@ Item {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.top: parent.top
-                anchors.topMargin: Sizing.pctH(6)
-                anchors.leftMargin: Sizing.pctW(6)
-                anchors.rightMargin: Sizing.pctW(6)
+                anchors.topMargin: Sizing.pctH(4)
+                anchors.leftMargin: Sizing.pctW(4)
+                anchors.rightMargin: Sizing.pctW(4)
                 spacing: Sizing.pctH(3)
 
                 Text {
@@ -144,7 +147,7 @@ Item {
                     visible: modal.body !== "" && modal.kind !== "shell"
                     text: modal.body
                     font.family: Theme.fontUi
-                    font.pixelSize: Sizing.fontSize(2.5)
+                    font.pixelSize: Sizing.fontSize(2.6)
                     color: Theme.textPrimary
                     wrapMode: Text.WordWrap
                     horizontalAlignment: Text.AlignHCenter
@@ -180,7 +183,7 @@ Item {
                         // pill can otherwise overflow the panel.
                         width: Math.min(Sizing.pctW(28), cancelSlot.width)
                         height: parent.height
-                        color: Theme.bgBar
+                        color: Theme.surfaceCard
                         border.width: 1
                         border.color: Theme.borderMid
                         radius: Sizing.cornerRadius
@@ -189,7 +192,7 @@ Item {
                             anchors.centerIn: parent
                             text: qsTr("Cancel")
                             font.family: Theme.fontUi
-                            font.pixelSize: Sizing.fontSize(2.5)
+                            font.pixelSize: Sizing.fontSize(2.6)
                             color: Theme.textPrimary
                             renderType: Text.NativeRendering
                         }
@@ -214,7 +217,7 @@ Item {
                         anchors.verticalCenter: parent.verticalCenter
                         width: Math.min(Sizing.pctW(28), acceptSlot.width)
                         height: parent.height
-                        color: Theme.bgBar
+                        color: Theme.surfaceCard
                         border.width: 1
                         border.color: Theme.borderMid
                         radius: Sizing.cornerRadius
@@ -223,7 +226,7 @@ Item {
                             anchors.centerIn: parent
                             text: modal.buttonLabel
                             font.family: Theme.fontUi
-                            font.pixelSize: Sizing.fontSize(2.5)
+                            font.pixelSize: Sizing.fontSize(2.6)
                             color: Theme.textPrimary
                             renderType: Text.NativeRendering
                         }
@@ -264,7 +267,7 @@ Item {
                         Rectangle {
                             width: confirmSlot._pillWidth
                             height: Sizing.pctH(7)
-                            color: Theme.bgBar
+                            color: Theme.surfaceCard
                             border.width: modal._focusYes ? 1 : 2
                             border.color: modal._focusYes
                                           ? Theme.borderMid
@@ -275,7 +278,7 @@ Item {
                                 anchors.centerIn: parent
                                 text: modal.confirmNoLabel
                                 font.family: Theme.fontUi
-                                font.pixelSize: Sizing.fontSize(2.5)
+                                font.pixelSize: Sizing.fontSize(2.6)
                                 color: Theme.textPrimary
                                 renderType: Text.NativeRendering
                             }
@@ -293,7 +296,7 @@ Item {
                         Rectangle {
                             width: confirmSlot._pillWidth
                             height: Sizing.pctH(7)
-                            color: Theme.bgBar
+                            color: Theme.surfaceCard
                             border.width: modal._focusYes ? 2 : 1
                             border.color: modal._focusYes
                                           ? Theme.accent
@@ -304,7 +307,7 @@ Item {
                                 anchors.centerIn: parent
                                 text: modal.confirmYesLabel
                                 font.family: Theme.fontUi
-                                font.pixelSize: Sizing.fontSize(2.5)
+                                font.pixelSize: Sizing.fontSize(2.6)
                                 color: Theme.textPrimary
                                 renderType: Text.NativeRendering
                             }

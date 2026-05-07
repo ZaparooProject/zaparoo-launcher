@@ -67,7 +67,7 @@ Item {
                 width: parent.width
                 text: qsTr("Copyright 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.")
                 font.family: Theme.fontUi
-                font.pixelSize: Sizing.fontSize(2.5)
+                font.pixelSize: Sizing.fontSize(2.6)
                 color: Theme.textPrimary
                 wrapMode: Text.WordWrap
                 horizontalAlignment: Text.AlignHCenter
@@ -78,7 +78,7 @@ Item {
                 width: parent.width
                 text: qsTr("This free source-available build is for personal and non-commercial use only. Commercial use or redistribution requires a license.")
                 font.family: Theme.fontUi
-                font.pixelSize: Sizing.fontSize(2.5)
+                font.pixelSize: Sizing.fontSize(2.6)
                 color: Theme.textPrimary
                 wrapMode: Text.WordWrap
                 horizontalAlignment: Text.AlignHCenter
@@ -89,7 +89,7 @@ Item {
                 width: parent.width
                 text: qsTr("Contact: legal@zaparoo.org")
                 font.family: Theme.fontUi
-                font.pixelSize: Sizing.fontSize(2.5)
+                font.pixelSize: Sizing.fontSize(2.6)
                 color: Theme.textLabel
                 wrapMode: Text.WordWrap
                 horizontalAlignment: Text.AlignHCenter
@@ -100,7 +100,7 @@ Item {
                 width: parent.width
                 text: qsTr("Full details available any time under Settings > About / License.")
                 font.family: Theme.fontUi
-                font.pixelSize: Sizing.fontSize(2.3)
+                font.pixelSize: Sizing.fontSize(2.4)
                 color: Theme.textLabel
                 wrapMode: Text.WordWrap
                 horizontalAlignment: Text.AlignHCenter
@@ -118,7 +118,7 @@ Item {
                     width: parent.width
                     text: qsTr("Created by")
                     font.family: Theme.fontUi
-                    font.pixelSize: Sizing.fontSize(2.3)
+                    font.pixelSize: Sizing.fontSize(2.4)
                     color: Theme.textLabel
                     horizontalAlignment: Text.AlignHCenter
                     renderType: Text.NativeRendering
@@ -130,7 +130,7 @@ Item {
                     width: parent.width
                     text: "Andrea Bogazzi, BossRighteous, Tim Wilsie, Wizzo"
                     font.family: Theme.fontUi
-                    font.pixelSize: Sizing.fontSize(2.5)
+                    font.pixelSize: Sizing.fontSize(2.6)
                     color: Theme.textPrimary
                     wrapMode: Text.WordWrap
                     horizontalAlignment: Text.AlignHCenter
@@ -148,7 +148,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     width: Math.min(Sizing.pctW(28), understandSlot.width)
                     height: parent.height
-                    color: Theme.bgBar
+                    color: Theme.surfaceCard
                     border.width: 1
                     border.color: Theme.borderMid
                     radius: Sizing.cornerRadius
@@ -157,7 +157,7 @@ Item {
                         anchors.centerIn: parent
                         text: qsTr("I understand")
                         font.family: Theme.fontUi
-                        font.pixelSize: Sizing.fontSize(2.5)
+                        font.pixelSize: Sizing.fontSize(2.6)
                         color: Theme.textPrimary
                         renderType: Text.NativeRendering
                     }

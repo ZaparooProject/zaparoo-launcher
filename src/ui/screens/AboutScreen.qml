@@ -75,8 +75,14 @@ Item {
     // at narrow line lengths, and the cap also keeps the logo from
     // having to scale up past its 600px native width on widescreen.
     // Bottom margin clears the help bar (pctH(6)) plus a small gap.
-    Flickable {
-        id: flickable
+    //
+    // Card stays put; the Flickable sits inside the card and content
+    // scrolls within it. Putting the Flickable outside the card would
+    // scroll the card itself, which reads wrong. Internal padding
+    // matches the Settings row recipe (pctW(3) / pctH(3)) so the body
+    // text doesn't kiss the card edge.
+    Rectangle {
+        id: card
 
         anchors.top: topStrip.bottom
         anchors.topMargin: Sizing.pctH(2)
@@ -84,167 +90,181 @@ Item {
         anchors.bottomMargin: Sizing.pctH(8)
         anchors.horizontalCenter: parent.horizontalCenter
         width: Math.min(parent.width - Sizing.pctW(10), Sizing.pctW(50))
-        contentWidth: width
-        contentHeight: body.implicitHeight
-        clip: true
-        boundsBehavior: Flickable.StopAtBounds
+        color: Theme.surfaceCard
+        radius: Sizing.cornerRadius
+        border.color: Theme.borderMid
+        border.width: 1
 
-        Column {
-            id: body
+        Flickable {
+            id: flickable
 
-            width: parent.width
-            spacing: Sizing.pctH(2)
+            anchors.fill: parent
+            anchors.leftMargin: Sizing.pctW(3)
+            anchors.rightMargin: Sizing.pctW(3)
+            anchors.topMargin: Sizing.pctH(3)
+            anchors.bottomMargin: Sizing.pctH(3)
+            contentWidth: width
+            contentHeight: body.implicitHeight
+            clip: true
+            boundsBehavior: Flickable.StopAtBounds
 
-            // Logo width is capped at a screen-height-relative size so
-            // the brand mark stays a header element across 240p →
-            // 1080p without ballooning. sourceSize is pinned to the
-            // native pixel dimensions to stop Qt upscaling then
-            // downsampling and to keep the lines crisp; height is
-            // derived from width via the image's intrinsic aspect.
-            Image {
-                anchors.horizontalCenter: parent.horizontalCenter
-                source: "qrc:/qt/qml/Zaparoo/App/resources/images/logo.png"
-                fillMode: Image.PreserveAspectFit
-                sourceSize.width: 600
-                sourceSize.height: 135
-                width: Math.min(parent.width, Sizing.pctH(35))
-                height: width * 135 / 600
-            }
+            Column {
+                id: body
 
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                horizontalAlignment: Text.AlignHCenter
-                text: qsTr("Zaparoo Launcher")
-                color: Theme.textPrimary
-                font.family: Theme.fontUi
-                font.pixelSize: Sizing.fontSize(4)
-                font.weight: Font.Medium
-                renderType: Text.NativeRendering
-            }
-
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                horizontalAlignment: Text.AlignHCenter
-                text: qsTr("Version %1 · %2 · %3")
-                    .arg(Qt.application.version)
-                    .arg(Browse.BuildInfo.commit)
-                    .arg(Browse.BuildInfo.channel)
-                color: Theme.textLabel
-                font.family: Theme.fontUi
-                font.pixelSize: Sizing.fontSize(2.4)
-                renderType: Text.NativeRendering
-            }
-
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                horizontalAlignment: Text.AlignHCenter
-                text: qsTr("Built %1").arg(Browse.BuildInfo.build_date)
-                color: Theme.textLabel
-                font.family: Theme.fontUi
-                font.pixelSize: Sizing.fontSize(2.2)
-                renderType: Text.NativeRendering
-            }
-
-            Text {
                 width: parent.width
-                horizontalAlignment: Text.AlignHCenter
-                wrapMode: Text.Wrap
-                text: qsTr("Copyright 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.")
-                color: Theme.textPrimary
-                font.family: Theme.fontUi
-                font.pixelSize: Sizing.fontSize(2.6)
-                renderType: Text.NativeRendering
-            }
+                spacing: Sizing.pctH(2)
 
-            Text {
-                width: parent.width
-                horizontalAlignment: Text.AlignHCenter
-                wrapMode: Text.Wrap
-                text: qsTr("Source available under the PolyForm Noncommercial License 1.0.0. Free for personal, non-commercial use. Commercial use or redistribution requires a separate license.")
-                color: Theme.textPrimary
-                font.family: Theme.fontUi
-                font.pixelSize: Sizing.fontSize(2.6)
-                renderType: Text.NativeRendering
-            }
+                // Logo width is capped at a screen-height-relative size so
+                // the brand mark stays a header element across 240p →
+                // 1080p without ballooning. sourceSize is pinned to the
+                // native pixel dimensions to stop Qt upscaling then
+                // downsampling and to keep the lines crisp; height is
+                // derived from width via the image's intrinsic aspect.
+                Image {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    source: "qrc:/qt/qml/Zaparoo/App/resources/images/logo.png"
+                    fillMode: Image.PreserveAspectFit
+                    sourceSize.width: 600
+                    sourceSize.height: 135
+                    width: Math.min(parent.width, Sizing.pctH(35))
+                    height: width * 135 / 600
+                }
 
-            Text {
-                width: parent.width
-                horizontalAlignment: Text.AlignHCenter
-                wrapMode: Text.Wrap
-                text: qsTr("Commercial licensing: legal@zaparoo.org")
-                color: Theme.textPrimary
-                font.family: Theme.fontUi
-                font.pixelSize: Sizing.fontSize(2.6)
-                renderType: Text.NativeRendering
-            }
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    horizontalAlignment: Text.AlignHCenter
+                    text: qsTr("Zaparoo Launcher")
+                    color: Theme.textPrimary
+                    font.family: Theme.fontUi
+                    font.pixelSize: Sizing.fontSize(4)
+                    font.weight: Font.Medium
+                    renderType: Text.NativeRendering
+                }
 
-            Text {
-                width: parent.width
-                horizontalAlignment: Text.AlignHCenter
-                wrapMode: Text.Wrap
-                text: qsTr("Project: https://zaparoo.org")
-                color: Theme.textPrimary
-                font.family: Theme.fontUi
-                font.pixelSize: Sizing.fontSize(2.6)
-                renderType: Text.NativeRendering
-            }
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    horizontalAlignment: Text.AlignHCenter
+                    text: qsTr("Version %1 · %2 · %3")
+                        .arg(Qt.application.version)
+                        .arg(Browse.BuildInfo.commit)
+                        .arg(Browse.BuildInfo.channel)
+                    color: Theme.textLabel
+                    font.family: Theme.fontUi
+                    font.pixelSize: Sizing.fontSize(2.4)
+                    renderType: Text.NativeRendering
+                }
 
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                horizontalAlignment: Text.AlignHCenter
-                text: qsTr("Created by")
-                color: Theme.textLabel
-                font.family: Theme.fontUi
-                font.pixelSize: Sizing.fontSize(2.4)
-                renderType: Text.NativeRendering
-            }
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    horizontalAlignment: Text.AlignHCenter
+                    text: qsTr("Built %1").arg(Browse.BuildInfo.build_date)
+                    color: Theme.textLabel
+                    font.family: Theme.fontUi
+                    font.pixelSize: Sizing.fontSize(2.2)
+                    renderType: Text.NativeRendering
+                }
 
-            // Contributor names are not translated — they're proper
-            // names. Joined with newlines (not separate Text items)
-            // so the block reads as one credits paragraph and the
-            // Column spacing doesn't push them apart.
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                horizontalAlignment: Text.AlignHCenter
-                text: "Andrea Bogazzi\nBossRighteous\nTim Wilsie\nWizzo"
-                color: Theme.textPrimary
-                font.family: Theme.fontUi
-                font.pixelSize: Sizing.fontSize(2.6)
-                renderType: Text.NativeRendering
-            }
+                Text {
+                    width: parent.width
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.Wrap
+                    text: qsTr("Copyright 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.")
+                    color: Theme.textPrimary
+                    font.family: Theme.fontUi
+                    font.pixelSize: Sizing.fontSize(2.6)
+                    renderType: Text.NativeRendering
+                }
 
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                horizontalAlignment: Text.AlignHCenter
-                text: qsTr("Translations")
-                color: Theme.textLabel
-                font.family: Theme.fontUi
-                font.pixelSize: Sizing.fontSize(2.4)
-                renderType: Text.NativeRendering
-            }
+                Text {
+                    width: parent.width
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.Wrap
+                    text: qsTr("Source available under the PolyForm Noncommercial License 1.0.0. Free for personal, non-commercial use. Commercial use or redistribution requires a separate license.")
+                    color: Theme.textPrimary
+                    font.family: Theme.fontUi
+                    font.pixelSize: Sizing.fontSize(2.6)
+                    renderType: Text.NativeRendering
+                }
 
-            // Translator names are not translated, they're proper
-            // names. Native-language labels (Italiano, Español) read
-            // correctly in any UI locale.
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                horizontalAlignment: Text.AlignHCenter
-                text: "Italiano - Andrea Bogazzi\nEspañol - Carlos R."
-                color: Theme.textPrimary
-                font.family: Theme.fontUi
-                font.pixelSize: Sizing.fontSize(2.6)
-                renderType: Text.NativeRendering
-            }
+                Text {
+                    width: parent.width
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.Wrap
+                    text: qsTr("Commercial licensing: legal@zaparoo.org")
+                    color: Theme.textPrimary
+                    font.family: Theme.fontUi
+                    font.pixelSize: Sizing.fontSize(2.6)
+                    renderType: Text.NativeRendering
+                }
 
-            Text {
-                width: parent.width
-                horizontalAlignment: Text.AlignHCenter
-                wrapMode: Text.Wrap
-                text: qsTr("Full license text in COPYING.")
-                color: Theme.textLabel
-                font.family: Theme.fontUi
-                font.pixelSize: Sizing.fontSize(2.4)
-                renderType: Text.NativeRendering
+                Text {
+                    width: parent.width
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.Wrap
+                    text: qsTr("Project: https://zaparoo.org")
+                    color: Theme.textPrimary
+                    font.family: Theme.fontUi
+                    font.pixelSize: Sizing.fontSize(2.6)
+                    renderType: Text.NativeRendering
+                }
+
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    horizontalAlignment: Text.AlignHCenter
+                    text: qsTr("Created by")
+                    color: Theme.textLabel
+                    font.family: Theme.fontUi
+                    font.pixelSize: Sizing.fontSize(2.4)
+                    renderType: Text.NativeRendering
+                }
+
+                // Contributor names are not translated — they're proper
+                // names. Joined with newlines (not separate Text items)
+                // so the block reads as one credits paragraph and the
+                // Column spacing doesn't push them apart.
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    horizontalAlignment: Text.AlignHCenter
+                    text: "Andrea Bogazzi\nBossRighteous\nTim Wilsie\nWizzo"
+                    color: Theme.textPrimary
+                    font.family: Theme.fontUi
+                    font.pixelSize: Sizing.fontSize(2.6)
+                    renderType: Text.NativeRendering
+                }
+
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    horizontalAlignment: Text.AlignHCenter
+                    text: qsTr("Translations")
+                    color: Theme.textLabel
+                    font.family: Theme.fontUi
+                    font.pixelSize: Sizing.fontSize(2.4)
+                    renderType: Text.NativeRendering
+                }
+
+                // Translator names are not translated, they're proper
+                // names. Native-language labels (Italiano, Español) read
+                // correctly in any UI locale.
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    horizontalAlignment: Text.AlignHCenter
+                    text: "Italiano - Andrea Bogazzi\nEspañol - Carlos R."
+                    color: Theme.textPrimary
+                    font.family: Theme.fontUi
+                    font.pixelSize: Sizing.fontSize(2.6)
+                    renderType: Text.NativeRendering
+                }
+
+                Text {
+                    width: parent.width
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.Wrap
+                    text: qsTr("Full license text in COPYING.")
+                    color: Theme.textLabel
+                    font.family: Theme.fontUi
+                    font.pixelSize: Sizing.fontSize(2.4)
+                    renderType: Text.NativeRendering
+                }
             }
         }
     }

@@ -461,7 +461,7 @@ Item {
         text: Browse.GamesModel.current_description
         color: Theme.textLabel
         font.family: Theme.fontUi
-        font.pixelSize: Sizing.fontSize(2.1)
+        font.pixelSize: Sizing.fontSize(2.2)
         wrapMode: Text.Wrap
         elide: Text.ElideRight
         horizontalAlignment: Text.AlignLeft

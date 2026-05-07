@@ -63,7 +63,7 @@ Item {
                 return ""
             }
             font.family: Theme.fontUi
-            font.pixelSize: Sizing.fontSize(3)
+            font.pixelSize: Sizing.fontSize(2.9)
             color: Theme.textPrimary
             horizontalAlignment: Text.AlignHCenter
             renderType: Text.NativeRendering

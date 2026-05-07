@@ -39,6 +39,7 @@ MainLayout {
     readonly property string modalFirstRunIndex: "first_run_index"
     readonly property string modalLogUpload: "log_upload"
     readonly property string modalQuitConfirm: "quit_confirm"
+    readonly property string modalListPicker: "list_picker"
     // One-shot session flag: the first-run modal is shown at most
     // once per launcher process, even if the WS link drops and the
     // mediadb-empty condition would otherwise be satisfied again.
@@ -601,6 +602,11 @@ MainLayout {
             else if (actionId === "aboutLicense")
                 root._navigateToAbout()
         }
+        function onRequestListPicker(title: string, entries: var,
+                                     initialId: string,
+                                     fieldId: string): void {
+            root.openListPickerModal(title, entries, initialId, fieldId)
+        }
     }
     Connections {
         target: root.aboutScreen
@@ -940,6 +946,44 @@ MainLayout {
     onCloseQuitConfirmRequested: root.closeQuitConfirmModal()
     onQuitConfirmAccepted: Qt.quit()
 
+    // List-picker lifecycle. Settings screens emit requestListPicker
+    // with a fieldId that round-trips through the modal so the accept
+    // handler can dispatch the chosen id back to the matching
+    // Browse.Settings.set_X without re-parsing the title.
+    function openListPickerModal(title: string, entries: var,
+                                 initialId: string, fieldId: string): void {
+        root.listPickerTitle = title
+        root.listPickerEntries = entries
+        root.listPickerInitialId = initialId
+        root.listPickerFieldId = fieldId
+        root.listPickerModalVisible = true
+        if (ScreenManager.topModal !== root.modalListPicker)
+            ScreenManager.pushModal(root.modalListPicker)
+    }
+
+    function closeListPickerModal(): void {
+        root.listPickerModalVisible = false
+        root.listPickerTitle = ""
+        root.listPickerEntries = []
+        root.listPickerInitialId = ""
+        root.listPickerFieldId = ""
+        if (ScreenManager.topModal === root.modalListPicker)
+            ScreenManager.popModal()
+    }
+
+    onListPickerAccepted: (fieldId, selectedId) => {
+        if (fieldId === "language")
+            Browse.Settings.set_language(selectedId)
+        else if (fieldId === "browseLayout")
+            Browse.Settings.set_browse_layout(selectedId)
+        else if (fieldId === "buttonLayout")
+            Browse.Settings.set_button_layout(selectedId)
+        else if (fieldId === "resolution")
+            Browse.Settings.set_resolution(selectedId)
+        root.closeListPickerModal()
+    }
+    onListPickerCloseRequested: root.closeListPickerModal()
+
     Connections {
         target: Browse.AppStatus
         function onConnection_stateChanged(): void {
@@ -1064,6 +1108,8 @@ MainLayout {
                 root.logUploadModal.handleAction(action)
             } else if (ScreenManager.topModal === root.modalQuitConfirm) {
                 root.quitConfirmModal.handleAction(action)
+            } else if (ScreenManager.topModal === root.modalListPicker) {
+                root.listPickerModal.handleAction(action)
             }
             // While a modal owns input, swallow everything not handled
             // above rather than leak it to the root screen.

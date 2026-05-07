@@ -19,6 +19,7 @@ qt_add_qml_module(
         FirstRunIndexModal.qml
         HeaderBar.qml
         LoadingIndicator.qml
+        ListPickerModal.qml
         LogUploadModal.qml
         Modal.qml
         PagedGrid.qml

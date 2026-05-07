@@ -132,7 +132,7 @@ Item {
                 visible: modal.phase === "idle"
                 text: qsTr("Zaparoo needs to scan your games before you can use the launcher. This usually takes a few minutes.")
                 font.family: Theme.fontUi
-                font.pixelSize: Sizing.fontSize(2.5)
+                font.pixelSize: Sizing.fontSize(2.6)
                 color: Theme.textPrimary
                 wrapMode: Text.WordWrap
                 horizontalAlignment: Text.AlignHCenter
@@ -213,7 +213,7 @@ Item {
                             return qsTr("Preparing…")
                         }
                         font.family: Theme.fontUi
-                        font.pixelSize: Sizing.fontSize(2.3)
+                        font.pixelSize: Sizing.fontSize(2.4)
                         color: Theme.textLabel
                         wrapMode: Text.WordWrap
                         horizontalAlignment: Text.AlignHCenter
@@ -246,7 +246,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     width: Sizing.pctW(28)
                     height: parent.height
-                    color: Theme.bgBar
+                    color: Theme.surfaceCard
                     border.width: 1
                     border.color: Theme.borderMid
                     radius: Sizing.cornerRadius
@@ -257,7 +257,7 @@ Item {
                               ? qsTr("Cancel")
                               : qsTr("Start scan")
                         font.family: Theme.fontUi
-                        font.pixelSize: Sizing.fontSize(2.5)
+                        font.pixelSize: Sizing.fontSize(2.6)
                         color: Theme.textPrimary
                         renderType: Text.NativeRendering
                     }

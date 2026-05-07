@@ -6,8 +6,8 @@ import QtQuick
 import Zaparoo.Theme
 
 // Unified grid tile. Solid card with a centered icon area filling the
-// card body, plus a white outline ring around the card when this tile
-// is the focused selection. Used by every tile surface in the launcher
+// card body, plus an accent-coloured outline ring around the card when
+// this tile is the focused selection. Used by every tile surface in the launcher
 // — hub categories row, systems grid, games grid, recents grid — so
 // the vocabulary is identical across screens.
 //
@@ -122,10 +122,16 @@ Item {
     // Tile body. Solid card so the white icon has a high-contrast
     // surface. Always visible — no opacity gating — which is the
     // unified-Tile contract: every grid renders the same shape.
+    // Static 1px borderMid edge gives every tile a card edge whether
+    // focused or not — same depth cue settings rows carry. The accent
+    // focus ring still paints on top when this tile is the focused
+    // selection.
     Rectangle {
         anchors.fill: parent
         radius: Sizing.cornerRadius
         color: Theme.surfaceCard
+        border.color: Theme.borderMid
+        border.width: 1
     }
 
     // Focus outline ring. Drawn *inside* the card edge so the ring
@@ -140,7 +146,7 @@ Item {
     // the inset (`_outlineGap = pctH(0.4)`), so the ring never overlaps
     // content.
     // Focus ring drawn as two stacked *filled* rounded rectangles — an
-    // outer white pill and an inner surfaceCard mask that punches the
+    // outer accent pill and an inner surfaceCard mask that punches the
     // centre back, leaving a uniform outline. Equivalent to the older
     // single-Rectangle `border.color` + `border.width` approach but
     // significantly smoother on the corners under Qt's software
@@ -153,7 +159,7 @@ Item {
         id: focusRingOuter
         anchors.fill: parent
         anchors.margins: root._outlineGap
-        color: Theme.textPrimary
+        color: Theme.accent
         radius: Sizing.cornerRadius - root._outlineGap
         antialiasing: true
         visible: root._focusedSelection
