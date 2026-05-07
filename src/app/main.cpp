@@ -9,8 +9,6 @@
 #include "media_image_provider.h"
 #include "native_video_writer.h"
 
-#include <cstdlib>
-#include <cstring>
 #include <QByteArray>
 #include <QFontDatabase>
 #include <QGuiApplication>
@@ -30,6 +28,8 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
+#include <cstring>
 #include <vector>
 
 // Default QPixmapCache cap is 10 MiB. With ~100 system PNGs decoded at
@@ -80,7 +80,8 @@ static void qtMessageHandler(QtMsgType type, const QMessageLogContext& /*ctx*/, 
     zaparoo_log_qt(static_cast<uint8_t>(type), utf8.constData(), static_cast<size_t>(utf8.size()));
 }
 
-struct ParsedArguments {
+struct ParsedArguments
+{
     bool crtNativePathForced = false;
     std::vector<char*> argv;
 };
@@ -148,16 +149,14 @@ int main(int argc, char* argv[])
             qWarning("Failed to register font: %s", qUtf8Printable(path));
             return;
         }
-        qInfo("Registered font %s: %s",
-              qUtf8Printable(path),
+        qInfo("Registered font %s: %s", qUtf8Printable(path),
               qUtf8Printable(QFontDatabase::applicationFontFamilies(fontId).join(", ")));
     };
-    registerFont(QStringLiteral(
-        ":/qt/qml/Zaparoo/App/resources/fonts/AtkinsonHyperlegible-Regular.ttf"));
-    registerFont(QStringLiteral(
-        ":/qt/qml/Zaparoo/App/resources/fonts/AtkinsonHyperlegible-Bold.ttf"));
     registerFont(
-        QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/Bongo-8 Mono.ttf"));
+        QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/AtkinsonHyperlegible-Regular.ttf"));
+    registerFont(
+        QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/AtkinsonHyperlegible-Bold.ttf"));
+    registerFont(QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/Bongo-8 Mono.ttf"));
     if (zaparoo_rust_crt_native_path_enabled())
     {
         QQuickWindow::setTextRenderType(QQuickWindow::NativeTextRendering);

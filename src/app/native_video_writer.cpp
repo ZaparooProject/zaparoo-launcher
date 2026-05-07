@@ -6,21 +6,20 @@
 
 #if defined(ZAPAROO_EMBEDDED_BUILD) && defined(__linux__)
 
-#include <fcntl.h>
-#include <linux/fb.h>
-#include <sys/ioctl.h>
-#include <sys/mman.h>
-#include <unistd.h>
-
+#include <QLoggingCategory>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <cstring>
+#include <fcntl.h>
+#include <linux/fb.h>
+#include <sys/ioctl.h>
+#include <sys/mman.h>
 #include <thread>
+#include <unistd.h>
 
-#include <QLoggingCategory>
-
-namespace {
+namespace
+{
 
 constexpr uintptr_t kNativeVideoBase = 0x3A000000u;
 constexpr size_t kNativeVideoRegionSize = 0x00060000u;
@@ -36,26 +35,24 @@ constexpr size_t kOutputRowBytes = kOutputWidth * kSourceBytesPerPixel;
 std::atomic<bool> g_running{false};
 std::thread g_thread;
 
-bool validateFramebufferWindow(const fb_fix_screeninfo& fixed, const fb_var_screeninfo& var, size_t fbSize)
+bool validateFramebufferWindow(const fb_fix_screeninfo& fixed, const fb_var_screeninfo& var,
+                               size_t fbSize)
 {
-    if (var.bits_per_pixel != 16 || var.xres < kOutputWidth || var.yres < kOutputHeight
-        || fixed.line_length < kOutputRowBytes)
+    if (var.bits_per_pixel != 16 || var.xres < kOutputWidth || var.yres < kOutputHeight ||
+        fixed.line_length < kOutputRowBytes)
     {
-        qWarning("native video writer: unsupported fb0 mode %ux%u %u bpp; expected at least 384x224 16 bpp",
-                 var.xres,
-                 var.yres,
-                 var.bits_per_pixel);
+        qWarning("native video writer: unsupported fb0 mode %ux%u %u bpp; expected at least "
+                 "384x224 16 bpp",
+                 var.xres, var.yres, var.bits_per_pixel);
         return false;
     }
 
-    if (var.xres_virtual < var.xoffset || var.yres_virtual < var.yoffset
-        || var.xres_virtual - var.xoffset < kOutputWidth || var.yres_virtual - var.yoffset < kOutputHeight)
+    if (var.xres_virtual < var.xoffset || var.yres_virtual < var.yoffset ||
+        var.xres_virtual - var.xoffset < kOutputWidth ||
+        var.yres_virtual - var.yoffset < kOutputHeight)
     {
         qWarning("native video writer: visible fb0 window %u,%u in %ux%u cannot cover 384x224",
-                 var.xoffset,
-                 var.yoffset,
-                 var.xres_virtual,
-                 var.yres_virtual);
+                 var.xoffset, var.yoffset, var.xres_virtual, var.yres_virtual);
         return false;
     }
 
@@ -68,12 +65,11 @@ bool validateFramebufferWindow(const fb_fix_screeninfo& fixed, const fb_var_scre
         return false;
     }
 
-    const size_t visibleOffset =
-        static_cast<size_t>(var.yoffset) * fixed.line_length
-        + static_cast<size_t>(var.xoffset) * kSourceBytesPerPixel;
-    const size_t lastByte =
-        visibleOffset + static_cast<size_t>(kOutputHeight - 1) * fixed.line_length
-        + static_cast<size_t>(kOutputWidth) * kSourceBytesPerPixel;
+    const size_t visibleOffset = static_cast<size_t>(var.yoffset) * fixed.line_length +
+                                 static_cast<size_t>(var.xoffset) * kSourceBytesPerPixel;
+    const size_t lastByte = visibleOffset +
+                            static_cast<size_t>(kOutputHeight - 1) * fixed.line_length +
+                            static_cast<size_t>(kOutputWidth) * kSourceBytesPerPixel;
     if (lastByte > fbSize)
     {
         qWarning("native video writer: visible fb0 window exceeds mapped framebuffer");
@@ -85,11 +81,8 @@ bool validateFramebufferWindow(const fb_fix_screeninfo& fixed, const fb_var_scre
 
 class Fd
 {
-public:
-    explicit Fd(const char* path, int flags)
-        : m_fd(open(path, flags))
-    {
-    }
+  public:
+    explicit Fd(const char* path, int flags) : m_fd(open(path, flags)) {}
 
     ~Fd()
     {
@@ -102,10 +95,16 @@ public:
     Fd(const Fd&) = delete;
     Fd& operator=(const Fd&) = delete;
 
-    int get() const { return m_fd; }
-    bool ok() const { return m_fd >= 0; }
+    int get() const
+    {
+        return m_fd;
+    }
+    bool ok() const
+    {
+        return m_fd >= 0;
+    }
 
-private:
+  private:
     int m_fd = -1;
 };
 
@@ -120,14 +119,15 @@ void writerLoop()
 
     fb_fix_screeninfo fixed = {};
     fb_var_screeninfo var = {};
-    if (ioctl(fbFd.get(), FBIOGET_FSCREENINFO, &fixed) < 0
-        || ioctl(fbFd.get(), FBIOGET_VSCREENINFO, &var) < 0)
+    if (ioctl(fbFd.get(), FBIOGET_FSCREENINFO, &fixed) < 0 ||
+        ioctl(fbFd.get(), FBIOGET_VSCREENINFO, &var) < 0)
     {
         qWarning("native video writer: failed to inspect /dev/fb0");
         return;
     }
-    const size_t fbSize =
-        fixed.smem_len != 0 ? fixed.smem_len : static_cast<size_t>(fixed.line_length) * var.yres_virtual;
+    const size_t fbSize = fixed.smem_len != 0
+                              ? fixed.smem_len
+                              : static_cast<size_t>(fixed.line_length) * var.yres_virtual;
     if (!validateFramebufferWindow(fixed, var, fbSize))
     {
         return;
@@ -148,8 +148,9 @@ void writerLoop()
         return;
     }
 
-    auto* nativeBase = static_cast<volatile uint8_t*>(
-        mmap(nullptr, kNativeVideoRegionSize, PROT_READ | PROT_WRITE, MAP_SHARED, memFd.get(), kNativeVideoBase));
+    auto* nativeBase =
+        static_cast<volatile uint8_t*>(mmap(nullptr, kNativeVideoRegionSize, PROT_READ | PROT_WRITE,
+                                            MAP_SHARED, memFd.get(), kNativeVideoBase));
     if (nativeBase == MAP_FAILED)
     {
         munmap(fb, fbSize);
@@ -162,8 +163,7 @@ void writerLoop()
     *reinterpret_cast<volatile uint32_t*>(const_cast<uint8_t*>(nativeBase + kControlOffset)) = 0;
 
     qInfo("native video writer: copying top-left 384x224 RGB565 from /dev/fb0 %ux%u to native DDR",
-          var.xres,
-          var.yres);
+          var.xres, var.yres);
 
     uint32_t frame = 0;
     int active = 0;
@@ -180,9 +180,8 @@ void writerLoop()
             break;
         }
 
-        const auto* visible =
-            fb + static_cast<size_t>(var.yoffset) * fixed.line_length
-            + static_cast<size_t>(var.xoffset) * kSourceBytesPerPixel;
+        const auto* visible = fb + static_cast<size_t>(var.yoffset) * fixed.line_length +
+                              static_cast<size_t>(var.xoffset) * kSourceBytesPerPixel;
         const size_t dstOffset = active == 0 ? kBuffer0Offset : kBuffer1Offset;
         const size_t dstAddress = kNativeVideoBase + dstOffset;
         auto* dst = const_cast<uint8_t*>(nativeBase + dstOffset);
