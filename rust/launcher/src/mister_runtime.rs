@@ -5,7 +5,7 @@
 /// Sets `QT_QPA_PLATFORM=linuxfb` and `QT_QUICK_BACKEND=software`. Must
 /// be called before `QGuiApplication`. No-op on non-MiSTer builds.
 ///
-/// In the normal path, resolution is set by the MiSTer wrapper before
+/// In the normal path, resolution is set by the `MiSTer` wrapper before
 /// launching us. With `--crt`, the launcher applies `[video]`
 /// width/height itself so Qt opens a small linuxfb surface while the
 /// custom core owns real CRT output.
