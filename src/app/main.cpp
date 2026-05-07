@@ -27,8 +27,10 @@
 #include <QUrl>
 #include <QVariantMap>
 #include <QtQml/qqmlextensionplugin.h>
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <vector>
 
 // Default QPixmapCache cap is 10 MiB. With ~100 system PNGs decoded at
 // 256 px sourceSize the working set straddles that limit, so navigating
@@ -78,27 +80,45 @@ static void qtMessageHandler(QtMsgType type, const QMessageLogContext& /*ctx*/, 
     zaparoo_log_qt(static_cast<uint8_t>(type), utf8.constData(), static_cast<size_t>(utf8.size()));
 }
 
-static bool extractCrtArgument(int& argc, char* argv[])
-{
+struct ParsedArguments {
     bool crtNativePathForced = false;
-    int dst = 1;
-    for (int src = 1; src < argc; ++src)
+    std::vector<char*> argv;
+};
+
+static ParsedArguments extractCrtArgument(int argc, char* argv[])
+{
+    ParsedArguments parsed;
+    parsed.argv.reserve(static_cast<size_t>(argc));
+    std::copy_n(argv, argc, std::back_inserter(parsed.argv));
+
+    std::vector<char*> filtered;
+    filtered.reserve(parsed.argv.size());
+    if (!parsed.argv.empty())
     {
-        if (std::strcmp(argv[src], "--crt") == 0)
+        filtered.push_back(parsed.argv.front());
+    }
+
+    for (size_t i = 1; i < parsed.argv.size(); ++i)
+    {
+        if (std::strcmp(parsed.argv[i], "--crt") == 0)
         {
-            crtNativePathForced = true;
+            parsed.crtNativePathForced = true;
             continue;
         }
-        argv[dst++] = argv[src];
+        filtered.push_back(parsed.argv[i]);
     }
-    argv[dst] = nullptr;
-    argc = dst;
-    return crtNativePathForced;
+
+    parsed.argv = std::move(filtered);
+    parsed.argv.push_back(nullptr);
+    return parsed;
 }
 
 int main(int argc, char* argv[])
 {
-    const bool crtNativePathForced = extractCrtArgument(argc, argv);
+    ParsedArguments parsedArgs = extractCrtArgument(argc, argv);
+    const bool crtNativePathForced = parsedArgs.crtNativePathForced;
+    int qtArgc = static_cast<int>(parsedArgs.argv.size()) - 1;
+    char** qtArgv = parsedArgs.argv.data();
 
     QGuiApplication::setApplicationName("Zaparoo Launcher");
     QGuiApplication::setApplicationVersion("0.1.0");
@@ -114,7 +134,7 @@ int main(int argc, char* argv[])
     // messages are emitted.
     qInstallMessageHandler(qtMessageHandler);
 
-    QGuiApplication app(argc, argv);
+    QGuiApplication app(qtArgc, qtArgv);
     QPixmapCache::setCacheLimit(kPixmapCacheLimitKiB);
     // addApplicationFont returns -1 on failure (broken qrc path,
     // unreadable file). Logging the failure mode keeps a refactor that
