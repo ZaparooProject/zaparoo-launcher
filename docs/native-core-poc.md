@@ -51,6 +51,24 @@ After QML loads, the launcher also starts a native-video copy thread:
 0x3A02A200  buffer 1: 384x224 RGB565
 ```
 
+## Current CRT UI Constraints
+
+This branch is still Qt-on-`linuxfb`, so CRT legibility depends on keeping the
+QML scene aligned to integer pixels.
+
+- Use `Sizing.px()`, `Sizing.center()`, `Sizing.stroke()`, and `Sizing.half()`
+  for geometry that would otherwise land on fractional coordinates.
+- Avoid `anchors.horizontalCenter` / `Text.AlignHCenter` for CRT-critical text
+  when the final glyph run can land on a half-pixel. Center the `Text` item on
+  an integer `x`, then draw the glyphs left-aligned inside it.
+- Treat line widths and borders as integer pixels only.
+- In CRT mode, `Sizing.fontSize()` is intentionally quantized to `8` or `16`
+  pixels only. Intermediate sizes are not allowed for now.
+- The CRT path uses `Bongo-8 Mono` plus Qt native text rendering. Any new text
+  treatment added to the CRT path must be checked against that assumption.
+- Header HUD layout reserves clock width using the measured advance of `23:59`
+  so the Wi-Fi / LAN / Bluetooth / NFC icons do not shift as time changes.
+
 ## Core/Wrapper Contract
 
 The custom wrapper/core side must keep the scaler framebuffer path disabled for
@@ -80,3 +98,12 @@ This is not the final native renderer. It still relies on Qt rendering to
 `linuxfb`; it only decouples that framebuffer from the actual CRT output path.
 Final native video should render offscreen or write a dedicated DDR buffer
 directly.
+
+The CRT typography path is also provisional. It currently assumes:
+
+- integer-positioned layout
+- 8 px / 16 px font quantization only
+- one bundled bitmap-style font family
+
+If those assumptions change, revisit the snapping rules above before adding
+more CRT-specific UI polish.

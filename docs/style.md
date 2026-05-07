@@ -84,3 +84,16 @@ super-ellipse curvature is invisible at typical viewing distances.
 If a new surface has rounded corners, it picks `Sizing.cornerRadius` or it
 joins the pill family. There is no third option. Inconsistent radii were the
 problem this token was introduced to solve.
+
+## CRT drawing
+
+The current CRT path has stricter rules than the general desktop UI:
+
+- Geometry must land on integer pixels.
+- Stroke widths must be integer pixels.
+- Text sizes are restricted to `8px` or `16px`.
+- Bitmap-style text should not rely on centered glyph layout; center the text
+  item, not the glyph run.
+
+These are implementation constraints, not aesthetic preferences. If a CRT-only
+surface is added and needs an exception, document the reason in the same change.

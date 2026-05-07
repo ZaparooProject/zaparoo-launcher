@@ -36,6 +36,31 @@ fact; avoiding them is faster.
 - **`NumberAnimation on propName`** conflicts with `property T propName: value`.
   Drop the `: value` initializer; the animation takes over immediately.
 
+## Integer-pixel rules for CRT work
+
+The current CRT path depends on integer pixel placement. If a control looks
+fine on desktop but soft on MiSTer CRT, assume fractional geometry first.
+
+- **Snap geometry through `Sizing`.** Use `Sizing.px()`, `Sizing.center()`,
+  `Sizing.stroke()`, and `Sizing.half()` instead of raw `/ 2`, `%`, or implicit
+  centering math when the result drives `x`, `y`, `width`, `height`, margins,
+  or border widths.
+
+- **Do not trust centered text by default.** `anchors.horizontalCenter` and
+  `Text.AlignHCenter` can leave the glyph run on a half-pixel when the control
+  width and measured text width have opposite parity. For CRT-sensitive labels,
+  center the `Text` item itself on an integer `x`, then render with
+  `horizontalAlignment: Text.AlignLeft` inside that box.
+
+- **Quantize CRT font sizes.** `Sizing.fontSize()` now snaps to `8` or `16`
+  pixels when `crtNativePath` is active. Any new CRT text should assume those
+  are the only valid sizes for now.
+
+- **Reserve space from worst-case metrics.** If dynamic text shares a row with
+  icons, measure the widest expected string with `TextMetrics` and reserve that
+  width up front. Current example: the header clock reserves the advance width
+  of `23:59`.
+
 ## Software-renderer animation costs
 
 The MiSTer build runs on Qt Quick's Software adaptation — raster paint engine,
