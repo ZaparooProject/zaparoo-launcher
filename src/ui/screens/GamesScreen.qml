@@ -481,7 +481,7 @@ Item {
         anchors.right: parent.right
         anchors.top: topStrip.bottom
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: Sizing.pctH(8)
+        anchors.bottomMargin: Sizing.pctH(15)
         model: Browse.GamesModel
         delegate: Tile { showCaption: true }
         // Cover-art tiles run taller than systems logos, so a 5x3
@@ -507,6 +507,15 @@ Item {
             if (games._listLayout)
                 games._scheduleMetadataLoad(games._currentMoveIsRepeat)
         }
+        // Cover prefetch is driven by what the user is looking at,
+        // not by what metadata page Core happened to send back. Each
+        // page turn re-anchors the queue so the visible page wins
+        // LIFO drain order, with the next page warming behind it.
+        onCurrentPageChanged: {
+            const first = currentPage * pageSize
+            Browse.GamesModel.visible_first_row = first
+            Browse.GamesModel.prefetch_around(first)
+        }
         onItemHovered: (index) => games._focusIndex(index)
         onItemClicked: (index) => {
             games._focusIndex(index)
@@ -527,7 +536,7 @@ Item {
     // tile selection).
     ActiveLabel {
         id: activeLabel
-        visible: false
+        visible: !games.transitioning && !games.coverGateLoading && !games._listLayout
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: gamesGrid.bottom

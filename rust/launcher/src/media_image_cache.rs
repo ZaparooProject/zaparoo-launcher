@@ -103,6 +103,23 @@ const FETCH_DRIVER_WORKERS: usize = 4;
 /// current page without dropping anything.
 const MAX_QUEUE_LEN: usize = 60;
 
+/// How many pages of headroom each drain round ships in one
+/// `media.image` request. A drain pops the first queued entry, takes
+/// its `page_size` as the round's target, and drains up to
+/// `IMAGE_BATCH_PAGES * page_size` more entries with the same
+/// `page_size`. Keeping this expressed as a multiple of the caller's
+/// page size — never a hardcoded "8" or "50" — means the wire batch
+/// scales with whatever page size the screen requested: a Games page
+/// of 15 ships as one 15-item batch; Favorites/Recents of 25 ship as
+/// 25; if a user later configures Games at 30 it becomes 30, and so on.
+/// `MEDIA_IMAGE_BATCH_MAX` is still applied as a final clamp so a
+/// future page size that exceeds Core's cap can't blow it.
+///
+/// Today this is a structural constant rather than a config knob.
+/// When per-screen `page_size` becomes user-tunable, this graduates
+/// to a config field at the same time so the two stay coherent.
+const IMAGE_BATCH_PAGES: u32 = 1;
+
 /// MIME content-type → on-disk extension for the formats we are willing
 /// to cache. Falls back to inspecting `MediaImageResult.extension` when
 /// `content_type` is missing or unknown — Core started populating the
@@ -280,6 +297,17 @@ pub struct MediaImageUpdate {
     pub ext: Option<&'static str>,
 }
 
+/// One slot in the LIFO fetch queue. Tracks the `page_size` of the
+/// caller that enqueued the key so the drain can ship one page's
+/// worth at a time (see `IMAGE_BATCH_PAGES`). `pending`/`map`/the
+/// negative memo continue to key on `MediaKey` only — `page_size` is
+/// transport metadata, not part of cache identity.
+#[derive(Clone, Debug)]
+struct QueueEntry {
+    key: MediaKey,
+    page_size: u32,
+}
+
 #[derive(Debug)]
 struct MediaImageEntry {
     bytes: Vec<u8>,
@@ -437,7 +465,7 @@ pub struct MediaImageCache {
     /// time"), and page N+1 doesn't start until the visible page is
     /// fully cached, which is well after a fast-moving user has
     /// already paginated. Don't reintroduce a priority split here.
-    queue: Arc<Mutex<VecDeque<MediaKey>>>,
+    queue: Arc<Mutex<VecDeque<QueueEntry>>>,
     /// Single-permit signal that wakes the driver when a fresh key
     /// hits the queue. Drained by `notified().await` and rearmed by
     /// `notify_one()` per enqueue.
@@ -452,7 +480,7 @@ impl MediaImageCache {
     {
         info!(cap_bytes, "media_image_cache: initialised (in-memory)");
         let state = Arc::new(RwLock::new(CacheState::new()));
-        let queue: Arc<Mutex<VecDeque<MediaKey>>> = Arc::new(Mutex::new(VecDeque::new()));
+        let queue: Arc<Mutex<VecDeque<QueueEntry>>> = Arc::new(Mutex::new(VecDeque::new()));
         let queue_notify = Arc::new(Notify::new());
         let (updates_tx, _) = broadcast::channel::<MediaImageUpdate>(64);
 
@@ -537,10 +565,24 @@ impl MediaImageCache {
     /// (Core restart) self-heals on the next attempt. Safe to call
     /// repeatedly: the latest non-`None` hint wins, and `None` leaves
     /// any prior hint untouched.
-    pub fn enqueue_with_media_id(&self, key: MediaKey, media_id: Option<i64>) {
+    ///
+    /// `page_size` is the page size of the screen that enqueued this
+    /// key. The drain uses it to ship batches in multiples of the
+    /// page (`IMAGE_BATCH_PAGES * page_size`) so the wire batch
+    /// always tracks whatever the caller asked Core for. If a key is
+    /// already enqueued the new `page_size` is ignored (the existing
+    /// entry's round will fire the broadcast that satisfies both
+    /// callers); otherwise the page that re-enqueued it triggers its
+    /// own drain round, so the value can't go stale.
+    pub fn enqueue_with_media_id(&self, key: MediaKey, media_id: Option<i64>, page_size: u32) {
         if key.system_id.is_empty() || key.path.is_empty() {
             return;
         }
+        // A `page_size` of zero would let a single key dominate a
+        // round (cap = 0 * 1 = 0, but the first item is always taken)
+        // and breaks the "K * page_size" invariant. Clamp to 1 so the
+        // batch is at least the single triggering entry.
+        let page_size = page_size.max(1);
         let should_send = {
             #[allow(clippy::unwrap_used, reason = "RwLock poisoning is unrecoverable")]
             let mut guard = self.state.write().unwrap();
@@ -567,7 +609,7 @@ impl MediaImageCache {
         let dropped = {
             #[allow(clippy::unwrap_used, reason = "Mutex poisoning is unrecoverable")]
             let mut q = self.queue.lock().unwrap();
-            q.push_back(key);
+            q.push_back(QueueEntry { key, page_size });
             // Keep only the freshest MAX_QUEUE_LEN entries; the rest
             // (oldest enqueues at the front) get dropped. The dropped
             // keys must also leave `pending` so a later `enqueue` can
@@ -576,7 +618,7 @@ impl MediaImageCache {
             let mut dropped: Vec<MediaKey> = Vec::new();
             while q.len() > MAX_QUEUE_LEN {
                 let Some(stale) = q.pop_front() else { break };
-                dropped.push(stale);
+                dropped.push(stale.key);
             }
             dropped
         };
@@ -604,12 +646,63 @@ impl MediaImageCache {
     }
 }
 
+/// Drain one batch round from the LIFO queue. The first popped entry
+/// sets the round's target `page_size`; subsequent pops are taken
+/// only while their `page_size` matches and the running total is
+/// under `IMAGE_BATCH_PAGES * target` (further clamped by
+/// `MEDIA_IMAGE_BATCH_MAX` so a future page size larger than Core's
+/// per-request cap can't blow it). Entries with a different
+/// `page_size` are left alone at the front of the queue so the next
+/// round picks them up — never mixed into a round that doesn't
+/// belong to them.
+///
+/// Mismatched entries are detected by popping and re-inserting at
+/// the front rather than peeking, because `VecDeque` doesn't expose
+/// a "peek the back" through the `Mutex` ergonomically. The
+/// rotate-back is one element per round in the worst case.
+///
+/// Returns an empty Vec when the queue is empty, signalling the
+/// driver to park on `queue_notify`.
+fn drain_one_round(queue: &Arc<Mutex<VecDeque<QueueEntry>>>) -> Vec<QueueEntry> {
+    #[allow(clippy::unwrap_used, reason = "Mutex poisoning is unrecoverable")]
+    let mut q = queue.lock().unwrap();
+    let Some(first) = q.pop_back() else {
+        return Vec::new();
+    };
+    let target = first.page_size.max(1);
+    let cap = usize::min(
+        // `IMAGE_BATCH_PAGES * target` cannot overflow at any
+        // realistic page size; saturating math here is belt-and-
+        // braces against a future config knob.
+        (IMAGE_BATCH_PAGES as usize).saturating_mul(target as usize),
+        MEDIA_IMAGE_BATCH_MAX,
+    )
+    .max(1);
+    let mut out = Vec::with_capacity(cap);
+    out.push(first);
+    while out.len() < cap {
+        let Some(next) = q.pop_back() else { break };
+        if next.page_size == target {
+            out.push(next);
+        } else {
+            // Different page size — put it back at the *back* (where
+            // it was) and stop draining. The next round's `pop_back`
+            // will pick it up and use its `page_size` as the new
+            // target. Pushing to the front would starve it forever
+            // if the user keeps appending same-page-size enqueues.
+            q.push_back(next);
+            break;
+        }
+    }
+    out
+}
+
 fn spawn_fetch_driver<F>(
     runtime: &Arc<Runtime>,
     cap_bytes: usize,
     state: &Arc<RwLock<CacheState>>,
     updates_tx: &broadcast::Sender<MediaImageUpdate>,
-    queue: &Arc<Mutex<VecDeque<MediaKey>>>,
+    queue: &Arc<Mutex<VecDeque<QueueEntry>>>,
     queue_notify: &Arc<Notify>,
     store_factory: F,
 ) where
@@ -627,19 +720,7 @@ fn spawn_fetch_driver<F>(
         let store_factory = store_factory.clone();
         runtime.spawn(async move {
             loop {
-                // Drain a whole batch in one critical section so a
-                // page-fill burst of 6–10 enqueues hits Core as a
-                // single `media.image` request.
-                let batch: Vec<MediaKey> = {
-                    #[allow(clippy::unwrap_used, reason = "Mutex poisoning is unrecoverable")]
-                    let mut q = queue.lock().unwrap();
-                    let mut out = Vec::with_capacity(MEDIA_IMAGE_BATCH_MAX);
-                    while out.len() < MEDIA_IMAGE_BATCH_MAX {
-                        let Some(k) = q.pop_back() else { break };
-                        out.push(k);
-                    }
-                    out
-                };
+                let batch = drain_one_round(&queue);
                 if batch.is_empty() {
                     queue_notify.notified().await;
                     continue;
@@ -668,27 +749,30 @@ fn process_batch_outcomes(
     state: &Arc<RwLock<CacheState>>,
     cap_bytes: usize,
     updates_tx: &broadcast::Sender<MediaImageUpdate>,
-    queue: &Arc<Mutex<VecDeque<MediaKey>>>,
+    queue: &Arc<Mutex<VecDeque<QueueEntry>>>,
     queue_notify: &Arc<Notify>,
-    outcomes: Vec<(MediaKey, FetchOutcome)>,
+    outcomes: Vec<(QueueEntry, FetchOutcome)>,
 ) {
-    for (key, outcome) in outcomes {
+    for (entry, outcome) in outcomes {
+        let key = entry.key.clone();
         let is_transient = matches!(outcome, FetchOutcome::Transient);
         let update = finish_fetch(state, cap_bytes, &key, outcome);
         if is_transient {
             let attempts = {
                 #[allow(clippy::unwrap_used, reason = "RwLock poisoning is unrecoverable")]
                 let mut s = state.write().unwrap();
-                let entry = s.attempts.entry(key.clone()).or_insert(0);
-                *entry = entry.saturating_add(1);
-                *entry
+                let counter = s.attempts.entry(key.clone()).or_insert(0);
+                *counter = counter.saturating_add(1);
+                *counter
             };
             if attempts < MAX_FETCH_ATTEMPTS {
-                // Re-enter `pending` and re-enqueue at the back. The
-                // next batch picks it up alongside whatever the user
-                // has enqueued in the meantime; LIFO drain order
-                // means the fresh page lands first while this retry
-                // tags along behind it.
+                // Re-enter `pending` and re-enqueue at the back,
+                // preserving the original `page_size` so the retry
+                // batches alongside its own page. The next batch
+                // picks it up alongside whatever the user has
+                // enqueued in the meantime; LIFO drain order means
+                // the fresh page lands first while this retry tags
+                // along behind it.
                 {
                     #[allow(clippy::unwrap_used, reason = "RwLock poisoning is unrecoverable")]
                     let mut s = state.write().unwrap();
@@ -697,7 +781,7 @@ fn process_batch_outcomes(
                 let dropped = {
                     #[allow(clippy::unwrap_used, reason = "Mutex poisoning is unrecoverable")]
                     let mut q = queue.lock().unwrap();
-                    q.push_back(key);
+                    q.push_back(entry);
                     // Mirror the `enqueue_with_media_id` cap: a
                     // long-running burst of transient failures can
                     // push the queue past `MAX_QUEUE_LEN` if we
@@ -708,7 +792,7 @@ fn process_batch_outcomes(
                     let mut dropped: Vec<MediaKey> = Vec::new();
                     while q.len() > MAX_QUEUE_LEN {
                         let Some(stale) = q.pop_front() else { break };
-                        dropped.push(stale);
+                        dropped.push(stale.key);
                     }
                     dropped
                 };
@@ -796,8 +880,8 @@ enum FetchOutcome {
 async fn fetch_batch(
     store: &Arc<Store>,
     state: &Arc<RwLock<CacheState>>,
-    batch: &[MediaKey],
-) -> Vec<(MediaKey, FetchOutcome)> {
+    batch: &[QueueEntry],
+) -> Vec<(QueueEntry, FetchOutcome)> {
     // Build the request, preferring `media_id` from the sidecar when
     // we have one — Core resolves the row directly without a path
     // lookup. Falls back to `(system, path)` on any key without a
@@ -812,7 +896,8 @@ async fn fetch_batch(
         let guard = state.read().unwrap();
         batch
             .iter()
-            .map(|k| {
+            .map(|entry| {
+                let k = &entry.key;
                 let mut item = match guard.media_ids.get(k) {
                     Some(id) => MediaImageBulkItem::for_media_id(*id),
                     None => MediaImageBulkItem::for_media(k.system_id.as_ref(), k.path.as_ref()),
@@ -841,7 +926,7 @@ async fn fetch_batch(
             return batch
                 .iter()
                 .cloned()
-                .map(|k| (k, FetchOutcome::Transient))
+                .map(|entry| (entry, FetchOutcome::Transient))
                 .collect();
         }
     };
@@ -860,7 +945,7 @@ async fn fetch_batch(
         return batch
             .iter()
             .cloned()
-            .map(|k| (k, FetchOutcome::Transient))
+            .map(|entry| (entry, FetchOutcome::Transient))
             .collect();
     }
     // The `id_hinted` snapshot captured alongside `items` above
@@ -877,17 +962,17 @@ async fn fetch_batch(
         .cloned()
         .zip(response.items)
         .zip(id_hinted)
-        .map(|((key, item), had_id_hint)| {
-            let outcome = classify_bulk_item(&key, item, had_id_hint);
+        .map(|((entry, item), had_id_hint)| {
+            let outcome = classify_bulk_item(&entry.key, item, had_id_hint);
             if matches!(outcome, FetchOutcome::Transient) && had_id_hint {
                 // Drop the suspect hint so the retry sends
                 // `(system, path)` instead. Self-heals the rare case
                 // where Core was restarted and the id we cached
                 // points at a different (or no) row.
                 #[allow(clippy::unwrap_used, reason = "RwLock poisoning is unrecoverable")]
-                state.write().unwrap().media_ids.remove(&key);
+                state.write().unwrap().media_ids.remove(&entry.key);
             }
-            (key, outcome)
+            (entry, outcome)
         })
         .collect()
 }
@@ -1122,9 +1207,9 @@ mod tests {
     )]
 
     use super::{
-        ext_for_content_type, ext_from_extension_field, finish_fetch, CacheState, FetchOutcome,
-        MediaImageCache, MediaImageUpdate, MediaKey, NegativeMemo, MAX_QUEUE_LEN,
-        NEGATIVE_MEMO_CAP,
+        drain_one_round, ext_for_content_type, ext_from_extension_field, finish_fetch, CacheState,
+        FetchOutcome, MediaImageCache, MediaImageUpdate, MediaKey, NegativeMemo, QueueEntry,
+        IMAGE_BATCH_PAGES, MAX_QUEUE_LEN, NEGATIVE_MEMO_CAP,
     };
     use std::collections::VecDeque;
     use std::sync::{Arc, Mutex, RwLock};
@@ -1137,7 +1222,7 @@ mod tests {
     /// (no consumer), which is exactly what these tests want.
     fn cache_for_test() -> MediaImageCache {
         let state = Arc::new(RwLock::new(CacheState::new()));
-        let queue: Arc<Mutex<VecDeque<MediaKey>>> = Arc::new(Mutex::new(VecDeque::new()));
+        let queue: Arc<Mutex<VecDeque<QueueEntry>>> = Arc::new(Mutex::new(VecDeque::new()));
         let queue_notify = Arc::new(Notify::new());
         let (updates_tx, _) = broadcast::channel::<MediaImageUpdate>(64);
         MediaImageCache {
@@ -1528,17 +1613,26 @@ mod tests {
         // C must drain as C, B, A so the page the user just landed on
         // is serviced ahead of older enqueues.
         use std::collections::VecDeque;
-        let mut q: VecDeque<MediaKey> = VecDeque::new();
+        let mut q: VecDeque<QueueEntry> = VecDeque::new();
         let a = key("SNES", "/a");
         let b = key("SNES", "/b");
         let c = key("SNES", "/c");
-        q.push_back(a.clone());
-        q.push_back(b.clone());
-        q.push_back(c.clone());
-        assert_eq!(q.pop_back(), Some(c));
-        assert_eq!(q.pop_back(), Some(b));
-        assert_eq!(q.pop_back(), Some(a));
-        assert_eq!(q.pop_back(), None);
+        q.push_back(QueueEntry {
+            key: a.clone(),
+            page_size: 15,
+        });
+        q.push_back(QueueEntry {
+            key: b.clone(),
+            page_size: 15,
+        });
+        q.push_back(QueueEntry {
+            key: c.clone(),
+            page_size: 15,
+        });
+        assert_eq!(q.pop_back().map(|e| e.key), Some(c));
+        assert_eq!(q.pop_back().map(|e| e.key), Some(b));
+        assert_eq!(q.pop_back().map(|e| e.key), Some(a));
+        assert!(q.pop_back().is_none());
     }
 
     #[test]
@@ -1554,7 +1648,7 @@ mod tests {
         // Push MAX_QUEUE_LEN + 5 distinct keys; the first 5 must be
         // the ones that get dropped.
         for i in 0..(MAX_QUEUE_LEN + 5) {
-            cache.enqueue_with_media_id(key("SNES", &format!("/p/{i}")), None);
+            cache.enqueue_with_media_id(key("SNES", &format!("/p/{i}")), None, 15);
         }
         let queue_len = cache.queue.lock().unwrap().len();
         assert_eq!(
@@ -1585,7 +1679,7 @@ mod tests {
         // Re-enqueueing a previously-dropped key must succeed (it's
         // no longer in pending). Verify by checking the queue grows.
         let revived = key("SNES", "/p/0");
-        cache.enqueue_with_media_id(revived.clone(), None);
+        cache.enqueue_with_media_id(revived.clone(), None, 15);
         let queue_len = cache.queue.lock().unwrap().len();
         // Pushing one extra back into a full queue truncates one
         // *other* old entry off the front, so length stays at cap.
@@ -1594,6 +1688,104 @@ mod tests {
         assert!(
             guard.pending.contains(&revived),
             "re-enqueued key must be pending again"
+        );
+    }
+
+    #[test]
+    #[allow(
+        clippy::items_after_statements,
+        reason = "test-local imports stay near use sites"
+    )]
+    fn drain_batches_in_multiples_of_page_size() {
+        // The invariant: every drain round ships
+        // `IMAGE_BATCH_PAGES * page_size` of *one* page size at a
+        // time. A magic constant like "8" or "50" is a regression —
+        // page size is the only knob that scales with the screen the
+        // batch belongs to. This test enqueues two distinct page
+        // sizes and asserts each drain round either matches that
+        // size's `K * page_size` or shrinks to whatever remainder
+        // that page size has left, and never mixes pages from the
+        // two cohorts.
+        let cache = cache_for_test();
+        // 30 keys at page_size=15 (Games-style), then 25 at
+        // page_size=25 (Favorites/Recents-style). Use distinct system
+        // ids so the two cohorts can't collide on key equality.
+        let games_count = 30usize;
+        let fav_count = 25usize;
+        for i in 0..games_count {
+            cache.enqueue_with_media_id(key("GAMES", &format!("/g/{i}")), None, 15);
+        }
+        for i in 0..fav_count {
+            cache.enqueue_with_media_id(key("FAVS", &format!("/f/{i}")), None, 25);
+        }
+        let mut all_drained: Vec<MediaKey> = Vec::new();
+        loop {
+            let round = drain_one_round(&cache.queue);
+            if round.is_empty() {
+                break;
+            }
+            // Every entry in a round shares the round's page_size.
+            let target = round[0].page_size;
+            for entry in &round {
+                assert_eq!(
+                    entry.page_size, target,
+                    "drain round mixed page sizes ({} vs {target})",
+                    entry.page_size,
+                );
+            }
+            // The round size is K * page_size, OR — when we've
+            // drained the trailing partial — strictly less than that
+            // ceiling because that page-size cohort ran out.
+            let cap = usize::min(
+                (IMAGE_BATCH_PAGES as usize).saturating_mul(target as usize),
+                super::MEDIA_IMAGE_BATCH_MAX,
+            );
+            assert!(
+                round.len() <= cap,
+                "round of size {} exceeds cap {} for page_size={}",
+                round.len(),
+                cap,
+                target,
+            );
+            for entry in round {
+                all_drained.push(entry.key);
+            }
+        }
+        // Union of every round equals the union of every enqueue.
+        // Use a HashSet for set equality independent of order.
+        use std::collections::HashSet;
+        let drained: HashSet<MediaKey> = all_drained.into_iter().collect();
+        let mut expected: HashSet<MediaKey> = HashSet::new();
+        for i in 0..games_count {
+            expected.insert(key("GAMES", &format!("/g/{i}")));
+        }
+        for i in 0..fav_count {
+            expected.insert(key("FAVS", &format!("/f/{i}")));
+        }
+        assert_eq!(
+            drained, expected,
+            "every enqueued key must show up in exactly one drain round",
+        );
+    }
+
+    #[test]
+    fn drain_round_never_exceeds_core_cap() {
+        // A future page size that exceeds Core's per-request cap
+        // (`MEDIA_IMAGE_BATCH_MAX`) must still clamp at the cap so a
+        // single round can't blow the bulk-RPC contract. Lock that in
+        // by enqueuing more keys than the cap with an oversized
+        // page_size and asserting the first round caps at exactly
+        // `MEDIA_IMAGE_BATCH_MAX`.
+        let cache = cache_for_test();
+        let oversized = (super::MEDIA_IMAGE_BATCH_MAX as u32) * 4;
+        for i in 0..(super::MEDIA_IMAGE_BATCH_MAX + 5) {
+            cache.enqueue_with_media_id(key("BIG", &format!("/b/{i}")), None, oversized);
+        }
+        let round = drain_one_round(&cache.queue);
+        assert_eq!(
+            round.len(),
+            super::MEDIA_IMAGE_BATCH_MAX,
+            "round must clamp at Core's per-request cap",
         );
     }
 

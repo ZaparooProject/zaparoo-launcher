@@ -444,19 +444,16 @@ fn cover_key_for(entry: &MediaHistoryEntry) -> String {
     let media_key = media_key_for(entry);
     let cache = global_media_image_cache();
     let cached = media_key.as_ref().is_some_and(|k| cache.is_cached(k));
-    if !cached {
+    let negative = media_key.as_ref().is_some_and(|k| cache.is_negative(k));
+    if !cached && !negative {
         // Miss-driven re-enqueue, same rationale as GamesModel's
         // `cover_key_for`: tiles re-bound after LRU eviction or stale-
         // enqueue truncation will hit this branch and re-arm the fetch.
-        // The negative-memo guard avoids the lock dance on keys we've
-        // already learned have nothing to fetch.
         if let Some(k) = media_key.as_ref() {
-            if !cache.is_negative(k) {
-                cache.enqueue_with_media_id(k.clone(), entry.media_id);
-            }
+            cache.enqueue_with_media_id(k.clone(), entry.media_id, PAGE_SIZE);
         }
     }
-    cover_key_for_with(entry, media_key.as_ref(), cached)
+    cover_key_for_with(entry, media_key.as_ref(), cached, negative)
 }
 
 /// Build the canonical `(systemId, mediaPath)` identifier for a history
@@ -472,14 +469,25 @@ fn media_key_for(entry: &MediaHistoryEntry) -> Option<MediaKey> {
 }
 
 /// Pure helper for `cover_key_for`. Split out so tests can drive the
-/// branches (cached, uncached, unattributed) without spinning up the
-/// global cover cache and its tokio runtime.
-fn cover_key_for_with(entry: &MediaHistoryEntry, key: Option<&MediaKey>, cached: bool) -> String {
+/// branches (cached, in-flight, negative-memoed, unattributed)
+/// without spinning up the global cover cache and its tokio runtime.
+///
+/// In-flight (has a key, not cached, not negatively memoed) returns
+/// the hourglass — same convention as `GamesModel`. Negatively memoed
+/// rows fall back to the system logo, which is a friendlier "no cover
+/// available" cue for the favorites/recents lists than `icons/File`.
+fn cover_key_for_with(
+    entry: &MediaHistoryEntry,
+    key: Option<&MediaKey>,
+    cached: bool,
+    negative: bool,
+) -> String {
     if entry.system_id.is_empty() {
         return "icons/File".to_string();
     }
     match key {
         Some(k) if cached => MediaImageCache::image_key_for(k),
+        Some(_) if !negative => "icons/Loading".to_string(),
         _ => format!("systems/{}", entry.system_id),
     }
 }
@@ -511,7 +519,7 @@ fn enqueue_recents_covers(entries: &[MediaHistoryEntry]) {
     let cache = global_media_image_cache();
     for entry in entries.iter().rev() {
         if let Some(key) = media_key_for(entry) {
-            cache.enqueue_with_media_id(key, entry.media_id);
+            cache.enqueue_with_media_id(key, entry.media_id, PAGE_SIZE);
         }
     }
 }
@@ -787,10 +795,28 @@ mod tests {
     }
 
     #[test]
-    fn cover_key_uses_system_logo_when_uncached() {
+    fn cover_key_uses_loading_icon_when_in_flight() {
         let e = entry("smb", "/p/smb", "NES", "NES");
         let key = media_key_for(&e).expect("media has key");
-        assert_eq!(cover_key_for_with(&e, Some(&key), false), "systems/NES",);
+        // Has a key, not cached, not negative → fetch is in flight,
+        // show the hourglass over the tile.
+        assert_eq!(
+            cover_key_for_with(&e, Some(&key), false, false),
+            "icons/Loading"
+        );
+    }
+
+    #[test]
+    fn cover_key_falls_back_to_system_logo_when_negatively_memoed() {
+        let e = entry("smb", "/p/smb", "NES", "NES");
+        let key = media_key_for(&e).expect("media has key");
+        // Has a key, not cached, negatively memoed → no image to wait
+        // for. Fall back to the system logo (friendlier than icons/File
+        // for favorites/recents lists).
+        assert_eq!(
+            cover_key_for_with(&e, Some(&key), false, true),
+            "systems/NES"
+        );
     }
 
     #[test]
@@ -798,14 +824,14 @@ mod tests {
         let e = entry("smb", "/p/smb", "NES", "NES");
         let key = media_key_for(&e).expect("media has key");
         let expected = MediaImageCache::image_key_for(&key);
-        assert_eq!(cover_key_for_with(&e, Some(&key), true), expected);
+        assert_eq!(cover_key_for_with(&e, Some(&key), true, false), expected);
         assert!(expected.starts_with("media-image/"));
     }
 
     #[test]
     fn cover_key_falls_back_to_file_glyph_when_system_missing() {
         let e = entry("orphan", "/p/orphan", "", "");
-        assert_eq!(cover_key_for_with(&e, None, false), "icons/File");
+        assert_eq!(cover_key_for_with(&e, None, false, false), "icons/File");
     }
 
     #[test]

@@ -76,8 +76,14 @@ Item {
     // Right-side current-value text for `control: "picker"`. Accept on
     // a picker row opens the list-picker modal owned by `Main.qml`;
     // left/right are no-ops (no inline cycling — see `SettingsScreen`).
+    //
+    // Anchors clamp between the label's right edge and the row's
+    // right padding so a long localized value (e.g. a translated
+    // language name) elides instead of overlapping `labelText`.
     Text {
         visible: root.control === "picker"
+        anchors.left: labelText.right
+        anchors.leftMargin: Sizing.pctW(2)
         anchors.right: parent.right
         anchors.rightMargin: Sizing.pctW(2)
         anchors.verticalCenter: parent.verticalCenter
@@ -85,6 +91,8 @@ Item {
         color: Theme.textPrimary
         font.family: Theme.fontUi
         font.pixelSize: Sizing.fontSize(2.6)
+        elide: Text.ElideRight
+        horizontalAlignment: Text.AlignRight
         renderType: Text.NativeRendering
     }
 
@@ -125,8 +133,12 @@ Item {
     // Right-side caption for `control: "action"`. Only paints while
     // the operation is in flight ("In progress" / "Paused" /
     // "Optimizing"). No chevron — chevron is reserved for navigation.
+    // Same width clamp as the picker text so a long localized status
+    // string elides instead of overlapping `labelText`.
     Text {
         visible: root.control === "action" && root.actionStatus !== ""
+        anchors.left: labelText.right
+        anchors.leftMargin: Sizing.pctW(2)
         anchors.right: parent.right
         anchors.rightMargin: Sizing.pctW(2)
         anchors.verticalCenter: parent.verticalCenter
@@ -134,6 +146,8 @@ Item {
         color: Theme.textLabel
         font.family: Theme.fontUi
         font.pixelSize: Sizing.fontSize(2.4)
+        elide: Text.ElideRight
+        horizontalAlignment: Text.AlignRight
         renderType: Text.NativeRendering
     }
 

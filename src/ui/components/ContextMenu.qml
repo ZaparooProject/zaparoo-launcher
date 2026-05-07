@@ -97,9 +97,16 @@ Item {
     // on top in z-order. Clicks on the punched-through anchor area
     // also hit this MouseArea (the bands don't cover the anchor) and
     // close the menu.
+    //
+    // Swallows hover and every mouse button so neither hover events
+    // nor right-clicks bleed through to the underlying grid while the
+    // menu is open. Without `hoverEnabled` and `Qt.AllButtons` the
+    // grid below would highlight tiles under the scrim and a right
+    // click on the dim area would land on the grid's context handler.
     MouseArea {
         anchors.fill: parent
-        acceptedButtons: Qt.LeftButton
+        hoverEnabled: true
+        acceptedButtons: Qt.AllButtons
         onClicked: menu.closeRequested()
     }
 

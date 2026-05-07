@@ -41,11 +41,19 @@ Item {
     signal accepted(string id)
     signal closeRequested()
 
-    readonly property int _maxVisibleRows: 6
     readonly property int _rowHeight: Sizing.pctH(7)
     readonly property int _rowSpacing: Sizing.pctH(1)
+    // Cap the picker viewport at a portion of the screen height so it
+    // never grows past what the modal shell can reasonably contain.
+    // Visible row count falls out of this — `floor((max + spacing) /
+    // (rowHeight + spacing))` gives the row count whose viewport fits
+    // inside `_maxViewportHeight`, with at least 1 row.
+    readonly property int _maxViewportHeight: Sizing.pctH(60)
     readonly property int _visibleRows:
-        Math.min(_maxVisibleRows, Math.max(1, entries.length))
+        Math.max(1,
+                 Math.min(entries.length,
+                          Math.floor((_maxViewportHeight + _rowSpacing)
+                                     / (_rowHeight + _rowSpacing))))
     readonly property int _viewportHeight:
         _visibleRows * _rowHeight
         + Math.max(0, _visibleRows - 1) * _rowSpacing

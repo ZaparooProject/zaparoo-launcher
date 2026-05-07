@@ -580,19 +580,16 @@ fn cover_key_for(entry: &MediaItem) -> String {
     let media_key = media_key_for(entry);
     let cache = global_media_image_cache();
     let cached = media_key.as_ref().is_some_and(|k| cache.is_cached(k));
-    if !cached {
+    let negative = media_key.as_ref().is_some_and(|k| cache.is_negative(k));
+    if !cached && !negative {
         // Miss-driven re-enqueue, same rationale as GamesModel's
         // `cover_key_for`: tiles re-bound after LRU eviction or stale-
         // enqueue truncation will hit this branch and re-arm the fetch.
-        // The negative-memo guard avoids the lock dance on keys we've
-        // already learned have nothing to fetch.
         if let Some(k) = media_key.as_ref() {
-            if !cache.is_negative(k) {
-                cache.enqueue_with_media_id(k.clone(), entry.media_id);
-            }
+            cache.enqueue_with_media_id(k.clone(), entry.media_id, PAGE_SIZE);
         }
     }
-    cover_key_for_with(entry, media_key.as_ref(), cached)
+    cover_key_for_with(entry, media_key.as_ref(), cached, negative)
 }
 
 /// Build the canonical `(systemId, mediaPath)` identifier for a search
@@ -676,14 +673,25 @@ fn apply_favorite_tags(
 }
 
 /// Pure helper for `cover_key_for`. Split out so tests can drive the
-/// branches (cached, uncached, unattributed) without spinning up the
-/// global cover cache and its tokio runtime.
-fn cover_key_for_with(entry: &MediaItem, key: Option<&MediaKey>, cached: bool) -> String {
+/// branches (cached, in-flight, negative-memoed, unattributed)
+/// without spinning up the global cover cache and its tokio runtime.
+///
+/// In-flight (has a key, not cached, not negatively memoed) returns
+/// the hourglass — same convention as `GamesModel`. Negatively memoed
+/// rows fall back to the system logo, which is a friendlier "no cover
+/// available" cue for the favorites/recents lists than `icons/File`.
+fn cover_key_for_with(
+    entry: &MediaItem,
+    key: Option<&MediaKey>,
+    cached: bool,
+    negative: bool,
+) -> String {
     if entry.system.id.is_empty() {
         return "icons/File".to_string();
     }
     match key {
         Some(k) if cached => MediaImageCache::image_key_for(k),
+        Some(_) if !negative => "icons/Loading".to_string(),
         _ => format!("systems/{}", entry.system.id),
     }
 }
@@ -701,7 +709,7 @@ fn enqueue_favorites_covers(results: &[MediaItem]) {
     let cache = global_media_image_cache();
     for entry in results.iter().rev() {
         if let Some(key) = media_key_for(entry) {
-            cache.enqueue_with_media_id(key, entry.media_id);
+            cache.enqueue_with_media_id(key, entry.media_id, PAGE_SIZE);
         }
     }
 }

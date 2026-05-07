@@ -238,7 +238,7 @@ Item {
         anchors.right: parent.right
         anchors.top: topStrip.bottom
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: Sizing.pctH(8)
+        anchors.bottomMargin: Sizing.pctH(15)
         model: Browse.SystemsModel
         delegate: Tile {}
         onItemHovered: (index) => systems._focusIndex(index)
@@ -273,7 +273,7 @@ Item {
         text: systemsGrid.itemCount > 0
               ? Browse.SystemsModel.system_name_at(systemsGrid.currentIndex)
               : ""
-        visible: false
+        visible: !systems.transitioning && !systems._listLayout
     }
 
     ScreenStateOverlay {

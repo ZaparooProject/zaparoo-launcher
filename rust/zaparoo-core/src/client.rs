@@ -29,7 +29,10 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
-use tokio_tungstenite::{connect_async, tungstenite::Message};
+use tokio_tungstenite::{
+    connect_async_with_config,
+    tungstenite::{protocol::WebSocketConfig, Message},
+};
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
@@ -324,7 +327,19 @@ impl Client {
                     connection_clone.send_replace(next);
                 }
 
-                match connect_async(&endpoint).await {
+                // tungstenite's default 16 MiB frame / 64 MiB message
+                // caps exist to "prevent memory eating by a malicious
+                // user". The launcher connects to exactly one trusted
+                // Core on the LAN, so that threat model doesn't apply —
+                // and a legitimate bulk `media.image` response can
+                // exceed 16 MiB, which kills the session and cascades
+                // every in-flight watcher into "disconnected". Disable
+                // both incoming caps; outbound traffic is small JSON
+                // requests that never approach the limits.
+                let ws_config = WebSocketConfig::default()
+                    .max_message_size(None)
+                    .max_frame_size(None);
+                match connect_async_with_config(&endpoint, Some(ws_config), false).await {
                     Ok((ws_stream, _)) => {
                         info!("connected to core at {endpoint}");
 

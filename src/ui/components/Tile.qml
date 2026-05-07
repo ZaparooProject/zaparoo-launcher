@@ -105,8 +105,18 @@ Item {
     // extension — `systems/snes`, `categories/Consoles`, etc. The model
     // chooses the subdirectory; Tile is agnostic. Resources.coverUrl is
     // the single source of truth for the qrc layout — see Resources.qml.
-    readonly property url _coverSource:
-        Resources.coverUrl(root.delegateCoverKey)
+    //
+    // The model's `icons/Loading` sentinel is a special case: it means
+    // "cover fetch is in flight". Routing it through the full-bleed
+    // cover slot would rasterise the SVG at the entire icon area; the
+    // existing `loadingGlyph` overlay below already defines the
+    // standard centred hourglass size, so swallow the source here and
+    // let `loadingGlyph` own the painting.
+    readonly property bool _coverPending:
+        root.delegateCoverKey === "icons/Loading"
+    readonly property url _coverSource: root._coverPending
+        ? ""
+        : Resources.coverUrl(root.delegateCoverKey)
     readonly property bool _hasCover: cover.status === Image.Ready
 
     // No focus scale bump. The earlier 1.06 scale on the focused tile
@@ -237,7 +247,8 @@ Item {
         fillMode: Image.PreserveAspectFit
         smooth: true
         asynchronous: false
-        visible: root.showCaption && cover.status === Image.Loading
+        visible: root.showCaption
+                 && (root._coverPending || cover.status === Image.Loading)
     }
 
     Image {

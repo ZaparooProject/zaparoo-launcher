@@ -167,17 +167,36 @@ TestCase {
     }
 
     function test_long_list_caps_visible_rows(): void {
-        // _viewportHeight is bounded by _maxVisibleRows (= 6 in source).
-        // For an 8-entry list, the viewport must reflect the cap, not
-        // the full content height. _contentHeight is unbounded so the
-        // Flickable can scroll.
-        picker.entries = _entries(8)
-        picker.open = true
+        // _viewportHeight is bounded by _maxViewportHeight, which is
+        // a Sizing.pctH(...) value — visible row count falls out of
+        // that. For a list longer than the cap, the viewport must
+        // reflect the cap (not full content) so the Flickable
+        // scrolls; _contentHeight stays sized to the full list.
+        const cap = picker._maxViewportHeight
         const stride = picker._rowHeight + picker._rowSpacing
-        const expectedViewport =
-              6 * picker._rowHeight + 5 * picker._rowSpacing
-        compare(picker._viewportHeight, expectedViewport)
+        const fits = Math.floor((cap + picker._rowSpacing) / stride)
+        // Use enough entries to exceed the cap on any plausible
+        // screen size so the cap is exercised.
+        const total = fits + 4
+        picker.entries = _entries(total)
+        picker.open = true
+        compare(picker._visibleRows, fits)
+        verify(picker._viewportHeight <= cap)
+        compare(picker._viewportHeight,
+                fits * picker._rowHeight
+                + Math.max(0, fits - 1) * picker._rowSpacing)
         compare(picker._contentHeight,
-                8 * picker._rowHeight + 7 * picker._rowSpacing)
+                total * picker._rowHeight
+                + (total - 1) * picker._rowSpacing)
+    }
+
+    function test_short_list_does_not_pad_viewport(): void {
+        // For a list that fits inside the cap, the viewport should
+        // match the content exactly so the modal doesn't reserve dead
+        // space below the entries.
+        picker.entries = _entries(2)
+        picker.open = true
+        compare(picker._visibleRows, 2)
+        compare(picker._viewportHeight, picker._contentHeight)
     }
 }
