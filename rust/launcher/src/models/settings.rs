@@ -262,7 +262,6 @@ impl ffi::Settings {
         self.as_mut().rust_mut().current_debug_logging = value;
         self.as_mut().current_debug_logging_changed();
     }
-
 }
 
 fn persist_settings<F: FnOnce(&mut SettingsState)>(mutator: F) -> persist::PersistedState {
