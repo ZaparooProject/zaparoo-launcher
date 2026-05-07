@@ -75,7 +75,7 @@ jobs:
           # Qt library paths and linker flags into target/, so stale cache
           # from a different Qt version leaves dangling `-l` refs.
           env-vars: "CARGO CC CFLAGS CXX CMAKE RUST QT"
-      - uses: taiki-e/install-action@7769b73c2ec98c38dfcf2e18c83cfd4880c038c1 # v2
+      - uses: taiki-e/install-action@cca35edeb1d01366c2843b68fc3ca441446d73d3 # v2
         with:
           tool: cargo-deny
       - name: rustfmt
@@ -123,7 +123,7 @@ jobs:
         with:
           workspaces: rust
           env-vars: "CARGO CC CFLAGS CXX CMAKE RUST QT"
-      - uses: taiki-e/install-action@7769b73c2ec98c38dfcf2e18c83cfd4880c038c1 # v2
+      - uses: taiki-e/install-action@cca35edeb1d01366c2843b68fc3ca441446d73d3 # v2
         with:
           tool: cargo-nextest
       - name: nextest
