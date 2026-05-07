@@ -184,8 +184,11 @@ Item {
                         width: Math.min(Sizing.pctW(28), cancelSlot.width)
                         height: parent.height
                         color: Theme.surfaceCard
-                        border.width: 1
-                        border.color: Theme.borderMid
+                        // Single button — always the default action, so
+                        // render with the focused recipe (accent border,
+                        // 2px) instead of the unfocused borderMid edge.
+                        border.width: 2
+                        border.color: Theme.accent
                         radius: Sizing.cornerRadius
 
                         Text {
@@ -218,8 +221,11 @@ Item {
                         width: Math.min(Sizing.pctW(28), acceptSlot.width)
                         height: parent.height
                         color: Theme.surfaceCard
-                        border.width: 1
-                        border.color: Theme.borderMid
+                        // Single button — always the default action, so
+                        // render with the focused recipe (accent border,
+                        // 2px) instead of the unfocused borderMid edge.
+                        border.width: 2
+                        border.color: Theme.accent
                         radius: Sizing.cornerRadius
 
                         Text {

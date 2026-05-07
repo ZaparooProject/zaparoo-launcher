@@ -2898,11 +2898,6 @@ mod tests {
 
     #[test]
     fn prefetch_around_plan_pushes_next_page_then_current_in_reverse() {
-        // 45 rows, page 1 visible (rows 15..30), next page rows 30..45.
-        // Expected push order so the LIFO drains the visible page
-        // first: [next-page reversed (29 down to 15 -- wait, that's
-        // current. let me re-do).
-        //
         // Visible page: rows 15..30 (15 rows). Next page: 30..45.
         // Push next first reversed: 44, 43, ..., 30.
         // Push current next reversed: 29, 28, ..., 15.

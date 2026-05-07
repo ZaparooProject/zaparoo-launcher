@@ -130,11 +130,11 @@ Item {
         }
     }
 
-    // Right-side caption for `control: "action"`. Only paints while
-    // the operation is in flight ("In progress" / "Paused" /
-    // "Optimizing"). No chevron — chevron is reserved for navigation.
-    // Same width clamp as the picker text so a long localized status
-    // string elides instead of overlapping `labelText`.
+    // Right-side value for `control: "action"`. Carries either a
+    // transient run state ("In progress" / "Paused" / "Optimizing")
+    // or a persistent idle count ("100,000 indexed"). Styled to match
+    // the picker right-text recipe so idle counts read as values, not
+    // dimmed chrome. No chevron — chevron is reserved for navigation.
     Text {
         visible: root.control === "action" && root.actionStatus !== ""
         anchors.left: labelText.right
@@ -143,9 +143,9 @@ Item {
         anchors.rightMargin: Sizing.pctW(2)
         anchors.verticalCenter: parent.verticalCenter
         text: root.actionStatus
-        color: Theme.textLabel
+        color: Theme.textPrimary
         font.family: Theme.fontUi
-        font.pixelSize: Sizing.fontSize(2.4)
+        font.pixelSize: Sizing.fontSize(2.6)
         elide: Text.ElideRight
         horizontalAlignment: Text.AlignRight
         renderType: Text.NativeRendering

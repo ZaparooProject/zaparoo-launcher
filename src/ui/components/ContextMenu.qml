@@ -4,6 +4,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import QtQuick.Shapes
 import Zaparoo.Theme
 
 // `entries` is a `var` array of plain JS objects (`{ id, label }`). The
@@ -14,10 +15,19 @@ import Zaparoo.Theme
 
 // Software-rendering safe contextual menu. It positions itself next to an
 // anchor rectangle and clamps to the window bounds so edge tiles never push
-// the menu off-screen. The scrim is drawn as four bands around `anchorRect`
-// so the anchored tile stays bright while the rest of the screen dims —
-// a full-screen scrim would defeat the "this menu is about *that* tile"
-// affordance.
+// the menu off-screen. The scrim is a single `Shape` with two subpaths and
+// `OddEvenFill`: an outer full-window rect and an inner rounded rect that
+// punches a hole over `anchorRect`, so the anchored tile stays bright with
+// rounded corners that match the tile's own radius. A full-screen scrim
+// would defeat the "this menu is about *that* tile" affordance, and four
+// rectangular bands left a square cutout around the rounded tile corners.
+//
+// `Shape` is software-renderer safe — Qt's docs guarantee the software
+// adaptation paints `Shape` via `QPainter::fillPath()` (no scenegraph
+// shaders). Path triangulation is one-shot per `anchorRect` change, on
+// the CPU during the polishing phase, so the steady-state cost is just
+// the QPainter fill — same family of work as the four `Rectangle` bands
+// it replaces.
 Item {
     id: menu
 
@@ -91,12 +101,14 @@ Item {
     }
 
     // Catches dismiss-clicks on the dimmed area around the anchor.
-    // Sits beneath the four scrim bands and the panel; the panel's
-    // interior MouseAreas (per row) win for clicks inside the panel
-    // because the panel is declared after this MouseArea, so it sits
-    // on top in z-order. Clicks on the punched-through anchor area
-    // also hit this MouseArea (the bands don't cover the anchor) and
-    // close the menu.
+    // Sits beneath the scrim and the panel; per-row MouseAreas inside
+    // the panel win for clicks on rows because the panel is declared
+    // after this MouseArea, so the panel subtree sits on top in
+    // z-order. Clicks on the punched-through anchor area also hit
+    // this MouseArea (the scrim cutout has no fill there) and close
+    // the menu. Clicks inside the panel chrome (top/bottom radius
+    // padding, side margins, row spacing) are filtered out by the
+    // bounding-rect check so a stray press on padding doesn't dismiss.
     //
     // Swallows hover and every mouse button so neither hover events
     // nor right-clicks bleed through to the underlying grid while the
@@ -107,41 +119,100 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         acceptedButtons: Qt.AllButtons
-        onClicked: menu.closeRequested()
+        onClicked: (mouse) => {
+            if (mouse.x < panel.x || mouse.y < panel.y
+                || mouse.x > panel.x + panel.width
+                || mouse.y > panel.y + panel.height)
+                menu.closeRequested()
+        }
     }
 
-    // Four scrim bands framing `anchorRect`. The anchor area itself is
-    // intentionally not painted so the tile the menu is *about* stays
-    // bright. `Math.max(0, ...)` clamps every dimension so an anchor
-    // flush against an edge collapses the matching band rather than
-    // overflowing into negative territory.
-    Rectangle {
-        x: 0
-        y: 0
-        width: menu.width
-        height: Math.max(0, menu.anchorRect.y)
-        color: Theme.scrim
-    }
-    Rectangle {
-        x: 0
-        y: menu.anchorRect.y + menu.anchorRect.height
-        width: menu.width
-        height: Math.max(0, menu.height - (menu.anchorRect.y + menu.anchorRect.height))
-        color: Theme.scrim
-    }
-    Rectangle {
-        x: 0
-        y: menu.anchorRect.y
-        width: Math.max(0, menu.anchorRect.x)
-        height: Math.max(0, menu.anchorRect.height)
-        color: Theme.scrim
-    }
-    Rectangle {
-        x: menu.anchorRect.x + menu.anchorRect.width
-        y: menu.anchorRect.y
-        width: Math.max(0, menu.width - (menu.anchorRect.x + menu.anchorRect.width))
-        height: Math.max(0, menu.anchorRect.height)
-        color: Theme.scrim
+    // Scrim with a rounded cutout over `anchorRect`. Two subpaths on
+    // one `ShapePath` with `OddEvenFill`: the outer rect fills the whole
+    // window, the inner rounded-rect subtracts so the anchor area stays
+    // bright. The cutout radius matches `Sizing.cornerRadius` (the same
+    // token tile cards use) so the cutout edge and the tile edge sit
+    // concentric — no scrim peeking through at the corners.
+    //
+    // No stroke (the cutout edge meets the bright tile cleanly without
+    // a bordering line). Path coords are in the Shape's local space,
+    // which equals the menu's local space because the Shape fills it.
+    Shape {
+        id: scrim
+
+        anchors.fill: parent
+        // Default `Shape.UnknownRenderer` lets Qt pick the right backend
+        // per Qt Quick scenegraph: `SoftwareRenderer` (QPainter) on
+        // MiSTer's software adaptation, `CurveRenderer`/`GeometryRenderer`
+        // on a hardware backend. Don't pin it — pinning to
+        // `SoftwareRenderer` on a GL/RHI backend forces the slow path
+        // for no reason.
+
+        readonly property real _cutoutRadius: Math.min(
+            Sizing.cornerRadius,
+            Math.min(menu.anchorRect.width, menu.anchorRect.height) / 2)
+
+        ShapePath {
+            strokeWidth: -1     // -1 = no stroke
+            fillColor: Theme.scrim
+            fillRule: ShapePath.OddEvenFill
+
+            // Outer rect (subpath 1) — the full menu area.
+            startX: 0
+            startY: 0
+            PathLine { x: scrim.width; y: 0 }
+            PathLine { x: scrim.width; y: scrim.height }
+            PathLine { x: 0; y: scrim.height }
+            PathLine { x: 0; y: 0 }
+
+            // Inner rounded rect (subpath 2) — punches the hole. Walk
+            // the rectangle clockwise from the top edge, with PathArc
+            // segments rounding each corner at `_cutoutRadius`.
+            PathMove {
+                x: menu.anchorRect.x + scrim._cutoutRadius
+                y: menu.anchorRect.y
+            }
+            PathLine {
+                x: menu.anchorRect.x + menu.anchorRect.width - scrim._cutoutRadius
+                y: menu.anchorRect.y
+            }
+            PathArc {
+                x: menu.anchorRect.x + menu.anchorRect.width
+                y: menu.anchorRect.y + scrim._cutoutRadius
+                radiusX: scrim._cutoutRadius
+                radiusY: scrim._cutoutRadius
+            }
+            PathLine {
+                x: menu.anchorRect.x + menu.anchorRect.width
+                y: menu.anchorRect.y + menu.anchorRect.height - scrim._cutoutRadius
+            }
+            PathArc {
+                x: menu.anchorRect.x + menu.anchorRect.width - scrim._cutoutRadius
+                y: menu.anchorRect.y + menu.anchorRect.height
+                radiusX: scrim._cutoutRadius
+                radiusY: scrim._cutoutRadius
+            }
+            PathLine {
+                x: menu.anchorRect.x + scrim._cutoutRadius
+                y: menu.anchorRect.y + menu.anchorRect.height
+            }
+            PathArc {
+                x: menu.anchorRect.x
+                y: menu.anchorRect.y + menu.anchorRect.height - scrim._cutoutRadius
+                radiusX: scrim._cutoutRadius
+                radiusY: scrim._cutoutRadius
+            }
+            PathLine {
+                x: menu.anchorRect.x
+                y: menu.anchorRect.y + scrim._cutoutRadius
+            }
+            PathArc {
+                x: menu.anchorRect.x + scrim._cutoutRadius
+                y: menu.anchorRect.y
+                radiusX: scrim._cutoutRadius
+                radiusY: scrim._cutoutRadius
+            }
+        }
     }
 
     Rectangle {

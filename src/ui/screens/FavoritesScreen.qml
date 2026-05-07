@@ -33,6 +33,10 @@ Item {
     // screens so the convention holds when a future routing change adds
     // a Favorites-as-source path.
     property bool transitioning: false
+    // Router-driven flag: `MainLayout` writes this to
+    // `!ScreenManager.hasModal` so the focused tile's accent ring
+    // hides while a modal (the context menu) is on top of the stack.
+    property bool gridFocused: true
     readonly property bool _listLayout: Browse.Settings.current_browse_layout === "list"
 
     // True while either the cross-screen router is mid-flip
@@ -234,7 +238,11 @@ Item {
         anchors.right: parent.right
         anchors.top: topStrip.bottom
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: Sizing.pctH(8)
+        // pctH(15) clears the focused-title row (pctH(7)) plus the
+        // pctH(2) gap and the pctH(6) instructions bar — same recipe
+        // GamesScreen uses, so the bottom band reads consistently.
+        anchors.bottomMargin: Sizing.pctH(15)
+        focused: favorites.gridFocused
         model: Browse.FavoritesModel
         delegate: Tile { showCaption: true }
         // Match games-grid layout (taller cover-art tiles); the systems
@@ -255,9 +263,13 @@ Item {
         onEmptyRightClicked: favorites.handleAction("cancel")
     }
 
+    // Focused-tile caption — single big line just under the grid.
+    // Same typography / placement as GamesScreen so the screens read
+    // as a matched pair (top strip = section context, bottom row =
+    // focused-tile selection).
     ActiveLabel {
         id: activeLabel
-        visible: false
+        visible: !favorites._gateHide && !favorites._listLayout
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: favoritesGrid.bottom

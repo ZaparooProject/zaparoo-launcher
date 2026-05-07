@@ -27,7 +27,7 @@ Item {
         anchors.left: parent.left
         // Same left inset as `SettingsField` labels so headers and
         // field labels share a vertical baseline.
-        anchors.leftMargin: Sizing.pctW(3)
+        anchors.leftMargin: Sizing.pctW(2)
         anchors.bottom: parent.bottom
         anchors.bottomMargin: Sizing.pctH(0.5)
         // Sentence-case + DemiBold reads as a header without needing

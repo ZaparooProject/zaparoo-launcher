@@ -28,6 +28,14 @@ Item {
 
     property alias systemsGrid: systemsGrid
     property bool transitioning: false
+    // Router-driven flag: `MainLayout` writes this to
+    // `!ScreenManager.hasModal` so the focused tile's accent ring
+    // hides while a modal (the context menu) is on top of the stack.
+    // Two competing focus rings — one on the menu's selected entry
+    // and one on the anchored tile — read as ambiguous; suppressing
+    // the tile ring keeps a single visible focus indicator at all
+    // times. The ring restores automatically when the modal pops.
+    property bool gridFocused: true
     readonly property bool _listLayout: Browse.Settings.current_browse_layout === "list"
 
     signal requestAccept(systemId: string)
@@ -239,6 +247,7 @@ Item {
         anchors.top: topStrip.bottom
         anchors.bottom: parent.bottom
         anchors.bottomMargin: Sizing.pctH(15)
+        focused: systems.gridFocused
         model: Browse.SystemsModel
         delegate: Tile {}
         onItemHovered: (index) => systems._focusIndex(index)

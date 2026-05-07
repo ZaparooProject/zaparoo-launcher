@@ -39,6 +39,13 @@ Item {
     readonly property bool contentOverflows:
         body.implicitHeight > flickable.height
 
+    // Drive the top/bottom scroll chevrons. The 1-px epsilon swallows
+    // sub-pixel rounding so the chevrons don't flicker on exact-fit
+    // content.
+    readonly property bool _hasContentAbove: flickable.contentY > 1
+    readonly property bool _hasContentBelow:
+        flickable.contentY + flickable.height < flickable.contentHeight - 1
+
     function _scrollBy(delta: int): void {
         const maxY = Math.max(0, flickable.contentHeight - flickable.height)
         flickable.contentY = Math.max(0, Math.min(maxY, flickable.contentY + delta))
@@ -98,11 +105,14 @@ Item {
         Flickable {
             id: flickable
 
+            // top/bottomMargin is sized to leave a clear band inside
+            // the card for the scroll chevrons to sit outside the
+            // scrollable area (chevron pctH(3) + breathing room).
             anchors.fill: parent
             anchors.leftMargin: Sizing.pctW(3)
             anchors.rightMargin: Sizing.pctW(3)
-            anchors.topMargin: Sizing.pctH(3)
-            anchors.bottomMargin: Sizing.pctH(3)
+            anchors.topMargin: Sizing.pctH(4)
+            anchors.bottomMargin: Sizing.pctH(4)
             contentWidth: width
             contentHeight: body.implicitHeight
             clip: true
@@ -113,6 +123,15 @@ Item {
 
                 width: parent.width
                 spacing: Sizing.pctH(2)
+
+                // Leading spacer — keeps the logo clear of the top
+                // scroll chevron when the page overflows, and gives
+                // the cut-off edge a breath of whitespace instead of
+                // clipping the logo mid-stroke.
+                Item {
+                    width: body.width
+                    height: Sizing.pctH(2)
+                }
 
                 // Logo width is capped at a screen-height-relative size so
                 // the brand mark stays a header element across 240p →
@@ -265,7 +284,43 @@ Item {
                     font.pixelSize: Sizing.fontSize(2.4)
                     renderType: Text.NativeRendering
                 }
+
+                // Trailing spacer — symmetric with the leading spacer.
+                Item {
+                    width: body.width
+                    height: Sizing.pctH(2)
+                }
             }
+        }
+
+        // Top/bottom scroll chevrons — mirror the PagedGrid/BrowseList
+        // recipe (same SVG icons, `PreserveAspectFit` + `smooth: true`)
+        // but centered on the viewport in the card's chrome gap *above*
+        // and *below* the Flickable, not inside its visible band.
+        // Sitting outside the scrolled area means the chevrons never
+        // overlap moving content as the user scrolls.
+        Image {
+            source: Resources.iconUrl("ScrollUp")
+            width: Sizing.pctH(3)
+            height: width
+            anchors.bottom: flickable.top
+            anchors.bottomMargin: Sizing.pctH(0.5)
+            anchors.horizontalCenter: flickable.horizontalCenter
+            fillMode: Image.PreserveAspectFit
+            smooth: true
+            visible: about._hasContentAbove
+        }
+
+        Image {
+            source: Resources.iconUrl("ScrollDown")
+            width: Sizing.pctH(3)
+            height: width
+            anchors.top: flickable.bottom
+            anchors.topMargin: Sizing.pctH(0.5)
+            anchors.horizontalCenter: flickable.horizontalCenter
+            fillMode: Image.PreserveAspectFit
+            smooth: true
+            visible: about._hasContentBelow
         }
     }
 }

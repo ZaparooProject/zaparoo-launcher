@@ -243,7 +243,19 @@ async fn seed_now(client: &Arc<Client>, state: &Arc<watch::Sender<MediaStatusSta
             // dropped, the outer loop catches the disconnect.
             warn!("media_status: media seed failed: {e}");
             sleep(SEED_RETRY_DELAY).await;
+            return;
         }
+    }
+    // Scrape state has its own one-shot endpoint — `media.scraping`
+    // notifications only fire while a scrape is running, so without
+    // this call a fresh launcher seeing an idle Core would always
+    // report `total_scraped = 0`. Mirrors the TUI's `getScrapeStatus`.
+    match client.media_scrape_status().await {
+        Ok(status) => {
+            state.send_modify(|s| s.apply_scraping(&status));
+            debug!("media_status: seeded scrape status");
+        }
+        Err(e) => warn!("media_status: scrape status seed failed: {e}"),
     }
 }
 

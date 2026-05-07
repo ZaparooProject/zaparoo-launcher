@@ -120,22 +120,32 @@ Item {
         return out
     }
 
-    // Live-state caption helpers for the action rows. Empty string when
-    // the row's operation is idle, so the field renders as quietly as
-    // the cycler rows above. Pause/cancel paths use the same vocabulary
-    // as the Core TUI so the launcher looks like a third surface for
-    // the same flow.
+    // Live-state caption helpers for the action rows. While the matching
+    // operation is in flight we paint the same vocabulary as the Core TUI
+    // (Optimizing / In progress / Paused). When idle, fall back to a
+    // count summary so the user can see at a glance how much is indexed
+    // / scraped without having to start a job. The fields used here
+    // mirror the TUI's `formatDBMenuLabel` and `formatScrapeMenuLabel`:
+    // `total_media` is the populated-when-idle indexed count;
+    // `scrape_total_scraped` is the cumulative scraped count, seeded
+    // via `media.scrape.status` on connect.
     function _indexActionStatus(): string {
         if (Browse.MediaStatus.optimizing)
             return qsTr("Optimizing")
         if (Browse.MediaStatus.indexing)
             return Browse.MediaStatus.paused ? qsTr("Paused") : qsTr("In progress")
+        const total = Browse.MediaStatus.total_media
+        if (total > 0)
+            return qsTr("%1 indexed").arg(total)
         return ""
     }
 
     function _scrapeActionStatus(): string {
         if (Browse.MediaStatus.scraping)
             return Browse.MediaStatus.scrape_paused ? qsTr("Paused") : qsTr("In progress")
+        const total = Browse.MediaStatus.scrape_total_scraped
+        if (total > 0)
+            return qsTr("%1 scraped").arg(total)
         return ""
     }
 
@@ -145,6 +155,15 @@ Item {
     readonly property bool _indexBusy:
         Browse.MediaStatus.indexing || Browse.MediaStatus.optimizing
     readonly property bool _scrapeBusy: Browse.MediaStatus.scraping
+
+    // Drive the top/bottom scroll chevrons. Mirrors PagedGrid's
+    // `hasPagesAbove`/`hasPagesBelow` recipe, but for a continuous
+    // Flickable rather than a paginated grid. The 1-px epsilon
+    // swallows sub-pixel rounding so the chevrons don't flicker on
+    // exact-fit content.
+    readonly property bool _hasContentAbove: flickable.contentY > 1
+    readonly property bool _hasContentBelow:
+        flickable.contentY + flickable.height < flickable.contentHeight - 1
 
     function _triggerIndex(): void {
         if (settings._scrapeBusy)
@@ -490,10 +509,14 @@ Item {
     Flickable {
         id: flickable
 
+        // topMargin and bottomMargin are sized to leave a clear band
+        // for the scroll chevrons to sit outside the scrollable area
+        // (chevron pctH(3) + breathing room). bottomMargin also has to
+        // clear the help bar (pctH(6)) plus a small gap.
         anchors.top: topStrip.bottom
-        anchors.topMargin: Sizing.pctH(2)
+        anchors.topMargin: Sizing.pctH(4)
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: Sizing.pctH(8)
+        anchors.bottomMargin: Sizing.pctH(10)
         anchors.horizontalCenter: parent.horizontalCenter
         width: Math.min(parent.width - Sizing.pctW(10), Sizing.pctW(70))
         contentWidth: width
@@ -507,6 +530,14 @@ Item {
             width: parent.width
             spacing: Sizing.pctH(1.5)
             visible: settings.fieldCount > 0
+
+            // Leading spacer — keeps the first field clear of the top
+            // scroll chevron and gives the cut-off edge a breath of
+            // whitespace instead of clipping mid-row.
+            Item {
+                width: form.width
+                height: Sizing.pctH(2)
+            }
 
             Repeater {
                 id: rowRepeater
@@ -614,7 +645,46 @@ Item {
                     }
                 }
             }
+
+            // Trailing spacer — symmetric with the leading spacer, so
+            // the last field clears the bottom chevron and the cut-off
+            // edge sits in whitespace.
+            Item {
+                width: form.width
+                height: Sizing.pctH(2)
+            }
         }
+    }
+
+    // Top/bottom scroll chevrons — mirror the PagedGrid/BrowseList
+    // recipe (same SVG icons, `PreserveAspectFit` + `smooth: true`)
+    // but centered on the viewport in the chrome gap *above* and
+    // *below* the Flickable, not inside its visible band. Sitting
+    // outside the scrolled area means the chevrons never overlap
+    // moving content as the user scrolls. Visible only when content
+    // extends past the matching edge.
+    Image {
+        source: Resources.iconUrl("ScrollUp")
+        width: Sizing.pctH(3)
+        height: width
+        anchors.bottom: flickable.top
+        anchors.bottomMargin: Sizing.pctH(0.5)
+        anchors.horizontalCenter: flickable.horizontalCenter
+        fillMode: Image.PreserveAspectFit
+        smooth: true
+        visible: settings._hasContentAbove
+    }
+
+    Image {
+        source: Resources.iconUrl("ScrollDown")
+        width: Sizing.pctH(3)
+        height: width
+        anchors.top: flickable.bottom
+        anchors.topMargin: Sizing.pctH(0.5)
+        anchors.horizontalCenter: flickable.horizontalCenter
+        fillMode: Image.PreserveAspectFit
+        smooth: true
+        visible: settings._hasContentBelow
     }
 
     // Empty-state placeholder shown on runtimes with no settings to

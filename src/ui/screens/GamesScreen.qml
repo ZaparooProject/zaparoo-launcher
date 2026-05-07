@@ -28,6 +28,12 @@ Item {
     // "Loading…" cue paints alone on a cleared band rather than over
     // a populated grid.
     property bool transitioning: false
+    // Router-driven flag: `MainLayout` writes this to
+    // `!ScreenManager.hasModal` so the focused tile's accent ring
+    // hides while a modal (the context menu) is on top of the stack.
+    // Avoids the two-focus-ring read where the menu's selected entry
+    // and the anchored tile both light up.
+    property bool gridFocused: true
     readonly property bool _listLayout: Browse.Settings.current_browse_layout === "list"
     readonly property real _listBandScale: 0.85
     readonly property int _listPageSize: 10
@@ -482,6 +488,7 @@ Item {
         anchors.top: topStrip.bottom
         anchors.bottom: parent.bottom
         anchors.bottomMargin: Sizing.pctH(15)
+        focused: games.gridFocused
         model: Browse.GamesModel
         delegate: Tile { showCaption: true }
         // Cover-art tiles run taller than systems logos, so a 5x3

@@ -277,6 +277,11 @@ ApplicationWindow {
             anchors.fill: parent
             visible: root.activeScreen === root.screenSystems
             transitioning: root.pendingTransition !== ""
+            // While a modal (e.g. the context menu) is on top of the
+            // stack, the menu owns the visible focus indicator. The
+            // grid drops its tile focus ring to keep a single ring
+            // on screen, then restores it when the modal pops.
+            gridFocused: !ScreenManager.hasModal
         }
 
         GamesScreen {
@@ -284,6 +289,7 @@ ApplicationWindow {
             anchors.fill: parent
             visible: root.activeScreen === root.screenGames
             transitioning: root.pendingTransition !== ""
+            gridFocused: !ScreenManager.hasModal
         }
 
         FavoritesScreen {
@@ -291,6 +297,7 @@ ApplicationWindow {
             anchors.fill: parent
             visible: root.activeScreen === root.screenFavorites
             transitioning: root.pendingTransition !== ""
+            gridFocused: !ScreenManager.hasModal
         }
 
         RecentsScreen {
@@ -298,6 +305,7 @@ ApplicationWindow {
             anchors.fill: parent
             visible: root.activeScreen === root.screenRecents
             transitioning: root.pendingTransition !== ""
+            gridFocused: !ScreenManager.hasModal
         }
 
         SettingsScreen {

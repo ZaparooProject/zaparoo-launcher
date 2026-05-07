@@ -20,7 +20,7 @@ use crate::media_types::{
     MediaMetaParams, MediaMetaResult, MediaResult, MediaScrapeParams, MediaSearchParams,
     MediaSearchResult, MediaTagsParams, MediaTagsResult, MediaTagsUpdateParams,
     MediaTagsUpdateResult, ReadersResult, ReadersWriteParams, RunParams, ScrapersResult,
-    SystemsParams, SystemsResult, VersionResult,
+    ScrapingStatusResponse, SystemsParams, SystemsResult, VersionResult,
 };
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
@@ -689,6 +689,19 @@ impl Client {
         struct P {}
         self.call("media.scrape.cancel", &P {}).await?;
         Ok(())
+    }
+
+    /// One-shot scraper status. Mirrors the TUI's `getScrapeStatus` —
+    /// the `media.scraping` notification stream only fires while a scrape
+    /// is running, so a fresh launcher seeing an idle Core has no other
+    /// way to learn the cumulative `total_scraped`.
+    pub async fn media_scrape_status(&self) -> Result<ScrapingStatusResponse, ClientError> {
+        #[derive(Serialize)]
+        struct P {}
+        let val = self.call("media.scrape.status", &P {}).await?;
+        serde_json::from_value(val).map_err(|e| ClientError {
+            message: e.to_string(),
+        })
     }
 
     /// Lists the scrapers Core knows how to run. Used to resolve a
