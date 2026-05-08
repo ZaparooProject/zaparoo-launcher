@@ -12,7 +12,7 @@ import Zaparoo.Theme
 
 // Screen-burn protection. After an idle timeout the launcher captures
 // the live scene with `Item.grabToImage` and stacks three static
-// layers — solid-black backstop, opaque snapshot, 80% black scrim —
+// layers — solid-black backstop, opaque snapshot, 85% black scrim —
 // behind a single bouncing copy of the Zaparoo logo.
 //
 // Why three static layers instead of baking everything into one
@@ -86,6 +86,8 @@ Item {
     function activate(grabRootItem: Item, logoSrc: url, startRect: rect): void {
         if (overlay._armed)
             return;
+        if (!grabRootItem)
+            return;
         overlay._grabRoot = grabRootItem;
         overlay.logoSource = logoSrc;
         overlay._logoStartX = Sizing.px(startRect.x);
@@ -100,21 +102,40 @@ Item {
         overlay._dy = 1;
         overlay._snapshotSource = "";
         overlay._grabResult = null;
-        overlay._armed = true;
-        // Capture the live scene one tick later so the scrim Rectangle
-        // (which becomes visible the instant `_armed` flips) is in the
-        // grab too. The scrim is also stacked on top of the snapshot
-        // as a separate node, so even if the snapshot were captured
-        // before the scrim the user would still see the darken — the
-        // double-source-of-truth is intentional.
-        snapshotTimer.restart();
+        // Critical: grab the scene BEFORE arming the overlay. The
+        // overlay lives inside `scene`, so grabbing scene with the
+        // overlay armed would capture the overlay's own backstop and
+        // scrim too — the resulting "snapshot" would be mostly black
+        // and the user would see no live content underneath the
+        // darken. Arming after the grab lands keeps the snapshot a
+        // faithful copy of what the user was looking at.
+        grabRootItem.grabToImage(function (result) {
+            // Save to a tempfs path and point the Image at the
+            // resulting file:// URL. The in-memory `result.url` is
+            // only resolvable while the QQuickItemGrabResult QObject
+            // is referenced, and the lifetime contract is fiddly
+            // enough across Qt versions that the file-backed path is
+            // the dependable option. /tmp is RAM-backed on MiSTer, so
+            // a single ~few-MB PNG per session is well within budget.
+            const fsPath = "/tmp/zaparoo_screensaver_snapshot.png";
+            const url = "file://" + fsPath;
+            if (result.saveToFile(fsPath)) {
+                overlay._snapshotSource = url;
+            } else {
+                // Fall back to the in-memory grab url and pin the
+                // result QObject so the url stays resolvable.
+                overlay._grabResult = result;
+                overlay._snapshotSource = result.url;
+            }
+            overlay._armed = true;
+            holdBeforeBounce.restart();
+        });
     }
 
     function deactivate(): void {
         if (!overlay._armed)
             return;
         bounceSegment.stop();
-        snapshotTimer.stop();
         holdBeforeBounce.stop();
         overlay._armed = false;
         overlay._snapshotSource = "";
@@ -164,7 +185,7 @@ Item {
 
         anchors.fill: parent
         color: "black"
-        opacity: 0.8
+        opacity: 0.85
         visible: overlay._armed
     }
 
@@ -199,28 +220,6 @@ Item {
         onPressed: mouse => {
             overlay.userDismissed();
             mouse.accepted = true;
-        }
-    }
-
-    Timer {
-        id: snapshotTimer
-        interval: 50
-        repeat: false
-        onTriggered: {
-            if (!overlay._armed || !overlay._grabRoot)
-                return;
-            overlay._grabRoot.grabToImage(function (result) {
-                if (!overlay._armed)
-                    return;
-                // Pin the QQuickItemGrabResult on a property *before*
-                // assigning its url — otherwise the callback returns,
-                // `result` becomes unreferenced, the engine releases
-                // the underlying QImage, and the Image element below
-                // ends up with a dangling url it cannot resolve.
-                overlay._grabResult = result;
-                overlay._snapshotSource = result.url;
-                holdBeforeBounce.restart();
-            });
         }
     }
 

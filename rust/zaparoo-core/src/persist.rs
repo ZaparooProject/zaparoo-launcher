@@ -271,6 +271,7 @@ mod tests {
                 button_layout: "b".into(),
                 mouse_enabled: false,
                 debug_logging: true,
+                screensaver_timeout: "30".into(),
             },
         };
         save_to(&path, &original);

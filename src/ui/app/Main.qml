@@ -558,6 +558,11 @@ MainLayout {
     function _completeTransition(screen: string): void {
         root.pendingTransition = "";
         root._goto(screen);
+        // Restart the idle countdown so the screensaver gate (which
+        // skips activation while a transition is in flight) does not
+        // leave the timer dead after the gate opens. No-op when the
+        // screensaver setting is "off".
+        root._resetIdle();
     }
 
     Connections {
@@ -1023,6 +1028,11 @@ MainLayout {
             // hub is paintable. _maybeOpenCommercialNotice early-returns
             // until bootComplete is true, so this is the natural edge.
             root._maybeOpenCommercialNotice();
+            // The screensaver gate also early-returns until bootComplete
+            // — restart the idle countdown so the timer fires again on
+            // the post-boot quiet period. No-op when the setting is
+            // "off".
+            root._resetIdle();
         }
     }
 
@@ -1273,6 +1283,15 @@ MainLayout {
 
     function _activateScreensaver(): void {
         if (screensaverOverlay.armed)
+            return;
+        // Skip while the cold-launch curtain is up or a forward
+        // transition is in flight: the BootOverlay and the
+        // transition "Loading…" cue are not screen-burn targets, and
+        // grabbing the scene at those moments would freeze a stale
+        // chrome state into the snapshot. `_maybeCompleteBoot` and
+        // `_completeTransition` call `_resetIdle()` so the countdown
+        // restarts cleanly the moment the gate clears.
+        if (!root.bootComplete || root.pendingTransition !== "")
             return;
         const lg = root.headerBar.logoItem;
         if (!lg)
