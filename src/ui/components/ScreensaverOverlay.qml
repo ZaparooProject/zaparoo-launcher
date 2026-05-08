@@ -11,13 +11,34 @@ import QtQuick
 import Zaparoo.Theme
 
 // Screen-burn protection. After an idle timeout the launcher captures
-// the live scene, bakes an 80%-black scrim into that capture once via
-// `Item.grabToImage`, and then displays the resulting opaque image as
-// the screensaver background. A copy of the Zaparoo logo bounces 45°
-// across the window. Software-renderer safe: the baked background is
-// fully opaque so Qt's scene graph keeps it cached and only the small
-// logo dirty rect repaints per frame; no translucent overlay is
-// animated over busy content. State is purely in-memory (no persist).
+// the live scene with `Item.grabToImage` and stacks three static
+// layers — solid-black backstop, opaque snapshot, 80% black scrim —
+// behind a single bouncing copy of the Zaparoo logo.
+//
+// Why three static layers instead of baking everything into one
+// image: the original implementation tried to bake (snapshot + 80%
+// scrim) into a single opaque QImage by painting the scrim above
+// the live scene and grabbing that composite. On Qt's Software
+// adaptation the grab raced the scrim's first paint — `_armed` only
+// dirties the binding; the Rectangle is not actually rasterised
+// until the next sync — so the captured pixmap held just the live
+// scene with no darken. Even with a longer pre-grab delay the
+// behaviour was unreliable across cold-start frames. Stacking the
+// scrim as its own QML node avoids that race entirely: the user
+// sees the darken from the moment the overlay is armed, regardless
+// of whether the grab has completed yet.
+//
+// CLAUDE.md's "no translucent overlay over a screen body" rule
+// targets translucent nodes above *animated* content (screens,
+// transitions): every animated frame underneath propagates up
+// through the translucent layer and forces a repaint of the
+// blended pixels. Here the only thing under the scrim is the
+// snapshot Image (or the solid-black backstop while the snapshot
+// is still arriving). Both are static, so the only dirty rect
+// per frame is the bouncing logo's own bounding box — three
+// blits at that small rect (snapshot patch, scrim patch, logo)
+// and nothing else. State is purely in-memory; the timeout
+// itself is persisted on `Browse.Settings.current_screensaver_timeout`.
 Item {
     id: overlay
 
@@ -38,12 +59,12 @@ Item {
     // particular root.
     property Item _grabRoot: null
     property bool _armed: false
-    property url _bakedSource: ""
+    property url _snapshotSource: ""
     // Holds the QQuickItemGrabResult object alive. Its `url` is only
     // resolvable while the grab-result QObject is referenced — drop
     // the reference and the Image stops painting. Letting the
     // callback's local go out of scope was the original bug: the
-    // baked image showed nothing because the url backing it had
+    // snapshot image showed nothing because the url backing it had
     // already been freed.
     property var _grabResult: null
     // Logo geometry copied from the live header logo, in the overlay's
@@ -77,60 +98,74 @@ Item {
         ssLogo.height = overlay._logoStartH;
         overlay._dx = 1;
         overlay._dy = 1;
-        overlay._bakedSource = "";
+        overlay._snapshotSource = "";
         overlay._grabResult = null;
         overlay._armed = true;
-        // Wait two frames so the scrim Rectangle is actually rasterised
-        // before we grab — `_armed = true` only marks the binding
-        // dirty; the bake scrim does not show up in the next render
-        // until the scene graph syncs and paints. A single 16 ms tick
-        // is racy on the software adaptation (cold-start frames can
-        // run long), so use a slightly longer hold to guarantee the
-        // 80% darken is in the captured frame.
-        bakeTimer.restart();
+        // Capture the live scene one tick later so the scrim Rectangle
+        // (which becomes visible the instant `_armed` flips) is in the
+        // grab too. The scrim is also stacked on top of the snapshot
+        // as a separate node, so even if the snapshot were captured
+        // before the scrim the user would still see the darken — the
+        // double-source-of-truth is intentional.
+        snapshotTimer.restart();
     }
 
     function deactivate(): void {
         if (!overlay._armed)
             return;
         bounceSegment.stop();
-        bakeTimer.stop();
+        snapshotTimer.stop();
         holdBeforeBounce.stop();
         overlay._armed = false;
-        overlay._bakedSource = "";
+        overlay._snapshotSource = "";
         overlay._grabResult = null;
         overlay._grabRoot = null;
     }
 
-    // ── Bake-time scrim ──────────────────────────────────────────────
-    // Translucent black, painted ONCE while the grab is pending. After
-    // the callback assigns `_bakedSource`, the scrim hides and the
-    // opaque baked image takes over — no translucent layer is ever
-    // animated over.
+    // ── Solid-black backstop ─────────────────────────────────────────
+    // Opaque, painted the instant the screensaver arms. Guarantees a
+    // dark canvas under the scrim before the snapshot grab arrives,
+    // and acts as a fallback if the grab fails for any reason.
     Rectangle {
-        id: bakeScrim
+        id: hardBackstop
 
         anchors.fill: parent
         color: "black"
-        opacity: 0.8
-        visible: overlay._armed && overlay._bakedSource === ""
+        visible: overlay._armed
     }
 
-    // ── Baked scene ──────────────────────────────────────────────────
-    // Opaque snapshot of (live scene + bake scrim) produced by
-    // `Item.grabToImage`. Once visible it covers everything underneath
-    // so Qt's scene graph stops painting the live screens — the only
-    // dirty rect per frame is the bouncing logo above.
+    // ── Live-scene snapshot ──────────────────────────────────────────
+    // Opaque copy of the scene captured by `Item.grabToImage` at
+    // activation time. Sits above the backstop so the snapshot fades
+    // through the scrim above it. Source binds to the grab result's
+    // url; `_grabResult` is held on the overlay so the underlying
+    // QImage stays alive (the url alone goes stale when the result
+    // QObject is GC'd).
     Image {
-        id: bakedBg
+        id: snapshotImage
 
         anchors.fill: parent
         cache: false
         smooth: false
         asynchronous: false
         fillMode: Image.Stretch
-        source: overlay._bakedSource
-        visible: overlay._bakedSource !== ""
+        source: overlay._snapshotSource
+        visible: overlay._snapshotSource !== ""
+    }
+
+    // ── Static darken scrim ──────────────────────────────────────────
+    // Translucent black on top of the snapshot. Static while the
+    // overlay is armed — only the logo above moves — so on the
+    // software adaptation the only per-frame dirty rect is the
+    // logo's bounding box. The scrim's blend cost stays bounded to
+    // that small patch instead of the full screen.
+    Rectangle {
+        id: darkenScrim
+
+        anchors.fill: parent
+        color: "black"
+        opacity: 0.8
+        visible: overlay._armed
     }
 
     // ── Bouncing logo ────────────────────────────────────────────────
@@ -146,7 +181,7 @@ Item {
         fillMode: Image.PreserveAspectFit
         smooth: false
         cache: true
-        visible: overlay._bakedSource !== ""
+        visible: overlay._armed
     }
 
     // Click/tap dismissal. Enabled only while armed so the overlay
@@ -168,7 +203,7 @@ Item {
     }
 
     Timer {
-        id: bakeTimer
+        id: snapshotTimer
         interval: 50
         repeat: false
         onTriggered: {
@@ -183,7 +218,7 @@ Item {
                 // the underlying QImage, and the Image element below
                 // ends up with a dangling url it cannot resolve.
                 overlay._grabResult = result;
-                overlay._bakedSource = result.url;
+                overlay._snapshotSource = result.url;
                 holdBeforeBounce.restart();
             });
         }
@@ -215,7 +250,7 @@ Item {
     }
 
     function _scheduleNextBounce(): void {
-        if (!overlay._armed || overlay._bakedSource === "")
+        if (!overlay._armed || overlay._snapshotSource === "")
             return;
         const minX = 0;
         const minY = 0;
