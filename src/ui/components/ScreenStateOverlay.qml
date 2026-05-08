@@ -1,20 +1,18 @@
 // Zaparoo Launcher
 // Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-
-import QtQuick
-import Zaparoo.Theme
-
 // Shared Loading / Error / Empty / Ready overlay for the data screens.
 // The four-state vocabulary is the locked decision in MVP_PLAN.md;
 // this component is the single rendering surface that implements it.
-//
 // Callers expose their model's `loading`, `error_message`, and `count`
 // here and the overlay derives `state` internally so the same ternary
 // isn't repeated at every binding site. CategoriesModel doesn't have
 // a `loading` qproperty (eager bind_to_endpoint! load) — leaving the
 // `loading` property at its default `false` is the supported usage.
-//
+
+import QtQuick
+import Zaparoo.Theme
+
 // Software-rendering safe: only Item, Column, Text. No transforms,
 // no shaders, no animations — state changes are atomic per the
 // "Plain text Loading state" decision; skeletons would register
@@ -27,7 +25,6 @@ Item {
     property int count: 0
     property string emptyText: qsTr("Nothing here")
     property string loadingText: qsTr("Loading…")
-
     // Named `viewState` rather than `state` — `Item.state` is a
     // built-in slot wired to `states:` / `transitions:`, and shadowing
     // it would silently break any future maintainer who adds state
@@ -57,8 +54,10 @@ Item {
             text: {
                 if (overlay.viewState === "error")
                     return qsTr("Failed to load");
+
                 if (overlay.viewState === "empty")
                     return overlay.emptyText;
+
                 return "";
             }
             font.family: Theme.fontUi

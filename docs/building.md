@@ -17,15 +17,15 @@ not already cover the job.
 - Ninja (required; pinned by `CMakePresets.json`)
 - mold (used as linker on x86_64 Linux; pinned by `rust/.cargo/config.toml`)
 - `just`
+- Docker (used by `just lint`, `just fmt`, `just fix`, and the ARM32
+  cross-build; see [Lints](#lints) for the rationale on running them in
+  the published image rather than against host tools)
 
-Optional, but used by the lint and test recipes — install once after
-cloning with `just install-tools`:
-
-- `cargo-nextest` (test runner used by `just test` / `just test-rust`)
-- `cargo-deny` (license/advisory check used by `just lint-rust`; the
-  recipe skips it with a warning when not installed)
-- Tooling for the Docker-based lint path is fetched at runtime when you
-  use `just fmt-docker` / `just lint-docker` / `just fix-docker`
+Run `just install-tools` once after cloning to install the cargo
+extensions used by the host test recipes (currently `cargo-nextest`).
+The lint image carries every other tool — clang-format, qmlformat,
+cmake-format, qmllint, cargo-deny — so they do not need to be on the
+host PATH.
 
 Fedora / RHEL:
 ```bash
@@ -41,7 +41,7 @@ sudo apt install qt6-declarative-dev qt6-quick-controls2-dev \
 ```
 
 Install Rust via rustup, then run `just install-tools` after cloning the
-launcher to install the optional cargo extensions:
+launcher to install `cargo-nextest`:
 
 ```bash
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
@@ -157,60 +157,44 @@ just test-san        # ASan/UBSan suite
 
 ## Lints
 
+All lint and format recipes run inside the published lint image
+(`ghcr.io/zaparooproject/zaparoo-lint:<lint/VERSION>`). Host execution
+is not exposed because clang-format, qmlformat, and cmake-format have
+no per-project version pin (no rust-toolchain.toml equivalent), and
+host distros routinely package different majors than the image. Routing
+through Docker means host runs, Docker runs, and CI produce identical
+output by construction.
+
 ```bash
 just lint            # everything (rust + cpp + qml)
 just lint-cpp        # clang-format check + clang-tidy
 just lint-qml        # qmllint
 just lint-rust       # rustfmt check + clippy + cargo-deny
-```
-
-`just lint` is the zero-warnings gate before a PR. `compile_commands.json` is
-always generated in `build/`, so clang-tidy and qmllint have the project
-metadata they need.
-
-### Auto-fix
-
-When CI complains about formatting or a fixable clippy lint, run:
-
-```bash
-just fix             # cargo clippy --fix, then all formatters
-just fmt             # only the formatters (cargo fmt + clang-format +
+just fix             # clippy --fix, then all formatters
+just fmt             # formatters only (cargo fmt + clang-format +
                      # qmlformat + cmake-format) on tracked files
 ```
 
-`just fix` runs `cargo clippy --fix` first because its rewrites may not be
-pre-formatted; the formatters are the cleanup pass. The recipes invoke each
-underlying tool directly — there is no `pre-commit` or other Python
-orchestrator in the loop.
+`just lint` is the zero-warnings gate before a PR. `just fix` runs
+`cargo clippy --fix` first because its rewrites may not be pre-formatted;
+the formatters are the cleanup pass.
 
-### Docker-based lint and fix
+The image carries Rust 1.90 + rustfmt + clippy + cargo-deny +
+cargo-nextest, clang-format / clang-tidy 19, qmlformat / qmllint /
+qmake from Qt 6.10.3 (installed via aqtinstall), cmake-format 0.6.13,
+ccache, and mold. The same image runs in CI, so the version pin is
+shared by construction.
 
-If you do not want to install Qt, clang-format, clang-tidy, qmlformat,
-qmllint, cmake-format, or cargo-deny on the host, every lint and format
-recipe has a Docker variant. They run the published `Dockerfile.lint`
-image from GHCR — tag is read from `lint/VERSION` so a single source of
-truth drives both the publish workflow and your local pulls.
+The lint recipes configure CMake into `build-docker/`, not `build/`,
+so they never stomp the artifacts from a host `just build`. First run
+is slow (full Qt-linked build inside the container). Subsequent runs
+reuse `build-docker/` via the bind mount and are fast.
 
-```bash
-just fmt-docker         # just fmt inside the image
-just fix-docker         # just fix inside the image
-just lint-docker        # rust + cpp + qml lints inside the image
-just lint-cpp-docker    # only the cmake `lint` target (clang-format + clang-tidy + qmllint)
-just lint-qml-docker    # only the qmllint subset
-```
-
-The lint image carries Rust, rustfmt, clippy, cargo-deny, clang-format,
-clang-tidy, qmlformat, qmllint, cmake-format, and Qt6 dev libraries
-(cargo clippy and the cmake lint target both need Qt to link cxx-qt-lib
-and to generate `compile_commands.json` plus the cxx-qt qmldir). The
-image is published multi-arch (linux/amd64, linux/arm64), so Apple
-Silicon Mac contributors get a native image with no Rosetta translation.
-
-The Docker recipes that build (cpp/qml/full `lint-docker`, `fix-docker`)
-configure CMake into `build-docker/`, not `build/`, so they never stomp
-the artifacts from a host `just build`. First run is slow (full Qt-linked
-build inside the container). Subsequent runs reuse `build-docker/` via
-the bind mount and are fast.
+When you bump `lint/VERSION` (because `Dockerfile.lint` changed), the
+first CI run on the PR builds and pushes the new image to GHCR
+automatically before the lint/test/build jobs start. After the PR
+merges to main, `lint-image-build.yml` rebuilds the image multi-arch
+so non-amd64 hosts have a native pull available too.
 
 ## Deploy desktop bundle
 
@@ -273,9 +257,10 @@ cmake --preset desktop-debug
 cmake --build --preset desktop-debug
 ```
 
-`just lint-cpp` resolves to `cmake --build build --target lint`. That runs
-clang-format (check only), clang-tidy, and qmllint together. The individual
-targets are:
+`just lint-cpp` resolves to `cmake --build build-docker --target lint`
+inside the lint container — which runs clang-format (check only),
+clang-tidy, and qmllint together against the same artifacts a fresh
+configure would produce. The individual targets are:
 
 ```bash
 cmake --build build --target format-check   # clang-format dry-run

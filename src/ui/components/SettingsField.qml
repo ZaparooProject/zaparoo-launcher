@@ -1,20 +1,18 @@
 // Zaparoo Launcher
 // Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-
-import QtQuick
-import Zaparoo.Theme
-
 // Single row in a `SettingsScreen.qml` form. Label on the left, current
 // value on the right with `<` `>` cycling arrows when focused. The
 // arrows are hint glyphs — actual cycling is owned by the parent
 // screen's `handleAction`, which calls a model setter on left/right.
-//
 // Visual states:
 //   * Unfocused — flat surface, muted label, primary value text.
 //   * Focused — surface bumps to `surfaceCard`, borders to `textPrimary`,
 //     and the cycling-arrow glyphs become visible.
-//
+
+import QtQuick
+import Zaparoo.Theme
+
 // The component is purely presentational. The screen owns layout (Column
 // stacking + selection index) and value mutation.
 Item {
@@ -47,8 +45,7 @@ Item {
     // opacity here gives a matching visual cue. Setting `enabled: false`
     // on the row makes Accept a no-op (the index/scrape pair use this
     // when one of the two is in flight — Core serialises them).
-    opacity: enabled ? 1.0 : 0.4
-
+    opacity: enabled ? 1 : 0.4
     implicitHeight: Sizing.pctH(8)
 
     Rectangle {
@@ -90,7 +87,7 @@ Item {
             visible: root.isFocused && root.canCyclePrev
             color: Theme.textPrimary
             font.family: Theme.fontUi
-            font.pixelSize: Sizing.fontSize(3.0)
+            font.pixelSize: Sizing.fontSize(3)
             renderType: Text.NativeRendering
         }
 
@@ -109,7 +106,7 @@ Item {
             visible: root.isFocused && root.canCycleNext
             color: Theme.textPrimary
             font.family: Theme.fontUi
-            font.pixelSize: Sizing.fontSize(3.0)
+            font.pixelSize: Sizing.fontSize(3)
             renderType: Text.NativeRendering
         }
     }
@@ -173,7 +170,7 @@ Item {
             text: "›"
             color: Theme.textPrimary
             font.family: Theme.fontUi
-            font.pixelSize: Sizing.fontSize(3.0)
+            font.pixelSize: Sizing.fontSize(3)
             renderType: Text.NativeRendering
         }
     }
@@ -183,7 +180,6 @@ Item {
         hoverEnabled: true
         acceptedButtons: Qt.LeftButton | Qt.RightButton
         cursorShape: Qt.PointingHandCursor
-
         onEntered: root.hovered()
         // Action rows fire `accepted()` (the screen runs start/cancel
         // there); every other control fires `clicked()` (the screen
@@ -191,13 +187,12 @@ Item {
         // rows used to make `onClicked` and `onAccepted` race over
         // the same press.
         onClicked: mouse => {
-            if (mouse.button === Qt.RightButton) {
+            if (mouse.button === Qt.RightButton)
                 root.rightClicked();
-            } else if (root.control === "action") {
+            else if (root.control === "action")
                 root.accepted();
-            } else {
+            else
                 root.clicked();
-            }
         }
     }
 }

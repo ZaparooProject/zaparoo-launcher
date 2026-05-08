@@ -7,7 +7,6 @@ import Zaparoo.Theme
 MainLayout {
     width: 1280
     height: 720
-
     Component.onCompleted: {
         Sizing.screenWidth = width;
         Sizing.screenHeight = height;

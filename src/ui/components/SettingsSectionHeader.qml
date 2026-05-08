@@ -1,19 +1,17 @@
 // Zaparoo Launcher
 // Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-
-import QtQuick
-import Zaparoo.Theme
-
 // Non-focusable group label for the Settings form. Splits the otherwise
 // flat list of `SettingsField` rows into bands (General / Library /
 // Advanced) so adjacent items are visibly related and rare entries
 // don't crowd the commonly-used ones.
-//
 // The screen's navigation logic skips entries whose `kind` is `"header"`,
 // so this row never receives focus, never paints a border, and has no
 // hover/accept handling — it's purely a divider.
-//
+
+import QtQuick
+import Zaparoo.Theme
+
 // Software-renderer safe: a single Text in an Item, no shaders, no
 // transforms, no animations.
 Item {

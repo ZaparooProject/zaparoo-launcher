@@ -185,7 +185,7 @@ Item {
         root.currentIndex = idx;
     }
 
-    function _handleWheel(wheel): void {
+    function _handleWheel(wheel: WheelEvent): void {
         const amount = wheel.angleDelta.y !== 0 ? wheel.angleDelta.y : wheel.pixelDelta.y;
         if (amount === 0)
             return;
