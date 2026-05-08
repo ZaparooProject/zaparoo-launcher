@@ -136,6 +136,8 @@ ApplicationWindow {
     property alias logUploadModal: logUploadModal
     property alias quitConfirmModal: quitConfirmModal
     property alias listPickerModal: listPickerModal
+    property alias headerBar: headerBar
+    property alias screensaverOverlay: screensaverOverlay
     // Exposed so Main.qml binds Sizing.screenWidth/Height to the
     // (logical) scene dimensions in CRT preview mode rather than the
     // (physical) ApplicationWindow dimensions. Outside preview the
@@ -978,6 +980,19 @@ ApplicationWindow {
             hoverEnabled: true
             acceptedButtons: Qt.AllButtons
             cursorShape: Qt.BlankCursor
+        }
+
+        // Screen-burn protection. Sits inside `scene` so the bake-time
+        // grab captures the same logical dimensions Sizing reads from
+        // (CRT preview included). Z is above modals (300) and the help
+        // bar (400) so the screensaver covers every chrome layer; the
+        // mouse-blanking MouseArea above (z: 10000) still wins when
+        // mouse input is disabled, which keeps the cursor hidden.
+        ScreensaverOverlay {
+            id: screensaverOverlay
+
+            anchors.fill: parent
+            z: 500
         }
     }
 }

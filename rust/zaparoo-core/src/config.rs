@@ -47,6 +47,7 @@ pub struct SettingsConfig {
     pub browse_layout: Option<String>,
     pub button_layout: Option<String>,
     pub mouse_enabled: Option<bool>,
+    pub screensaver_timeout: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -120,6 +121,7 @@ struct RawSettings {
     browse_layout: Option<String>,
     button_layout: Option<String>,
     mouse_enabled: Option<bool>,
+    screensaver_timeout: Option<String>,
 }
 
 #[derive(Deserialize, Default)]
@@ -194,6 +196,10 @@ pub fn load_config(path: &Path) -> Config {
             .button_layout
             .map(|value| value.trim().to_string()),
         mouse_enabled: raw.settings.mouse_enabled,
+        screensaver_timeout: raw
+            .settings
+            .screensaver_timeout
+            .map(|value| value.trim().to_string()),
     };
     cfg.notice = NoticeConfig {
         commercial_ack: raw.notice.commercial_ack.unwrap_or(false),
@@ -208,6 +214,7 @@ pub fn save_settings_mirror(
     button_layout: &str,
     mouse_enabled: bool,
     debug_logging: bool,
+    screensaver_timeout: &str,
 ) -> Result<(), String> {
     let mut table = if path.exists() {
         let src = std::fs::read_to_string(path)
@@ -250,6 +257,10 @@ pub fn save_settings_mirror(
         toml::Value::String(button_layout.trim().to_string()),
     );
     settings.insert("mouse_enabled".into(), toml::Value::Boolean(mouse_enabled));
+    settings.insert(
+        "screensaver_timeout".into(),
+        toml::Value::String(screensaver_timeout.trim().to_string()),
+    );
 
     let logging_value = table
         .entry("logging")
@@ -539,12 +550,13 @@ mod tests {
     fn save_settings_mirror_creates_sections() {
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("launcher.toml");
-        save_settings_mirror(&path, "it_IT", "list", "b", false, true).expect("save");
+        save_settings_mirror(&path, "it_IT", "list", "b", false, true, "30").expect("save");
         let cfg = load_config(&path);
         assert_eq!(cfg.language, "it_IT");
         assert_eq!(cfg.settings.browse_layout.as_deref(), Some("list"));
         assert_eq!(cfg.settings.button_layout.as_deref(), Some("b"));
         assert_eq!(cfg.settings.mouse_enabled, Some(false));
+        assert_eq!(cfg.settings.screensaver_timeout.as_deref(), Some("30"));
         assert!(cfg.debug_logging);
     }
 
@@ -553,7 +565,7 @@ mod tests {
         let f = write_tmp(
             "[core]\nendpoint = \"ws://example.com/api\"\n[video]\nbackend = \"native-core-poc\"\nwidth = 1280\nheight = 720\n",
         );
-        save_settings_mirror(f.path(), "en", "grid", "a", true, false).expect("save");
+        save_settings_mirror(f.path(), "en", "grid", "a", true, false, "60").expect("save");
         let written = std::fs::read_to_string(f.path()).expect("read");
         assert!(!written.contains("backend"));
         let cfg = load_config(f.path());
@@ -564,24 +576,27 @@ mod tests {
         assert_eq!(cfg.settings.browse_layout.as_deref(), Some("grid"));
         assert_eq!(cfg.settings.button_layout.as_deref(), Some("a"));
         assert_eq!(cfg.settings.mouse_enabled, Some(true));
+        assert_eq!(cfg.settings.screensaver_timeout.as_deref(), Some("60"));
         assert!(!cfg.debug_logging);
     }
 
     #[test]
     fn save_settings_mirror_normalizes_auto() {
         let f = write_tmp("");
-        save_settings_mirror(f.path(), "", "list", "c", false, true).expect("save");
+        save_settings_mirror(f.path(), "", "list", "c", false, true, "off").expect("save");
         let written = std::fs::read_to_string(f.path()).expect("read");
         assert!(written.contains("language = \"auto\""));
         assert!(written.contains("browse_layout = \"list\""));
         assert!(written.contains("button_layout = \"c\""));
         assert!(written.contains("mouse_enabled = false"));
+        assert!(written.contains("screensaver_timeout = \"off\""));
         assert!(written.contains("debug = true"));
         let cfg = load_config(f.path());
         assert_eq!(cfg.language, "");
         assert_eq!(cfg.settings.browse_layout.as_deref(), Some("list"));
         assert_eq!(cfg.settings.button_layout.as_deref(), Some("c"));
         assert_eq!(cfg.settings.mouse_enabled, Some(false));
+        assert_eq!(cfg.settings.screensaver_timeout.as_deref(), Some("off"));
         assert!(cfg.debug_logging);
     }
 

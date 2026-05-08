@@ -105,6 +105,8 @@ pub struct SettingsState {
     pub mouse_enabled: bool,
     #[serde(default)]
     pub debug_logging: bool,
+    #[serde(default = "default_screensaver_timeout")]
+    pub screensaver_timeout: String,
 }
 
 impl Default for SettingsState {
@@ -116,6 +118,7 @@ impl Default for SettingsState {
             button_layout: default_button_layout(),
             mouse_enabled: default_mouse_enabled(),
             debug_logging: false,
+            screensaver_timeout: default_screensaver_timeout(),
         }
     }
 }
@@ -133,6 +136,10 @@ fn default_button_layout() -> String {
 
 fn default_mouse_enabled() -> bool {
     true
+}
+
+fn default_screensaver_timeout() -> String {
+    "60".into()
 }
 
 pub fn load() -> PersistedState {

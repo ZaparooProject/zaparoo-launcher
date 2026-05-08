@@ -7,7 +7,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-LAUNCHER="${PROJECT_ROOT}/build-macos/bin/launcher"
+LAUNCHER="${PROJECT_ROOT}/build/bin/launcher"
 
 if [ ! -x "${LAUNCHER}" ]; then
     echo "Error: macOS launcher not found or not executable: ${LAUNCHER}" >&2
@@ -17,3 +17,4 @@ fi
 
 export ZAPAROO_CORE_ENDPOINT="ws://192.168.1.176:7497/api/v0.1"
 exec "${LAUNCHER}"
+# exec "${LAUNCHER}" --crt

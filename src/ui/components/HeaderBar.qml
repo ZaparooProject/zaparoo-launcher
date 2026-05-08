@@ -20,6 +20,11 @@ import Zaparoo.Theme
 Item {
     id: header
 
+    // Exposed for the screensaver overlay so it can read the logo's
+    // on-screen geometry (mapToItem + paintedWidth/Height) and start
+    // the bouncing copy at exactly the same position.
+    property alias logoItem: logo
+
     height: Sizing.headerHeight
 
     Image {

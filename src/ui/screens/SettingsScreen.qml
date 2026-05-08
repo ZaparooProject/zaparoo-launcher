@@ -88,6 +88,11 @@ Item {
             label: qsTr("Button style")
         });
         out.push({
+            kind: "field",
+            id: "screensaverTimeout",
+            label: qsTr("Screensaver")
+        });
+        out.push({
             kind: "header",
             label: qsTr("Library")
         });
@@ -360,6 +365,25 @@ Item {
         return qsTr("Style A");
     }
 
+    function _screensaverTimeoutList(): list<string> {
+        const raw = Browse.Settings.available_screensaver_timeouts;
+        return raw === undefined || raw === null ? [] : raw;
+    }
+
+    function _screensaverTimeoutDisplay(value: string): string {
+        if (value === "off")
+            return qsTr("Off");
+        if (value === "1")
+            return qsTr("1 second (testing)");
+        if (value === "15")
+            return qsTr("15 seconds");
+        if (value === "30")
+            return qsTr("30 seconds");
+        if (value === "60")
+            return qsTr("1 minute");
+        return qsTr("%1 seconds").arg(value);
+    }
+
     // Build the picker entry list for a field. Each entry is
     // `{ id: string, label: string }` — `id` is the canonical value
     // the model stores, `label` is the localised display string.
@@ -405,6 +429,15 @@ Item {
                     label: settings._buttonLayoutDisplay(list[i])
                 });
             initialId = Browse.Settings.current_button_layout;
+        } else if (id === "screensaverTimeout") {
+            title = qsTr("Screensaver");
+            const list = settings._screensaverTimeoutList();
+            for (let i = 0; i < list.length; i++)
+                entries.push({
+                    id: list[i],
+                    label: settings._screensaverTimeoutDisplay(list[i])
+                });
+            initialId = Browse.Settings.current_screensaver_timeout;
         } else {
             return;
         }
@@ -596,7 +629,7 @@ Item {
                         // `_triggerIndex`/`_triggerScrape`.
                         enabled: row.modelData.id === "updateMediaDb" ? !settings._scrapeBusy : row.modelData.id === "runScraper" ? !settings._indexBusy : true
                         label: row.modelData.label
-                        value: row.modelData.id === "resolution" ? settings._resolutionDisplay(Browse.Settings.current_resolution) : row.modelData.id === "language" ? settings._languageDisplay(Browse.Settings.current_language) : row.modelData.id === "browseLayout" ? settings._browseLayoutDisplay(Browse.Settings.current_browse_layout) : row.modelData.id === "buttonLayout" ? settings._buttonLayoutDisplay(Browse.Settings.current_button_layout) : ""
+                        value: row.modelData.id === "resolution" ? settings._resolutionDisplay(Browse.Settings.current_resolution) : row.modelData.id === "language" ? settings._languageDisplay(Browse.Settings.current_language) : row.modelData.id === "browseLayout" ? settings._browseLayoutDisplay(Browse.Settings.current_browse_layout) : row.modelData.id === "buttonLayout" ? settings._buttonLayoutDisplay(Browse.Settings.current_button_layout) : row.modelData.id === "screensaverTimeout" ? settings._screensaverTimeoutDisplay(Browse.Settings.current_screensaver_timeout) : ""
                         control: row.modelData.id === "mouseEnabled" || row.modelData.id === "debugLogging" ? "toggle" : row.modelData.id === "aboutLicense" ? "navigate" : (row.modelData.id === "updateMediaDb" || row.modelData.id === "runScraper" || row.modelData.id === "uploadLog") ? "action" : "picker"
                         checked: row.modelData.id === "debugLogging" ? Browse.Settings.current_debug_logging : Browse.Settings.current_mouse_enabled
                         actionStatus: row.modelData.id === "updateMediaDb" ? settings._indexActionStatus() : row.modelData.id === "runScraper" ? settings._scrapeActionStatus() : ""
