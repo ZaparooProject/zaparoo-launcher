@@ -848,7 +848,7 @@ MainLayout {
         // we avoid stacking two modals at the same time.
         if (!Browse.Notice.commercial_ack)
             return
-        if (Browse.AppStatus.connection_state !== 2 /* READY */)
+        if (Browse.AppStatus.connection_state !== 2)
             return
         if (!Browse.CategoriesModel.loaded)
             return
@@ -955,7 +955,7 @@ MainLayout {
     function _maybeCompleteBoot(): void {
         if (root.bootComplete)
             return
-        if (Browse.AppStatus.connection_state === 2 /* READY */) {
+        if (Browse.AppStatus.connection_state === 2) {
             root.bootComplete = true
             // Curtain just lifted — fire the notice gate now that the
             // hub is paintable. _maybeOpenCommercialNotice early-returns

@@ -26,6 +26,16 @@ FROM rust:1-slim-trixie
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+# Debian's Qt6 packages install the helper binaries (qmlformat, qmllint,
+# lupdate, etc.) under /usr/lib/qt6/bin/ rather than /usr/bin/, so they
+# are not on PATH by default. Add them so the lint and fmt recipes can
+# invoke `qmlformat`/`qmllint` without a Qt-specific prefix.
+ENV PATH="/usr/lib/qt6/bin:${PATH}"
+
+# Qt complains and switches to C.UTF-8 every time it is invoked under the
+# default `C` locale; set it explicitly so the tool output is clean.
+ENV LANG=C.UTF-8
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
         clang-format \
