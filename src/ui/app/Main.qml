@@ -291,6 +291,14 @@ MainLayout {
     property var _systemReadyCallback: null
     property var _favoritesReadyCallback: null
     property var _recentsReadyCallback: null
+    // Set when `_ensureCategory` arms `deferredCategorySetTimer` and
+    // cleared inside the timer's `onTriggered` after `set_category`
+    // actually fires. Gates `_categoryReadyCallback` consumption so a
+    // stale `SystemsModel.loading` false-edge from an unrelated in-flight
+    // fill (e.g. `restoreFromCategoriesReset` already running) can't
+    // complete the transition before our own `set_category` has been
+    // issued.
+    property bool _deferredCategoryPending: false
     // Saved games-screen entry path that wasn't on the freshly seeded
     // page 1 of MediaBrowse. The GamesModel.onCountChanged watcher
     // below paginates forward via fetch_more until the path is found
@@ -312,6 +320,10 @@ MainLayout {
         target: Browse.SystemsModel
         function onLoadingChanged(): void {
             if (Browse.SystemsModel.loading)
+                return;
+            // Deferred set_category hasn't fired yet — this false-edge
+            // belongs to a prior in-flight fill, not our transition.
+            if (root._deferredCategoryPending)
                 return;
             const cb = root._categoryReadyCallback;
             if (cb === null)
@@ -376,6 +388,7 @@ MainLayout {
             return;
         }
         root._categoryReadyCallback = cb;
+        root._deferredCategoryPending = true;
         deferredCategorySetTimer.targetCategory = category;
         deferredCategorySetTimer.restart();
     }
@@ -1406,6 +1419,11 @@ MainLayout {
         interval: 50
         repeat: false
         property string targetCategory: ""
-        onTriggered: Browse.SystemsModel.set_category(deferredCategorySetTimer.targetCategory)
+        onTriggered: {
+            Browse.SystemsModel.set_category(deferredCategorySetTimer.targetCategory);
+            // Cleared after set_category so the resulting loading=false
+            // edge is the one our callback consumes.
+            root._deferredCategoryPending = false;
+        }
     }
 }

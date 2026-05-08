@@ -142,7 +142,7 @@ Item {
         games._currentMoveIsRepeat = isRepeat;
         games.gamesGrid.currentIndex = next;
         games._currentMoveIsRepeat = false;
-        Browse.GamesState.set_selected_at_top(Browse.GamesModel.path_at(games.gamesGrid.currentIndex));
+        games._scheduleSelectedPersist(Browse.GamesModel.path_at(games.gamesGrid.currentIndex));
         if (next >= count - 2 && Browse.GamesModel.has_next_page)
             Browse.GamesModel.fetch_more();
         games._prefetchListTail(next);
@@ -197,7 +197,6 @@ Item {
         games._currentMoveIsRepeat = false;
         games.gamesGrid.currentIndex = index;
         games._currentMoveIsRepeat = false;
-        Browse.GamesState.set_selected_at_top(Browse.GamesModel.path_at(games.gamesGrid.currentIndex));
         games._scheduleSelectedPersist(Browse.GamesModel.path_at(games.gamesGrid.currentIndex));
     }
 

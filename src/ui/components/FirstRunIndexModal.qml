@@ -75,13 +75,18 @@ Item {
                 return;
             }
             if (modal.phase === "running") {
-                if (Browse.MediaStatus.total_files > 0) {
+                // Use catalog count (not total_files) as the success
+                // signal: cancel_index() flips indexing=false even after
+                // partial work, so a non-zero total_files alone would
+                // claim "Done" on a cancelled scan. The catalog only
+                // populates when Core has actually finished and reindexed.
+                if (Browse.CategoriesModel.count > 0) {
                     modal.phase = "completed";
                     completionTimer.restart();
                 } else {
-                    // Cancel landed before any files were counted, or
-                    // Core never started. Drop back to idle so the user
-                    // can retry.
+                    // Cancel landed before catalog populated, or Core
+                    // never started. Drop back to idle so the user can
+                    // retry.
                     modal.phase = "idle";
                 }
             }

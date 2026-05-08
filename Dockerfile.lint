@@ -42,6 +42,7 @@ ARG CMAKELANG_VERSION=0.6.13
 ARG AQTINSTALL_VERSION=3.3.0
 ARG CARGO_DENY_VERSION=0.19.4
 ARG CARGO_NEXTEST_VERSION=0.9.110
+ARG JUST_VERSION=1.50.0
 
 # Apt-installed packages. clang-format / clang-tidy are pinned to a
 # specific major because Trixie ships 17, 18, and 19 side-by-side and
@@ -129,7 +130,7 @@ RUN rustup component add rustfmt clippy \
     && rustup target add armv7-unknown-linux-gnueabihf \
     && cargo install --locked --version ${CARGO_DENY_VERSION} cargo-deny \
     && cargo install --locked --version ${CARGO_NEXTEST_VERSION} cargo-nextest \
-    && cargo install --locked just
+    && cargo install --locked --version ${JUST_VERSION} just
 
 # `just *-docker` recipes pass `-u $(id -u):$(id -g)` so the formatter writes
 # files with host-user ownership in the bind mount. cargo then needs to write

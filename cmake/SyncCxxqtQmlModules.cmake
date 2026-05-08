@@ -132,7 +132,11 @@ foreach(_qt_file IN LISTS _synced_qmltypes)
             endif()
         endif()
     endforeach()
-    if(NOT _non_singleton_components)
+    # Only inject `isFinal: true` when we actually parsed Component headers and confirmed every one
+    # is a singleton. An empty `_component_headers` (regex miss on a future Qt qmltypes format, or a
+    # generated file with no Components) leaves `_non_singleton_components` empty too, but in that
+    # case we have no evidence the rewrite is safe.
+    if(_component_headers AND NOT _non_singleton_components)
         string(REGEX REPLACE "(Property \\{\n)([ \t]+)(name:)" "\\1\\2isFinal: true\n\\2\\3"
                              _qt_content "${_qt_content}"
         )
