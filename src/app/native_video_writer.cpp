@@ -162,7 +162,7 @@ void writerLoop()
     memset(const_cast<uint8_t*>(nativeBase + kBuffer1Offset), 0, kOutputBytes);
     *reinterpret_cast<volatile uint32_t*>(const_cast<uint8_t*>(nativeBase + kControlOffset)) = 0;
 
-    qInfo("native video writer: copying top-left 320x240 RGB565 from /dev/fb0 %ux%u to native DDR",
+    qInfo("native video writer: copying top-left 320x240 RGB8888 from /dev/fb0 %ux%u to native DDR",
           var.xres, var.yres);
 
     uint32_t frame = 0;
