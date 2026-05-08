@@ -65,9 +65,9 @@ Item {
     // on a prebaked-kind modal can't leak into the panel.
     default property alias contentData: contentSlot.data
 
-    signal accepted()         // action_error: button click
-    signal cancelRequested()  // transient Cancel; confirm No / Back
-    signal confirmed()        // confirm: Yes selected
+    signal accepted         // action_error: button click
+    signal cancelRequested  // transient Cancel; confirm No / Back
+    signal confirmed        // confirm: Yes selected
 
     visible: modal.open
     anchors.fill: parent
@@ -75,25 +75,25 @@ Item {
 
     onOpenChanged: {
         if (modal.open && modal.kind === "confirm")
-            modal._focusYes = false
+            modal._focusYes = false;
     }
 
     // confirm-only input dispatch. Main.qml routes key/controller
     // actions here while this modal is on top of the stack.
     function handleAction(action: string): void {
         if (modal.kind !== "confirm")
-            return
+            return;
         if (action === "left") {
-            modal._focusYes = false
+            modal._focusYes = false;
         } else if (action === "right") {
-            modal._focusYes = true
+            modal._focusYes = true;
         } else if (action === "accept") {
             if (modal._focusYes)
-                modal.confirmed()
+                modal.confirmed();
             else
-                modal.cancelRequested()
+                modal.cancelRequested();
         } else if (action === "cancel") {
-            modal.cancelRequested()
+            modal.cancelRequested();
         }
     }
 
@@ -252,9 +252,7 @@ Item {
                     // slot, not the Row, so the Row can stay implicitly
                     // sized by its children and centered.
                     readonly property int _gap: Sizing.pctW(2)
-                    readonly property int _pillWidth:
-                        Math.min(Sizing.pctW(28),
-                                 Math.max(0, (width - _gap) / 2))
+                    readonly property int _pillWidth: Math.min(Sizing.pctW(28), Math.max(0, (width - _gap) / 2))
 
                     Row {
                         anchors.horizontalCenter: parent.horizontalCenter
@@ -266,9 +264,7 @@ Item {
                             height: Sizing.pctH(7)
                             color: Theme.bgBar
                             border.width: modal._focusYes ? 1 : 2
-                            border.color: modal._focusYes
-                                          ? Theme.borderMid
-                                          : Theme.accent
+                            border.color: modal._focusYes ? Theme.borderMid : Theme.accent
                             radius: Sizing.cornerRadius
 
                             Text {
@@ -284,8 +280,8 @@ Item {
                                 anchors.fill: parent
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
-                                    modal._focusYes = false
-                                    modal.cancelRequested()
+                                    modal._focusYes = false;
+                                    modal.cancelRequested();
                                 }
                             }
                         }
@@ -295,9 +291,7 @@ Item {
                             height: Sizing.pctH(7)
                             color: Theme.bgBar
                             border.width: modal._focusYes ? 2 : 1
-                            border.color: modal._focusYes
-                                          ? Theme.accent
-                                          : Theme.borderMid
+                            border.color: modal._focusYes ? Theme.accent : Theme.borderMid
                             radius: Sizing.cornerRadius
 
                             Text {
@@ -313,8 +307,8 @@ Item {
                                 anchors.fill: parent
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
-                                    modal._focusYes = true
-                                    modal.confirmed()
+                                    modal._focusYes = true;
+                                    modal.confirmed();
                                 }
                             }
                         }

@@ -41,10 +41,9 @@ Item {
     // the centred `ScreenStateOverlay` paints alone on a cleared band
     // during cold-launch / model-reset, matching `GamesScreen.qml`.
     // Pagination uses a separate `loading_more` flag and is unaffected.
-    readonly property bool _gateHide:
-        recents.transitioning || Browse.RecentsModel.loading
+    readonly property bool _gateHide: recents.transitioning || Browse.RecentsModel.loading
 
-    signal requestHubScreen()
+    signal requestHubScreen
     signal requestContextMenu(int index, var anchorRect)
 
     // Restore the previously focused entry when the model is Ready.
@@ -54,13 +53,13 @@ Item {
     // user's previously highlighted row if it's still in the page.
     function restoreSelection(): void {
         if (Browse.RecentsModel.count <= 0)
-            return
-        const path = Browse.RecentsState.selected_path
+            return;
+        const path = Browse.RecentsState.selected_path;
         if (path === "")
-            return
-        const idx = Browse.RecentsModel.index_for_path(path)
+            return;
+        const idx = Browse.RecentsModel.index_for_path(path);
         if (idx >= 0 && idx !== recentsGrid.currentIndex)
-            recentsGrid.currentIndex = idx
+            recentsGrid.currentIndex = idx;
     }
 
     // Persist the focused entry's path on every focus move so a
@@ -69,99 +68,97 @@ Item {
     // shrinkage clamp (currentIndex → 0 when itemCount drops to 0)
     // doesn't clobber the saved path with the empty fallback.
     function _persistFocus(): void {
-        const idx = recentsGrid.currentIndex
+        const idx = recentsGrid.currentIndex;
         if (idx < 0)
-            return
-        const path = Browse.RecentsModel.path_at(idx)
+            return;
+        const path = Browse.RecentsModel.path_at(idx);
         if (path === "")
-            return
-        Browse.RecentsState.selected_path = path
+            return;
+        Browse.RecentsState.selected_path = path;
     }
 
     function _focusIndex(index: int): void {
         if (index < 0 || index >= recents.recentsGrid.itemCount)
-            return
-        recents.recentsGrid.currentIndex = index
-        recents._persistFocus()
+            return;
+        recents.recentsGrid.currentIndex = index;
+        recents._persistFocus();
     }
 
     function _performLinearMove(delta: int): void {
-        const count = recents.recentsGrid.itemCount
+        const count = recents.recentsGrid.itemCount;
         if (count <= 0)
-            return
-        let next = recents.recentsGrid.currentIndex + delta
+            return;
+        let next = recents.recentsGrid.currentIndex + delta;
         if (next < 0)
-            next = count - 1
+            next = count - 1;
         else if (next >= count)
-            next = 0
+            next = 0;
         if (next === recents.recentsGrid.currentIndex) {
             if (next >= count - 2)
-                Browse.RecentsModel.fetch_more()
-            return
+                Browse.RecentsModel.fetch_more();
+            return;
         }
-        recents.recentsGrid.currentIndex = next
-        recents._persistFocus()
+        recents.recentsGrid.currentIndex = next;
+        recents._persistFocus();
         if (next >= count - 2)
-            Browse.RecentsModel.fetch_more()
+            Browse.RecentsModel.fetch_more();
     }
 
     function _state(): string {
         if (Browse.RecentsModel.loading)
-            return "loading"
+            return "loading";
         if ((Browse.RecentsModel.error_message ?? "") !== "")
-            return "error"
+            return "error";
         if (Browse.RecentsModel.count === 0)
-            return "empty"
-        return "ready"
+            return "empty";
+        return "ready";
     }
 
     function handleAction(action: string): void {
         if (action === "left") {
             if (!recents._listLayout)
-                recents.recentsGrid.moveSelection(-1, 0)
+                recents.recentsGrid.moveSelection(-1, 0);
         } else if (action === "right") {
             if (!recents._listLayout)
-                recents.recentsGrid.moveSelection(1, 0)
+                recents.recentsGrid.moveSelection(1, 0);
         } else if (action === "up") {
             if (recents._listLayout)
-                recents._performLinearMove(-1)
+                recents._performLinearMove(-1);
             else
-                recents.recentsGrid.moveSelection(0, -1)
+                recents.recentsGrid.moveSelection(0, -1);
         } else if (action === "down") {
             if (recents._listLayout)
-                recents._performLinearMove(1)
+                recents._performLinearMove(1);
             else
-                recents.recentsGrid.moveSelection(0, 1)
+                recents.recentsGrid.moveSelection(0, 1);
         } else if (action === "page_prev") {
             if (recents._state() === "ready")
-                recents.recentsGrid.pageBy(-1)
+                recents.recentsGrid.pageBy(-1);
         } else if (action === "page_next") {
             if (recents._state() === "ready")
-                recents.recentsGrid.pageBy(1)
+                recents.recentsGrid.pageBy(1);
         } else if (action === "accept") {
             // Loading swallows the press at the screen layer; Empty/Error
             // re-fires the current load by calling `fetch_more` (a stale
             // cursor still triggers the fetch — the model's seq guard
             // discards a result that no longer matches the chain).
-            const state = recents._state()
+            const state = recents._state();
             if (state === "loading")
-                return
+                return;
             if (state === "error" || state === "empty") {
-                Browse.RecentsModel.fetch_more()
-                return
+                Browse.RecentsModel.fetch_more();
+                return;
             }
-            Browse.RecentsModel.launch_at(recents.recentsGrid.currentIndex)
+            Browse.RecentsModel.launch_at(recents.recentsGrid.currentIndex);
         } else if (action === "write_card") {
             if (recents.recentsGrid.itemCount > 0) {
-                const idx = recents.recentsGrid.currentIndex
-                recents._persistFocus()
-                const rect = recents._listLayout
-                             ? recentsList.currentCellRectIn(recents)
-                             : recents.recentsGrid.currentCellRectIn(recents)
-                recents.requestContextMenu(idx, rect)
+                const idx = recents.recentsGrid.currentIndex;
+                recents._persistFocus();
+                const rect = recents._listLayout ? recentsList.currentCellRectIn(recents) : recents.recentsGrid.currentCellRectIn(recents);
+                recents.requestContextMenu(idx, rect);
             }
         } else if (action === "cancel") {
-            recents.requestHubScreen()
+            recents.requestHubScreen();
         }
     }
 
@@ -181,11 +178,8 @@ Item {
         height: Sizing.pctH(7)
         title: qsTr("Recently Played")
         currentPage: recentsGrid.currentPage
-        totalPages: Math.max(1,
-            Math.ceil(Browse.RecentsModel.count / recentsGrid.pageSize))
-        totalText: Browse.RecentsModel.count > 0
-                   ? qsTr("%1 entries").arg(Browse.RecentsModel.count)
-                   : ""
+        totalPages: Math.max(1, Math.ceil(Browse.RecentsModel.count / recentsGrid.pageSize))
+        totalText: Browse.RecentsModel.count > 0 ? qsTr("%1 entries").arg(Browse.RecentsModel.count) : ""
     }
 
     BrowseList {
@@ -201,14 +195,13 @@ Item {
         width: Sizing.pctW(45)
         model: Browse.RecentsModel
         currentIndex: recentsGrid.currentIndex
-        onItemHovered: (index) => recents._focusIndex(index)
-        onItemClicked: (index) => {
-            recents._focusIndex(index)
-            recents.handleAction("accept")
+        onItemHovered: index => recents._focusIndex(index)
+        onItemClicked: index => {
+            recents._focusIndex(index);
+            recents.handleAction("accept");
         }
         onEmptyRightClicked: recents.handleAction("cancel")
-        onPageWheelRequested: (delta) => recents.handleAction(
-            delta > 0 ? "page_next" : "page_prev")
+        onPageWheelRequested: delta => recents.handleAction(delta > 0 ? "page_next" : "page_prev")
     }
 
     BrowseDetailPane {
@@ -233,25 +226,26 @@ Item {
         anchors.bottom: parent.bottom
         anchors.bottomMargin: Sizing.pctH(8)
         model: Browse.RecentsModel
-        delegate: Tile { showCaption: true }
+        delegate: Tile {
+            showCaption: true
+        }
         // Match games-grid layout (taller cover-art tiles); the systems
         // grid's 5x3 starves vertical space on these covers.
         columnsOverride: Sizing.gamesGridColumns
         rowsOverride: Sizing.gamesGridRows
         onLoadMoreRequested: Browse.RecentsModel.fetch_more()
         onCurrentIndexChanged: recents._persistFocus()
-        onItemHovered: (index) => recents._focusIndex(index)
-        onItemClicked: (index) => {
-            recents._focusIndex(index)
-            recents.handleAction("accept")
+        onItemHovered: index => recents._focusIndex(index)
+        onItemClicked: index => {
+            recents._focusIndex(index);
+            recents.handleAction("accept");
         }
-        onItemRightClicked: (index) => {
-            recents._focusIndex(index)
-            recents.handleAction("write_card")
+        onItemRightClicked: index => {
+            recents._focusIndex(index);
+            recents.handleAction("write_card");
         }
         onEmptyRightClicked: recents.handleAction("cancel")
-        onPageWheelRequested: (delta) => recents.handleAction(
-            delta > 0 ? "page_next" : "page_prev")
+        onPageWheelRequested: delta => recents.handleAction(delta > 0 ? "page_next" : "page_prev")
     }
 
     ActiveLabel {
@@ -261,9 +255,7 @@ Item {
         anchors.right: parent.right
         anchors.top: recentsGrid.bottom
         height: Sizing.pctH(7)
-        text: recentsGrid.itemCount > 0
-              ? Browse.RecentsModel.name_at(recentsGrid.currentIndex)
-              : ""
+        text: recentsGrid.itemCount > 0 ? Browse.RecentsModel.name_at(recentsGrid.currentIndex) : ""
     }
 
     ScreenStateOverlay {

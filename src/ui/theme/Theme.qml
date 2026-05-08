@@ -39,5 +39,4 @@ QtObject {
     // Fonts
     readonly property string fontUi: "Atkinson Hyperlegible"
     readonly property string fontMono: "monospace"
-
 }

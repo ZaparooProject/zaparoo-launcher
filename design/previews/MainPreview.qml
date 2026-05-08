@@ -9,7 +9,7 @@ MainLayout {
     height: 720
 
     Component.onCompleted: {
-        Sizing.screenWidth = width
-        Sizing.screenHeight = height
+        Sizing.screenWidth = width;
+        Sizing.screenHeight = height;
     }
 }

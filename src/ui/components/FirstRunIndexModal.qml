@@ -44,7 +44,7 @@ Item {
     // "completed" → finished, completionTimer ticking down to dismiss.
     property string phase: "idle"
 
-    signal closeRequested()
+    signal closeRequested
 
     visible: modal.open
     anchors.fill: parent
@@ -52,10 +52,10 @@ Item {
 
     onOpenChanged: {
         if (modal.open) {
-            modal.phase = Browse.MediaStatus.indexing ? "running" : "idle"
+            modal.phase = Browse.MediaStatus.indexing ? "running" : "idle";
         } else {
-            modal.phase = "idle"
-            completionTimer.stop()
+            modal.phase = "idle";
+            completionTimer.stop();
         }
     }
 
@@ -68,21 +68,21 @@ Item {
         target: Browse.MediaStatus
         function onIndexingChanged(): void {
             if (!modal.open)
-                return
+                return;
             if (Browse.MediaStatus.indexing) {
-                modal.phase = "running"
-                completionTimer.stop()
-                return
+                modal.phase = "running";
+                completionTimer.stop();
+                return;
             }
             if (modal.phase === "running") {
                 if (Browse.MediaStatus.total_files > 0) {
-                    modal.phase = "completed"
-                    completionTimer.restart()
+                    modal.phase = "completed";
+                    completionTimer.restart();
                 } else {
                     // Cancel landed before any files were counted, or
                     // Core never started. Drop back to idle so the user
                     // can retry.
-                    modal.phase = "idle"
+                    modal.phase = "idle";
                 }
             }
         }
@@ -96,10 +96,8 @@ Item {
     Connections {
         target: Browse.CategoriesModel
         function onCountChanged(): void {
-            if (modal.open
-                && Browse.CategoriesModel.count > 0
-                && modal.phase !== "completed") {
-                modal.closeRequested()
+            if (modal.open && Browse.CategoriesModel.count > 0 && modal.phase !== "completed") {
+                modal.closeRequested();
             }
         }
     }
@@ -107,12 +105,12 @@ Item {
     function handleAction(action: string): void {
         if (action === "accept") {
             if (modal.phase === "idle") {
-                Browse.MediaStatus.start_index()
-                modal.phase = "running"
+                Browse.MediaStatus.start_index();
+                modal.phase = "running";
             }
         } else if (action === "cancel") {
             if (modal.phase === "running")
-                Browse.MediaStatus.cancel_index()
+                Browse.MediaStatus.cancel_index();
         }
     }
 
@@ -179,11 +177,11 @@ Item {
 
                         Rectangle {
                             readonly property real _ratio: {
-                                const tot = Browse.MediaStatus.total_steps
+                                const tot = Browse.MediaStatus.total_steps;
                                 if (tot <= 0)
-                                    return 0
-                                const cur = Browse.MediaStatus.current_step
-                                return Math.max(0, Math.min(1, cur / tot))
+                                    return 0;
+                                const cur = Browse.MediaStatus.current_step;
+                                return Math.max(0, Math.min(1, cur / tot));
                             }
 
                             anchors.left: parent.left
@@ -201,16 +199,16 @@ Item {
                         anchors.top: progressTrack.bottom
                         anchors.topMargin: Sizing.pctH(2.4)
                         text: {
-                            const display = Browse.MediaStatus.current_step_display
-                            const cur = Browse.MediaStatus.current_step
-                            const tot = Browse.MediaStatus.total_steps
+                            const display = Browse.MediaStatus.current_step_display;
+                            const cur = Browse.MediaStatus.current_step;
+                            const tot = Browse.MediaStatus.total_steps;
                             if (Browse.MediaStatus.paused)
-                                return qsTr("Indexing paused")
+                                return qsTr("Indexing paused");
                             if (tot > 0 && display !== "")
-                                return qsTr("Step %1 of %2 - %3").arg(cur).arg(tot).arg(display)
+                                return qsTr("Step %1 of %2 - %3").arg(cur).arg(tot).arg(display);
                             if (tot > 0)
-                                return qsTr("Step %1 of %2").arg(cur).arg(tot)
-                            return qsTr("Preparing…")
+                                return qsTr("Step %1 of %2").arg(cur).arg(tot);
+                            return qsTr("Preparing…");
                         }
                         font.family: Theme.fontUi
                         font.pixelSize: Sizing.fontSize(2.3)
@@ -253,9 +251,7 @@ Item {
 
                     Text {
                         anchors.centerIn: parent
-                        text: modal.phase === "running"
-                              ? qsTr("Cancel")
-                              : qsTr("Start scan")
+                        text: modal.phase === "running" ? qsTr("Cancel") : qsTr("Start scan")
                         font.family: Theme.fontUi
                         font.pixelSize: Sizing.fontSize(2.5)
                         color: Theme.textPrimary
@@ -266,8 +262,7 @@ Item {
                         anchors.fill: parent
                         acceptedButtons: Qt.LeftButton
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: modal.handleAction(modal.phase === "running"
-                                                      ? "cancel" : "accept")
+                        onClicked: modal.handleAction(modal.phase === "running" ? "cancel" : "accept")
                     }
                 }
             }

@@ -21,18 +21,14 @@ QtObject {
     // Paged grid shape: chosen by screen height so the same grid reads
     // sensibly from MiSTer 240p through 1080p. Width × height of one
     // page in tiles; product is the page size used by `PagedGrid`.
-    readonly property int gridColumns: screenHeight < 300 ? 3
-                                       : screenHeight < 600 ? 4
-                                       : 5
+    readonly property int gridColumns: screenHeight < 300 ? 3 : screenHeight < 600 ? 4 : 5
     readonly property int gridRows: screenHeight < 300 ? 2 : 3
 
     // Games grid shape — taller per-tile cover art than systems logos
     // means a 5x3 layout starves vertical space, so games use 5x2 on
     // desktop. The 240p MiSTer branch keeps a 3x2 layout for parity
     // with the other rows on a small screen.
-    readonly property int gamesGridColumns: screenHeight < 300 ? 3
-                                            : screenHeight < 600 ? 4
-                                            : 5
+    readonly property int gamesGridColumns: screenHeight < 300 ? 3 : screenHeight < 600 ? 4 : 5
     readonly property int gamesGridRows: 2
 
     // Standard corner radius for rounded surfaces — tile cards, focus
@@ -55,15 +51,15 @@ QtObject {
     readonly property int headerBottom: headerTopMargin + headerHeight
 
     function pctH(percent: real): int {
-        return Math.round(screenHeight * percent / 100)
+        return Math.round(screenHeight * percent / 100);
     }
 
     function pctW(percent: real): int {
-        return Math.round(screenWidth * percent / 100)
+        return Math.round(screenWidth * percent / 100);
     }
 
     // Minimum 8px to remain legible on CRT 240p displays.
     function fontSize(percent: real): int {
-        return Math.max(8, pctH(percent))
+        return Math.max(8, pctH(percent));
     }
 }

@@ -35,13 +35,13 @@ Item {
     // owns the binding; the field treats it as a plain caption.
     property string actionStatus: ""
 
-    signal hovered()
-    signal clicked()
-    signal rightClicked()
+    signal hovered
+    signal clicked
+    signal rightClicked
     // Emitted when the action-control row receives an accept press.
     // The screen wires this to the matching invokable (start/cancel
     // index, start/cancel scrape) and gates by `actionStatus`.
-    signal accepted()
+    signal accepted
 
     // Item.enabled (built-in) gates the MouseArea below; the dimmed
     // opacity here gives a matching visual cue. Setting `enabled: false`
@@ -190,9 +190,9 @@ Item {
         // moves focus and toggles a value). Emitting both for action
         // rows used to make `onClicked` and `onAccepted` race over
         // the same press.
-        onClicked: (mouse) => {
+        onClicked: mouse => {
             if (mouse.button === Qt.RightButton) {
-                root.rightClicked()
+                root.rightClicked();
             } else if (root.control === "action") {
                 root.accepted();
             } else {

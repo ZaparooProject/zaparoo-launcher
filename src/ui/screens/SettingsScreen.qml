@@ -34,7 +34,7 @@ Item {
     // change adds a Settings-as-source path.
     property bool transitioning: false
 
-    signal requestHubScreen()
+    signal requestHubScreen
     // Forward signal carrying the focused action row's id. The router
     // decides what the payload means — currently only "uploadLog" is
     // wired, which opens the log-upload modal.
@@ -51,8 +51,11 @@ Item {
     // splitting commonly-used controls (General, Library) from rarer
     // diagnostics-flavoured ones (Advanced).
     readonly property var fields: {
-        const out = []
-        out.push({ kind: "header", label: qsTr("General") })
+        const out = [];
+        out.push({
+            kind: "header",
+            label: qsTr("General")
+        });
         // Resolution row hidden — `vmode` switching isn't reliable yet.
         // Restore by re-enabling this block once the MiSTer-side path is
         // trusted again; the picker plumbing in `_cycleResolution` and
@@ -69,50 +72,56 @@ Item {
             kind: "field",
             id: "language",
             label: qsTr("Language")
-        })
+        });
         out.push({
             kind: "field",
             id: "browseLayout",
             label: qsTr("Browsing layout")
-        })
+        });
         out.push({
             kind: "field",
             id: "buttonLayout",
             label: qsTr("Button style")
-        })
-        out.push({ kind: "header", label: qsTr("Library") })
+        });
+        out.push({
+            kind: "header",
+            label: qsTr("Library")
+        });
         out.push({
             kind: "field",
             id: "updateMediaDb",
             label: qsTr("Update media database")
-        })
+        });
         out.push({
             kind: "field",
             id: "runScraper",
             label: qsTr("Scrape metadata")
-        })
-        out.push({ kind: "header", label: qsTr("Advanced") })
+        });
+        out.push({
+            kind: "header",
+            label: qsTr("Advanced")
+        });
         out.push({
             kind: "field",
             id: "mouseEnabled",
             label: qsTr("Mouse support")
-        })
+        });
         out.push({
             kind: "field",
             id: "debugLogging",
             label: qsTr("Debug logging")
-        })
+        });
         out.push({
             kind: "field",
             id: "uploadLog",
             label: qsTr("Upload log file")
-        })
+        });
         out.push({
             kind: "field",
             id: "aboutLicense",
             label: qsTr("About / License")
-        })
-        return out
+        });
+        return out;
     }
 
     // Live-state caption helpers for the action rows. Empty string when
@@ -122,41 +131,40 @@ Item {
     // the same flow.
     function _indexActionStatus(): string {
         if (Browse.MediaStatus.optimizing)
-            return qsTr("Optimizing")
+            return qsTr("Optimizing");
         if (Browse.MediaStatus.indexing)
-            return Browse.MediaStatus.paused ? qsTr("Paused") : qsTr("In progress")
-        return ""
+            return Browse.MediaStatus.paused ? qsTr("Paused") : qsTr("In progress");
+        return "";
     }
 
     function _scrapeActionStatus(): string {
         if (Browse.MediaStatus.scraping)
-            return Browse.MediaStatus.scrape_paused ? qsTr("Paused") : qsTr("In progress")
-        return ""
+            return Browse.MediaStatus.scrape_paused ? qsTr("Paused") : qsTr("In progress");
+        return "";
     }
 
     // Index and scrape can't run concurrently — Core serialises them.
     // While one is in flight the *other* row is non-actionable so we
     // don't queue a request that Core will reject.
-    readonly property bool _indexBusy:
-        Browse.MediaStatus.indexing || Browse.MediaStatus.optimizing
+    readonly property bool _indexBusy: Browse.MediaStatus.indexing || Browse.MediaStatus.optimizing
     readonly property bool _scrapeBusy: Browse.MediaStatus.scraping
 
     function _triggerIndex(): void {
         if (settings._scrapeBusy)
-            return
+            return;
         if (settings._indexBusy)
-            Browse.MediaStatus.cancel_index()
+            Browse.MediaStatus.cancel_index();
         else
-            Browse.MediaStatus.start_index()
+            Browse.MediaStatus.start_index();
     }
 
     function _triggerScrape(): void {
         if (settings._indexBusy)
-            return
+            return;
         if (settings._scrapeBusy)
-            Browse.MediaStatus.cancel_scrape()
+            Browse.MediaStatus.cancel_scrape();
         else
-            Browse.MediaStatus.start_scrape()
+            Browse.MediaStatus.start_scrape();
     }
 
     readonly property int fieldCount: settings.fields.length
@@ -167,8 +175,8 @@ Item {
     // can't mis-light the help bar.
     function _isField(idx: int): bool {
         if (idx < 0 || idx >= settings.fieldCount)
-            return false
-        return settings.fields[idx].kind === "field"
+            return false;
+        return settings.fields[idx].kind === "field";
     }
 
     // First focusable row in the registry. Used to seed `currentIndex`
@@ -177,40 +185,37 @@ Item {
     function _firstNavigableIndex(): int {
         for (let i = 0; i < settings.fieldCount; i++)
             if (settings.fields[i].kind === "field")
-                return i
-        return -1
+                return i;
+        return -1;
     }
 
     // Walk from `from` in `direction` (±1) until we hit a focusable
     // row or run off the registry. Headers are transparent — Up/Down
     // skip across them so the user feels a single flat list.
     function _seekNavigable(from: int, direction: int): int {
-        let i = from + direction
+        let i = from + direction;
         while (i >= 0 && i < settings.fieldCount) {
             if (settings.fields[i].kind === "field")
-                return i
-            i += direction
+                return i;
+            i += direction;
         }
-        return from
+        return from;
     }
 
     readonly property bool focusedFieldIsToggle: {
         if (!settings._isField(settings.currentIndex))
-            return false
-        const id = settings.fields[settings.currentIndex].id
-        return id === "mouseEnabled" || id === "debugLogging"
+            return false;
+        const id = settings.fields[settings.currentIndex].id;
+        return id === "mouseEnabled" || id === "debugLogging";
     }
     // True when the focused field is an action button (updateMediaDb,
     // runScraper, uploadLog, aboutLicense). Drives the help-bar Accept
     // hint and the SettingsField chevron.
     readonly property bool focusedFieldIsAction: {
         if (!settings._isField(settings.currentIndex))
-            return false
-        const id = settings.fields[settings.currentIndex].id
-        return id === "updateMediaDb"
-               || id === "runScraper"
-               || id === "uploadLog"
-               || id === "aboutLicense"
+            return false;
+        const id = settings.fields[settings.currentIndex].id;
+        return id === "updateMediaDb" || id === "runScraper" || id === "uploadLog" || id === "aboutLicense";
     }
     // Verb shown on the help-bar Accept hint for the focused action
     // row. Index/scrape flip between Start and Cancel because the press
@@ -219,28 +224,28 @@ Item {
     // the press navigates rather than starts a job.
     readonly property string focusedActionLabel: {
         if (!settings._isField(settings.currentIndex))
-            return ""
-        const id = settings.fields[settings.currentIndex].id
+            return "";
+        const id = settings.fields[settings.currentIndex].id;
         if (id === "updateMediaDb" || id === "runScraper")
-            return settings.focusedActionBusy ? qsTr("Cancel") : qsTr("Start")
+            return settings.focusedActionBusy ? qsTr("Cancel") : qsTr("Start");
         if (id === "uploadLog")
-            return qsTr("Start")
+            return qsTr("Start");
         if (id === "aboutLicense")
-            return qsTr("Open")
-        return ""
+            return qsTr("Open");
+        return "";
     }
     // True when the focused action's matching operation is currently
     // running, so the help bar can label Accept as "Cancel" rather
     // than "Start".
     readonly property bool focusedActionBusy: {
         if (!settings._isField(settings.currentIndex))
-            return false
-        const id = settings.fields[settings.currentIndex].id
+            return false;
+        const id = settings.fields[settings.currentIndex].id;
         if (id === "updateMediaDb")
-            return settings._indexBusy
+            return settings._indexBusy;
         if (id === "runScraper")
-            return settings._scrapeBusy
-        return false
+            return settings._scrapeBusy;
+        return false;
     }
     // True when the focused action can't run right now because the
     // *other* media operation has the bus. Drives the dimmed-row
@@ -248,13 +253,13 @@ Item {
     // promising a press that will silently no-op.
     readonly property bool focusedActionDisabled: {
         if (!settings._isField(settings.currentIndex))
-            return false
-        const id = settings.fields[settings.currentIndex].id
+            return false;
+        const id = settings.fields[settings.currentIndex].id;
         if (id === "updateMediaDb")
-            return settings._scrapeBusy
+            return settings._scrapeBusy;
         if (id === "runScraper")
-            return settings._indexBusy
-        return false
+            return settings._indexBusy;
+        return false;
     }
 
     // Initial focus: first navigable row. The binding evaluates once
@@ -264,13 +269,13 @@ Item {
     // to 0 covers the all-headers degenerate case; helpers below
     // early-return on `_isField(0) === false` if it ever lands there.
     property int currentIndex: {
-        const idx = settings._firstNavigableIndex()
-        return idx >= 0 ? idx : 0
+        const idx = settings._firstNavigableIndex();
+        return idx >= 0 ? idx : 0;
     }
 
     function _resolutionList(): list<string> {
-        const raw = Browse.Settings.available_resolutions
-        return raw === undefined || raw === null ? [] : raw
+        const raw = Browse.Settings.available_resolutions;
+        return raw === undefined || raw === null ? [] : raw;
     }
 
     function _resolutionDisplay(value: string): string {
@@ -278,197 +283,195 @@ Item {
         // which the Settings model treats as the platform default. Render
         // it as a translated label rather than an empty cell so the user
         // sees something selectable.
-        return value === "" ? qsTr("Default") : value
+        return value === "" ? qsTr("Default") : value;
     }
 
     function _currentResolutionIndex(): int {
-        const list = settings._resolutionList()
-        const cur = Browse.Settings.current_resolution
+        const list = settings._resolutionList();
+        const cur = Browse.Settings.current_resolution;
         for (let i = 0; i < list.length; i++)
             if (list[i] === cur)
-                return i
-        return -1
+                return i;
+        return -1;
     }
 
     function _cycleResolution(direction: int): void {
-        const list = settings._resolutionList()
+        const list = settings._resolutionList();
         if (list.length === 0)
-            return
-        let idx = settings._currentResolutionIndex()
+            return;
+        let idx = settings._currentResolutionIndex();
         if (idx < 0) {
             // Current value is off the curated list (custom value
             // persisted from a previous build, or the empty "Default"
             // sentinel). Snap to the first or last list entry depending
             // on direction so the user sees an immediate change.
-            idx = direction > 0 ? -1 : 0
+            idx = direction > 0 ? -1 : 0;
         }
-        const next = ((idx + direction) % list.length + list.length) % list.length
-        Browse.Settings.set_resolution(list[next])
+        const next = ((idx + direction) % list.length + list.length) % list.length;
+        Browse.Settings.set_resolution(list[next]);
     }
 
     function _buttonLayoutList(): list<string> {
-        const raw = Browse.Settings.available_button_layouts
-        return raw === undefined || raw === null ? [] : raw
+        const raw = Browse.Settings.available_button_layouts;
+        return raw === undefined || raw === null ? [] : raw;
     }
 
     function _browseLayoutList(): list<string> {
-        const raw = Browse.Settings.available_browse_layouts
-        return raw === undefined || raw === null ? [] : raw
+        const raw = Browse.Settings.available_browse_layouts;
+        return raw === undefined || raw === null ? [] : raw;
     }
 
     function _languageList(): list<string> {
-        const raw = Browse.Settings.available_languages
-        return raw === undefined || raw === null ? [] : raw
+        const raw = Browse.Settings.available_languages;
+        return raw === undefined || raw === null ? [] : raw;
     }
 
     function _languageDisplay(value: string): string {
         if (value === "en")
-            return qsTr("English")
+            return qsTr("English");
         if (value === "it_IT")
-            return qsTr("Italian")
-        return qsTr("Auto")
+            return qsTr("Italian");
+        return qsTr("Auto");
     }
 
     function _currentLanguageIndex(): int {
-        const list = settings._languageList()
-        const cur = Browse.Settings.current_language
+        const list = settings._languageList();
+        const cur = Browse.Settings.current_language;
         for (let i = 0; i < list.length; i++)
             if (list[i] === cur)
-                return i
-        return -1
+                return i;
+        return -1;
     }
 
     function _cycleLanguage(direction: int): void {
-        const list = settings._languageList()
+        const list = settings._languageList();
         if (list.length === 0)
-            return
-        let idx = settings._currentLanguageIndex()
+            return;
+        let idx = settings._currentLanguageIndex();
         if (idx < 0)
-            idx = direction > 0 ? -1 : 0
-        const next = ((idx + direction) % list.length + list.length) % list.length
-        Browse.Settings.set_language(list[next])
+            idx = direction > 0 ? -1 : 0;
+        const next = ((idx + direction) % list.length + list.length) % list.length;
+        Browse.Settings.set_language(list[next]);
     }
 
     function _browseLayoutDisplay(value: string): string {
         if (value === "list")
-            return qsTr("Detailed list view")
-        return qsTr("Grid view")
+            return qsTr("Detailed list view");
+        return qsTr("Grid view");
     }
 
     function _currentBrowseLayoutIndex(): int {
-        const list = settings._browseLayoutList()
-        const cur = Browse.Settings.current_browse_layout
+        const list = settings._browseLayoutList();
+        const cur = Browse.Settings.current_browse_layout;
         for (let i = 0; i < list.length; i++)
             if (list[i] === cur)
-                return i
-        return -1
+                return i;
+        return -1;
     }
 
     function _cycleBrowseLayout(direction: int): void {
-        const list = settings._browseLayoutList()
+        const list = settings._browseLayoutList();
         if (list.length === 0)
-            return
-        let idx = settings._currentBrowseLayoutIndex()
+            return;
+        let idx = settings._currentBrowseLayoutIndex();
         if (idx < 0)
-            idx = direction > 0 ? -1 : 0
-        const next = ((idx + direction) % list.length + list.length) % list.length
-        Browse.Settings.set_browse_layout(list[next])
+            idx = direction > 0 ? -1 : 0;
+        const next = ((idx + direction) % list.length + list.length) % list.length;
+        Browse.Settings.set_browse_layout(list[next]);
     }
 
     function _buttonLayoutDisplay(value: string): string {
         if (value === "b")
-            return qsTr("Style B")
+            return qsTr("Style B");
         if (value === "c")
-            return qsTr("Style C")
+            return qsTr("Style C");
         if (value === "d")
-            return qsTr("Style D")
-        return qsTr("Style A")
+            return qsTr("Style D");
+        return qsTr("Style A");
     }
 
     function _currentButtonLayoutIndex(): int {
-        const list = settings._buttonLayoutList()
-        const cur = Browse.Settings.current_button_layout
+        const list = settings._buttonLayoutList();
+        const cur = Browse.Settings.current_button_layout;
         for (let i = 0; i < list.length; i++)
             if (list[i] === cur)
-                return i
-        return -1
+                return i;
+        return -1;
     }
 
     function _cycleButtonLayout(direction: int): void {
-        const list = settings._buttonLayoutList()
+        const list = settings._buttonLayoutList();
         if (list.length === 0)
-            return
-        let idx = settings._currentButtonLayoutIndex()
+            return;
+        let idx = settings._currentButtonLayoutIndex();
         if (idx < 0)
-            idx = direction > 0 ? -1 : 0
-        const next = ((idx + direction) % list.length + list.length) % list.length
-        Browse.Settings.set_button_layout(list[next])
+            idx = direction > 0 ? -1 : 0;
+        const next = ((idx + direction) % list.length + list.length) % list.length;
+        Browse.Settings.set_button_layout(list[next]);
     }
 
     function _setMouseEnabled(direction: int): void {
-        Browse.Settings.set_mouse_enabled(direction > 0)
+        Browse.Settings.set_mouse_enabled(direction > 0);
     }
 
     function _toggleMouseEnabled(): void {
-        Browse.Settings.set_mouse_enabled(!Browse.Settings.current_mouse_enabled)
+        Browse.Settings.set_mouse_enabled(!Browse.Settings.current_mouse_enabled);
     }
 
     function _setDebugLogging(direction: int): void {
-        Browse.Settings.set_debug_logging(direction > 0)
+        Browse.Settings.set_debug_logging(direction > 0);
     }
 
     function _toggleDebugLogging(): void {
-        Browse.Settings.set_debug_logging(!Browse.Settings.current_debug_logging)
+        Browse.Settings.set_debug_logging(!Browse.Settings.current_debug_logging);
     }
 
     function _cycleFocused(direction: int): void {
         if (!settings._isField(settings.currentIndex))
-            return
-        const id = settings.fields[settings.currentIndex].id
+            return;
+        const id = settings.fields[settings.currentIndex].id;
         if (id === "resolution")
-            settings._cycleResolution(direction)
+            settings._cycleResolution(direction);
         else if (id === "language")
-            settings._cycleLanguage(direction)
+            settings._cycleLanguage(direction);
         else if (id === "browseLayout")
-            settings._cycleBrowseLayout(direction)
+            settings._cycleBrowseLayout(direction);
         else if (id === "buttonLayout")
-            settings._cycleButtonLayout(direction)
+            settings._cycleButtonLayout(direction);
         else if (id === "mouseEnabled")
-            settings._setMouseEnabled(direction)
+            settings._setMouseEnabled(direction);
         else if (id === "debugLogging")
-            settings._setDebugLogging(direction)
-        // Action fields ignore left/right — they only respond to accept.
+            settings._setDebugLogging(direction);
+    // Action fields ignore left/right — they only respond to accept.
     }
 
     function handleAction(action: string): void {
         if (action === "up") {
-            settings.currentIndex =
-                settings._seekNavigable(settings.currentIndex, -1)
+            settings.currentIndex = settings._seekNavigable(settings.currentIndex, -1);
         } else if (action === "down") {
-            settings.currentIndex =
-                settings._seekNavigable(settings.currentIndex, 1)
+            settings.currentIndex = settings._seekNavigable(settings.currentIndex, 1);
         } else if (action === "left") {
-            settings._cycleFocused(-1)
+            settings._cycleFocused(-1);
         } else if (action === "right") {
-            settings._cycleFocused(1)
+            settings._cycleFocused(1);
         } else if (action === "accept") {
             if (!settings._isField(settings.currentIndex))
-                return
-            const id = settings.fields[settings.currentIndex].id
+                return;
+            const id = settings.fields[settings.currentIndex].id;
             if (id === "mouseEnabled")
-                settings._toggleMouseEnabled()
+                settings._toggleMouseEnabled();
             else if (id === "debugLogging")
-                settings._toggleDebugLogging()
+                settings._toggleDebugLogging();
             else if (id === "updateMediaDb")
-                settings._triggerIndex()
+                settings._triggerIndex();
             else if (id === "runScraper")
-                settings._triggerScrape()
+                settings._triggerScrape();
             else if (id === "uploadLog")
-                settings.requestAccept("uploadLog")
+                settings.requestAccept("uploadLog");
             else if (id === "aboutLicense")
-                settings.requestAccept("aboutLicense")
+                settings.requestAccept("aboutLicense");
         } else if (action === "cancel") {
-            settings.requestHubScreen()
+            settings.requestHubScreen();
         }
     }
 
@@ -500,16 +503,16 @@ Item {
     // budget can't pay for a moving column behind a focus border.
     function _scrollFocusedIntoView(): void {
         if (!settings._isField(settings.currentIndex))
-            return
-        const row = rowRepeater.itemAt(settings.currentIndex)
+            return;
+        const row = rowRepeater.itemAt(settings.currentIndex);
         if (row === null)
-            return
-        const top = row.y
-        const bottom = top + row.height
+            return;
+        const top = row.y;
+        const bottom = top + row.height;
         if (top < flickable.contentY)
-            flickable.contentY = top
+            flickable.contentY = top;
         else if (bottom > flickable.contentY + flickable.height)
-            flickable.contentY = bottom - flickable.height
+            flickable.contentY = bottom - flickable.height;
     }
 
     onCurrentIndexChanged: settings._scrollFocusedIntoView()
@@ -556,13 +559,10 @@ Item {
                     required property int index
                     required property var modelData
 
-                    readonly property bool isHeader:
-                        modelData.kind === "header"
+                    readonly property bool isHeader: modelData.kind === "header"
 
                     width: form.width
-                    implicitHeight: row.isHeader
-                                    ? header.implicitHeight
-                                    : field.implicitHeight
+                    implicitHeight: row.isHeader ? header.implicitHeight : field.implicitHeight
 
                     SettingsSectionHeader {
                         id: header
@@ -583,71 +583,24 @@ Item {
                         // dims and its MouseArea stops responding.
                         // Keyboard Accept is separately gated in
                         // `_triggerIndex`/`_triggerScrape`.
-                        enabled: row.modelData.id === "updateMediaDb"
-                                 ? !settings._scrapeBusy
-                                 : row.modelData.id === "runScraper"
-                                 ? !settings._indexBusy
-                                 : true
+                        enabled: row.modelData.id === "updateMediaDb" ? !settings._scrapeBusy : row.modelData.id === "runScraper" ? !settings._indexBusy : true
                         label: row.modelData.label
-                        value: row.modelData.id === "resolution"
-                               ? settings._resolutionDisplay(Browse.Settings.current_resolution)
-                               : row.modelData.id === "language"
-                               ? settings._languageDisplay(Browse.Settings.current_language)
-                               : row.modelData.id === "browseLayout"
-                               ? settings._browseLayoutDisplay(Browse.Settings.current_browse_layout)
-                               : row.modelData.id === "buttonLayout"
-                               ? settings._buttonLayoutDisplay(Browse.Settings.current_button_layout)
-                               : ""
-                        control: row.modelData.id === "mouseEnabled"
-                                 || row.modelData.id === "debugLogging"
-                                 ? "toggle"
-                                 : (row.modelData.id === "updateMediaDb"
-                                    || row.modelData.id === "runScraper"
-                                    || row.modelData.id === "uploadLog"
-                                    || row.modelData.id === "aboutLicense") ? "action"
-                                 : "value"
-                        checked: row.modelData.id === "debugLogging"
-                                 ? Browse.Settings.current_debug_logging
-                                 : Browse.Settings.current_mouse_enabled
-                        actionStatus: row.modelData.id === "updateMediaDb"
-                                      ? settings._indexActionStatus()
-                                      : row.modelData.id === "runScraper"
-                                      ? settings._scrapeActionStatus()
-                                      : ""
+                        value: row.modelData.id === "resolution" ? settings._resolutionDisplay(Browse.Settings.current_resolution) : row.modelData.id === "language" ? settings._languageDisplay(Browse.Settings.current_language) : row.modelData.id === "browseLayout" ? settings._browseLayoutDisplay(Browse.Settings.current_browse_layout) : row.modelData.id === "buttonLayout" ? settings._buttonLayoutDisplay(Browse.Settings.current_button_layout) : ""
+                        control: row.modelData.id === "mouseEnabled" || row.modelData.id === "debugLogging" ? "toggle" : (row.modelData.id === "updateMediaDb" || row.modelData.id === "runScraper" || row.modelData.id === "uploadLog" || row.modelData.id === "aboutLicense") ? "action" : "value"
+                        checked: row.modelData.id === "debugLogging" ? Browse.Settings.current_debug_logging : Browse.Settings.current_mouse_enabled
+                        actionStatus: row.modelData.id === "updateMediaDb" ? settings._indexActionStatus() : row.modelData.id === "runScraper" ? settings._scrapeActionStatus() : ""
                         // Pickers wrap modulo, so both arrows apply
                         // when the focused field has a populated
                         // option list.
-                        canCyclePrev: (row.modelData.id === "resolution"
-                                       && settings._resolutionList().length > 0)
-                                      || (row.modelData.id === "language"
-                                          && settings._languageList().length > 1)
-                                      || (row.modelData.id === "browseLayout"
-                                          && settings._browseLayoutList().length > 1)
-                                      || (row.modelData.id === "buttonLayout"
-                                          && settings._buttonLayoutList().length > 1)
-                                      || (row.modelData.id === "mouseEnabled"
-                                          && Browse.Settings.current_mouse_enabled)
-                                      || (row.modelData.id === "debugLogging"
-                                          && Browse.Settings.current_debug_logging)
-                        canCycleNext: (row.modelData.id === "resolution"
-                                       && settings._resolutionList().length > 0)
-                                      || (row.modelData.id === "language"
-                                          && settings._languageList().length > 1)
-                                      || (row.modelData.id === "browseLayout"
-                                          && settings._browseLayoutList().length > 1)
-                                      || (row.modelData.id === "buttonLayout"
-                                          && settings._buttonLayoutList().length > 1)
-                                      || (row.modelData.id === "mouseEnabled"
-                                          && !Browse.Settings.current_mouse_enabled)
-                                      || (row.modelData.id === "debugLogging"
-                                          && !Browse.Settings.current_debug_logging)
+                        canCyclePrev: (row.modelData.id === "resolution" && settings._resolutionList().length > 0) || (row.modelData.id === "language" && settings._languageList().length > 1) || (row.modelData.id === "browseLayout" && settings._browseLayoutList().length > 1) || (row.modelData.id === "buttonLayout" && settings._buttonLayoutList().length > 1) || (row.modelData.id === "mouseEnabled" && Browse.Settings.current_mouse_enabled) || (row.modelData.id === "debugLogging" && Browse.Settings.current_debug_logging)
+                        canCycleNext: (row.modelData.id === "resolution" && settings._resolutionList().length > 0) || (row.modelData.id === "language" && settings._languageList().length > 1) || (row.modelData.id === "browseLayout" && settings._browseLayoutList().length > 1) || (row.modelData.id === "buttonLayout" && settings._buttonLayoutList().length > 1) || (row.modelData.id === "mouseEnabled" && !Browse.Settings.current_mouse_enabled) || (row.modelData.id === "debugLogging" && !Browse.Settings.current_debug_logging)
                         onHovered: settings.currentIndex = row.index
                         onClicked: {
-                            settings.currentIndex = row.index
+                            settings.currentIndex = row.index;
                             if (row.modelData.id === "mouseEnabled")
-                                settings._toggleMouseEnabled()
+                                settings._toggleMouseEnabled();
                             else if (row.modelData.id === "debugLogging")
-                                settings._toggleDebugLogging()
+                                settings._toggleDebugLogging();
                         }
                         onRightClicked: settings.requestHubScreen()
                         // Action rows route through `onAccepted` only
@@ -656,15 +609,15 @@ Item {
                         // an action row moves focus before firing the
                         // action.
                         onAccepted: {
-                            settings.currentIndex = row.index
+                            settings.currentIndex = row.index;
                             if (row.modelData.id === "updateMediaDb")
-                                settings._triggerIndex()
+                                settings._triggerIndex();
                             else if (row.modelData.id === "runScraper")
-                                settings._triggerScrape()
+                                settings._triggerScrape();
                             else if (row.modelData.id === "uploadLog")
-                                settings.requestAccept("uploadLog")
+                                settings.requestAccept("uploadLog");
                             else if (row.modelData.id === "aboutLicense")
-                                settings.requestAccept("aboutLicense")
+                                settings.requestAccept("aboutLicense");
                         }
                     }
                 }

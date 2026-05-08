@@ -32,10 +32,7 @@ Item {
     // built-in slot wired to `states:` / `transitions:`, and shadowing
     // it would silently break any future maintainer who adds state
     // animations to the overlay or a subclass.
-    readonly property string viewState:
-        overlay.loading ? "loading"
-        : (overlay.errorMessage !== "" ? "error"
-        : (overlay.count === 0 ? "empty" : "ready"))
+    readonly property string viewState: overlay.loading ? "loading" : (overlay.errorMessage !== "" ? "error" : (overlay.count === 0 ? "empty" : "ready"))
 
     visible: overlay.viewState !== "ready"
 
@@ -58,9 +55,11 @@ Item {
             anchors.horizontalCenter: parent.horizontalCenter
             visible: overlay.viewState === "error" || overlay.viewState === "empty"
             text: {
-                if (overlay.viewState === "error") return qsTr("Failed to load")
-                if (overlay.viewState === "empty") return overlay.emptyText
-                return ""
+                if (overlay.viewState === "error")
+                    return qsTr("Failed to load");
+                if (overlay.viewState === "empty")
+                    return overlay.emptyText;
+                return "";
             }
             font.family: Theme.fontUi
             font.pixelSize: Sizing.fontSize(3)

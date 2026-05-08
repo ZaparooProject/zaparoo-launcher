@@ -74,9 +74,7 @@ Item {
         width: status._slotWidth - status._slotMargin
         elide: Text.ElideRight
         horizontalAlignment: Text.AlignRight
-        text: qsTr("Page %1 / %2")
-                .arg(status.currentPage + 1)
-                .arg(status.totalPages)
+        text: qsTr("Page %1 / %2").arg(status.currentPage + 1).arg(status.totalPages)
         font.family: Theme.fontUi
         font.pixelSize: Sizing.fontSize(3)
         color: Theme.textPrimary

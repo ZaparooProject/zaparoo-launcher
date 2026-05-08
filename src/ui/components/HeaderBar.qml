@@ -108,8 +108,7 @@ Item {
                 running: true
                 repeat: true
                 triggeredOnStart: true
-                onTriggered: clockLabel.currentTime =
-                    Qt.formatDateTime(new Date(), "HH:mm")
+                onTriggered: clockLabel.currentTime = Qt.formatDateTime(new Date(), "HH:mm")
             }
         }
     }

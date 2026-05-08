@@ -45,13 +45,19 @@ Item {
         const link = Browse.AppStatus.link_state ?? pill._linkDisconnected;
         const conn = Browse.AppStatus.connection_state ?? pill._linkDisconnected;
         // Priority 1 — Core link state.
-        if (link === pill._linkUnreachable) return qsTr("Disconnected");
-        if (link === pill._linkReconnecting) return qsTr("Reconnecting…");
-        if (link === pill._linkDisconnected) return qsTr("Disconnected");
-        if (link === pill._linkConnecting) return qsTr("Connecting…");
-        if (conn === pill._connError) return qsTr("Core error");
+        if (link === pill._linkUnreachable)
+            return qsTr("Disconnected");
+        if (link === pill._linkReconnecting)
+            return qsTr("Reconnecting…");
+        if (link === pill._linkDisconnected)
+            return qsTr("Disconnected");
+        if (link === pill._linkConnecting)
+            return qsTr("Connecting…");
+        if (conn === pill._connError)
+            return qsTr("Core error");
         // Priority 2 — media database.
-        if (Browse.MediaStatus.optimizing) return qsTr("Optimizing database");
+        if (Browse.MediaStatus.optimizing)
+            return qsTr("Optimizing database");
         if (Browse.MediaStatus.indexing) {
             const cur = Browse.MediaStatus.current_step;
             const tot = Browse.MediaStatus.total_steps;
@@ -82,9 +88,7 @@ Item {
 
     // Border colour leans on the same convention as the old connection
     // strip: warmer accent for error-class link states, muted otherwise.
-    readonly property bool _isError:
-        Browse.AppStatus.link_state === pill._linkUnreachable
-        || Browse.AppStatus.connection_state === pill._connError
+    readonly property bool _isError: Browse.AppStatus.link_state === pill._linkUnreachable || Browse.AppStatus.connection_state === pill._connError
 
     visible: pill._label !== ""
     height: pill.visible ? Sizing.fontSize(3.4) : 0

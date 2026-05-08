@@ -63,10 +63,10 @@ Item {
     property int _crossSavedIndex: -1
 
     signal requestAccept(category: string)
-    signal requestQuit()
-    signal requestFavoritesScreen()
-    signal requestRecentsScreen()
-    signal requestSettingsScreen()
+    signal requestQuit
+    signal requestFavoritesScreen
+    signal requestRecentsScreen
+    signal requestSettingsScreen
 
     // Vertically center the (categories row + actions row + activeLabel)
     // block in the band between the HeaderBar bottom (Sizing.headerBottom)
@@ -75,16 +75,8 @@ Item {
     // `cellHeight + 2*verticalPadding`, the gap between them collapses
     // the focus-bleed padding (see `actionsRow.anchors.topMargin`),
     // and the label sits pctH(3) below the actions row at pctH(7) tall.
-    readonly property int _blockHeight:
-        2 * (categoriesRow.cellHeight + 2 * categoriesRow.verticalPadding)
-        + (categoriesRow.spacing
-           - categoriesRow.verticalPadding
-           - actionsRow.verticalPadding)
-        + Sizing.pctH(3)
-        + Sizing.pctH(7)
-    readonly property int _blockY:
-        Math.round((Sizing.headerBottom + hub.height - Sizing.pctH(6)
-                    - hub._blockHeight) / 2)
+    readonly property int _blockHeight: 2 * (categoriesRow.cellHeight + 2 * categoriesRow.verticalPadding) + (categoriesRow.spacing - categoriesRow.verticalPadding - actionsRow.verticalPadding) + Sizing.pctH(3) + Sizing.pctH(7)
+    readonly property int _blockY: Math.round((Sizing.headerBottom + hub.height - Sizing.pctH(6) - hub._blockHeight) / 2)
 
     // Static action-row data. Three fixed entries; order matches
     // left-to-right reading. The `qsTr()` calls live directly in this
@@ -93,25 +85,37 @@ Item {
     // bound to `actionEntries[i].text` pick up the new values
     // automatically.
     readonly property var actionEntries: [
-        { id: "favorites", coverKey: "icons/HeartOutline", text: qsTr("Favorites") },
-        { id: "recents",  coverKey: "icons/History",  text: qsTr("Recently Played") },
-        { id: "settings", coverKey: "icons/Settings", text: qsTr("Settings") }
+        {
+            id: "favorites",
+            coverKey: "icons/HeartOutline",
+            text: qsTr("Favorites")
+        },
+        {
+            id: "recents",
+            coverKey: "icons/History",
+            text: qsTr("Recently Played")
+        },
+        {
+            id: "settings",
+            coverKey: "icons/Settings",
+            text: qsTr("Settings")
+        }
     ]
 
     function _actionIndexForId(id: string): int {
         for (let i = 0; i < hub.actionEntries.length; i++)
             if (hub.actionEntries[i].id === id)
-                return i
-        return 0
+                return i;
+        return 0;
     }
 
     // Test-harness hook so `tst_navigation.qml` can reset both focus
     // axes between cases without poking individual properties through
     // MainLayout's alias.
     function resetFocus(): void {
-        hub.currentRow = 0
-        hub.currentIndex = 0
-        hub._crossSavedIndex = -1
+        hub.currentRow = 0;
+        hub.currentIndex = 0;
+        hub._crossSavedIndex = -1;
     }
 
     // Restore the hub from the persisted `Browse.HubState`. Always
@@ -128,14 +132,10 @@ Item {
     // category — otherwise the visible focus drifts off whichever
     // screen the user is on.
     function restoreFromCategoriesReset(): void {
-        const savedCategory = Browse.HubState.category
-        const idx = savedCategory === ""
-                    ? -1
-                    : Browse.CategoriesModel.index_for_category(savedCategory)
-        const chosenCategoryIndex = idx >= 0 ? idx : 0
-        const chosenCategory = idx >= 0
-                               ? savedCategory
-                               : Browse.CategoriesModel.category_at(chosenCategoryIndex)
+        const savedCategory = Browse.HubState.category;
+        const idx = savedCategory === "" ? -1 : Browse.CategoriesModel.index_for_category(savedCategory);
+        const chosenCategoryIndex = idx >= 0 ? idx : 0;
+        const chosenCategory = idx >= 0 ? savedCategory : Browse.CategoriesModel.category_at(chosenCategoryIndex);
 
         // Restore which row the user was on, then point currentIndex
         // at the right slot for that row. Saved row outside [0, 1] is
@@ -144,27 +144,26 @@ Item {
         // top row has no tiles to focus, so we drop focus onto
         // Settings — the only meaningful action ("Run Update media
         // database from Settings") the empty-hub message points at.
-        const savedRow = Browse.HubState.selected_row
+        const savedRow = Browse.HubState.selected_row;
         if (savedRow === 1) {
-            hub.currentRow = 1
-            hub.currentIndex = hub._actionIndexForId(Browse.HubState.selected_action)
+            hub.currentRow = 1;
+            hub.currentIndex = hub._actionIndexForId(Browse.HubState.selected_action);
         } else if (Browse.CategoriesModel.count === 0) {
-            hub.currentRow = 1
-            hub.currentIndex = hub._actionIndexForId("settings")
+            hub.currentRow = 1;
+            hub.currentIndex = hub._actionIndexForId("settings");
         } else {
-            hub.currentRow = 0
-            hub.currentIndex = chosenCategoryIndex
+            hub.currentRow = 0;
+            hub.currentIndex = chosenCategoryIndex;
         }
         // A reseat from disk or from a category-list refresh makes any
         // armed round-trip context meaningless (the user might be on a
         // different row entirely now, and the saved source-index could
         // point past the new category list).
-        hub._crossSavedIndex = -1
+        hub._crossSavedIndex = -1;
 
-        if (Browse.SystemsModel.current_category === chosenCategory
-            && Browse.SystemsModel.count > 0)
-            return
-        Browse.SystemsModel.set_category(chosenCategory)
+        if (Browse.SystemsModel.current_category === chosenCategory && Browse.SystemsModel.count > 0)
+            return;
+        Browse.SystemsModel.set_category(chosenCategory);
     }
 
     // Returns true if the focus actually moved. Empty rows leave disk
@@ -172,20 +171,18 @@ Item {
     // against. Both rows wrap modulo their count so a single Left/Right
     // press at either end whips around to the far side.
     function _navigate(delta: int): bool {
-        const count = hub.currentRow === 0
-            ? Browse.CategoriesModel.count
-            : hub.actionEntries.length
+        const count = hub.currentRow === 0 ? Browse.CategoriesModel.count : hub.actionEntries.length;
         if (count <= 0)
-            return false
-        const next = ((hub.currentIndex + delta) % count + count) % count
+            return false;
+        const next = ((hub.currentIndex + delta) % count + count) % count;
         if (next === hub.currentIndex)
-            return false
-        hub.currentIndex = next
+            return false;
+        hub.currentIndex = next;
         // Horizontal motion on the destination row invalidates the
         // round-trip context — the user's intent is now to navigate
         // within this row, not bounce back to where they came from.
-        hub._crossSavedIndex = -1
-        return true
+        hub._crossSavedIndex = -1;
+        return true;
     }
 
     // Pure arithmetic — no model access. Maps an index in a row of
@@ -197,10 +194,10 @@ Item {
     // can be unit-tested without populating CategoriesModel.
     function _mapCrossRow(sourceIdx: int, sourceCount: int, destCount: int): int {
         if (destCount <= 0)
-            return 0
-        const offset = (sourceCount - destCount) / 2
-        const target = Math.round(sourceIdx - offset)
-        return Math.max(0, Math.min(destCount - 1, target))
+            return 0;
+        const offset = (sourceCount - destCount) / 2;
+        const target = Math.round(sourceIdx - offset);
+        return Math.max(0, Math.min(destCount - 1, target));
     }
 
     // Cross-row jump. Up and Down both flip to the *other* row — the
@@ -224,27 +221,24 @@ Item {
     // Returns false only when the destination row is empty (no
     // categories loaded yet, etc.).
     function _crossRow(): bool {
-        const topCount = Browse.CategoriesModel.count
-        const bottomCount = hub.actionEntries.length
-        const sourceCount = hub.currentRow === 0 ? topCount : bottomCount
-        const destCount = hub.currentRow === 0 ? bottomCount : topCount
+        const topCount = Browse.CategoriesModel.count;
+        const bottomCount = hub.actionEntries.length;
+        const sourceCount = hub.currentRow === 0 ? topCount : bottomCount;
+        const destCount = hub.currentRow === 0 ? bottomCount : topCount;
         if (destCount <= 0)
-            return false
+            return false;
 
-        const sourceIdx = hub.currentIndex
-        const restored = hub._crossSavedIndex >= 0
-                         && hub._crossSavedIndex < destCount
-        const destIdx = restored
-                        ? hub._crossSavedIndex
-                        : hub._mapCrossRow(sourceIdx, sourceCount, destCount)
+        const sourceIdx = hub.currentIndex;
+        const restored = hub._crossSavedIndex >= 0 && hub._crossSavedIndex < destCount;
+        const destIdx = restored ? hub._crossSavedIndex : hub._mapCrossRow(sourceIdx, sourceCount, destCount);
 
         // Save the source-row index BEFORE flipping so the next cross
         // can return here. Reading `currentIndex` after the flip would
         // capture the destination index instead.
-        hub._crossSavedIndex = sourceIdx
-        hub.currentRow = 1 - hub.currentRow
-        hub.currentIndex = destIdx
-        return true
+        hub._crossSavedIndex = sourceIdx;
+        hub.currentRow = 1 - hub.currentRow;
+        hub.currentIndex = destIdx;
+        return true;
     }
 
     // Side-effect of every focus move: persist HubState. We do NOT call
@@ -254,79 +248,75 @@ Item {
     // recreating SystemsScreen's bound delegates on the UI thread —
     // choppy on MiSTer even though SystemsScreen is `visible: false`.
     function _commitCategorySelection(): void {
-        Browse.HubState.selected_row = 0
+        Browse.HubState.selected_row = 0;
         if (Browse.CategoriesModel.count > 0)
-            Browse.HubState.category =
-                Browse.CategoriesModel.category_at(hub.currentIndex)
+            Browse.HubState.category = Browse.CategoriesModel.category_at(hub.currentIndex);
     }
 
     function _commitActionSelection(): void {
-        Browse.HubState.selected_row = 1
-        Browse.HubState.selected_action =
-            hub.actionEntries[hub.currentIndex].id
+        Browse.HubState.selected_row = 1;
+        Browse.HubState.selected_action = hub.actionEntries[hub.currentIndex].id;
     }
 
     function _commitCurrent(): void {
         if (hub.currentRow === 0)
-            hub._commitCategorySelection()
+            hub._commitCategorySelection();
         else
-            hub._commitActionSelection()
+            hub._commitActionSelection();
     }
 
     function _focusCategory(index: int): void {
         if (index < 0 || index >= Browse.CategoriesModel.count)
-            return
-        hub.currentRow = 0
-        hub.currentIndex = index
+            return;
+        hub.currentRow = 0;
+        hub.currentIndex = index;
         // Mouse focus is a deliberate landing on a specific tile — any
         // armed cross-row round-trip is no longer what the user wants.
-        hub._crossSavedIndex = -1
-        hub._commitCategorySelection()
+        hub._crossSavedIndex = -1;
+        hub._commitCategorySelection();
     }
 
     function _focusAction(index: int): void {
         if (index < 0 || index >= hub.actionEntries.length)
-            return
-        hub.currentRow = 1
-        hub.currentIndex = index
-        hub._crossSavedIndex = -1
-        hub._commitActionSelection()
+            return;
+        hub.currentRow = 1;
+        hub.currentIndex = index;
+        hub._crossSavedIndex = -1;
+        hub._commitActionSelection();
     }
 
     function _activateCurrent(): void {
         if (hub.currentRow === 0) {
             // Empty row sends "" — router treats that as the committed
             // "Enter on empty hub goes to Systems" passthrough.
-            const chosen = Browse.CategoriesModel.count <= 0
-                ? ""
-                : Browse.CategoriesModel.category_at(hub.currentIndex)
-            hub.requestAccept(chosen)
-            return
+            const chosen = Browse.CategoriesModel.count <= 0 ? "" : Browse.CategoriesModel.category_at(hub.currentIndex);
+            hub.requestAccept(chosen);
+            return;
         }
 
-        const id = hub.actionEntries[hub.currentIndex].id
+        const id = hub.actionEntries[hub.currentIndex].id;
         if (id === "favorites")
-            hub.requestFavoritesScreen()
+            hub.requestFavoritesScreen();
         else if (id === "recents")
-            hub.requestRecentsScreen()
+            hub.requestRecentsScreen();
         else if (id === "settings")
-            hub.requestSettingsScreen()
+            hub.requestSettingsScreen();
     }
 
     function handleAction(action: string): void {
         if (action === "left") {
             if (hub._navigate(-1))
-                hub._commitCurrent()
+                hub._commitCurrent();
         } else if (action === "right") {
             if (hub._navigate(1))
-                hub._commitCurrent()
+                hub._commitCurrent();
         } else if (action === "down" || action === "up") {
             if (hub._crossRow())
-                hub._commitCurrent()
+                hub._commitCurrent();
         } else if (action === "accept") {
-            hub._activateCurrent()
+            hub._activateCurrent();
         } else if (action === "cancel") {
-            hub.requestQuit()
+            hub.requestQuit();
         }
     }
 
@@ -348,17 +338,13 @@ Item {
         // size when the catalog reports 0 systems. Without the
         // fallback the Settings tile collapses to width=0 and the
         // user has nothing to navigate to.
-        readonly property int rawCellWidth:
-            n > 0
-                ? Math.floor((width - 2 * sideInset - (n - 1) * spacing) / n)
-                : maxCellWidth
+        readonly property int rawCellWidth: n > 0 ? Math.floor((width - 2 * sideInset - (n - 1) * spacing) / n) : maxCellWidth
         readonly property int cellWidth: Math.min(maxCellWidth, rawCellWidth)
         // Square cells (1:1) for the main menu. The focused tile's
         // 1.06× scale bleed is absorbed by `verticalPadding` on the
         // row Item, not by inflating the cell.
         readonly property int cellHeight: cellWidth
-        readonly property int totalRowWidth:
-            n > 0 ? n * cellWidth + (n - 1) * spacing : 0
+        readonly property int totalRowWidth: n > 0 ? n * cellWidth + (n - 1) * spacing : 0
         readonly property int rowOriginX: (width - totalRowWidth) / 2
 
         // Symmetric padding contains the focused tile's 1.06× scale
@@ -395,14 +381,12 @@ Item {
                 required property string name
                 required property string coverKey
 
-                x: categoriesRow.rowOriginX
-                   + index * (categoriesRow.cellWidth + categoriesRow.spacing)
+                x: categoriesRow.rowOriginX + index * (categoriesRow.cellWidth + categoriesRow.spacing)
                 y: categoriesRow.verticalPadding
                 width: categoriesRow.cellWidth
                 height: categoriesRow.cellHeight
 
-                readonly property bool isSelected:
-                    hub.currentRow === 0 && index === hub.currentIndex
+                readonly property bool isSelected: hub.currentRow === 0 && index === hub.currentIndex
                 // Focused tile draws on top so its 1.06× scale-up isn't
                 // clipped by neighbours to the right.
                 z: isSelected ? 1 : 0
@@ -424,8 +408,8 @@ Item {
 
                     onEntered: hub._focusCategory(cellItem.index)
                     onClicked: {
-                        hub._focusCategory(cellItem.index)
-                        hub._activateCurrent()
+                        hub._focusCategory(cellItem.index);
+                        hub._activateCurrent();
                     }
                 }
             }
@@ -448,8 +432,7 @@ Item {
         readonly property int cellHeight: categoriesRow.cellHeight
         readonly property int verticalPadding: categoriesRow.verticalPadding
         readonly property int n: hub.actionEntries.length
-        readonly property int totalRowWidth:
-            n > 0 ? n * cellWidth + (n - 1) * spacing : 0
+        readonly property int totalRowWidth: n > 0 ? n * cellWidth + (n - 1) * spacing : 0
         readonly property int rowOriginX: (width - totalRowWidth) / 2
 
         anchors.horizontalCenter: parent.horizontalCenter
@@ -479,14 +462,12 @@ Item {
                 required property int index
                 required property var modelData
 
-                x: actionsRow.rowOriginX
-                   + index * (actionsRow.cellWidth + actionsRow.spacing)
+                x: actionsRow.rowOriginX + index * (actionsRow.cellWidth + actionsRow.spacing)
                 y: actionsRow.verticalPadding
                 width: actionsRow.cellWidth
                 height: actionsRow.cellHeight
 
-                readonly property bool isSelected:
-                    hub.currentRow === 1 && index === hub.currentIndex
+                readonly property bool isSelected: hub.currentRow === 1 && index === hub.currentIndex
                 z: isSelected ? 1 : 0
 
                 TileLoader {
@@ -506,8 +487,8 @@ Item {
 
                     onEntered: hub._focusAction(actionCellItem.index)
                     onClicked: {
-                        hub._focusAction(actionCellItem.index)
-                        hub._activateCurrent()
+                        hub._focusAction(actionCellItem.index);
+                        hub._activateCurrent();
                     }
                 }
             }
@@ -531,12 +512,12 @@ Item {
                 // during cold launch, before HubState is clamped to the
                 // row. Guard the lookup so an undefined access doesn't
                 // surface as a TypeError in the log.
-                const entry = hub.actionEntries[hub.currentIndex]
-                return entry ? entry.text : ""
+                const entry = hub.actionEntries[hub.currentIndex];
+                return entry ? entry.text : "";
             }
             if (Browse.CategoriesModel.count > 0)
-                return Browse.CategoriesModel.category_at(hub.currentIndex)
-            return ""
+                return Browse.CategoriesModel.category_at(hub.currentIndex);
+            return "";
         }
         visible: !hub.transitioning
     }

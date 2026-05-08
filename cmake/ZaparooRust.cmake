@@ -12,13 +12,15 @@ include_guard(GLOBAL)
 
 include(FetchContent)
 
-# When cross-compiling for MiSTer ARM32, tell Corrosion the Rust target triple
-# explicitly. Corrosion's mapping from CMAKE_SYSTEM_PROCESSOR="arm" is
-# ambiguous; MiSTer is ARMv7 hard-float (armv7-unknown-linux-gnueabihf).
+# When cross-compiling for MiSTer ARM32, tell Corrosion the Rust target triple explicitly.
+# Corrosion's mapping from CMAKE_SYSTEM_PROCESSOR="arm" is ambiguous; MiSTer is ARMv7 hard-float
+# (armv7-unknown-linux-gnueabihf).
 if(CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_PROCESSOR STREQUAL "arm")
     if(NOT Rust_CARGO_TARGET)
-        set(Rust_CARGO_TARGET "armv7-unknown-linux-gnueabihf"
-            CACHE STRING "Cargo target triple for ARM32 cross-build" FORCE)
+        set(Rust_CARGO_TARGET
+            "armv7-unknown-linux-gnueabihf"
+            CACHE STRING "Cargo target triple for ARM32 cross-build" FORCE
+        )
     endif()
 endif()
 
@@ -29,17 +31,15 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(Corrosion)
 
-# Import the Rust workspace staticlib. Corrosion creates a CMake IMPORTED
-# STATIC LIBRARY target named "zaparoo_launcher_rs" (the [lib] name).
+# Import the Rust workspace staticlib. Corrosion creates a CMake IMPORTED STATIC LIBRARY target
+# named "zaparoo_launcher_rs" (the [lib] name).
 corrosion_import_crate(
-    MANIFEST_PATH "${CMAKE_SOURCE_DIR}/rust/Cargo.toml"
-    CRATES zaparoo-launcher-rs
+    MANIFEST_PATH "${CMAKE_SOURCE_DIR}/rust/Cargo.toml" CRATES zaparoo-launcher-rs
 )
 
-# ── Environment variables for cxx_qt_build's build.rs ───────────────────────
-# QMAKE: cxx_qt_build (via qt-build-utils) uses qmake to locate Qt headers
-# and libraries. For ARM32 cross-builds the system qmake points to x86_64 Qt;
-# override with the cross-compiled qmake.
+# ── Environment variables for cxx_qt_build's build.rs ─────────────────────── QMAKE: cxx_qt_build
+# (via qt-build-utils) uses qmake to locate Qt headers and libraries. For ARM32 cross-builds the
+# system qmake points to x86_64 Qt; override with the cross-compiled qmake.
 get_target_property(_rs_qt6_core_type Qt6::Core TYPE)
 if(_rs_qt6_core_type STREQUAL "STATIC_LIBRARY")
     set(_rs_qmake "/opt/qt6-arm32/bin/qmake6")
@@ -47,9 +47,7 @@ else()
     find_program(_rs_qmake NAMES qmake6 qmake REQUIRED)
 endif()
 
-corrosion_set_env_vars(zaparoo_launcher_rs
-    "QMAKE=${_rs_qmake}"
-)
+corrosion_set_env_vars(zaparoo_launcher_rs "QMAKE=${_rs_qmake}")
 if(_rs_qt6_core_type STREQUAL "STATIC_LIBRARY")
     corrosion_set_env_vars(zaparoo_launcher_rs "ZAPAROO_RUNTIME=mister")
 endif()
@@ -57,23 +55,24 @@ if(ZAPAROO_DEV)
     corrosion_set_env_vars(zaparoo_launcher_rs "ZAPAROO_DEV_BUILD=1")
 endif()
 
-# ── C++ executable ───────────────────────────────────────────────────────────
-# Using qt_add_executable (not add_executable) so that Qt's CMake sets up
-# the target with all the properties needed by qt_import_qml_plugins.
-qt_add_executable(launcher
-    "${CMAKE_SOURCE_DIR}/src/app/main.cpp"
+# ── C++ executable ─────────────────────────────────────────────────────────── Using
+# qt_add_executable (not add_executable) so that Qt's CMake sets up the target with all the
+# properties needed by qt_import_qml_plugins.
+qt_add_executable(
+    launcher "${CMAKE_SOURCE_DIR}/src/app/main.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/media_image_provider.h"
     "${CMAKE_SOURCE_DIR}/src/app/media_image_provider.cpp"
 )
-target_include_directories(launcher PRIVATE "${CMAKE_SOURCE_DIR}/src/app")
-
-target_compile_definitions(launcher
-    PRIVATE ZAPAROO_VERSION="${CMAKE_PROJECT_VERSION}"
+target_include_directories(
+    launcher
+    PRIVATE "${CMAKE_SOURCE_DIR}/src/app"
 )
 
-# For static Qt (ARM32): define QT_STATIC so main.cpp's #ifdef fires.
-# Qt itself defines this in its headers, but the compiler may not see it
-# before the first #include unless we make it explicit here too.
+target_compile_definitions(launcher PRIVATE ZAPAROO_VERSION="${CMAKE_PROJECT_VERSION}")
+
+# For static Qt (ARM32): define QT_STATIC so main.cpp's #ifdef fires. Qt itself defines this in its
+# headers, but the compiler may not see it before the first #include unless we make it explicit here
+# too.
 if(_rs_qt6_core_type STREQUAL "STATIC_LIBRARY")
     target_compile_definitions(launcher PRIVATE QT_STATIC)
 endif()
@@ -82,122 +81,104 @@ if(ZAPAROO_DEV)
     target_compile_definitions(launcher PRIVATE ZAPAROO_DEV_BUILD)
 endif()
 
-# Load Qt QML plugin CMake configs so that qt_import_qml_plugins can find
-# and link the correct static plugin archives. These are not loaded by
-# find_package(Qt6 ...) by default.
+# Load Qt QML plugin CMake configs so that qt_import_qml_plugins can find and link the correct
+# static plugin archives. These are not loaded by find_package(Qt6 ...) by default.
 if(_rs_qt6_core_type STREQUAL "STATIC_LIBRARY")
     get_filename_component(_rs_qt_prefix "${Qt6_DIR}/../../.." ABSOLUTE)
     file(GLOB _rs_qml_plugin_configs
-        "${_rs_qt_prefix}/lib/cmake/Qt6Qml/QmlPlugins/Qt6*Config.cmake"
+         "${_rs_qt_prefix}/lib/cmake/Qt6Qml/QmlPlugins/Qt6*Config.cmake"
     )
     foreach(_rs_config IN LISTS _rs_qml_plugin_configs)
         include("${_rs_config}" OPTIONAL)
     endforeach()
     include("${_rs_qt_prefix}/lib/cmake/Qt6Gui/Qt6QLinuxFbIntegrationPluginConfig.cmake" OPTIONAL)
-    foreach(_rs_qml_plugin IN ITEMS
-            qtquickcontrols2plugin
-            qtquickcontrols2basicstyleplugin
-            qtquickcontrols2implplugin
-            qtquicktemplates2plugin
-            quickwindow)
-        include("${_rs_qt_prefix}/lib/cmake/Qt6Qml/QmlPlugins/Qt6${_rs_qml_plugin}Config.cmake" OPTIONAL)
+    foreach(_rs_qml_plugin IN ITEMS qtquickcontrols2plugin qtquickcontrols2basicstyleplugin
+                                    qtquickcontrols2implplugin qtquicktemplates2plugin quickwindow
+    )
+        include("${_rs_qt_prefix}/lib/cmake/Qt6Qml/QmlPlugins/Qt6${_rs_qml_plugin}Config.cmake"
+                OPTIONAL
+        )
     endforeach()
 endif()
 
-target_link_libraries(launcher
-    PRIVATE
-        zaparoo_launcher_rs
-        zaparoo_ui_appplugin
-        Qt6::Quick
-        Qt6::QuickControls2
+target_link_libraries(
+    launcher
+    PRIVATE zaparoo_launcher_rs zaparoo_ui_appplugin Qt6::Quick Qt6::QuickControls2
 )
 
-# Dummy CMake target satisfying qmlimportscanner's lookup for the cxx-qt
-# plugin. build/qml/Zaparoo/Browse/qmldir declares `optional plugin
-# Zaparoo_Browse`, and qt_import_qml_plugins() warns when that name has
-# no matching CMake target. The real plugin code is baked into
-# zaparoo_launcher_rs (already linked above); the INTERFACE target here
-# is a no-op link-wise but silences the "plugin will not be linked"
-# warning. Defined at global scope so tests/ui sees it too.
+# Dummy CMake target satisfying qmlimportscanner's lookup for the cxx-qt plugin.
+# build/qml/Zaparoo/Browse/qmldir declares `optional plugin Zaparoo_Browse`, and
+# qt_import_qml_plugins() warns when that name has no matching CMake target. The real plugin code is
+# baked into zaparoo_launcher_rs (already linked above); the INTERFACE target here is a no-op
+# link-wise but silences the "plugin will not be linked" warning. Defined at global scope so
+# tests/ui sees it too.
 if(NOT TARGET Zaparoo_Browse)
     add_library(Zaparoo_Browse INTERFACE)
 endif()
 
-# Critical: documented Qt static-plugin machinery. Runs qmlimportscanner,
-# traverses the QML module dependency graph, and emits correct
-# Q_IMPORT_QML_PLUGIN calls + --whole-archive link lines for every Qt
-# static QML plugin and qmldir resource init .o.
+# Critical: documented Qt static-plugin machinery. Runs qmlimportscanner, traverses the QML module
+# dependency graph, and emits correct Q_IMPORT_QML_PLUGIN calls + --whole-archive link lines for
+# every Qt static QML plugin and qmldir resource init .o.
 qt_import_qml_plugins(launcher)
 
-# For static Qt (ARM32): the Controls chain _init OBJECT targets carry the
-# Q_IMPORT_QML_PLUGIN static-init factories. Not propagated automatically
-# from a cross-compiled Qt toolchain, so link them explicitly. The
-# QSvgPlugin entry registers the SVG image format with QImageReader so
-# `Image { source: "...svg" }` works in the static build (the shared
-# desktop build picks the plugin up automatically from the Qt install).
+# For static Qt (ARM32): the Controls chain _init OBJECT targets carry the Q_IMPORT_QML_PLUGIN
+# static-init factories. Not propagated automatically from a cross-compiled Qt toolchain, so link
+# them explicitly. The QSvgPlugin entry registers the SVG image format with QImageReader so `Image {
+# source: "...svg" }` works in the static build (the shared desktop build picks the plugin up
+# automatically from the Qt install).
 if(_rs_qt6_core_type STREQUAL "STATIC_LIBRARY")
     if(TARGET Qt6::QLinuxFbIntegrationPlugin)
-        target_link_libraries(launcher PRIVATE
-            Qt6::QLinuxFbIntegrationPlugin
-            Qt6::QLinuxFbIntegrationPlugin_init
+        target_link_libraries(
+            launcher PRIVATE Qt6::QLinuxFbIntegrationPlugin Qt6::QLinuxFbIntegrationPlugin_init
         )
     endif()
     if(TARGET Qt6::QSvgPlugin)
-        target_link_libraries(launcher PRIVATE
-            Qt6::QSvgPlugin
-            Qt6::QSvgPlugin_init
-        )
+        target_link_libraries(launcher PRIVATE Qt6::QSvgPlugin Qt6::QSvgPlugin_init)
     endif()
-    foreach(_rs_qml_plugin IN ITEMS
-            qtquickcontrols2plugin
-            qtquickcontrols2basicstyleplugin
-            qtquickcontrols2implplugin
-            qtquicktemplates2plugin
-            quickwindow)
+    foreach(_rs_qml_plugin IN ITEMS qtquickcontrols2plugin qtquickcontrols2basicstyleplugin
+                                    qtquickcontrols2implplugin qtquicktemplates2plugin quickwindow
+    )
         if(TARGET Qt6::${_rs_qml_plugin})
-            target_link_libraries(launcher PRIVATE
-                Qt6::${_rs_qml_plugin}
-                Qt6::${_rs_qml_plugin}_init
+            target_link_libraries(
+                launcher PRIVATE Qt6::${_rs_qml_plugin} Qt6::${_rs_qml_plugin}_init
             )
         endif()
     endforeach()
 endif()
 
-set_target_properties(launcher PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
-)
+set_target_properties(launcher PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 
-# ── Translations ─────────────────────────────────────────────────────────────
-# lrelease compiles .ts → .qm and qt_add_translations embeds them into the
-# launcher binary under qrc:/i18n/ (the default RESOURCE_PREFIX). main.cpp
-# loads the locale-matching .qm with `QTranslator::load(locale, "launcher",
-# "_", ":/i18n")` before the QML engine runs.
+# ── Translations ───────────────────────────────────────────────────────────── lrelease compiles
+# .ts → .qm and qt_add_translations embeds them into the launcher binary under qrc:/i18n/ (the
+# default RESOURCE_PREFIX). main.cpp loads the locale-matching .qm with `QTranslator::load(locale,
+# "launcher", "_", ":/i18n")` before the QML engine runs.
 #
-# IMMEDIATE_CALL runs source collection inline instead of deferring to the
-# end of the top-level directory scope. Without it, qt_add_translations
-# defers until CMake finalises PROJECT_SOURCE_DIR and the generated resource
-# targets land after link-time, producing missing-dependency errors on
+# IMMEDIATE_CALL runs source collection inline instead of deferring to the end of the top-level
+# directory scope. Without it, qt_add_translations defers until CMake finalises PROJECT_SOURCE_DIR
+# and the generated resource targets land after link-time, producing missing-dependency errors on
 # parallel builds (Corrosion-provided staticlibs are visited out of order).
-qt_add_translations(launcher
+qt_add_translations(
+    launcher
     TS_FILES
-        "${CMAKE_SOURCE_DIR}/src/ui/translations/launcher_en.ts"
-        "${CMAKE_SOURCE_DIR}/src/ui/translations/launcher_it.ts"
-        "${CMAKE_SOURCE_DIR}/src/ui/translations/launcher_es.ts"
-    RESOURCE_PREFIX "/i18n"
+    "${CMAKE_SOURCE_DIR}/src/ui/translations/launcher_en.ts"
+    "${CMAKE_SOURCE_DIR}/src/ui/translations/launcher_it.ts"
+    "${CMAKE_SOURCE_DIR}/src/ui/translations/launcher_es.ts"
+    RESOURCE_PREFIX
+    "/i18n"
     IMMEDIATE_CALL
 )
 
-# ── cxx-qt QML module sync for tooling ───────────────────────────────────────
-# cxx-qt writes qmldir + plugin.qmltypes under cargo's OUT_DIR, which qmllint
-# does not search. Copy them into ${QT_QML_OUTPUT_DIRECTORY}/<module>/ so
-# qmllint's -I path resolves types (Browse.QAppState, Browse.GamesModel, …)
-# exposed by the Rust staticlib. The cmake script globs at build time because
+# ── cxx-qt QML module sync for tooling ─────────────────────────────────────── cxx-qt writes qmldir
+# + plugin.qmltypes under cargo's OUT_DIR, which qmllint does not search. Copy them into
+# ${QT_QML_OUTPUT_DIRECTORY}/<module>/ so qmllint's -I path resolves types (Browse.QAppState,
+# Browse.GamesModel, …) exposed by the Rust staticlib. The cmake script globs at build time because
 # Corrosion's hash-segmented path is not known at configure time.
-add_custom_target(zaparoo_cxxqt_qml_sync
-    COMMAND ${CMAKE_COMMAND}
-        -DCARGO_DIR=${CMAKE_BINARY_DIR}/cargo
-        -DDEST_QML_DIR=${CMAKE_BINARY_DIR}/qml
-        -P ${CMAKE_SOURCE_DIR}/cmake/SyncCxxqtQmlModules.cmake
+add_custom_target(
+    zaparoo_cxxqt_qml_sync
+    COMMAND
+        ${CMAKE_COMMAND} -DCARGO_DIR=${CMAKE_BINARY_DIR}/cargo
+        -DDEST_QML_DIR=${CMAKE_BINARY_DIR}/qml -P
+        ${CMAKE_SOURCE_DIR}/cmake/SyncCxxqtQmlModules.cmake
     DEPENDS cargo-build_zaparoo_launcher_rs
     COMMENT "Syncing cxx-qt QML module manifests into ${CMAKE_BINARY_DIR}/qml"
     VERBATIM

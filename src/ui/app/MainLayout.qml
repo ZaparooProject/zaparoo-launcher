@@ -95,7 +95,7 @@ ApplicationWindow {
     property var contextMenuEntries: []
 
     signal contextMenuAccepted(string id)
-    signal contextMenuCloseRequested()
+    signal contextMenuCloseRequested
 
     // Forward-transition state owned by Main.qml. "" while idle;
     // "systems" or "games" while waiting on a model fill before
@@ -120,37 +120,23 @@ ApplicationWindow {
     // CategoriesModel binds eagerly via bind_to_endpoint! and exposes
     // no `loading` qproperty, so a count-of-zero collapses straight
     // into Empty (matching the overlay's existing behavior on Hub).
-    readonly property string systemsScreenState:
-        Browse.SystemsModel.loading ? "loading"
-        : ((Browse.SystemsModel.error_message ?? "") !== "" ? "error"
-        : (Browse.SystemsModel.count === 0 ? "empty" : "ready"))
+    readonly property string systemsScreenState: Browse.SystemsModel.loading ? "loading" : ((Browse.SystemsModel.error_message ?? "") !== "" ? "error" : (Browse.SystemsModel.count === 0 ? "empty" : "ready"))
 
-    readonly property string gamesScreenState:
-        Browse.GamesModel.loading ? "loading"
-        : ((Browse.GamesModel.error_message ?? "") !== "" ? "error"
-        : (Browse.GamesModel.count === 0 ? "empty" : "ready"))
+    readonly property string gamesScreenState: Browse.GamesModel.loading ? "loading" : ((Browse.GamesModel.error_message ?? "") !== "" ? "error" : (Browse.GamesModel.count === 0 ? "empty" : "ready"))
 
-    readonly property string favoritesScreenState:
-        Browse.FavoritesModel.loading ? "loading"
-        : ((Browse.FavoritesModel.error_message ?? "") !== "" ? "error"
-        : (Browse.FavoritesModel.count === 0 ? "empty" : "ready"))
+    readonly property string favoritesScreenState: Browse.FavoritesModel.loading ? "loading" : ((Browse.FavoritesModel.error_message ?? "") !== "" ? "error" : (Browse.FavoritesModel.count === 0 ? "empty" : "ready"))
 
-    readonly property string hubScreenState:
-        (Browse.CategoriesModel.error_message ?? "") !== "" ? "error"
-        : (Browse.CategoriesModel.count === 0 ? "empty" : "ready")
+    readonly property string hubScreenState: (Browse.CategoriesModel.error_message ?? "") !== "" ? "error" : (Browse.CategoriesModel.count === 0 ? "empty" : "ready")
 
-    readonly property string recentsScreenState:
-        Browse.RecentsModel.loading ? "loading"
-        : ((Browse.RecentsModel.error_message ?? "") !== "" ? "error"
-        : (Browse.RecentsModel.count === 0 ? "empty" : "ready"))
+    readonly property string recentsScreenState: Browse.RecentsModel.loading ? "loading" : ((Browse.RecentsModel.error_message ?? "") !== "" ? "error" : (Browse.RecentsModel.count === 0 ? "empty" : "ready"))
 
-    signal cancelCardWriteRequested()
-    signal closeQrCodeRequested()
-    signal closeCommercialNoticeRequested()
-    signal closeFirstRunIndexRequested()
-    signal closeLogUploadRequested()
-    signal closeQuitConfirmRequested()
-    signal quitConfirmAccepted()
+    signal cancelCardWriteRequested
+    signal closeQrCodeRequested
+    signal closeCommercialNoticeRequested
+    signal closeFirstRunIndexRequested
+    signal closeLogUploadRequested
+    signal closeQuitConfirmRequested
+    signal quitConfirmAccepted
 
     // Two-way sync between root.activeScreen and ScreenManager.activeScreen.
     // Binding-breaking assignments (tests setting root.activeScreen = "games")
@@ -161,13 +147,13 @@ ApplicationWindow {
     // tracked single-source-of-truth refactor.
     onActiveScreenChanged: {
         if (ScreenManager.activeScreen !== root.activeScreen)
-            ScreenManager.activeScreen = root.activeScreen
+            ScreenManager.activeScreen = root.activeScreen;
     }
     Connections {
         target: ScreenManager
         function onActiveScreenChanged(): void {
             if (root.activeScreen !== ScreenManager.activeScreen)
-                root.activeScreen = ScreenManager.activeScreen
+                root.activeScreen = ScreenManager.activeScreen;
         }
     }
 
@@ -315,7 +301,7 @@ ApplicationWindow {
         anchors.fill: parent
         active: !root.bootComplete
         z: 50
-        sourceComponent: BootOverlay { }
+        sourceComponent: BootOverlay {}
     }
 
     // ── Card writer modal ────────────────────────────────────────────────────
@@ -326,9 +312,7 @@ ApplicationWindow {
         open: root.cardWriteModalVisible
         kind: "transient"
         failed: root.cardWriteFailed
-        title: root.cardWriteFailed
-               ? qsTr("Writing failed")
-               : qsTr("Put a writable card near the reader")
+        title: root.cardWriteFailed ? qsTr("Writing failed") : qsTr("Put a writable card near the reader")
         onCancelRequested: root.cancelCardWriteRequested()
     }
 
@@ -447,47 +431,110 @@ ApplicationWindow {
         readonly property var helpEntries: {
             if (root.contextMenuVisible)
                 return [
-                    { button: "Dpad", label: qsTr("Move") },
-                    { button: "ButtonA", label: qsTr("Select") },
-                    { button: "ButtonB", label: qsTr("Close") },
-                    { button: "ButtonX", label: qsTr("Close") }
+                    {
+                        button: "Dpad",
+                        label: qsTr("Move")
+                    },
+                    {
+                        button: "ButtonA",
+                        label: qsTr("Select")
+                    },
+                    {
+                        button: "ButtonB",
+                        label: qsTr("Close")
+                    },
+                    {
+                        button: "ButtonX",
+                        label: qsTr("Close")
+                    }
                 ];
             if (root.cardWriteModalVisible)
-                return [{ button: "ButtonB", label: qsTr("Cancel") }];
+                return [
+                    {
+                        button: "ButtonB",
+                        label: qsTr("Cancel")
+                    }
+                ];
             if (root.qrCodeModalVisible)
-                return [{ button: "ButtonB", label: qsTr("Close") }];
+                return [
+                    {
+                        button: "ButtonB",
+                        label: qsTr("Close")
+                    }
+                ];
             if (root.logUploadModalVisible) {
                 const phase = root.logUploadModal.phase;
                 if (phase === root.logUploadModal._stateSuccess)
                     return [
-                        { button: "ButtonA", label: qsTr("Done") },
-                        { button: "ButtonB", label: qsTr("Close") }
+                        {
+                            button: "ButtonA",
+                            label: qsTr("Done")
+                        },
+                        {
+                            button: "ButtonB",
+                            label: qsTr("Close")
+                        }
                     ];
                 if (phase === root.logUploadModal._stateError)
                     return [
-                        { button: "ButtonA", label: qsTr("Retry") },
-                        { button: "ButtonB", label: qsTr("Close") }
+                        {
+                            button: "ButtonA",
+                            label: qsTr("Retry")
+                        },
+                        {
+                            button: "ButtonB",
+                            label: qsTr("Close")
+                        }
                     ];
                 // Idle / uploading: only Cancel.
-                return [{ button: "ButtonB", label: qsTr("Cancel") }];
+                return [
+                    {
+                        button: "ButtonB",
+                        label: qsTr("Cancel")
+                    }
+                ];
             }
             if (root.commercialNoticeModalVisible)
-                return [{ button: "ButtonA", label: qsTr("I understand") }];
+                return [
+                    {
+                        button: "ButtonA",
+                        label: qsTr("I understand")
+                    }
+                ];
             if (root.quitConfirmModalVisible)
                 return [
-                    { button: "Dpad", label: qsTr("Move") },
-                    { button: "ButtonA", label: qsTr("Select") },
-                    { button: "ButtonB", label: qsTr("Cancel") }
+                    {
+                        button: "Dpad",
+                        label: qsTr("Move")
+                    },
+                    {
+                        button: "ButtonA",
+                        label: qsTr("Select")
+                    },
+                    {
+                        button: "ButtonB",
+                        label: qsTr("Cancel")
+                    }
                 ];
             if (!root.bootComplete)
                 return [];
             if (root.firstRunIndexModalVisible) {
                 const phase = root.firstRunIndexModal.phase;
                 if (phase === "running")
-                    return [{ button: "ButtonB", label: qsTr("Cancel") }];
+                    return [
+                        {
+                            button: "ButtonB",
+                            label: qsTr("Cancel")
+                        }
+                    ];
                 if (phase === "completed")
                     return [];
-                return [{ button: "ButtonA", label: qsTr("Start") }];
+                return [
+                    {
+                        button: "ButtonA",
+                        label: qsTr("Start")
+                    }
+                ];
             }
             if (root.pendingTransition !== "")
                 return [];
@@ -499,14 +546,28 @@ ApplicationWindow {
                 // navigable, otherwise the user reads "Quit only"
                 // and misses the Settings tile entirely.
                 return [
-                    { button: "Dpad",    label: qsTr("Move") },
-                    { button: "ButtonA", label: qsTr("Open") },
-                    { button: "ButtonB", label: qsTr("Quit") }
+                    {
+                        button: "Dpad",
+                        label: qsTr("Move")
+                    },
+                    {
+                        button: "ButtonA",
+                        label: qsTr("Open")
+                    },
+                    {
+                        button: "ButtonB",
+                        label: qsTr("Quit")
+                    }
                 ];
             }
             if (root.activeScreen === root.screenSystems) {
                 if (root.systemsScreenState === "loading")
-                    return [{ button: "ButtonB", label: qsTr("Back") }];
+                    return [
+                        {
+                            button: "ButtonB",
+                            label: qsTr("Back")
+                        }
+                    ];
                 if (root.systemsScreenState === "ready") {
                     // L/R shoulders page jump; only advertise the cue
                     // when there's a second page to jump to, so we
@@ -514,47 +575,87 @@ ApplicationWindow {
                     // page of systems.
                     const pages = root.systemsScreen.systemsGrid.pageCount;
                     let row = [
-                        { button: "Dpad",    label: qsTr("Move") }
+                        {
+                            button: "Dpad",
+                            label: qsTr("Move")
+                        }
                     ];
                     if (pages > 1)
-                        row.push({ buttons: ["ButtonL", "ButtonR"], label: qsTr("Page") });
-                    row.push({ button: "ButtonA", label: qsTr("Open") },
-                             { button: "ButtonX", label: qsTr("Options") },
-                             { button: "ButtonB", label: qsTr("Back") });
+                        row.push({
+                            buttons: ["ButtonL", "ButtonR"],
+                            label: qsTr("Page")
+                        });
+                    row.push({
+                        button: "ButtonA",
+                        label: qsTr("Open")
+                    }, {
+                        button: "ButtonX",
+                        label: qsTr("Options")
+                    }, {
+                        button: "ButtonB",
+                        label: qsTr("Back")
+                    });
                     return row;
                 }
                 return [
-                    { button: "ButtonA", label: qsTr("Retry") },
-                    { button: "ButtonB", label: qsTr("Back") }
+                    {
+                        button: "ButtonA",
+                        label: qsTr("Retry")
+                    },
+                    {
+                        button: "ButtonB",
+                        label: qsTr("Back")
+                    }
                 ];
             }
-            if (root.activeScreen === root.screenFavorites
-                || root.activeScreen === root.screenRecents) {
-                const isFavorites = root.activeScreen === root.screenFavorites
-                const state = isFavorites
-                    ? root.favoritesScreenState
-                    : root.recentsScreenState
-                const grid = isFavorites
-                    ? root.favoritesScreen.favoritesGrid
-                    : root.recentsScreen.recentsGrid
+            if (root.activeScreen === root.screenFavorites || root.activeScreen === root.screenRecents) {
+                const isFavorites = root.activeScreen === root.screenFavorites;
+                const state = isFavorites ? root.favoritesScreenState : root.recentsScreenState;
+                const grid = isFavorites ? root.favoritesScreen.favoritesGrid : root.recentsScreen.recentsGrid;
                 if (state === "loading")
-                    return [{ button: "ButtonB", label: qsTr("Back") }];
+                    return [
+                        {
+                            button: "ButtonB",
+                            label: qsTr("Back")
+                        }
+                    ];
                 if (state === "ready") {
                     const pages = grid.pageCount;
                     let row = [
-                        { button: "Dpad", label: qsTr("Move") }
+                        {
+                            button: "Dpad",
+                            label: qsTr("Move")
+                        }
                     ];
                     if (pages > 1)
-                        row.push({ buttons: ["ButtonL", "ButtonR"], label: qsTr("Page") });
-                    row.push({ button: "ButtonA", label: qsTr("Open") });
+                        row.push({
+                            buttons: ["ButtonL", "ButtonR"],
+                            label: qsTr("Page")
+                        });
+                    row.push({
+                        button: "ButtonA",
+                        label: qsTr("Open")
+                    });
                     if (isFavorites)
-                        row.push({ button: "ButtonX", label: qsTr("Options") });
-                    row.push({ button: "ButtonB", label: qsTr("Back") });
+                        row.push({
+                            button: "ButtonX",
+                            label: qsTr("Options")
+                        });
+                    row.push({
+                        button: "ButtonB",
+                        label: qsTr("Back")
+                    });
                     return row;
                 }
                 return [
-                    { button: "ButtonA", label: qsTr("Retry") },
-                    { button: "ButtonB", label: qsTr("Back") }
+                    {
+                        button: "ButtonA",
+                        label: qsTr("Retry")
+                    },
+                    {
+                        button: "ButtonB",
+                        label: qsTr("Back")
+                    }
                 ];
             }
             if (root.activeScreen === root.screenSettings) {
@@ -570,22 +671,26 @@ ApplicationWindow {
                 // Left/Right cycles the focused field's value. Skip
                 // the cue when the focused field is an action row
                 // (no left/right binding) or there are no fields.
-                if (root.settingsScreen.fieldCount > 0
-                    && !root.settingsScreen.focusedFieldIsAction) {
+                if (root.settingsScreen.fieldCount > 0 && !root.settingsScreen.focusedFieldIsAction) {
                     row.push({
                         buttons: ["DpadLeft", "DpadRight"],
                         label: qsTr("Change")
                     });
                 }
                 if (root.settingsScreen.focusedFieldIsToggle)
-                    row.push({ button: "ButtonA", label: qsTr("Toggle") });
-                else if (root.settingsScreen.focusedFieldIsAction
-                         && !root.settingsScreen.focusedActionDisabled)
+                    row.push({
+                        button: "ButtonA",
+                        label: qsTr("Toggle")
+                    });
+                else if (root.settingsScreen.focusedFieldIsAction && !root.settingsScreen.focusedActionDisabled)
                     row.push({
                         button: "ButtonA",
                         label: root.settingsScreen.focusedActionLabel
                     });
-                row.push({ button: "ButtonB", label: qsTr("Back") });
+                row.push({
+                    button: "ButtonB",
+                    label: qsTr("Back")
+                });
                 return row;
             }
             if (root.activeScreen === root.screenAbout) {
@@ -598,12 +703,20 @@ ApplicationWindow {
                         buttons: ["DpadUp", "DpadDown"],
                         label: qsTr("Scroll")
                     });
-                row.push({ button: "ButtonB", label: qsTr("Back") });
+                row.push({
+                    button: "ButtonB",
+                    label: qsTr("Back")
+                });
                 return row;
             }
             // games
             if (root.gamesScreenState === "loading")
-                return [{ button: "ButtonB", label: qsTr("Back") }];
+                return [
+                    {
+                        button: "ButtonB",
+                        label: qsTr("Back")
+                    }
+                ];
             if (root.gamesScreenState === "ready") {
                 const pages = root.gamesScreen.gamesGrid.pageCount;
                 // Options menu is only meaningful on media leaves —
@@ -614,19 +727,40 @@ ApplicationWindow {
                 const entryType = Browse.GamesModel.entry_type_at(idx);
                 const isFolder = entryType === "directory" || entryType === "root";
                 let row = [
-                    { button: "Dpad",    label: qsTr("Move") }
+                    {
+                        button: "Dpad",
+                        label: qsTr("Move")
+                    }
                 ];
                 if (pages > 1)
-                    row.push({ buttons: ["ButtonL", "ButtonR"], label: qsTr("Page") });
-                row.push({ button: "ButtonA", label: qsTr("Open") });
+                    row.push({
+                        buttons: ["ButtonL", "ButtonR"],
+                        label: qsTr("Page")
+                    });
+                row.push({
+                    button: "ButtonA",
+                    label: qsTr("Open")
+                });
                 if (!isFolder)
-                    row.push({ button: "ButtonX", label: qsTr("Options") });
-                row.push({ button: "ButtonB", label: qsTr("Back") });
+                    row.push({
+                        button: "ButtonX",
+                        label: qsTr("Options")
+                    });
+                row.push({
+                    button: "ButtonB",
+                    label: qsTr("Back")
+                });
                 return row;
             }
             return [
-                { button: "ButtonA", label: qsTr("Retry") },
-                { button: "ButtonB", label: qsTr("Back") }
+                {
+                    button: "ButtonA",
+                    label: qsTr("Retry")
+                },
+                {
+                    button: "ButtonB",
+                    label: qsTr("Back")
+                }
             ];
         }
 
@@ -649,10 +783,7 @@ ApplicationWindow {
                     required property var modelData
                     spacing: Sizing.pctW(0.6)
 
-                    readonly property var buttonList:
-                        helpEntry.modelData.buttons !== undefined
-                            ? helpEntry.modelData.buttons
-                            : [helpEntry.modelData.button]
+                    readonly property var buttonList: helpEntry.modelData.buttons !== undefined ? helpEntry.modelData.buttons : [helpEntry.modelData.button]
 
                     Repeater {
                         model: helpEntry.buttonList

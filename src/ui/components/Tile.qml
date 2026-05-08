@@ -69,14 +69,8 @@ Item {
         // sees the failure mode immediately instead of debugging
         // mysteriously empty tiles.
         // qmllint disable missing-property compiler
-        if (typeof parent.isSelected !== "boolean"
-            || typeof parent.isFocused !== "boolean"
-            || typeof parent.name !== "string"
-            || typeof parent.coverKey !== "string") {
-            console.warn(
-                "Tile: parent does not satisfy the delegate contract "
-                + "(expected isSelected:bool, isFocused:bool, "
-                + "name:string, coverKey:string)")
+        if (typeof parent.isSelected !== "boolean" || typeof parent.isFocused !== "boolean" || typeof parent.name !== "string" || typeof parent.coverKey !== "string") {
+            console.warn("Tile: parent does not satisfy the delegate contract " + "(expected isSelected:bool, isFocused:bool, " + "name:string, coverKey:string)");
         }
         // qmllint enable missing-property compiler
     }
@@ -98,15 +92,13 @@ Item {
     readonly property int _captionHeight: Sizing.pctH(5.5)
     readonly property int _captionGap: Sizing.pctH(0.4)
 
-    readonly property bool _focusedSelection:
-        root.delegateIsSelected && root.delegateIsFocused
+    readonly property bool _focusedSelection: root.delegateIsSelected && root.delegateIsFocused
 
     // `coverKey` is the relative path under `resources/images/` without
     // extension — `systems/snes`, `categories/Consoles`, etc. The model
     // chooses the subdirectory; Tile is agnostic. Resources.coverUrl is
     // the single source of truth for the qrc layout — see Resources.qml.
-    readonly property url _coverSource:
-        Resources.coverUrl(root.delegateCoverKey)
+    readonly property url _coverSource: Resources.coverUrl(root.delegateCoverKey)
     readonly property bool _hasCover: cover.status === Image.Ready
 
     // No focus scale bump. The earlier 1.06 scale on the focused tile
@@ -188,9 +180,7 @@ Item {
             // caption is flush against the card's bottom edge, so the
             // cover's lower bound is just (caption height + gap) —
             // there is no second layer of card padding below.
-            bottomMargin: root.showCaption
-                          ? root._captionHeight + root._captionGap
-                          : root._padding
+            bottomMargin: root.showCaption ? root._captionHeight + root._captionGap : root._padding
             horizontalCenter: parent.horizontalCenter
         }
         width: parent.width - 2 * root._padding

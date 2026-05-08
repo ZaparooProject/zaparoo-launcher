@@ -17,8 +17,7 @@ Item {
     property bool canPreviousImage: false
     property bool canNextImage: false
 
-    readonly property int _carouselGutter:
-        (canPreviousImage || canNextImage) ? Sizing.pctW(4) : 0
+    readonly property int _carouselGutter: (canPreviousImage || canNextImage) ? Sizing.pctW(4) : 0
 
     Item {
         id: imageSlot
@@ -104,12 +103,10 @@ Item {
                 required property string modelData
 
                 width: tagTable.width
-                height: Math.max(Sizing.pctH(3),
-                                 tagValue.paintedHeight)
+                height: Math.max(Sizing.pctH(3), tagValue.paintedHeight)
 
                 readonly property var parts: modelData.split("\t")
-                readonly property bool isFilename:
-                    parts.length > 0 && parts[0] === "Filename"
+                readonly property bool isFilename: parts.length > 0 && parts[0] === "Filename"
 
                 Text {
                     id: tagType

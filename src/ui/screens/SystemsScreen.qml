@@ -31,7 +31,7 @@ Item {
     readonly property bool _listLayout: Browse.Settings.current_browse_layout === "list"
 
     signal requestAccept(systemId: string)
-    signal requestHubScreen()
+    signal requestHubScreen
     signal requestContextMenu(int index, var anchorRect)
 
     // Move selection by (dx, dy) and commit the new system id on
@@ -41,32 +41,30 @@ Item {
     function _performMove(dx: int, dy: int): bool {
         if (systems._listLayout) {
             if (dy === 0)
-                return false
-            return systems._performLinearMove(dy)
+                return false;
+            return systems._performLinearMove(dy);
         }
         if (systems.systemsGrid.moveSelection(dx, dy)) {
-            Browse.SystemsState.system_id =
-                Browse.SystemsModel.system_id_at(systems.systemsGrid.currentIndex)
-            return true
+            Browse.SystemsState.system_id = Browse.SystemsModel.system_id_at(systems.systemsGrid.currentIndex);
+            return true;
         }
-        return false
+        return false;
     }
 
     function _performLinearMove(delta: int): bool {
-        const count = systems.systemsGrid.itemCount
+        const count = systems.systemsGrid.itemCount;
         if (count <= 0)
-            return false
-        let next = systems.systemsGrid.currentIndex + delta
+            return false;
+        let next = systems.systemsGrid.currentIndex + delta;
         if (next < 0)
-            next = count - 1
+            next = count - 1;
         else if (next >= count)
-            next = 0
+            next = 0;
         if (next === systems.systemsGrid.currentIndex)
-            return false
-        systems.systemsGrid.currentIndex = next
-        Browse.SystemsState.system_id =
-            Browse.SystemsModel.system_id_at(systems.systemsGrid.currentIndex)
-        return true
+            return false;
+        systems.systemsGrid.currentIndex = next;
+        Browse.SystemsState.system_id = Browse.SystemsModel.system_id_at(systems.systemsGrid.currentIndex);
+        return true;
     }
 
     // Page jump (L/R shoulder buttons). Wraps in both directions; same
@@ -74,54 +72,52 @@ Item {
     // tracks whichever entry the user lands on.
     function _performPage(delta: int): bool {
         if (systems.systemsGrid.pageBy(delta)) {
-            Browse.SystemsState.system_id =
-                Browse.SystemsModel.system_id_at(systems.systemsGrid.currentIndex)
-            return true
+            Browse.SystemsState.system_id = Browse.SystemsModel.system_id_at(systems.systemsGrid.currentIndex);
+            return true;
         }
-        return false
+        return false;
     }
 
     function _focusIndex(index: int): void {
         if (index < 0 || index >= systems.systemsGrid.itemCount)
-            return
-        systems.systemsGrid.currentIndex = index
-        Browse.SystemsState.system_id =
-            Browse.SystemsModel.system_id_at(systems.systemsGrid.currentIndex)
+            return;
+        systems.systemsGrid.currentIndex = index;
+        Browse.SystemsState.system_id = Browse.SystemsModel.system_id_at(systems.systemsGrid.currentIndex);
     }
 
     // Mirrors ScreenStateOverlay's `state` ternary so accept routing and
     // the in-screen overlay agree on which state we're in.
     function _state(): string {
         if (Browse.SystemsModel.loading)
-            return "loading"
+            return "loading";
         if ((Browse.SystemsModel.error_message ?? "") !== "")
-            return "error"
+            return "error";
         if (Browse.SystemsModel.count === 0)
-            return "empty"
-        return "ready"
+            return "empty";
+        return "ready";
     }
 
     function handleAction(action: string): void {
         if (action === "left") {
-            systems._performMove(-1, 0)
+            systems._performMove(-1, 0);
         } else if (action === "right") {
-            systems._performMove(1, 0)
+            systems._performMove(1, 0);
         } else if (action === "down") {
-            systems._performMove(0, 1)
+            systems._performMove(0, 1);
         } else if (action === "up") {
             // Up inside the grid moves a row; at the top row it wraps
             // to the bottom row of the same page. Use Escape to back
             // out to the hub.
-            systems._performMove(0, -1)
+            systems._performMove(0, -1);
         } else if (action === "page_prev") {
             // L shoulder. Ignored on non-Ready states — there's no
             // data to page through.
             if (systems._state() === "ready")
-                systems._performPage(-1)
+                systems._performPage(-1);
         } else if (action === "page_next") {
             // R shoulder.
             if (systems._state() === "ready")
-                systems._performPage(1)
+                systems._performPage(1);
         } else if (action === "accept") {
             // Accept routing depends on the screen's data state, matching
             // the help bar vocabulary in MainLayout.qml. Loading swallows
@@ -129,29 +125,23 @@ Item {
             // Empty/Error emit `requestAccept("")` to signal the router
             // to retry the current load (the [OK] RETRY contract).
             // Ready emits `requestAccept(systemId)` to drill into Games.
-            const state = systems._state()
+            const state = systems._state();
             if (state === "loading")
-                return
+                return;
             if (state === "error" || state === "empty") {
-                systems.requestAccept("")
-                return
+                systems.requestAccept("");
+                return;
             }
-            const chosen =
-                Browse.SystemsModel.system_id_at(systems.systemsGrid.currentIndex)
-            systems.requestAccept(chosen)
+            const chosen = Browse.SystemsModel.system_id_at(systems.systemsGrid.currentIndex);
+            systems.requestAccept(chosen);
         } else if (action === "write_card") {
             if (systems.systemsGrid.itemCount > 0) {
-                const idx = systems.systemsGrid.currentIndex
-                Browse.SystemsState.system_id =
-                    Browse.SystemsModel.system_id_at(idx)
-                systems.requestContextMenu(
-                    idx,
-                    systems._listLayout
-                        ? systemsList.currentCellRectIn(systems)
-                        : systems.systemsGrid.currentCellRectIn(systems))
+                const idx = systems.systemsGrid.currentIndex;
+                Browse.SystemsState.system_id = Browse.SystemsModel.system_id_at(idx);
+                systems.requestContextMenu(idx, systems._listLayout ? systemsList.currentCellRectIn(systems) : systems.systemsGrid.currentCellRectIn(systems));
             }
         } else if (action === "cancel") {
-            systems.requestHubScreen()
+            systems.requestHubScreen();
         }
     }
 
@@ -180,11 +170,8 @@ Item {
         height: Sizing.pctH(7)
         title: Browse.SystemsModel.current_category
         currentPage: systemsGrid.currentPage
-        totalPages: Math.max(1,
-            Math.ceil(Browse.SystemsModel.count / systemsGrid.pageSize))
-        totalText: Browse.SystemsModel.count > 0
-                   ? qsTr("%1 systems").arg(Browse.SystemsModel.count)
-                   : ""
+        totalPages: Math.max(1, Math.ceil(Browse.SystemsModel.count / systemsGrid.pageSize))
+        totalText: Browse.SystemsModel.count > 0 ? qsTr("%1 systems").arg(Browse.SystemsModel.count) : ""
         visible: !systems.transitioning
     }
 
@@ -201,18 +188,17 @@ Item {
         width: Sizing.pctW(45)
         model: Browse.SystemsModel
         currentIndex: systemsGrid.currentIndex
-        onItemHovered: (index) => systems._focusIndex(index)
-        onItemClicked: (index) => {
-            systems._focusIndex(index)
-            systems.handleAction("accept")
+        onItemHovered: index => systems._focusIndex(index)
+        onItemClicked: index => {
+            systems._focusIndex(index);
+            systems.handleAction("accept");
         }
-        onItemRightClicked: (index) => {
-            systems._focusIndex(index)
-            systems.handleAction("write_card")
+        onItemRightClicked: index => {
+            systems._focusIndex(index);
+            systems.handleAction("write_card");
         }
         onEmptyRightClicked: systems.handleAction("cancel")
-        onPageWheelRequested: (delta) => systems.handleAction(
-            delta > 0 ? "page_next" : "page_prev")
+        onPageWheelRequested: delta => systems.handleAction(delta > 0 ? "page_next" : "page_prev")
     }
 
     BrowseDetailPane {
@@ -241,18 +227,17 @@ Item {
         anchors.bottomMargin: Sizing.pctH(8)
         model: Browse.SystemsModel
         delegate: Tile {}
-        onItemHovered: (index) => systems._focusIndex(index)
-        onItemClicked: (index) => {
-            systems._focusIndex(index)
-            systems.handleAction("accept")
+        onItemHovered: index => systems._focusIndex(index)
+        onItemClicked: index => {
+            systems._focusIndex(index);
+            systems.handleAction("accept");
         }
-        onItemRightClicked: (index) => {
-            systems._focusIndex(index)
-            systems.handleAction("write_card")
+        onItemRightClicked: index => {
+            systems._focusIndex(index);
+            systems.handleAction("write_card");
         }
         onEmptyRightClicked: systems.handleAction("cancel")
-        onPageWheelRequested: (delta) => systems.handleAction(
-            delta > 0 ? "page_next" : "page_prev")
+        onPageWheelRequested: delta => systems.handleAction(delta > 0 ? "page_next" : "page_prev")
 
         // Hide the tiles while the router holds us here on a forward
         // transition (Systems → Games) so the centred "Loading…" cue
@@ -270,9 +255,7 @@ Item {
         anchors.right: parent.right
         anchors.top: systemsGrid.bottom
         height: Sizing.pctH(7)
-        text: systemsGrid.itemCount > 0
-              ? Browse.SystemsModel.system_name_at(systemsGrid.currentIndex)
-              : ""
+        text: systemsGrid.itemCount > 0 ? Browse.SystemsModel.system_name_at(systemsGrid.currentIndex) : ""
         visible: false
     }
 

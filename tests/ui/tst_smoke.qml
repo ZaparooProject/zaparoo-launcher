@@ -25,18 +25,18 @@ TestCase {
     }
 
     function test_window_loads() {
-        verify(mainWindow.visible, "Main window should be visible")
-        compare(mainWindow.title, "Zaparoo Launcher")
+        verify(mainWindow.visible, "Main window should be visible");
+        compare(mainWindow.title, "Zaparoo Launcher");
     }
 
     function test_initial_state() {
-        compare(mainWindow.activeScreen, "hub")
+        compare(mainWindow.activeScreen, "hub");
     }
 
     function test_system_status_properties_exist() {
-        compare(typeof Browse.SystemStatus.has_nfc, "boolean")
-        compare(typeof Browse.SystemStatus.has_wifi_internet, "boolean")
-        compare(typeof Browse.SystemStatus.has_lan_internet, "boolean")
-        compare(typeof Browse.SystemStatus.has_bluetooth, "boolean")
+        compare(typeof Browse.SystemStatus.has_nfc, "boolean");
+        compare(typeof Browse.SystemStatus.has_wifi_internet, "boolean");
+        compare(typeof Browse.SystemStatus.has_lan_internet, "boolean");
+        compare(typeof Browse.SystemStatus.has_bluetooth, "boolean");
     }
 }

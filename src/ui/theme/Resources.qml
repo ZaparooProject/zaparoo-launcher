@@ -41,18 +41,18 @@ QtObject {
     // "no cover" sentinel.
     function coverUrl(key: string): url {
         if (key === "")
-            return ""
+            return "";
         if (key.startsWith("media-image/"))
-            return "image://media-image/" + key.substring("media-image/".length)
-        const ext = key.startsWith("systems/") ? "png" : "svg"
-        return baseUrl + "images/" + key + "." + ext
+            return "image://media-image/" + key.substring("media-image/".length);
+        const ext = key.startsWith("systems/") ? "png" : "svg";
+        return baseUrl + "images/" + key + "." + ext;
     }
 
     // Top-right HUD host-status icons (NFC/Wi-Fi/LAN/Bluetooth).
     function statusIconUrl(name: string): url {
         if (name === "")
-            return ""
-        return baseUrl + "images/status/" + name + ".svg"
+            return "";
+        return baseUrl + "images/status/" + name + ".svg";
     }
 
     // General-purpose UI glyphs (folder, file, loading spinner, settings,
@@ -62,10 +62,10 @@ QtObject {
     // antialiased button-face shading survives intact.
     function iconUrl(name: string): url {
         if (name === "")
-            return ""
+            return "";
         if (name.startsWith("Button"))
-            return baseUrl + "images/buttons/" + buttonLayout + "/" + name + ".png"
-        const ext = name.startsWith("Dpad") ? "png" : "svg"
-        return baseUrl + "images/icons/" + name + "." + ext
+            return baseUrl + "images/buttons/" + buttonLayout + "/" + name + ".png";
+        const ext = name.startsWith("Dpad") ? "png" : "svg";
+        return baseUrl + "images/icons/" + name + "." + ext;
     }
 }
