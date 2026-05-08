@@ -16,8 +16,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Dynamic Qt linking required for LGPL compliance on desktop.
-# The ARM32 Docker build overrides this via -DBUILD_SHARED_LIBS=OFF in the toolchain.
+# Dynamic Qt linking required for LGPL compliance on desktop. The ARM32 Docker build overrides this
+# via -DBUILD_SHARED_LIBS=OFF in the toolchain.
 option(BUILD_SHARED_LIBS "Build shared libraries (required for LGPL desktop builds)" ON)
 option(ZAPAROO_BUILD_TESTS "Build unit/smoke tests" ON)
 option(ZAPAROO_DEV "Development mode: windowed window and dev core endpoint" OFF)
@@ -47,11 +47,13 @@ endif()
 
 qt_standard_project_setup(REQUIRES 6.7)
 
-# Place all QML module outputs in a predictable location so qmllint and
-# Qt Creator's code model can find them. See:
-# https://www.basyskom.de/en/how-to-use-modern-qml-tooling-in-practice/
+# Place all QML module outputs in a predictable location so qmllint and Qt Creator's code model can
+# find them. See: https://www.basyskom.de/en/how-to-use-modern-qml-tooling-in-practice/
 set(QT_QML_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/qml")
-set(QML_IMPORT_PATH "${QT_QML_OUTPUT_DIRECTORY}" CACHE PATH "Extra QML import paths for IDE")
+set(QML_IMPORT_PATH
+    "${QT_QML_OUTPUT_DIRECTORY}"
+    CACHE PATH "Extra QML import paths for IDE"
+)
 
 add_subdirectory(src/ui/theme)
 add_subdirectory(src/ui/components)

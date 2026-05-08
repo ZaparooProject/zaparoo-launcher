@@ -37,8 +37,8 @@ TestCase {
         // Core's catalog reaches READY. Tests don't run a real Core, so
         // mark the boot complete up-front; otherwise visibility-driven
         // assertions would fail against the boot curtain.
-        main.bootComplete = true
-        main.activeScreen = main.screenHub
+        main.bootComplete = true;
+        main.activeScreen = main.screenHub;
     }
 
     // Browse.* singletons are process-wide, so state writes leak across
@@ -46,9 +46,9 @@ TestCase {
     // later suites — in particular tst_smoke's test_initial_state — see
     // a clean Component.onCompleted path.
     function cleanup(): void {
-        Browse.AppState.active_screen = ""
-        Browse.HubState.category = ""
-        Browse.SystemsState.system_id = ""
+        Browse.AppState.active_screen = "";
+        Browse.HubState.category = "";
+        Browse.SystemsState.system_id = "";
         // set_system_id resets path_stack/selected_at_level to [""], [""]
         // internally, but only on an actual transition — the setter
         // early-returns when the new value equals the old. Tests that
@@ -56,8 +56,8 @@ TestCase {
         // system_id was already empty would leave dirty stack state for
         // the next test if we just assigned `= ""`. Force a transition
         // through a sentinel to guarantee the reset fires.
-        Browse.GamesState.system_id = "_cleanup_sentinel"
-        Browse.GamesState.system_id = ""
+        Browse.GamesState.system_id = "_cleanup_sentinel";
+        Browse.GamesState.system_id = "";
     }
 
     // CategoriesModel is empty in this test harness (no live Core).
@@ -65,40 +65,37 @@ TestCase {
     // model, because that would wipe the saved category from
     // persisted state.
     function test_empty_categories_navigation_preserves_hub_state(): void {
-        Browse.HubState.category = "persistence-probe-category"
-        main.handleKey(Qt.Key_Left)
-        main.handleKey(Qt.Key_Right)
-        compare(Browse.HubState.category, "persistence-probe-category",
-                "navigating an empty categories row must not overwrite HubState.category")
+        Browse.HubState.category = "persistence-probe-category";
+        main.handleKey(Qt.Key_Left);
+        main.handleKey(Qt.Key_Right);
+        compare(Browse.HubState.category, "persistence-probe-category", "navigating an empty categories row must not overwrite HubState.category");
     }
 
     function test_empty_systems_navigation_preserves_systems_state(): void {
-        Browse.SystemsState.system_id = "persistence-probe-system"
-        main.activeScreen = main.screenSystems
+        Browse.SystemsState.system_id = "persistence-probe-system";
+        main.activeScreen = main.screenSystems;
         // None of these keys flip screens on an empty grid — they're
         // all in-grid moves that no-op when there's nothing to move
         // to. None may write a system id derived from index 0.
-        main.handleKey(Qt.Key_Left)
-        main.handleKey(Qt.Key_Right)
-        main.handleKey(Qt.Key_Down)
-        main.handleKey(Qt.Key_Up)
-        compare(Browse.SystemsState.system_id, "persistence-probe-system",
-                "Navigating an empty systems grid must not overwrite SystemsState.system_id")
+        main.handleKey(Qt.Key_Left);
+        main.handleKey(Qt.Key_Right);
+        main.handleKey(Qt.Key_Down);
+        main.handleKey(Qt.Key_Up);
+        compare(Browse.SystemsState.system_id, "persistence-probe-system", "Navigating an empty systems grid must not overwrite SystemsState.system_id");
     }
 
     function test_empty_games_navigation_preserves_games_state(): void {
         // Seed selected_at_level[0] via the stack API. set_selected_at_top
         // mutates the deepest level only, and at this point the stack is
         // at its minimum — index 0 is the deepest.
-        Browse.GamesState.set_selected_at_top("persistence-probe-path")
-        main.activeScreen = main.screenGames
-        main.handleKey(Qt.Key_Left)
-        main.handleKey(Qt.Key_Right)
-        main.handleKey(Qt.Key_Up)
-        main.handleKey(Qt.Key_Down)
-        const sels = Browse.GamesState.selected_at_level
-        compare(sels[sels.length - 1], "persistence-probe-path",
-                "navigating an empty games grid must not overwrite GamesState selection")
+        Browse.GamesState.set_selected_at_top("persistence-probe-path");
+        main.activeScreen = main.screenGames;
+        main.handleKey(Qt.Key_Left);
+        main.handleKey(Qt.Key_Right);
+        main.handleKey(Qt.Key_Up);
+        main.handleKey(Qt.Key_Down);
+        const sels = Browse.GamesState.selected_at_level;
+        compare(sels[sels.length - 1], "persistence-probe-path", "navigating an empty games grid must not overwrite GamesState selection");
     }
 
     // Screen flips are user-visible intent, not selection state. On Hub
@@ -108,9 +105,8 @@ TestCase {
     // an empty Systems grid re-fires the current load instead of
     // flipping forward — the screen-flip-on-empty rule is Hub-only.
     function test_screen_flip_on_empty_categories_persists_active_screen(): void {
-        main.handleKey(Qt.Key_Return)
-        compare(Browse.AppState.active_screen, main.screenSystems,
-                "Enter must flip active_screen to systems even on an empty categories row")
+        main.handleKey(Qt.Key_Return);
+        compare(Browse.AppState.active_screen, main.screenSystems, "Enter must flip active_screen to systems even on an empty categories row");
     }
 
     // Symmetric to the Hub test above: that one proves the flip *does*
@@ -120,11 +116,10 @@ TestCase {
     // path that writes AppState — so we need a non-empty starting value
     // to detect a stray write.
     function test_enter_on_empty_systems_does_not_persist_games_screen(): void {
-        Browse.AppState.active_screen = "persistence-probe-screen"
-        main.activeScreen = main.screenSystems
-        main.handleKey(Qt.Key_Return)
-        compare(Browse.AppState.active_screen, "persistence-probe-screen",
-                "Enter on an empty systems grid must retry, not flip — AppState.active_screen must not be overwritten")
+        Browse.AppState.active_screen = "persistence-probe-screen";
+        main.activeScreen = main.screenSystems;
+        main.handleKey(Qt.Key_Return);
+        compare(Browse.AppState.active_screen, "persistence-probe-screen", "Enter on an empty systems grid must retry, not flip — AppState.active_screen must not be overwritten");
     }
 
     // Enter commits the highlighted selection into HubState so first-launch
@@ -132,26 +127,23 @@ TestCase {
     // disk. The write is guarded by count > 0 — on an empty row (this
     // harness) the guard must skip the write, leaving prior state intact.
     function test_enter_on_empty_categories_preserves_hub_state(): void {
-        Browse.HubState.category = "persistence-probe-category"
-        main.handleKey(Qt.Key_Return)
-        compare(Browse.HubState.category, "persistence-probe-category",
-                "Enter on an empty categories row must not overwrite HubState.category")
+        Browse.HubState.category = "persistence-probe-category";
+        main.handleKey(Qt.Key_Return);
+        compare(Browse.HubState.category, "persistence-probe-category", "Enter on an empty categories row must not overwrite HubState.category");
     }
 
     function test_enter_on_empty_systems_preserves_systems_state(): void {
-        Browse.SystemsState.system_id = "persistence-probe-system"
-        main.activeScreen = main.screenSystems
-        main.handleKey(Qt.Key_Return)
-        compare(Browse.SystemsState.system_id, "persistence-probe-system",
-                "Enter on an empty systems grid must not overwrite SystemsState.system_id")
+        Browse.SystemsState.system_id = "persistence-probe-system";
+        main.activeScreen = main.screenSystems;
+        main.handleKey(Qt.Key_Return);
+        compare(Browse.SystemsState.system_id, "persistence-probe-system", "Enter on an empty systems grid must not overwrite SystemsState.system_id");
     }
 
     function test_enter_on_empty_games_preserves_games_state(): void {
-        Browse.GamesState.set_selected_at_top("persistence-probe-path")
-        main.activeScreen = main.screenGames
-        main.handleKey(Qt.Key_Return)
-        const sels = Browse.GamesState.selected_at_level
-        compare(sels[sels.length - 1], "persistence-probe-path",
-                "Enter on an empty games grid must not overwrite GamesState selection")
+        Browse.GamesState.set_selected_at_top("persistence-probe-path");
+        main.activeScreen = main.screenGames;
+        main.handleKey(Qt.Key_Return);
+        const sels = Browse.GamesState.selected_at_level;
+        compare(sels[sels.length - 1], "persistence-probe-path", "Enter on an empty games grid must not overwrite GamesState selection");
     }
 }

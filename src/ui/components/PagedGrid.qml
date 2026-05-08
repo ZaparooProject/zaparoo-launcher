@@ -56,14 +56,14 @@ Item {
     // response; models without ignore it. The grid does not know
     // whether the model has more data — that is a model concern, kept
     // out of this component so it stays generic.
-    signal loadMoreRequested()
+    signal loadMoreRequested
     // Mouse entry points. Screens own persistence and activation side
     // effects, so the grid only updates its focused index and reports the
     // row the pointer targeted.
     signal itemHovered(int index)
     signal itemClicked(int index)
     signal itemRightClicked(int index)
-    signal emptyRightClicked()
+    signal emptyRightClicked
     signal pageWheelRequested(int delta)
 
     // Per-instance shape overrides. -1 means "use the global Sizing
@@ -73,10 +73,8 @@ Item {
     // vertical room a 3-row layout would starve.
     property int columnsOverride: -1
     property int rowsOverride: -1
-    readonly property int columns:
-        columnsOverride > 0 ? columnsOverride : Sizing.gridColumns
-    readonly property int rows:
-        rowsOverride > 0 ? rowsOverride : Sizing.gridRows
+    readonly property int columns: columnsOverride > 0 ? columnsOverride : Sizing.gridColumns
+    readonly property int rows: rowsOverride > 0 ? rowsOverride : Sizing.gridRows
 
     // Pages of buffer to keep ahead of the user's current page before
     // firing `loadMoreRequested`. With `loadAheadPages: 2` the trigger
@@ -97,10 +95,10 @@ Item {
     // to 0 while the initial chunk is still landing.
     readonly property int pageCount: {
         if (itemCount <= 0)
-            return 1
+            return 1;
         if (root.hasMorePages)
-            return Math.max(1, Math.floor(itemCount / pageSize))
-        return Math.ceil(itemCount / pageSize)
+            return Math.max(1, Math.floor(itemCount / pageSize));
+        return Math.ceil(itemCount / pageSize);
     }
     readonly property int currentPage: Math.floor(currentIndex / pageSize)
     readonly property int currentColumn: (currentIndex % pageSize) % columns
@@ -123,10 +121,8 @@ Item {
     // this to their model's authoritative total so the thumb stays
     // stable while `fetch_more` grows the slice in the background.
     property int totalItemsOverride: -1
-    readonly property int totalItems:
-        totalItemsOverride >= 0 ? totalItemsOverride : itemCount
-    readonly property int totalPageCount:
-        Math.max(1, Math.ceil(totalItems / pageSize))
+    readonly property int totalItems: totalItemsOverride >= 0 ? totalItemsOverride : itemCount
+    readonly property int totalPageCount: Math.max(1, Math.ceil(totalItems / pageSize))
 
     // Caller-supplied "more pages exist" flag for paginated models.
     // Drives the pending-target watchdog: if the model says no more pages
@@ -180,44 +176,31 @@ Item {
     // gridColumns × gridRows. Callers don't override. The cell area
     // also reserves `gutterGap + gutterWidth` on the right for the
     // tight-gap-then-scrollbar layout described above.
-    readonly property int _availableWidth:
-        Math.max(0,
-                 width - leftInset - rightInset - gutterGap - gutterWidth)
-    readonly property int _availableHeight:
-        Math.max(0, height - topInset - bottomInset)
-    readonly property int cellWidth:
-        Math.max(0,
-                 Math.floor((root._availableWidth - (root.columns - 1) * root.cellSpacingX)
-                            / root.columns))
-    readonly property int cellHeight:
-        Math.max(0,
-                 Math.floor((root._availableHeight - (root.rows - 1) * root.cellSpacingY)
-                            / root.rows))
+    readonly property int _availableWidth: Math.max(0, width - leftInset - rightInset - gutterGap - gutterWidth)
+    readonly property int _availableHeight: Math.max(0, height - topInset - bottomInset)
+    readonly property int cellWidth: Math.max(0, Math.floor((root._availableWidth - (root.columns - 1) * root.cellSpacingX) / root.columns))
+    readonly property int cellHeight: Math.max(0, Math.floor((root._availableHeight - (root.rows - 1) * root.cellSpacingY) / root.rows))
 
     function setCurrentIndexImmediate(idx: int): void {
-        root.currentIndex = idx
+        root.currentIndex = idx;
     }
 
-    function _handleWheel(wheel): void {
-        const amount = wheel.angleDelta.y !== 0
-            ? wheel.angleDelta.y : wheel.pixelDelta.y
+    function _handleWheel(wheel: WheelEvent): void {
+        const amount = wheel.angleDelta.y !== 0 ? wheel.angleDelta.y : wheel.pixelDelta.y;
         if (amount === 0)
-            return
-        root.pageWheelRequested(amount < 0 ? 1 : -1)
-        wheel.accepted = true
+            return;
+        root.pageWheelRequested(amount < 0 ? 1 : -1);
+        wheel.accepted = true;
     }
 
     function currentCellRectIn(target: Item): rect {
         if (root.itemCount <= 0)
-            return Qt.rect(0, 0, 0, 0)
-        const local = root.currentIndex % root.pageSize
-        const row = Math.floor(local / root.columns)
-        const col = local % root.columns
-        const p = root.mapToItem(
-            target,
-            root.leftInset + col * (root.cellWidth + root.cellSpacingX),
-            root.topInset + row * (root.cellHeight + root.cellSpacingY))
-        return Qt.rect(p.x, p.y, root.cellWidth, root.cellHeight)
+            return Qt.rect(0, 0, 0, 0);
+        const local = root.currentIndex % root.pageSize;
+        const row = Math.floor(local / root.columns);
+        const col = local % root.columns;
+        const p = root.mapToItem(target, root.leftInset + col * (root.cellWidth + root.cellSpacingX), root.topInset + row * (root.cellHeight + root.cellSpacingY));
+        return Qt.rect(p.x, p.y, root.cellWidth, root.cellHeight);
     }
 
     // Jump the selection by `delta` whole pages. Wraps in both
@@ -233,40 +216,36 @@ Item {
     // pending-jump was stashed or the dataset is single-page.
     function pageBy(delta: int): bool {
         if (root.itemCount <= 0 || root.totalPageCount <= 1 || delta === 0)
-            return false
-        const total = root.totalPageCount
+            return false;
+        const total = root.totalPageCount;
         // JS `%` keeps sign on negatives — normalise into [0, total).
-        const targetPage = ((root.currentPage + delta) % total + total) % total
+        const targetPage = ((root.currentPage + delta) % total + total) % total;
         if (targetPage === root.currentPage)
-            return false
+            return false;
         if (targetPage > root.pageCount - 1) {
             // Target page hasn't been fetched yet. Stash the intent and
             // let the itemCount-change watcher commit it.
-            root._pendingTargetPage = targetPage
-            root._pendingTargetRow = root.currentRow
-            root._pendingTargetCol = root.currentColumn
-            root.loadMoreRequested()
-            return false
+            root._pendingTargetPage = targetPage;
+            root._pendingTargetRow = root.currentRow;
+            root._pendingTargetCol = root.currentColumn;
+            root.loadMoreRequested();
+            return false;
         }
-        root._pendingTargetPage = -1
-        const targetSlot =
-            targetPage * root.pageSize
-            + root.currentRow * root.columns
-            + root.currentColumn
-        const lastIdxOnPage =
-            Math.min((targetPage + 1) * root.pageSize, root.itemCount) - 1
+        root._pendingTargetPage = -1;
+        const targetSlot = targetPage * root.pageSize + root.currentRow * root.columns + root.currentColumn;
+        const lastIdxOnPage = Math.min((targetPage + 1) * root.pageSize, root.itemCount) - 1;
         if (lastIdxOnPage < 0)
-            return false
-        const newIndex = Math.min(targetSlot, lastIdxOnPage)
+            return false;
+        const newIndex = Math.min(targetSlot, lastIdxOnPage);
         if (newIndex === root.currentIndex)
-            return false
-        root.currentIndex = newIndex
+            return false;
+        root.currentIndex = newIndex;
         // Mirror moveSelection's pre-fetch: when we cross within
         // `loadAheadPages` of the loaded edge, kick a fetch so the next
         // page boundary lands on freshly loaded rows.
         if (root.currentPage >= root.pageCount - root.loadAheadPages - 1)
-            root.loadMoreRequested()
-        return true
+            root.loadMoreRequested();
+        return true;
     }
 
     // Commit the pending target move once the destination slot is
@@ -280,50 +259,46 @@ Item {
     // while the row/col slot itself isn't realised yet.
     function _commitPendingTarget(): void {
         if (root._pendingTargetPage < 0)
-            return
+            return;
         // Total may have shrunk under us (e.g. Core revised total_files
         // downward); clamp the target to whatever the dataset reports
         // now so we never overshoot.
-        const totalLast = root.totalPageCount - 1
-        const targetPage = Math.min(root._pendingTargetPage, totalLast)
+        const totalLast = root.totalPageCount - 1;
+        const targetPage = Math.min(root._pendingTargetPage, totalLast);
         if (targetPage < 0) {
-            root._pendingTargetPage = -1
-            return
+            root._pendingTargetPage = -1;
+            return;
         }
-        const targetIdx = targetPage * root.pageSize
-                          + root._pendingTargetRow * root.columns
-                          + root._pendingTargetCol
+        const targetIdx = targetPage * root.pageSize + root._pendingTargetRow * root.columns + root._pendingTargetCol;
         if (targetIdx >= root.itemCount) {
             // Specific (page, row, col) slot not realised yet.
             if (root.hasMorePages) {
                 // Keep the chain going; `fetch_more` is debounced
                 // model-side via `loading_more`, so a redundant emit
                 // is cheap.
-                root.loadMoreRequested()
-                return
+                root.loadMoreRequested();
+                return;
             }
             // Model says no more pages are coming. Settle on the
             // target page's last loaded item if it has any; otherwise
             // fall back to the dataset's overall loaded last so the
             // user's "go to end" intent isn't ignored.
-            root._pendingTargetPage = -1
-            const pageStart = targetPage * root.pageSize
-            const lastLoadedOnPage =
-                Math.min((targetPage + 1) * root.pageSize,
-                         root.itemCount) - 1
+            root._pendingTargetPage = -1;
+            const pageStart = targetPage * root.pageSize;
+            const lastLoadedOnPage = Math.min((targetPage + 1) * root.pageSize, root.itemCount) - 1;
             if (lastLoadedOnPage >= pageStart) {
                 if (lastLoadedOnPage !== root.currentIndex)
-                    root.currentIndex = lastLoadedOnPage
-                return
+                    root.currentIndex = lastLoadedOnPage;
+                return;
             }
-            const overall = root.itemCount - 1
+            const overall = root.itemCount - 1;
             if (overall >= 0 && overall !== root.currentIndex)
-                root.currentIndex = overall
-            return
+                root.currentIndex = overall;
+            return;
         }
-        root._pendingTargetPage = -1
+        root._pendingTargetPage = -1;
         if (targetIdx !== root.currentIndex)
-            root.currentIndex = targetIdx
+            root.currentIndex = targetIdx;
     }
 
     // Step the selection by (dCol, dRow). Returns true if the index
@@ -351,11 +326,11 @@ Item {
     //   page so the user always moves rather than sticking on a hole.
     function moveSelection(dCol: int, dRow: int): bool {
         if (root.itemCount <= 0)
-            return false
+            return false;
 
-        let newPage = root.currentPage
-        let newRow = root.currentRow
-        let newCol = root.currentColumn
+        let newPage = root.currentPage;
+        let newRow = root.currentRow;
+        let newCol = root.currentColumn;
 
         // Horizontal wrap stays on the source row; clamp the wrap target
         // to the row's actual filled span so a partial last row cycles
@@ -363,21 +338,17 @@ Item {
         if (dCol !== 0) {
             // Sideways step changes the user's intent — drop any
             // pending wrap-target chain we were waiting on.
-            root._pendingTargetPage = -1
-            const rowFirstIndex =
-                root.currentPage * root.pageSize
-                + root.currentRow * root.columns
-            const rowLastIndex =
-                Math.min(root.itemCount - 1,
-                         rowFirstIndex + root.columns - 1)
-            const maxColOnRow = rowLastIndex - rowFirstIndex
-            const colCandidate = root.currentColumn + dCol
+            root._pendingTargetPage = -1;
+            const rowFirstIndex = root.currentPage * root.pageSize + root.currentRow * root.columns;
+            const rowLastIndex = Math.min(root.itemCount - 1, rowFirstIndex + root.columns - 1);
+            const maxColOnRow = rowLastIndex - rowFirstIndex;
+            const colCandidate = root.currentColumn + dCol;
             if (colCandidate < 0)
-                newCol = maxColOnRow
+                newCol = maxColOnRow;
             else if (colCandidate > maxColOnRow)
-                newCol = 0
+                newCol = 0;
             else
-                newCol = colCandidate
+                newCol = colCandidate;
         }
 
         // Vertical wrap crosses page boundaries against the dataset's
@@ -396,56 +367,47 @@ Item {
         // of this function lands on the user's current cell and the
         // press appears to do nothing.
         if (dRow !== 0) {
-            const rowCandidate = root.currentRow + dRow
-            const itemsOnPage = Math.min(
-                root.pageSize,
-                root.itemCount - root.currentPage * root.pageSize)
-            const lastFilledRowOnPage =
-                Math.floor((itemsOnPage - 1) / root.columns)
+            const rowCandidate = root.currentRow + dRow;
+            const itemsOnPage = Math.min(root.pageSize, root.itemCount - root.currentPage * root.pageSize);
+            const lastFilledRowOnPage = Math.floor((itemsOnPage - 1) / root.columns);
             if (rowCandidate < 0) {
-                const targetPage = root.currentPage === 0
-                                   ? root.totalPageCount - 1
-                                   : root.currentPage - 1
+                const targetPage = root.currentPage === 0 ? root.totalPageCount - 1 : root.currentPage - 1;
                 if (targetPage > root.pageCount - 1) {
-                    root._pendingTargetPage = targetPage
-                    root._pendingTargetRow = root.rows - 1
-                    root._pendingTargetCol = root.currentColumn
-                    root.loadMoreRequested()
-                    return false
+                    root._pendingTargetPage = targetPage;
+                    root._pendingTargetRow = root.rows - 1;
+                    root._pendingTargetCol = root.currentColumn;
+                    root.loadMoreRequested();
+                    return false;
                 }
-                newPage = targetPage
-                newRow = root.rows - 1
-            } else if (rowCandidate >= root.rows
-                       || rowCandidate > lastFilledRowOnPage) {
-                const lastPage = root.totalPageCount - 1
-                const targetPage = root.currentPage === lastPage
-                                   ? 0
-                                   : root.currentPage + 1
+                newPage = targetPage;
+                newRow = root.rows - 1;
+            } else if (rowCandidate >= root.rows || rowCandidate > lastFilledRowOnPage) {
+                const lastPage = root.totalPageCount - 1;
+                const targetPage = root.currentPage === lastPage ? 0 : root.currentPage + 1;
                 if (targetPage > root.pageCount - 1) {
-                    root._pendingTargetPage = targetPage
-                    root._pendingTargetRow = 0
-                    root._pendingTargetCol = root.currentColumn
-                    root.loadMoreRequested()
-                    return false
+                    root._pendingTargetPage = targetPage;
+                    root._pendingTargetRow = 0;
+                    root._pendingTargetCol = root.currentColumn;
+                    root.loadMoreRequested();
+                    return false;
                 }
-                newPage = targetPage
-                newRow = 0
+                newPage = targetPage;
+                newRow = 0;
             } else {
-                newRow = rowCandidate
+                newRow = rowCandidate;
             }
         }
 
-        let newIndex = newPage * root.pageSize + newRow * root.columns + newCol
+        let newIndex = newPage * root.pageSize + newRow * root.columns + newCol;
         if (newIndex < 0)
-            return false
+            return false;
         if (newIndex >= root.itemCount) {
             // Target slot is a hole on a partial page. Clamp to the
             // page's last existing item.
-            const lastIdxOnPage =
-                Math.min((newPage + 1) * root.pageSize, root.itemCount) - 1
+            const lastIdxOnPage = Math.min((newPage + 1) * root.pageSize, root.itemCount) - 1;
             if (lastIdxOnPage < 0)
-                return false
-            newIndex = lastIdxOnPage
+                return false;
+            newIndex = lastIdxOnPage;
         }
         if (newIndex === root.currentIndex) {
             // Selection didn't move because the user is at an edge with
@@ -454,13 +416,13 @@ Item {
             // fetch more so a subsequent press can land on freshly-
             // loaded rows.
             if (root.currentPage >= root.pageCount - root.loadAheadPages - 1)
-                root.loadMoreRequested()
-            return false
+                root.loadMoreRequested();
+            return false;
         }
         // Successful directional move clears any pending wrap-target;
         // the user is no longer waiting on it.
-        root._pendingTargetPage = -1
-        root.currentIndex = newIndex
+        root._pendingTargetPage = -1;
+        root.currentIndex = newIndex;
         // Pre-fetch early - when the user enters within `loadAheadPages`
         // of the loaded edge, kick off the next fetch so the network
         // round-trip and model insert overlap with selection travel,
@@ -468,8 +430,8 @@ Item {
         // model's own debounce (`loading_more` guard) collapses
         // repeated emissions while a fetch is in flight.
         if (root.currentPage >= root.pageCount - root.loadAheadPages - 1)
-            root.loadMoreRequested()
-        return true
+            root.loadMoreRequested();
+        return true;
     }
 
     // Defensive clamp on shrinkage only: if the model shed rows below
@@ -486,7 +448,7 @@ Item {
     // (e.g. a final empty append).
     onHasMorePagesChanged: {
         if (root._pendingTargetPage >= 0)
-            root._commitPendingTarget()
+            root._commitPendingTarget();
     }
 
     onItemCountChanged: {
@@ -494,18 +456,18 @@ Item {
             // Model shed rows (reset, system change, path change). The
             // pending-target context no longer applies — drop it before
             // the row-count check below moves currentIndex.
-            root._pendingTargetPage = -1
+            root._pendingTargetPage = -1;
             if (root.currentIndex >= root.itemCount)
-                root.currentIndex = Math.max(0, root.itemCount - 1)
+                root.currentIndex = Math.max(0, root.itemCount - 1);
         } else if (root.itemCount > root._previousItemCount) {
             // Pages were appended. If a wrap-target jump is pending,
             // try to commit it now; the helper chains another
             // `loadMoreRequested` if the target is still ahead, or
             // settles on the loaded last item if `hasMorePages`
             // says no more pages are coming.
-            root._commitPendingTarget()
+            root._commitPendingTarget();
         }
-        root._previousItemCount = root.itemCount
+        root._previousItemCount = root.itemCount;
     }
 
     clip: true
@@ -515,7 +477,7 @@ Item {
         hoverEnabled: true
         acceptedButtons: Qt.RightButton
         onClicked: root.emptyRightClicked()
-        onWheel: (wheel) => root._handleWheel(wheel)
+        onWheel: wheel => root._handleWheel(wheel)
     }
 
     Item {
@@ -585,27 +547,20 @@ Item {
                 // after crossing past the retention edge runs at
                 // nice +10 (see media_image_provider.cpp) and is
                 // invisible to the renderer.
-                readonly property bool _coverInRange:
-                    Math.abs(cellPage - root.currentPage) <= 2
-                readonly property bool _coverInRetentionRange:
-                    Math.abs(cellPage - root.currentPage) <= 5
+                readonly property bool _coverInRange: Math.abs(cellPage - root.currentPage) <= 2
+                readonly property bool _coverInRetentionRange: Math.abs(cellPage - root.currentPage) <= 5
                 property bool _coverEverRequested: false
                 Binding on _coverEverRequested {
                     when: cellItem._coverInRange
                     value: true
                     restoreMode: Binding.RestoreNone
                 }
-                readonly property string _gatedCoverKey:
-                    (_coverInRange
-                     || (_coverEverRequested && _coverInRetentionRange))
-                        ? coverKey : ""
+                readonly property string _gatedCoverKey: (_coverInRange || (_coverEverRequested && _coverInRetentionRange)) ? coverKey : ""
 
                 width: root.cellWidth
                 height: root.cellHeight
-                x: root.leftInset
-                   + cellCol * (root.cellWidth + root.cellSpacingX)
-                y: root.topInset
-                   + cellRow * (root.cellHeight + root.cellSpacingY)
+                x: root.leftInset + cellCol * (root.cellWidth + root.cellSpacingX)
+                y: root.topInset + cellRow * (root.cellHeight + root.cellSpacingY)
                 // Selected tile draws on top so its scale-up tween isn't
                 // clipped by neighbours below/right of it.
                 z: isSelected ? 1 : 0
@@ -669,20 +624,20 @@ Item {
 
                     onEntered: {
                         if (root.currentIndex !== cellItem.index)
-                            root.currentIndex = cellItem.index
-                        root.itemHovered(cellItem.index)
+                            root.currentIndex = cellItem.index;
+                        root.itemHovered(cellItem.index);
                     }
 
-                    onClicked: (mouse) => {
+                    onClicked: mouse => {
                         if (root.currentIndex !== cellItem.index)
-                            root.currentIndex = cellItem.index
+                            root.currentIndex = cellItem.index;
                         if (mouse.button === Qt.RightButton)
-                            root.itemRightClicked(cellItem.index)
+                            root.itemRightClicked(cellItem.index);
                         else
-                            root.itemClicked(cellItem.index)
+                            root.itemClicked(cellItem.index);
                     }
 
-                    onWheel: (wheel) => root._handleWheel(wheel)
+                    onWheel: wheel => root._handleWheel(wheel)
                 }
             }
         }
@@ -708,8 +663,7 @@ Item {
         width: root.gutterWidth
         visible: root.totalPageCount > 1
 
-        readonly property int arrowSize:
-            Math.min(width, Sizing.pctH(4))
+        readonly property int arrowSize: Math.min(width, Sizing.pctH(4))
 
         Image {
             id: upArrow
@@ -769,14 +723,8 @@ Item {
             // remaining range. Floor on thumb height keeps it visible
             // when `totalPageCount` is large.
             readonly property int _minThumbHeight: Sizing.pctH(4)
-            readonly property int _thumbHeight:
-                Math.max(_minThumbHeight,
-                         Math.round(scrollRegion.height / root.totalPageCount))
-            readonly property int _thumbY:
-                root.totalPageCount <= 1
-                    ? 0
-                    : Sizing.px((root.currentPage / (root.totalPageCount - 1))
-                                * (scrollRegion.height - _thumbHeight))
+            readonly property int _thumbHeight: Math.max(_minThumbHeight, Math.round(scrollRegion.height / root.totalPageCount))
+            readonly property int _thumbY: root.totalPageCount <= 1 ? 0 : Sizing.px((root.currentPage / (root.totalPageCount - 1)) * (scrollRegion.height - _thumbHeight))
 
             Rectangle {
                 id: scrollThumb

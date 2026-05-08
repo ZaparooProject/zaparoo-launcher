@@ -1,16 +1,11 @@
 // Zaparoo Launcher
 // Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-
-import QtQuick
-import Zaparoo.Theme
-
 // Unified grid tile. Solid card with a centered icon area filling the
 // card body, plus a white outline ring around the card when this tile
 // is the focused selection. Used by every tile surface in the launcher
 // — hub categories row, systems grid, games grid, recents grid — so
 // the vocabulary is identical across screens.
-//
 // Two layout modes, gated by `showCaption`:
 //   - off (default): full-bleed icon, no in-tile label. Used by Hub
 //     and Systems where a curated logo already carries identity.
@@ -19,12 +14,10 @@ import Zaparoo.Theme
 //     and Recents because a long shelf of similar boxart needs
 //     per-tile labelling — the focused-tile caption below the grid
 //     (ActiveLabel) only identifies one cell at a time.
-//
 // In caption mode the loading-state fallback is an hourglass glyph,
 // not the wrapping-name text used in non-caption mode — the bottom
 // caption already shows the name, so the centred-text fallback would
 // just read it twice.
-//
 // Parent contract — Tile must be loaded inside a host that exposes:
 //   - isSelected: bool   — true when this tile is the focused selection
 //   - isFocused:  bool   — true when the section owning this tile has user focus
@@ -32,7 +25,10 @@ import Zaparoo.Theme
 //                          fallback while the cover PNG decodes)
 //   - coverKey:   string — relative path under resources/images/ (no extension)
 //   - favorite:   int    — optional 0/1; shows a small heart badge when 1
-//
+
+import QtQuick
+import Zaparoo.Theme
+
 // PagedGrid.qml and HubScreen's static category row both wrap their
 // Tile delegate in a TileLoader that defines the required properties
 // above; QML's late-binding model means a caller that forgets one
@@ -40,10 +36,6 @@ import Zaparoo.Theme
 // Component.onCompleted check below converts that footgun into a
 // loud warning.
 Item {
-    id: root
-
-    anchors.fill: parent
-
     // Do NOT add `layer.enabled` here. On Qt's software adaptation
     // it allocates a per-item QImage backing store, blits it into
     // the parent on every paint (extra memcpy, not the cached-blit
@@ -54,6 +46,24 @@ Item {
     // `layer.enabled` is documented for scene graph (GPU) rendering;
     // on the MiSTer software target it is a regression, not an
     // optimization.
+    // qmllint enable missing-property compiler
+    // qmllint enable missing-property compiler
+    // No focus scale bump. The earlier 1.06 scale on the focused tile
+    // forced a bilinear resample of the cover pixmap on every focus
+    // move and overflowed the cell by ~3% on each side, dirtying
+    // strips of up to four neighbours per press — under software
+    // rendering on MiSTer that read as choppy d-pad navigation on
+    // covered grids. The focus outline ring + caption + active-label
+    // already mark the selection clearly, so the size cue isn't worth
+    // the per-press repaint cost. See `docs/qml-gotchas.md` →
+    // "Software-renderer animation costs".
+    // Bottom caption strip (caption mode only). Single line, ellipsised
+    // when long. Tints to `textPrimary` on the focused tile so the
+    // selection reads at a glance even when the focus outline ring is
+    // outside the eye's centre — matches the procedural fallback's
+    // focus tint above.
+
+    id: root
 
     // qmllint disable missing-property compiler
     readonly property bool delegateIsSelected: parent.isSelected
@@ -61,31 +71,10 @@ Item {
     readonly property string delegateName: parent.name
     readonly property string delegateCoverKey: parent.coverKey
     readonly property bool delegateFavorite: parent.favorite !== 0
-    // qmllint enable missing-property compiler
-
-    Component.onCompleted: {
-        // Self-check the parent contract. Logs once at construction so
-        // a future caller that drops Tile into a non-conforming wrapper
-        // sees the failure mode immediately instead of debugging
-        // mysteriously empty tiles.
-        // qmllint disable missing-property compiler
-        if (typeof parent.isSelected !== "boolean"
-            || typeof parent.isFocused !== "boolean"
-            || typeof parent.name !== "string"
-            || typeof parent.coverKey !== "string") {
-            console.warn(
-                "Tile: parent does not satisfy the delegate contract "
-                + "(expected isSelected:bool, isFocused:bool, "
-                + "name:string, coverKey:string)")
-        }
-        // qmllint enable missing-property compiler
-    }
-
     // Opt-in per-tile name caption. Off by default so Hub and Systems
     // keep their full-bleed logo layout. Cover-art screens (Games,
     // Recents) flip this on at the delegate template.
     property bool showCaption: false
-
     // Equal cover padding on top, left, and right — the bottom is
     // owned by the caption strip in caption mode and matches `_padding`
     // visually in non-caption mode. pctH(2) is enough to read as
@@ -98,31 +87,27 @@ Item {
     readonly property int _captionHeight: Sizing.pctH(5.5)
     readonly property int _captionGap: Sizing.pctH(0.4)
     readonly property int _captionTextSize: Sizing.fontSize(2.2)
-    readonly property int _captionTextMaxWidth:
-        Math.max(0, root.width - 2 * Sizing.cornerRadius)
-    readonly property int _captionTextWidth:
-        Math.min(root._captionTextMaxWidth, Sizing.px(captionMetrics.advanceWidth))
+    readonly property int _captionTextMaxWidth: Math.max(0, root.width - 2 * Sizing.cornerRadius)
+    readonly property int _captionTextWidth: Math.min(root._captionTextMaxWidth, Sizing.px(captionMetrics.advanceWidth))
 
-    readonly property bool _focusedSelection:
-        root.delegateIsSelected && root.delegateIsFocused
-
+    readonly property bool _focusedSelection: root.delegateIsSelected && root.delegateIsFocused
     // `coverKey` is the relative path under `resources/images/` without
     // extension — `systems/snes`, `categories/Consoles`, etc. The model
     // chooses the subdirectory; Tile is agnostic. Resources.coverUrl is
     // the single source of truth for the qrc layout — see Resources.qml.
-    readonly property url _coverSource:
-        Resources.coverUrl(root.delegateCoverKey)
+    readonly property url _coverSource: Resources.coverUrl(root.delegateCoverKey)
     readonly property bool _hasCover: cover.status === Image.Ready
 
-    // No focus scale bump. The earlier 1.06 scale on the focused tile
-    // forced a bilinear resample of the cover pixmap on every focus
-    // move and overflowed the cell by ~3% on each side, dirtying
-    // strips of up to four neighbours per press — under software
-    // rendering on MiSTer that read as choppy d-pad navigation on
-    // covered grids. The focus outline ring + caption + active-label
-    // already mark the selection clearly, so the size cue isn't worth
-    // the per-press repaint cost. See `docs/qml-gotchas.md` →
-    // "Software-renderer animation costs".
+    anchors.fill: parent
+    Component.onCompleted: {
+        // Self-check the parent contract. Logs once at construction so
+        // a future caller that drops Tile into a non-conforming wrapper
+        // sees the failure mode immediately instead of debugging
+        // mysteriously empty tiles.
+        // qmllint disable missing-property compiler
+        if (typeof parent.isSelected !== "boolean" || typeof parent.isFocused !== "boolean" || typeof parent.name !== "string" || typeof parent.coverKey !== "string")
+            console.warn("Tile: parent does not satisfy the delegate contract " + "(expected isSelected:bool, isFocused:bool, " + "name:string, coverKey:string)");
+    }
 
     // Tile body. Solid card so the white icon has a high-contrast
     // surface. Always visible — no opacity gating — which is the
@@ -156,6 +141,7 @@ Item {
     // never bleeds past the cell bounds.
     Rectangle {
         id: focusRingOuter
+
         anchors.fill: parent
         anchors.margins: root._outlineGap
         color: Theme.textPrimary
@@ -163,6 +149,7 @@ Item {
         antialiasing: true
         visible: root._focusedSelection
     }
+
     Rectangle {
         anchors.fill: focusRingOuter
         anchors.margins: root._outlineWidth
@@ -184,20 +171,6 @@ Item {
     Image {
         id: cover
 
-        anchors {
-            top: parent.top
-            topMargin: root._padding
-            bottom: parent.bottom
-            // In caption mode the cover sits above the bottom caption
-            // strip with only `_captionGap` of breathing room. The
-            // caption is flush against the card's bottom edge, so the
-            // cover's lower bound is just (caption height + gap) —
-            // there is no second layer of card padding below.
-            bottomMargin: root.showCaption
-                          ? root._captionHeight + root._captionGap
-                          : root._padding
-            horizontalCenter: parent.horizontalCenter
-        }
         width: parent.width - 2 * root._padding
         source: root._coverSource
         // Pin to the system PNGs' native width (256). A size-dependent
@@ -210,7 +183,20 @@ Item {
         fillMode: Image.PreserveAspectFit
         smooth: true
         asynchronous: true
-        opacity: root._hasCover ? 1.0 : 0.0
+        opacity: root._hasCover ? 1 : 0
+
+        anchors {
+            top: parent.top
+            topMargin: root._padding
+            bottom: parent.bottom
+            // In caption mode the cover sits above the bottom caption
+            // strip with only `_captionGap` of breathing room. The
+            // caption is flush against the card's bottom edge, so the
+            // cover's lower bound is just (caption height + gap) —
+            // there is no second layer of card padding below.
+            bottomMargin: root.showCaption ? root._captionHeight + root._captionGap : root._padding
+            horizontalCenter: parent.horizontalCenter
+        }
     }
 
     // Caption-mode loading cue. Centred hourglass glyph that paints
@@ -221,6 +207,7 @@ Item {
     // the tile. Bundled qrc asset, decode is cheap, no animation.
     Image {
         id: loadingGlyph
+
         x: cover.x + Sizing.center(cover.width, width)
         y: cover.y + Sizing.center(cover.height, height)
         width: Sizing.pctH(10)
@@ -242,6 +229,7 @@ Item {
 
     Image {
         id: favoriteGlyph
+
         anchors.left: parent.left
         anchors.top: parent.top
         anchors.leftMargin: Sizing.px(parent.width / 12)
@@ -278,7 +266,7 @@ Item {
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
         renderType: Text.NativeRendering
-        opacity: (!root.showCaption && !root._hasCover) ? 1.0 : 0.0
+        opacity: (!root.showCaption && !root._hasCover) ? 1 : 0
         clip: true
     }
 
@@ -313,8 +301,7 @@ Item {
         id: caption
 
         x: Sizing.center(parent.width, width)
-        y: parent.height - root._captionHeight
-           + Sizing.center(root._captionHeight, height)
+        y: parent.height - root._captionHeight + Sizing.center(root._captionHeight, height)
         width: root._captionTextWidth
         height: root._captionTextSize
         visible: root.showCaption

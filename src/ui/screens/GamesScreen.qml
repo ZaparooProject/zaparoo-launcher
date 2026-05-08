@@ -31,8 +31,7 @@ Item {
     readonly property bool _listLayout: Browse.Settings.current_browse_layout === "list"
     readonly property real _listBandScale: 0.85
     readonly property int _listPageSize: 10
-    readonly property int _browsePageSize:
-        games._listLayout ? games._listPageSize : gamesGrid.pageSize
+    readonly property int _browsePageSize: games._listLayout ? games._listPageSize : gamesGrid.pageSize
     property bool _currentMoveIsRepeat: false
 
     // Cover-gate flag: true while `GamesModel` is holding `loading`
@@ -44,15 +43,15 @@ Item {
 
     on_ListLayoutChanged: {
         if (games._listLayout) {
-            games._fillListPage()
-            games._scheduleMetadataLoad(false)
+            games._fillListPage();
+            games._scheduleMetadataLoad(false);
         }
     }
 
     // Emitted when the user presses Escape — Main.qml flips the
     // active screen back to SystemsScreen (one peer up the back-stack;
     // a second Escape from there pops to Hub).
-    signal requestSystemsScreen()
+    signal requestSystemsScreen
     signal requestContextMenu(int index, var anchorRect)
 
     // Emitted when the user accepts a directory or root entry — Main.qml
@@ -62,7 +61,7 @@ Item {
 
     // Emitted when the user cancels from a deeper folder level — Main.qml
     // pops one level off the stack and rebrowses the parent.
-    signal requestNavigateOutOfFolder()
+    signal requestNavigateOutOfFolder
 
     // Persist debounce. Writing `state.toml` is an atomic
     // write+sync_all+rename (`rust/zaparoo-core/src/persist.rs`); on
@@ -82,15 +81,14 @@ Item {
         repeat: false
         onTriggered: {
             if (games._pendingSelectedPath !== "")
-                Browse.GamesState.set_selected_at_top(
-                    games._pendingSelectedPath)
-            games._pendingSelectedPath = ""
+                Browse.GamesState.set_selected_at_top(games._pendingSelectedPath);
+            games._pendingSelectedPath = "";
         }
     }
 
     function _scheduleSelectedPersist(path: string): void {
-        games._pendingSelectedPath = path
-        persistDebounce.restart()
+        games._pendingSelectedPath = path;
+        persistDebounce.restart();
     }
 
     // Force any pending persist to land synchronously. Called from the
@@ -100,12 +98,11 @@ Item {
     // `_stopRepeat` so dpad release commits the latest cell.
     function flushSelectedPersist(): void {
         if (!persistDebounce.running && games._pendingSelectedPath === "")
-            return
-        persistDebounce.stop()
+            return;
+        persistDebounce.stop();
         if (games._pendingSelectedPath !== "")
-            Browse.GamesState.set_selected_at_top(
-                games._pendingSelectedPath)
-        games._pendingSelectedPath = ""
+            Browse.GamesState.set_selected_at_top(games._pendingSelectedPath);
+        games._pendingSelectedPath = "";
     }
 
     // Move selection by (dx, dy) and commit the new selection on
@@ -115,82 +112,75 @@ Item {
     function _performMove(dx: int, dy: int, isRepeat): void {
         if (games._listLayout) {
             if (dy !== 0)
-                games._performLinearMove(dy, isRepeat === true)
-            return
+                games._performLinearMove(dy, isRepeat === true);
+            return;
         }
         if (games.gamesGrid.moveSelection(dx, dy))
-            games._scheduleSelectedPersist(
-                Browse.GamesModel.path_at(games.gamesGrid.currentIndex))
+            games._scheduleSelectedPersist(Browse.GamesModel.path_at(games.gamesGrid.currentIndex));
     }
 
     function _performLinearMove(delta: int, isRepeat: bool): void {
-        const count = games.gamesGrid.itemCount
+        const count = games.gamesGrid.itemCount;
         if (count <= 0)
-            return
-        let next = games.gamesGrid.currentIndex + delta
+            return;
+        let next = games.gamesGrid.currentIndex + delta;
         if (next < 0)
-            next = count - 1
+            next = count - 1;
         else if (next >= count) {
-            const knownTotal = Browse.GamesModel.dir_count
-                               + Browse.GamesModel.total_files
+            const knownTotal = Browse.GamesModel.dir_count + Browse.GamesModel.total_files;
             if (games._listHasMore(count, knownTotal)) {
-                Browse.GamesModel.fetch_more()
-                return
+                Browse.GamesModel.fetch_more();
+                return;
             }
-            next = 0
+            next = 0;
         }
         if (next === games.gamesGrid.currentIndex) {
             if (next >= count - 2)
-                Browse.GamesModel.fetch_more()
-            return
+                Browse.GamesModel.fetch_more();
+            return;
         }
-        games._currentMoveIsRepeat = isRepeat
-        games.gamesGrid.currentIndex = next
-        games._currentMoveIsRepeat = false
-        Browse.GamesState.set_selected_at_top(
-            Browse.GamesModel.path_at(games.gamesGrid.currentIndex))
-        if (next >= count - 2
-            && Browse.GamesModel.has_next_page)
-            Browse.GamesModel.fetch_more()
-        games._prefetchListTail(next)
+        games._currentMoveIsRepeat = isRepeat;
+        games.gamesGrid.currentIndex = next;
+        games._currentMoveIsRepeat = false;
+        games._scheduleSelectedPersist(Browse.GamesModel.path_at(games.gamesGrid.currentIndex));
+        if (next >= count - 2 && Browse.GamesModel.has_next_page)
+            Browse.GamesModel.fetch_more();
+        games._prefetchListTail(next);
     }
 
     function _scheduleMetadataLoad(isRepeat): void {
         if (!games._listLayout)
-            return
+            return;
         if (isRepeat === true)
-            Browse.GamesModel.clear_current_detail()
-        metadataLoadDebounce.restart()
+            Browse.GamesModel.clear_current_detail();
+        metadataLoadDebounce.restart();
     }
 
     function _loadSelectedMetadata(): void {
         if (!games._listLayout || games.gamesGrid.itemCount <= 0)
-            return
-        Browse.GamesModel.load_description_at(gamesGrid.currentIndex)
+            return;
+        Browse.GamesModel.load_description_at(gamesGrid.currentIndex);
     }
 
     function _fillListPage(): void {
         if (!games._listLayout)
-            return
-        const count = games.gamesGrid.itemCount
-        if (count > 0 && count <= games._listPageSize
-            && Browse.GamesModel.has_next_page)
-            Browse.GamesModel.fetch_more()
+            return;
+        const count = games.gamesGrid.itemCount;
+        if (count > 0 && count <= games._listPageSize && Browse.GamesModel.has_next_page)
+            Browse.GamesModel.fetch_more();
     }
 
     function _listHasMore(count: int, knownTotal: int): bool {
-        return Browse.GamesModel.has_next_page || knownTotal > count
+        return Browse.GamesModel.has_next_page || knownTotal > count;
     }
 
     function _prefetchListTail(index: int): void {
         if (!games._listLayout || Browse.GamesModel.loading_more)
-            return
-        const count = games.gamesGrid.itemCount
-        const knownTotal = Browse.GamesModel.dir_count
-                           + Browse.GamesModel.total_files
-        if (index >= count - games._listPageSize
-            && games._listHasMore(count, knownTotal))
-            Browse.GamesModel.fetch_more()
+            return;
+        const count = games.gamesGrid.itemCount;
+        const knownTotal = Browse.GamesModel.dir_count + Browse.GamesModel.total_files;
+        if (index >= count - games._listPageSize && games._listHasMore(count, knownTotal))
+            Browse.GamesModel.fetch_more();
     }
 
     // Page jump (L/R shoulder buttons). Wraps in both directions; same
@@ -198,69 +188,64 @@ Item {
     // tracks whichever item the user lands on.
     function _performPage(delta: int): void {
         if (games.gamesGrid.pageBy(delta))
-            games._scheduleSelectedPersist(
-                Browse.GamesModel.path_at(games.gamesGrid.currentIndex))
+            games._scheduleSelectedPersist(Browse.GamesModel.path_at(games.gamesGrid.currentIndex));
     }
 
     function _focusIndex(index: int): void {
         if (index < 0 || index >= games.gamesGrid.itemCount)
-            return
-        games._currentMoveIsRepeat = false
-        games.gamesGrid.currentIndex = index
-        games._currentMoveIsRepeat = false
-        Browse.GamesState.set_selected_at_top(
-            Browse.GamesModel.path_at(games.gamesGrid.currentIndex))
-        games._scheduleSelectedPersist(
-            Browse.GamesModel.path_at(games.gamesGrid.currentIndex))
+            return;
+        games._currentMoveIsRepeat = false;
+        games.gamesGrid.currentIndex = index;
+        games._currentMoveIsRepeat = false;
+        games._scheduleSelectedPersist(Browse.GamesModel.path_at(games.gamesGrid.currentIndex));
     }
 
     // Mirrors ScreenStateOverlay's `state` ternary so accept routing and
     // the in-screen overlay agree on which state we're in.
     function _state(): string {
         if (Browse.GamesModel.loading)
-            return "loading"
+            return "loading";
         if ((Browse.GamesModel.error_message ?? "") !== "")
-            return "error"
+            return "error";
         if (Browse.GamesModel.count === 0)
-            return "empty"
-        return "ready"
+            return "empty";
+        return "ready";
     }
 
     // True when we're inside a navigated folder (path_stack length > 1).
     // Drives folder-aware cancel routing.
     function _atFolderLevel(): bool {
-        return Browse.GamesState.path_stack.length > 1
+        return Browse.GamesState.path_stack.length > 1;
     }
 
     function handleAction(action: string, isRepeat): void {
-        if (games._listLayout && isRepeat === true
-            && (action === "up" || action === "down")) {
-            Browse.GamesModel.clear_current_detail()
-            metadataLoadDebounce.restart()
+        if (games._listLayout && isRepeat === true && (action === "up" || action === "down")) {
+            Browse.GamesModel.clear_current_detail();
+            metadataLoadDebounce.restart();
         }
         if (action === "left") {
             if (games._listLayout)
-                Browse.GamesModel.cycle_detail_image(-1)
+                Browse.GamesModel.cycle_detail_image(-1);
             else
-                games._performMove(-1, 0, isRepeat)
+                games._performMove(-1, 0, isRepeat);
         } else if (action === "right") {
             if (games._listLayout)
-                Browse.GamesModel.cycle_detail_image(1)
+                Browse.GamesModel.cycle_detail_image(1);
             else
-                games._performMove(1, 0, isRepeat)
+                games._performMove(1, 0, isRepeat);
         } else if (action === "up") {
-            games._performMove(0, -1, isRepeat)
+            games._performMove(0, -1, isRepeat);
         } else if (action === "down") {
-            games._performMove(0, 1, isRepeat)
+            games._performMove(0, 1, isRepeat);
         } else if (action === "page_prev") {
             // L shoulder. Ignored on non-Ready states — there's no
             // data to page through.
             if (games._state() === "ready")
-                games._performPage(-1)
+                games._performPage(-1);
         } else if (action === "page_next") {
             // R shoulder.
             if (games._state() === "ready")
-                games._performPage(1)
+                games._performPage(1);
         } else if (action === "accept") {
             // Accept routing depends on the screen's data state, matching
             // the help bar vocabulary in MainLayout.qml. Loading swallows
@@ -271,32 +256,32 @@ Item {
             // set_path vs set_system based on whether we're at a deeper
             // level, so retrying inside a folder doesn't kick the user
             // back to the system root.
-            const state = games._state()
+            const state = games._state();
             if (state === "loading")
-                return
+                return;
             if (state === "error" || state === "empty") {
                 if (games._atFolderLevel()) {
-                    const stack = Browse.GamesState.path_stack
-                    const top = stack[stack.length - 1]
-                    Browse.GamesModel.set_path(top)
+                    const stack = Browse.GamesState.path_stack;
+                    const top = stack[stack.length - 1];
+                    Browse.GamesModel.set_path(top);
                 } else {
-                    const sid = Browse.GamesModel.current_system_id
+                    const sid = Browse.GamesModel.current_system_id;
                     if (sid !== "")
-                        Browse.GamesModel.set_system(sid)
+                        Browse.GamesModel.set_system(sid);
                 }
-                return
+                return;
             }
-            const idx = games.gamesGrid.currentIndex
-            const entryType = Browse.GamesModel.entry_type_at(idx)
+            const idx = games.gamesGrid.currentIndex;
+            const entryType = Browse.GamesModel.entry_type_at(idx);
             if (entryType === "directory" || entryType === "root") {
                 // Flush before push_level. The debounced timer writes to
                 // selected_at_level.last(); push_level appends a new ""
                 // entry for the child level, so a late flush would land
                 // the parent's selection on the just-pushed child level.
                 // Same handoff pattern as launch_at and cancel below.
-                games.flushSelectedPersist()
-                games.requestNavigateIntoFolder(Browse.GamesModel.path_at(idx))
-                return
+                games.flushSelectedPersist();
+                games.requestNavigateIntoFolder(Browse.GamesModel.path_at(idx));
+                return;
             }
             // Persist before handing control away. Directional moves
             // already update the saved selection on every step, but the
@@ -306,31 +291,27 @@ Item {
             // explicit so a kill during launch resumes on the correct
             // entry. Schedule + flush so the debounced timer doesn't
             // strand a later move past launch handoff.
-            games._scheduleSelectedPersist(
-                Browse.GamesModel.path_at(idx))
-            games.flushSelectedPersist()
-            Browse.GamesModel.launch_at(idx)
+            games._scheduleSelectedPersist(Browse.GamesModel.path_at(idx));
+            games.flushSelectedPersist();
+            Browse.GamesModel.launch_at(idx);
         } else if (action === "write_card") {
             if (games.gamesGrid.itemCount > 0) {
-                const idx = games.gamesGrid.currentIndex
+                const idx = games.gamesGrid.currentIndex;
                 // Folders/roots have no menu — open=Accept, X is a no-op.
-                const entryType = Browse.GamesModel.entry_type_at(idx)
+                const entryType = Browse.GamesModel.entry_type_at(idx);
                 if (entryType === "directory" || entryType === "root")
-                    return
-                games._scheduleSelectedPersist(
-                    Browse.GamesModel.path_at(idx))
-                games.flushSelectedPersist()
-                const rect = games._listLayout
-                             ? gamesList.currentCellRectIn(games)
-                             : games.gamesGrid.currentCellRectIn(games)
-                games.requestContextMenu(idx, rect)
+                    return;
+                games._scheduleSelectedPersist(Browse.GamesModel.path_at(idx));
+                games.flushSelectedPersist();
+                const rect = games._listLayout ? gamesList.currentCellRectIn(games) : games.gamesGrid.currentCellRectIn(games);
+                games.requestContextMenu(idx, rect);
             }
         } else if (action === "cancel") {
-            games.flushSelectedPersist()
+            games.flushSelectedPersist();
             if (games._atFolderLevel())
-                games.requestNavigateOutOfFolder()
+                games.requestNavigateOutOfFolder();
             else
-                games.requestSystemsScreen()
+                games.requestSystemsScreen();
         }
     }
 
@@ -365,19 +346,15 @@ Item {
         anchors.topMargin: Sizing.headerBottom + Sizing.pctH(1)
         height: Sizing.pctH(7)
         title: {
-            const sid = Browse.GamesModel.current_system_id
+            const sid = Browse.GamesModel.current_system_id;
             if (sid === "")
-                return ""
-            const idx = Browse.SystemsModel.index_for_system_id(sid)
-            return idx >= 0 ? Browse.SystemsModel.system_name_at(idx) : sid
+                return "";
+            const idx = Browse.SystemsModel.index_for_system_id(sid);
+            return idx >= 0 ? Browse.SystemsModel.system_name_at(idx) : sid;
         }
         currentPage: Math.floor(gamesGrid.currentIndex / games._browsePageSize)
-        totalPages: Math.max(1,
-            Math.ceil((Browse.GamesModel.dir_count
-                       + Browse.GamesModel.total_files) / games._browsePageSize))
-        totalText: Browse.GamesModel.total_files > 0
-                   ? qsTr("%1 files").arg(Browse.GamesModel.total_files)
-                   : ""
+        totalPages: Math.max(1, Math.ceil((Browse.GamesModel.dir_count + Browse.GamesModel.total_files) / games._browsePageSize))
+        totalText: Browse.GamesModel.total_files > 0 ? qsTr("%1 files").arg(Browse.GamesModel.total_files) : ""
     }
 
     Item {
@@ -388,9 +365,7 @@ Item {
         anchors.right: parent.right
         anchors.top: topStrip.bottom
         anchors.topMargin: Sizing.pctH(2)
-        height: Math.round(Math.max(0,
-            games.height - (topStrip.y + topStrip.height + Sizing.pctH(2))
-            - Sizing.pctH(8)) * games._listBandScale)
+        height: Math.round(Math.max(0, games.height - (topStrip.y + topStrip.height + Sizing.pctH(2)) - Sizing.pctH(8)) * games._listBandScale)
     }
 
     BrowseList {
@@ -403,23 +378,21 @@ Item {
         anchors.bottom: listBand.bottom
         width: Sizing.pctW(45)
         model: Browse.GamesModel
-        totalItemsOverride: Browse.GamesModel.dir_count
-                            + Browse.GamesModel.total_files
+        totalItemsOverride: Browse.GamesModel.dir_count + Browse.GamesModel.total_files
         targetVisibleRowCount: games._listPageSize
         showFileStem: true
         currentIndex: gamesGrid.currentIndex
-        onItemHovered: (index) => games._focusIndex(index)
-        onItemClicked: (index) => {
-            games._focusIndex(index)
-            games.handleAction("accept")
+        onItemHovered: index => games._focusIndex(index)
+        onItemClicked: index => {
+            games._focusIndex(index);
+            games.handleAction("accept");
         }
-        onItemRightClicked: (index) => {
-            games._focusIndex(index)
-            games.handleAction("write_card")
+        onItemRightClicked: index => {
+            games._focusIndex(index);
+            games.handleAction("write_card");
         }
         onEmptyRightClicked: games.handleAction("cancel")
-        onPageWheelRequested: (delta) => games.handleAction(
-            delta > 0 ? "page_next" : "page_prev")
+        onPageWheelRequested: delta => games.handleAction(delta > 0 ? "page_next" : "page_prev")
     }
 
     BrowseDetailPane {
@@ -431,9 +404,7 @@ Item {
         anchors.top: listBand.top
         anchors.bottom: listBand.bottom
         title: gamesList.currentName
-        coverKey: Browse.GamesModel.current_detail_image_key !== ""
-                  ? Browse.GamesModel.current_detail_image_key
-                  : gamesList.currentCoverKey
+        coverKey: Browse.GamesModel.current_detail_image_key !== "" ? Browse.GamesModel.current_detail_image_key : gamesList.currentCoverKey
         description: Browse.GamesModel.current_description
         showDescription: false
         showTitle: false
@@ -442,7 +413,7 @@ Item {
         canNextImage: Browse.GamesModel.current_detail_image_can_next
         onVisibleChanged: {
             if (visible)
-                Browse.GamesModel.load_description_at(gamesGrid.currentIndex)
+                Browse.GamesModel.load_description_at(gamesGrid.currentIndex);
         }
     }
 
@@ -483,7 +454,9 @@ Item {
         anchors.bottom: parent.bottom
         anchors.bottomMargin: Sizing.pctH(8)
         model: Browse.GamesModel
-        delegate: Tile { showCaption: true }
+        delegate: Tile {
+            showCaption: true
+        }
         // Cover-art tiles run taller than systems logos, so a 5x3
         // layout starves vertical space. Games gets its own
         // gamesGridColumns/Rows in Sizing — 5x2 on desktop, narrower
@@ -493,8 +466,7 @@ Item {
         // Stable scroll-thumb sizing while `fetch_more` grows the loaded
         // slice: feed PagedGrid the dataset's true total entry count
         // (same expression the top strip uses for `totalPages`).
-        totalItemsOverride: Browse.GamesModel.dir_count
-                            + Browse.GamesModel.total_files
+        totalItemsOverride: Browse.GamesModel.dir_count + Browse.GamesModel.total_files
         // Drives the pending-target watchdog inside PagedGrid: while
         // this is true, an Up-at-page-1 (or Down-past-last-loaded)
         // wrap-target chains additional `loadMoreRequested` emissions
@@ -505,20 +477,19 @@ Item {
         onLoadMoreRequested: Browse.GamesModel.fetch_more()
         onCurrentIndexChanged: {
             if (games._listLayout)
-                games._scheduleMetadataLoad(games._currentMoveIsRepeat)
+                games._scheduleMetadataLoad(games._currentMoveIsRepeat);
         }
-        onItemHovered: (index) => games._focusIndex(index)
-        onItemClicked: (index) => {
-            games._focusIndex(index)
-            games.handleAction("accept")
+        onItemHovered: index => games._focusIndex(index)
+        onItemClicked: index => {
+            games._focusIndex(index);
+            games.handleAction("accept");
         }
-        onItemRightClicked: (index) => {
-            games._focusIndex(index)
-            games.handleAction("write_card")
+        onItemRightClicked: index => {
+            games._focusIndex(index);
+            games.handleAction("write_card");
         }
         onEmptyRightClicked: games.handleAction("cancel")
-        onPageWheelRequested: (delta) => games.handleAction(
-            delta > 0 ? "page_next" : "page_prev")
+        onPageWheelRequested: delta => games.handleAction(delta > 0 ? "page_next" : "page_prev")
     }
 
     // Active game caption — single big line just under the grid. Same
@@ -532,9 +503,7 @@ Item {
         anchors.right: parent.right
         anchors.top: gamesGrid.bottom
         height: Sizing.pctH(7)
-        text: gamesGrid.itemCount > 0
-              ? Browse.GamesModel.name_at(gamesGrid.currentIndex)
-              : ""
+        text: gamesGrid.itemCount > 0 ? Browse.GamesModel.name_at(gamesGrid.currentIndex) : ""
     }
 
     ScreenStateOverlay {
@@ -568,10 +537,7 @@ Item {
     // over the global "Loading..." overlay.
     LoadingIndicator {
         id: pageLoadingCue
-        visible: !games.transitioning
-                 && !games.coverGateLoading
-                 && Browse.GamesModel.loading_more
-                 && gamesGrid.hasPendingTarget
+        visible: !games.transitioning && !games.coverGateLoading && Browse.GamesModel.loading_more && gamesGrid.hasPendingTarget
         anchors.left: activeLabel.left
         anchors.leftMargin: gamesGrid.leftInset
         anchors.verticalCenter: activeLabel.verticalCenter

@@ -41,10 +41,9 @@ Item {
     // the centred `ScreenStateOverlay` paints alone on a cleared band
     // during cold-launch / model-reset, matching `GamesScreen.qml`.
     // Pagination uses a separate `loading_more` flag and is unaffected.
-    readonly property bool _gateHide:
-        favorites.transitioning || Browse.FavoritesModel.loading
+    readonly property bool _gateHide: favorites.transitioning || Browse.FavoritesModel.loading
 
-    signal requestHubScreen()
+    signal requestHubScreen
     signal requestContextMenu(int index, var anchorRect)
 
     // Restore the previously focused entry when the model is Ready.
@@ -53,13 +52,13 @@ Item {
     // the user's previously highlighted row if it's still in the page.
     function restoreSelection(): void {
         if (Browse.FavoritesModel.count <= 0)
-            return
-        const path = Browse.FavoritesState.selected_path
+            return;
+        const path = Browse.FavoritesState.selected_path;
         if (path === "")
-            return
-        const idx = Browse.FavoritesModel.index_for_path(path)
+            return;
+        const idx = Browse.FavoritesModel.index_for_path(path);
         if (idx >= 0 && idx !== favoritesGrid.currentIndex)
-            favoritesGrid.currentIndex = idx
+            favoritesGrid.currentIndex = idx;
     }
 
     // Persist the focused entry's path on every focus move so a
@@ -68,99 +67,97 @@ Item {
     // shrinkage clamp (currentIndex → 0 when itemCount drops to 0)
     // doesn't clobber the saved path with the empty fallback.
     function _persistFocus(): void {
-        const idx = favoritesGrid.currentIndex
+        const idx = favoritesGrid.currentIndex;
         if (idx < 0)
-            return
-        const path = Browse.FavoritesModel.path_at(idx)
+            return;
+        const path = Browse.FavoritesModel.path_at(idx);
         if (path === "")
-            return
-        Browse.FavoritesState.selected_path = path
+            return;
+        Browse.FavoritesState.selected_path = path;
     }
 
     function _focusIndex(index: int): void {
         if (index < 0 || index >= favorites.favoritesGrid.itemCount)
-            return
-        favorites.favoritesGrid.currentIndex = index
-        favorites._persistFocus()
+            return;
+        favorites.favoritesGrid.currentIndex = index;
+        favorites._persistFocus();
     }
 
     function _performLinearMove(delta: int): void {
-        const count = favorites.favoritesGrid.itemCount
+        const count = favorites.favoritesGrid.itemCount;
         if (count <= 0)
-            return
-        let next = favorites.favoritesGrid.currentIndex + delta
+            return;
+        let next = favorites.favoritesGrid.currentIndex + delta;
         if (next < 0)
-            next = count - 1
+            next = count - 1;
         else if (next >= count)
-            next = 0
+            next = 0;
         if (next === favorites.favoritesGrid.currentIndex) {
             if (next >= count - 2)
-                Browse.FavoritesModel.fetch_more()
-            return
+                Browse.FavoritesModel.fetch_more();
+            return;
         }
-        favorites.favoritesGrid.currentIndex = next
-        favorites._persistFocus()
+        favorites.favoritesGrid.currentIndex = next;
+        favorites._persistFocus();
         if (next >= count - 2)
-            Browse.FavoritesModel.fetch_more()
+            Browse.FavoritesModel.fetch_more();
     }
 
     function _state(): string {
         if (Browse.FavoritesModel.loading)
-            return "loading"
+            return "loading";
         if ((Browse.FavoritesModel.error_message ?? "") !== "")
-            return "error"
+            return "error";
         if (Browse.FavoritesModel.count === 0)
-            return "empty"
-        return "ready"
+            return "empty";
+        return "ready";
     }
 
     function handleAction(action: string): void {
         if (action === "left") {
             if (!favorites._listLayout)
-                favorites.favoritesGrid.moveSelection(-1, 0)
+                favorites.favoritesGrid.moveSelection(-1, 0);
         } else if (action === "right") {
             if (!favorites._listLayout)
-                favorites.favoritesGrid.moveSelection(1, 0)
+                favorites.favoritesGrid.moveSelection(1, 0);
         } else if (action === "up") {
             if (favorites._listLayout)
-                favorites._performLinearMove(-1)
+                favorites._performLinearMove(-1);
             else
-                favorites.favoritesGrid.moveSelection(0, -1)
+                favorites.favoritesGrid.moveSelection(0, -1);
         } else if (action === "down") {
             if (favorites._listLayout)
-                favorites._performLinearMove(1)
+                favorites._performLinearMove(1);
             else
-                favorites.favoritesGrid.moveSelection(0, 1)
+                favorites.favoritesGrid.moveSelection(0, 1);
         } else if (action === "page_prev") {
             if (favorites._state() === "ready")
-                favorites.favoritesGrid.pageBy(-1)
+                favorites.favoritesGrid.pageBy(-1);
         } else if (action === "page_next") {
             if (favorites._state() === "ready")
-                favorites.favoritesGrid.pageBy(1)
+                favorites.favoritesGrid.pageBy(1);
         } else if (action === "accept") {
             // Loading swallows the press at the screen layer; Empty/Error
             // re-fires the current load by calling `fetch_more` (a stale
             // cursor still triggers the fetch — the model's seq guard
             // discards a result that no longer matches the chain).
-            const state = favorites._state()
+            const state = favorites._state();
             if (state === "loading")
-                return
+                return;
             if (state === "error" || state === "empty") {
-                Browse.FavoritesModel.fetch_more()
-                return
+                Browse.FavoritesModel.fetch_more();
+                return;
             }
-            Browse.FavoritesModel.launch_at(favorites.favoritesGrid.currentIndex)
+            Browse.FavoritesModel.launch_at(favorites.favoritesGrid.currentIndex);
         } else if (action === "write_card") {
             if (favorites.favoritesGrid.itemCount > 0) {
-                const idx = favorites.favoritesGrid.currentIndex
-                favorites._persistFocus()
-                const rect = favorites._listLayout
-                             ? favoritesList.currentCellRectIn(favorites)
-                             : favorites.favoritesGrid.currentCellRectIn(favorites)
-                favorites.requestContextMenu(idx, rect)
+                const idx = favorites.favoritesGrid.currentIndex;
+                favorites._persistFocus();
+                const rect = favorites._listLayout ? favoritesList.currentCellRectIn(favorites) : favorites.favoritesGrid.currentCellRectIn(favorites);
+                favorites.requestContextMenu(idx, rect);
             }
         } else if (action === "cancel") {
-            favorites.requestHubScreen()
+            favorites.requestHubScreen();
         }
     }
 
@@ -180,11 +177,8 @@ Item {
         height: Sizing.pctH(7)
         title: qsTr("Favorites")
         currentPage: favoritesGrid.currentPage
-        totalPages: Math.max(1,
-            Math.ceil(Browse.FavoritesModel.count / favoritesGrid.pageSize))
-        totalText: Browse.FavoritesModel.count > 0
-                   ? qsTr("%1 entries").arg(Browse.FavoritesModel.count)
-                   : ""
+        totalPages: Math.max(1, Math.ceil(Browse.FavoritesModel.count / favoritesGrid.pageSize))
+        totalText: Browse.FavoritesModel.count > 0 ? qsTr("%1 entries").arg(Browse.FavoritesModel.count) : ""
     }
 
     BrowseList {
@@ -200,18 +194,17 @@ Item {
         width: Sizing.pctW(45)
         model: Browse.FavoritesModel
         currentIndex: favoritesGrid.currentIndex
-        onItemHovered: (index) => favorites._focusIndex(index)
-        onItemClicked: (index) => {
-            favorites._focusIndex(index)
-            favorites.handleAction("accept")
+        onItemHovered: index => favorites._focusIndex(index)
+        onItemClicked: index => {
+            favorites._focusIndex(index);
+            favorites.handleAction("accept");
         }
-        onItemRightClicked: (index) => {
-            favorites._focusIndex(index)
-            favorites.handleAction("write_card")
+        onItemRightClicked: index => {
+            favorites._focusIndex(index);
+            favorites.handleAction("write_card");
         }
         onEmptyRightClicked: favorites.handleAction("cancel")
-        onPageWheelRequested: (delta) => favorites.handleAction(
-            delta > 0 ? "page_next" : "page_prev")
+        onPageWheelRequested: delta => favorites.handleAction(delta > 0 ? "page_next" : "page_prev")
     }
 
     BrowseDetailPane {
@@ -236,21 +229,23 @@ Item {
         anchors.bottom: parent.bottom
         anchors.bottomMargin: Sizing.pctH(8)
         model: Browse.FavoritesModel
-        delegate: Tile { showCaption: true }
+        delegate: Tile {
+            showCaption: true
+        }
         // Match games-grid layout (taller cover-art tiles); the systems
         // grid's 5x3 starves vertical space on these covers.
         columnsOverride: Sizing.gamesGridColumns
         rowsOverride: Sizing.gamesGridRows
         onLoadMoreRequested: Browse.FavoritesModel.fetch_more()
         onCurrentIndexChanged: favorites._persistFocus()
-        onItemHovered: (index) => favorites._focusIndex(index)
-        onItemClicked: (index) => {
-            favorites._focusIndex(index)
-            favorites.handleAction("accept")
+        onItemHovered: index => favorites._focusIndex(index)
+        onItemClicked: index => {
+            favorites._focusIndex(index);
+            favorites.handleAction("accept");
         }
-        onItemRightClicked: (index) => {
-            favorites._focusIndex(index)
-            favorites.handleAction("write_card")
+        onItemRightClicked: index => {
+            favorites._focusIndex(index);
+            favorites.handleAction("write_card");
         }
         onEmptyRightClicked: favorites.handleAction("cancel")
     }
@@ -262,9 +257,7 @@ Item {
         anchors.right: parent.right
         anchors.top: favoritesGrid.bottom
         height: Sizing.pctH(7)
-        text: favoritesGrid.itemCount > 0
-              ? Browse.FavoritesModel.name_at(favoritesGrid.currentIndex)
-              : ""
+        text: favoritesGrid.itemCount > 0 ? Browse.FavoritesModel.name_at(favoritesGrid.currentIndex) : ""
     }
 
     ScreenStateOverlay {

@@ -16,15 +16,15 @@ concurrency:
 
 permissions:
   contents: read
+  # Consumer jobs (rust-lint, rust-test, desktop-build) pull the lint image
+  # from GHCR; that pull requires read scope even though the publishing
+  # `ensure-lint-image` job overrides to `packages: write` below. Setting
+  # an explicit `permissions:` block strips defaults, so without this
+  # line the consumer jobs would only get `contents: read` and `docker
+  # pull` would fail with "denied" against any private package version.
+  packages: read
 
 env:
-  # 6.10.x LTS — earlier versions' CMake machinery emits `--alias-cycle=error`
-  # (and similar `=error` levels) to qmllint, but the `error` level was only
-  # added to qmllint in 6.10. 6.7.2 and 6.8.3 qmllint both reject it with
-  # "Invalid logging level 'error'". The ARM32 static build still pins
-  # Qt 6.7.2 (built from source in its own toolchain image); this env is
-  # only for desktop CI via aqtinstall.
-  QT_VERSION: "6.10.3"
   # CI doesn't reuse incremental metadata across runs — it only bloats the
   # cached `target/` and slows the Swatinem post-cache upload.
   CARGO_INCREMENTAL: 0
@@ -33,51 +33,98 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # Resolve the lint image tag from `lint/VERSION` and make sure that tag
+  # exists on GHCR before downstream jobs try to spin up containers from
+  # it. PRs that bump `lint/VERSION` therefore self-bootstrap: the very
+  # first CI run for the bump publishes the image, then re-runs and
+  # downstream jobs reuse it. The dedicated `lint-image-build.yml`
+  # workflow still publishes multi-arch images on pushes to main; this
+  # job only ever produces linux/amd64 (CI's runner arch).
+  ensure-lint-image:
+    name: Ensure lint image
+    runs-on: ubuntu-latest
+    # Only this job pushes to GHCR — downstream jobs pull via container
+    # credentials, which use the same GITHUB_TOKEN but don't need write.
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.resolve.outputs.image }}
+      version: ${{ steps.resolve.outputs.version }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - id: resolve
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          VERSION=$(tr -d '[:space:]' < lint/VERSION)
+          OWNER_LC=$(printf '%s' "$OWNER" | tr '[:upper:]' '[:lower:]')
+          IMAGE="ghcr.io/${OWNER_LC}/zaparoo-lint:${VERSION}"
+          {
+            printf 'version=%s\n' "$VERSION"
+            printf 'image=%s\n' "$IMAGE"
+          } >> "$GITHUB_OUTPUT"
+      - uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: check
+        run: |
+          if docker manifest inspect ${{ steps.resolve.outputs.image }} >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Lint image ${{ steps.resolve.outputs.image }} already published"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "Lint image ${{ steps.resolve.outputs.image }} missing — building"
+          fi
+      # Fork PRs cannot push to GHCR (GITHUB_TOKEN is read-only), so a
+      # lint/VERSION bump from a fork would fail mid-`docker push` with
+      # an opaque "denied: forbidden". Fail fast here with a useful
+      # message instead. Maintainer-branch PRs (head.repo.fork == false)
+      # fall through to the existing build/push steps.
+      - if: steps.check.outputs.exists != 'true' && github.event.pull_request.head.repo.fork == true
+        run: |
+          echo "::error::Lint image ${{ steps.resolve.outputs.image }} is not yet published. Fork PRs cannot push to GHCR — ask a maintainer to land the lint/VERSION bump from the main repo first."
+          exit 1
+      - if: steps.check.outputs.exists != 'true' && github.event.pull_request.head.repo.fork != true
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
+      - if: steps.check.outputs.exists != 'true' && github.event.pull_request.head.repo.fork != true
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
+        with:
+          context: .
+          file: Dockerfile.lint
+          # Single-arch build is intentional. Multi-arch publish (amd64 +
+          # arm64 for Apple Silicon contributors) is the dedicated
+          # `lint-image-build.yml` workflow's job; CI runners are amd64.
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.resolve.outputs.image }}
+          cache-from: type=gha,scope=lint
+          cache-to: type=gha,scope=lint,mode=max
+
   rust-lint:
     name: Rust lint (fmt + clippy + deny)
+    needs: ensure-lint-image
     runs-on: ubicloud-standard-8
+    container:
+      image: ${{ needs.ensure-lint-image.outputs.image }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
     defaults:
       run:
         working-directory: rust
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Drop flaky Azure apt mirror
-        # Ubicloud's runner image points apt at azure.archive.ubuntu.com
-        # via /etc/apt/apt-mirrors.txt. That mirror intermittently times
-        # out and stalls install-qt-action's apt-get update for several
-        # minutes while apt retries before reaching archive.ubuntu.com.
-        # Rewrite all azure references to the canonical mirror so apt
-        # goes straight there.
-        run: |
-          for f in /etc/apt/apt-mirrors.txt /etc/apt/sources.list \
-                   /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
-            [ -f "$f" ] && sudo sed -i 's|http://azure\.archive\.ubuntu\.com|http://archive.ubuntu.com|g' "$f"
-          done
-      - name: Install mold
-        uses: awalsh128/cache-apt-pkgs-action@acb598e5ddbc6f68a970c5da0688d2f3a9f04d05 # v1.6.0
-        with:
-          packages: mold
-          version: 1.0
-      - name: Install Qt ${{ env.QT_VERSION }}
-        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
-        with:
-          version: ${{ env.QT_VERSION }}
-          modules: qtshadertools
-          cache: true
-      - uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # master
-        with:
-          toolchain: stable
-          components: rustfmt, clippy
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
           workspaces: rust
-          # QT_VERSION contributes to cache key — cxx-qt-lib's build.rs bakes
-          # Qt library paths and linker flags into target/, so stale cache
-          # from a different Qt version leaves dangling `-l` refs.
-          env-vars: "CARGO CC CFLAGS CXX CMAKE RUST QT"
-      - uses: taiki-e/install-action@7769b73c2ec98c38dfcf2e18c83cfd4880c038c1 # v2
-        with:
-          tool: cargo-deny
+          # Lint image version contributes to cache key — different image
+          # versions can ship different rustc / Qt / clang, so reusing
+          # target/ across image versions risks dangling object refs.
+          prefix-key: "v0-rust-${{ needs.ensure-lint-image.outputs.version }}"
+          env-vars: "CARGO CC CFLAGS CXX CMAKE RUST"
       - name: rustfmt
         run: cargo fmt --all --check
       - name: clippy
@@ -87,45 +134,23 @@ jobs:
 
   rust-test:
     name: Rust tests (nextest)
+    needs: ensure-lint-image
     runs-on: ubicloud-standard-8
+    container:
+      image: ${{ needs.ensure-lint-image.outputs.image }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
     defaults:
       run:
         working-directory: rust
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Drop flaky Azure apt mirror
-        # Ubicloud's runner image points apt at azure.archive.ubuntu.com
-        # via /etc/apt/apt-mirrors.txt. That mirror intermittently times
-        # out and stalls install-qt-action's apt-get update for several
-        # minutes while apt retries before reaching archive.ubuntu.com.
-        # Rewrite all azure references to the canonical mirror so apt
-        # goes straight there.
-        run: |
-          for f in /etc/apt/apt-mirrors.txt /etc/apt/sources.list \
-                   /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
-            [ -f "$f" ] && sudo sed -i 's|http://azure\.archive\.ubuntu\.com|http://archive.ubuntu.com|g' "$f"
-          done
-      - name: Install mold
-        uses: awalsh128/cache-apt-pkgs-action@acb598e5ddbc6f68a970c5da0688d2f3a9f04d05 # v1.6.0
-        with:
-          packages: mold
-          version: 1.0
-      - name: Install Qt ${{ env.QT_VERSION }}
-        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
-        with:
-          version: ${{ env.QT_VERSION }}
-          modules: qtshadertools
-          cache: true
-      - uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # master
-        with:
-          toolchain: stable
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
           workspaces: rust
-          env-vars: "CARGO CC CFLAGS CXX CMAKE RUST QT"
-      - uses: taiki-e/install-action@7769b73c2ec98c38dfcf2e18c83cfd4880c038c1 # v2
-        with:
-          tool: cargo-nextest
+          prefix-key: "v0-rust-${{ needs.ensure-lint-image.outputs.version }}"
+          env-vars: "CARGO CC CFLAGS CXX CMAKE RUST"
       - name: nextest
         run: cargo nextest run --workspace
 
@@ -134,47 +159,28 @@ jobs:
     # and the autogen/moc outputs that the desktop build already produces, so
     # running lint as the final step of the same job avoids building twice.
     name: Desktop build + ctest + lint
+    needs: ensure-lint-image
     runs-on: ubicloud-standard-8
+    container:
+      image: ${{ needs.ensure-lint-image.outputs.image }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Drop flaky Azure apt mirror
-        # Ubicloud's runner image points apt at azure.archive.ubuntu.com
-        # via /etc/apt/apt-mirrors.txt. That mirror intermittently times
-        # out and stalls install-qt-action's apt-get update for several
-        # minutes while apt retries before reaching archive.ubuntu.com.
-        # Rewrite all azure references to the canonical mirror so apt
-        # goes straight there.
-        run: |
-          for f in /etc/apt/apt-mirrors.txt /etc/apt/sources.list \
-                   /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
-            [ -f "$f" ] && sudo sed -i 's|http://azure\.archive\.ubuntu\.com|http://archive.ubuntu.com|g' "$f"
-          done
-      - name: Install system deps
-        uses: awalsh128/cache-apt-pkgs-action@acb598e5ddbc6f68a970c5da0688d2f3a9f04d05 # v1.6.0
-        with:
-          packages: cmake ninja-build mold clang-tidy clang-format libgl1-mesa-dev libxkbcommon-dev libxcb-xkb-dev libvulkan-dev
-          version: 1.0
-      - name: Install Qt ${{ env.QT_VERSION }}
-        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
-        with:
-          version: ${{ env.QT_VERSION }}
-          modules: qtshadertools
-          cache: true
-      - uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # master
-        with:
-          toolchain: stable
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
           workspaces: rust
-          env-vars: "CARGO CC CFLAGS CXX CMAKE RUST QT"
+          prefix-key: "v0-desktop-${{ needs.ensure-lint-image.outputs.version }}"
+          env-vars: "CARGO CC CFLAGS CXX CMAKE RUST"
       # ccache wraps clang/gcc invocations; CMake's launcher hooks pick it up
       # via CMAKE_{C,CXX}_COMPILER_LAUNCHER set on the configure command line
-      # below. QT_VERSION is part of the cache key because Qt include paths
-      # are baked into preprocessed translation units.
+      # below. Lint image version is part of the cache key because Qt
+      # include paths are baked into preprocessed translation units.
       - name: Set up ccache
         uses: hendrikmuhs/ccache-action@d62db5f07c26379fc4b4e0916f098a92573c3b03 # v1.2.23
         with:
-          key: desktop-build-${{ env.QT_VERSION }}
+          key: desktop-build-${{ needs.ensure-lint-image.outputs.version }}
           max-size: 500M
       - name: Configure
         run: >
@@ -195,4 +201,3 @@ jobs:
           path: build/bin/launcher
           if-no-files-found: warn
           retention-days: 7
-

@@ -46,16 +46,8 @@ MainLayout {
     property string cardWriteOwner: ""
     property string contextMenuOwner: ""
     property int contextMenuIndex: -1
-    readonly property bool activeCardWritePending:
-        root.cardWriteOwner === "systems" ? Browse.SystemsModel.card_write_pending
-        : root.cardWriteOwner === "games" ? Browse.GamesModel.card_write_pending
-        : root.cardWriteOwner === "favorites" ? Browse.FavoritesModel.card_write_pending
-        : false
-    readonly property string activeCardWriteError:
-        root.cardWriteOwner === "systems" ? Browse.SystemsModel.card_write_error
-        : root.cardWriteOwner === "games" ? Browse.GamesModel.card_write_error
-        : root.cardWriteOwner === "favorites" ? Browse.FavoritesModel.card_write_error
-        : ""
+    readonly property bool activeCardWritePending: root.cardWriteOwner === "systems" ? Browse.SystemsModel.card_write_pending : root.cardWriteOwner === "games" ? Browse.GamesModel.card_write_pending : root.cardWriteOwner === "favorites" ? Browse.FavoritesModel.card_write_pending : false
+    readonly property string activeCardWriteError: root.cardWriteOwner === "systems" ? Browse.SystemsModel.card_write_error : root.cardWriteOwner === "games" ? Browse.GamesModel.card_write_error : root.cardWriteOwner === "favorites" ? Browse.FavoritesModel.card_write_error : ""
 
     // Bound here (not in GamesScreen.qml) because `set_system` can fire
     // from the accept handler before the games screen mounts; binding
@@ -65,72 +57,63 @@ MainLayout {
     // visual grid pageSize and produced half-loaded pages on every
     // subsequent cursor advance.
     readonly property int _gamesListFetchSize: 30
-    readonly property int _gamesPageSize:
-        Browse.Settings.current_browse_layout === "list"
-            ? root._gamesListFetchSize
-            : Sizing.gamesGridColumns * Sizing.gamesGridRows
+    readonly property int _gamesPageSize: Browse.Settings.current_browse_layout === "list" ? root._gamesListFetchSize : Sizing.gamesGridColumns * Sizing.gamesGridRows
     on_GamesPageSizeChanged: Browse.GamesModel.page_size = root._gamesPageSize
 
     onWidthChanged: {
-        Sizing.screenWidth = width
-        Sizing.screenHeight = height
+        Sizing.screenWidth = width;
+        Sizing.screenHeight = height;
     }
     onHeightChanged: {
-        Sizing.screenHeight = height
-        Sizing.screenWidth = width
+        Sizing.screenHeight = height;
+        Sizing.screenWidth = width;
     }
     Component.onCompleted: {
         // One-shot fullscreen sizing for embedded builds. Done as an
         // imperative write rather than a binding so a user resize on
         // a windowed build can never be undone by a re-evaluation.
         if (root.fullScreen) {
-            root.width = Screen.width
-            root.height = Screen.height
+            root.width = Screen.width;
+            root.height = Screen.height;
         }
-        Sizing.screenWidth = width
-        Sizing.screenHeight = height
-        Browse.GamesModel.page_size = root._gamesPageSize
+        Sizing.screenWidth = width;
+        Sizing.screenHeight = height;
+        Browse.GamesModel.page_size = root._gamesPageSize;
         // Restore screen synchronously before first paint. The parent
         // process on MiSTer kills the launcher without notice, so we
         // resume exactly where we left off. Selection restore happens
         // asynchronously in the modelReset handlers below as catalog
         // data arrives.
-        const savedScreen = Browse.AppState.active_screen
-        if (savedScreen === root.screenGames
-            || savedScreen === root.screenSystems
-            || savedScreen === root.screenHub
-            || savedScreen === root.screenFavorites
-            || savedScreen === root.screenRecents
-            || savedScreen === root.screenSettings
-            || savedScreen === root.screenAbout)
-            root.activeScreen = savedScreen
+        const savedScreen = Browse.AppState.active_screen;
+        if (savedScreen === root.screenGames || savedScreen === root.screenSystems || savedScreen === root.screenHub || savedScreen === root.screenFavorites || savedScreen === root.screenRecents || savedScreen === root.screenSettings || savedScreen === root.screenAbout)
+            root.activeScreen = savedScreen;
         // If the catalog is already ready, fire the restore here so
         // the cascade (set_category → SystemsModel reset → seed
         // currentIndex → set_system → GamesModel reset) lands before
         // first paint. Otherwise the CategoriesModel.onModelReset
         // Connection below fires it on first delivery.
         if (Browse.CategoriesModel.count > 0)
-            root.hubScreen.restoreFromCategoriesReset()
+            root.hubScreen.restoreFromCategoriesReset();
         // Warm-start into Favorites/Recents needs the same
         // restore-on-ready dance the navigate helpers perform,
         // otherwise the grid lands on index 0 and ignores persisted
         // selected_path.
         if (savedScreen === root.screenFavorites) {
             if (Browse.FavoritesModel.loading) {
-                root._favoritesReadyCallback = function() {
-                    root.favoritesScreen.restoreSelection()
-                }
+                root._favoritesReadyCallback = function () {
+                    root.favoritesScreen.restoreSelection();
+                };
             } else {
-                root.favoritesScreen.restoreSelection()
+                root.favoritesScreen.restoreSelection();
             }
         }
         if (savedScreen === root.screenRecents) {
             if (Browse.RecentsModel.loading) {
-                root._recentsReadyCallback = function() {
-                    root.recentsScreen.restoreSelection()
-                }
+                root._recentsReadyCallback = function () {
+                    root.recentsScreen.restoreSelection();
+                };
             } else {
-                root.recentsScreen.restoreSelection()
+                root.recentsScreen.restoreSelection();
             }
         }
         // Open the commercial-use notice on first paint of an unacked
@@ -138,12 +121,12 @@ MainLayout {
         // routing order — `_maybeOpenFirstRunIndex` early-returns until
         // `Browse.Notice.commercial_ack` flips true, at which point the
         // notice's close handler retriggers the media-DB check.
-        root._maybeOpenCommercialNotice()
+        root._maybeOpenCommercialNotice();
         // Kick the first-run check in case both READY and a seeded
         // empty-mediadb snapshot landed before our Connections wired up
         // (e.g. an unusually fast warm-cache reconnect).
-        root._maybeCompleteBoot()
-        root._maybeOpenFirstRunIndex()
+        root._maybeCompleteBoot();
+        root._maybeOpenFirstRunIndex();
     }
 
     // Seed row/grid indices from persisted state when models deliver new
@@ -160,7 +143,7 @@ MainLayout {
     Connections {
         target: Browse.CategoriesModel
         function onModelReset(): void {
-            root.hubScreen.restoreFromCategoriesReset()
+            root.hubScreen.restoreFromCategoriesReset();
         }
     }
     Connections {
@@ -173,14 +156,12 @@ MainLayout {
         // GamesState, or we'd override the user's position with a stale
         // games target from a prior escape-back-up-the-stack.
         function onModelReset(): void {
-            const savedSystem = root.activeScreen === root.screenGames
-                ? (Browse.GamesState.system_id !== "" ? Browse.GamesState.system_id : Browse.SystemsState.system_id)
-                : Browse.SystemsState.system_id
-            const idx = savedSystem === "" ? -1 : Browse.SystemsModel.index_for_system_id(savedSystem)
+            const savedSystem = root.activeScreen === root.screenGames ? (Browse.GamesState.system_id !== "" ? Browse.GamesState.system_id : Browse.SystemsState.system_id) : Browse.SystemsState.system_id;
+            const idx = savedSystem === "" ? -1 : Browse.SystemsModel.index_for_system_id(savedSystem);
             // Seed without animating the page-snap — a fresh model is a
             // category switch, not user navigation, so the previous
             // page's slide-out would just be a distracting swoop.
-            root.systemsScreen.systemsGrid.setCurrentIndexImmediate(idx >= 0 ? idx : 0)
+            root.systemsScreen.systemsGrid.setCurrentIndexImmediate(idx >= 0 ? idx : 0);
             if (idx >= 0) {
                 // Restore at the deepest persisted folder level. Index 0
                 // is the games-screen initial view (model decides
@@ -194,13 +175,12 @@ MainLayout {
                 // carries the intermediate levels. The set_system
                 // browse is invalidated by the second seq-bump and its
                 // result is discarded — wasted work but correct.
-                Browse.GamesModel.set_system(savedSystem)
-                const stack = Browse.GamesState.path_stack
-                const top = stack.length > 0 ? stack[stack.length - 1] : ""
+                Browse.GamesModel.set_system(savedSystem);
+                const stack = Browse.GamesState.path_stack;
+                const top = stack.length > 0 ? stack[stack.length - 1] : "";
                 if (top !== "")
-                    Browse.GamesModel.set_path(top)
-            } else if (root.activeScreen === root.screenGames
-                       && Browse.SystemsModel.count > 0) {
+                    Browse.GamesModel.set_path(top);
+            } else if (root.activeScreen === root.screenGames && Browse.SystemsModel.count > 0) {
                 // Games-screen restore where the saved id is missing
                 // (renamed system, ROM deleted): drive GamesModel from
                 // the visible row 0 fallback so the user sees real
@@ -208,7 +188,7 @@ MainLayout {
                 // stale list from a prior session. Persisted
                 // GamesState.system_id is left untouched so the user's
                 // intent survives a transient catalog gap.
-                Browse.GamesModel.set_system(Browse.SystemsModel.system_id_at(0))
+                Browse.GamesModel.set_system(Browse.SystemsModel.system_id_at(0));
             }
         }
     }
@@ -221,13 +201,13 @@ MainLayout {
             // always read the top-of-stack saved entry path; if the
             // entry is gone (deleted, moved, or this is a different
             // level than the one persisted) we fall back to row 0.
-            const sels = Browse.GamesState.selected_at_level
-            const savedPath = sels.length > 0 ? sels[sels.length - 1] : ""
-            const idx = savedPath === "" ? -1 : Browse.GamesModel.index_for_game_path(savedPath)
+            const sels = Browse.GamesState.selected_at_level;
+            const savedPath = sels.length > 0 ? sels[sels.length - 1] : "";
+            const idx = savedPath === "" ? -1 : Browse.GamesModel.index_for_game_path(savedPath);
             if (idx >= 0) {
-                root.gamesScreen.gamesGrid.setCurrentIndexImmediate(idx)
-                root._pendingGameRestorePath = ""
-                return
+                root.gamesScreen.gamesGrid.setCurrentIndexImmediate(idx);
+                root._pendingGameRestorePath = "";
+                return;
             }
             // Saved entry isn't on page 1. If there are more pages,
             // keep paginating until it shows up or we exhaust the
@@ -235,55 +215,55 @@ MainLayout {
             // Otherwise (entry truly gone, or single-page folder)
             // fall back to row 0.
             if (savedPath !== "" && Browse.GamesModel.has_next_page) {
-                root._pendingGameRestorePath = savedPath
-                root.gamesScreen.gamesGrid.setCurrentIndexImmediate(0)
-                Browse.GamesModel.fetch_more()
-                return
+                root._pendingGameRestorePath = savedPath;
+                root.gamesScreen.gamesGrid.setCurrentIndexImmediate(0);
+                Browse.GamesModel.fetch_more();
+                return;
             }
-            root._pendingGameRestorePath = ""
-            root.gamesScreen.gamesGrid.setCurrentIndexImmediate(0)
+            root._pendingGameRestorePath = "";
+            root.gamesScreen.gamesGrid.setCurrentIndexImmediate(0);
         }
         // Pages 2+ append rows via begin_insert_rows / end_insert_rows
         // (no model reset), so we can't piggy-back on onModelReset to
         // retry the lookup. `count` bumps on every append, giving us a
         // stable per-page edge to resume the deep-page restore on.
         function onCountChanged(): void {
-            const path = root._pendingGameRestorePath
+            const path = root._pendingGameRestorePath;
             if (path === "")
-                return
+                return;
             // User backed out to Hub/Systems before pagination caught
             // up — selected_at_level isn't touched by a peer-screen
             // exit, so without this gate the loop would keep hammering
             // fetch_more in the background until the folder exhausts.
             if (root.activeScreen !== root.screenGames) {
-                root._pendingGameRestorePath = ""
-                return
+                root._pendingGameRestorePath = "";
+                return;
             }
             // User input updates `selected_at_level` on every move,
             // so a divergence between the pending path and the top
             // of stack means the user navigated during the restore
             // — drop the auto-restore and let them stay where they
             // landed.
-            const sels = Browse.GamesState.selected_at_level
-            const currentTop = sels.length > 0 ? sels[sels.length - 1] : ""
+            const sels = Browse.GamesState.selected_at_level;
+            const currentTop = sels.length > 0 ? sels[sels.length - 1] : "";
             if (currentTop !== path) {
-                root._pendingGameRestorePath = ""
-                return
+                root._pendingGameRestorePath = "";
+                return;
             }
-            const idx = Browse.GamesModel.index_for_game_path(path)
+            const idx = Browse.GamesModel.index_for_game_path(path);
             if (idx >= 0) {
-                root.gamesScreen.gamesGrid.setCurrentIndexImmediate(idx)
-                root._pendingGameRestorePath = ""
-                return
+                root.gamesScreen.gamesGrid.setCurrentIndexImmediate(idx);
+                root._pendingGameRestorePath = "";
+                return;
             }
             if (Browse.GamesModel.has_next_page) {
                 // fetch_more is itself debounced by `loading_more` and
                 // `has_next_page`, so a redundant call here is a cheap
                 // no-op rather than a duplicate request.
-                Browse.GamesModel.fetch_more()
-                return
+                Browse.GamesModel.fetch_more();
+                return;
             }
-            root._pendingGameRestorePath = ""
+            root._pendingGameRestorePath = "";
         }
     }
 
@@ -296,8 +276,8 @@ MainLayout {
     // pair as a single helper makes the invariant explicit and keeps
     // the four request handlers below a single line each.
     function _goto(screen: string): void {
-        ScreenManager.activeScreen = screen
-        Browse.AppState.active_screen = screen
+        ScreenManager.activeScreen = screen;
+        Browse.AppState.active_screen = screen;
     }
 
     // Single-shot callback slots fired by the loadingChanged
@@ -311,6 +291,14 @@ MainLayout {
     property var _systemReadyCallback: null
     property var _favoritesReadyCallback: null
     property var _recentsReadyCallback: null
+    // Set when `_ensureCategory` arms `deferredCategorySetTimer` and
+    // cleared inside the timer's `onTriggered` after `set_category`
+    // actually fires. Gates `_categoryReadyCallback` consumption so a
+    // stale `SystemsModel.loading` false-edge from an unrelated in-flight
+    // fill (e.g. `restoreFromCategoriesReset` already running) can't
+    // complete the transition before our own `set_category` has been
+    // issued.
+    property bool _deferredCategoryPending: false
     // Saved games-screen entry path that wasn't on the freshly seeded
     // page 1 of MediaBrowse. The GamesModel.onCountChanged watcher
     // below paginates forward via fetch_more until the path is found
@@ -332,48 +320,52 @@ MainLayout {
         target: Browse.SystemsModel
         function onLoadingChanged(): void {
             if (Browse.SystemsModel.loading)
-                return
-            const cb = root._categoryReadyCallback
+                return;
+            // Deferred set_category hasn't fired yet — this false-edge
+            // belongs to a prior in-flight fill, not our transition.
+            if (root._deferredCategoryPending)
+                return;
+            const cb = root._categoryReadyCallback;
             if (cb === null)
-                return
-            root._categoryReadyCallback = null
-            cb()
+                return;
+            root._categoryReadyCallback = null;
+            cb();
         }
     }
     Connections {
         target: Browse.GamesModel
         function onLoadingChanged(): void {
             if (Browse.GamesModel.loading)
-                return
-            const cb = root._systemReadyCallback
+                return;
+            const cb = root._systemReadyCallback;
             if (cb === null)
-                return
-            root._systemReadyCallback = null
-            cb()
+                return;
+            root._systemReadyCallback = null;
+            cb();
         }
     }
     Connections {
         target: Browse.RecentsModel
         function onLoadingChanged(): void {
             if (Browse.RecentsModel.loading)
-                return
-            const cb = root._recentsReadyCallback
+                return;
+            const cb = root._recentsReadyCallback;
             if (cb === null)
-                return
-            root._recentsReadyCallback = null
-            cb()
+                return;
+            root._recentsReadyCallback = null;
+            cb();
         }
     }
     Connections {
         target: Browse.FavoritesModel
         function onLoadingChanged(): void {
             if (Browse.FavoritesModel.loading)
-                return
-            const cb = root._favoritesReadyCallback
+                return;
+            const cb = root._favoritesReadyCallback;
             if (cb === null)
-                return
-            root._favoritesReadyCallback = null
-            cb()
+                return;
+            root._favoritesReadyCallback = null;
+            cb();
         }
     }
 
@@ -390,15 +382,15 @@ MainLayout {
     // same event loop iteration before the next render polish/sync
     // pass.
     function _ensureCategory(category: string, cb): void {
-        if (Browse.SystemsModel.current_category === category
-            && Browse.SystemsModel.count > 0) {
-            Browse.SystemsModel.set_category(category)
-            cb()
-            return
+        if (Browse.SystemsModel.current_category === category && Browse.SystemsModel.count > 0) {
+            Browse.SystemsModel.set_category(category);
+            cb();
+            return;
         }
-        root._categoryReadyCallback = cb
-        deferredCategorySetTimer.targetCategory = category
-        deferredCategorySetTimer.restart()
+        root._categoryReadyCallback = cb;
+        root._deferredCategoryPending = true;
+        deferredCategorySetTimer.targetCategory = category;
+        deferredCategorySetTimer.restart();
     }
 
     // Ensure GamesModel is filled with `systemId`, then call cb().
@@ -409,14 +401,13 @@ MainLayout {
     // can call cb() synchronously on this path. Cold-load goes through
     // the systemReadyCallback waiter below.
     function _ensureSystem(systemId: string, cb): void {
-        if (Browse.GamesModel.current_system_id === systemId
-            && Browse.GamesModel.count > 0) {
-            Browse.GamesModel.set_system(systemId)
-            cb()
-            return
+        if (Browse.GamesModel.current_system_id === systemId && Browse.GamesModel.count > 0) {
+            Browse.GamesModel.set_system(systemId);
+            cb();
+            return;
         }
-        root._systemReadyCallback = cb
-        Browse.GamesModel.set_system(systemId)
+        root._systemReadyCallback = cb;
+        Browse.GamesModel.set_system(systemId);
     }
 
     // Hub Accept routing. Empty-row passthrough preserves the committed
@@ -428,50 +419,41 @@ MainLayout {
     // destination paints with logos already in QPixmapCache.
     function _navigateFromHub(category: string): void {
         if (category === "") {
-            root._goto(root.screenSystems)
-            return
+            root._goto(root.screenSystems);
+            return;
         }
-        Browse.HubState.category = category
-        root.pendingTransition = "systems"
-        root._ensureCategory(category, function() {
-            const arcadeBypass =
-                Browse.Platform.is_mister
-                && Browse.Platform.ready
-                && category === "Arcade"
-                && Browse.SystemsModel.count === 1
-            console.log("arcade-bypass eval:",
-                "category=" + JSON.stringify(category),
-                "platform.is_mister=" + Browse.Platform.is_mister,
-                "platform.ready=" + Browse.Platform.ready,
-                "systems.count=" + Browse.SystemsModel.count,
-                "→ bypass=" + arcadeBypass)
+        Browse.HubState.category = category;
+        root.pendingTransition = "systems";
+        root._ensureCategory(category, function () {
+            const arcadeBypass = Browse.Platform.is_mister && Browse.Platform.ready && category === "Arcade" && Browse.SystemsModel.count === 1;
+            console.log("arcade-bypass eval:", "category=" + JSON.stringify(category), "platform.is_mister=" + Browse.Platform.is_mister, "platform.ready=" + Browse.Platform.ready, "systems.count=" + Browse.SystemsModel.count, "→ bypass=" + arcadeBypass);
             if (arcadeBypass) {
-                const systemId = Browse.SystemsModel.system_id_at(0)
-                Browse.SystemsState.system_id = systemId
-                Browse.GamesState.system_id = systemId
-                root.pendingTransition = "games"
-                root._ensureSystem(systemId, function() {
-                    root._completeTransition(root.screenGames)
-                })
+                const systemId = Browse.SystemsModel.system_id_at(0);
+                Browse.SystemsState.system_id = systemId;
+                Browse.GamesState.system_id = systemId;
+                root.pendingTransition = "games";
+                root._ensureSystem(systemId, function () {
+                    root._completeTransition(root.screenGames);
+                });
             } else {
-                root._prefetchSystemCovers(function() {
-                    root._completeTransition(root.screenSystems)
-                })
+                root._prefetchSystemCovers(function () {
+                    root._completeTransition(root.screenSystems);
+                });
             }
-        })
+        });
     }
 
     function _navigateToFavorites(): void {
-        root.pendingTransition = "favorites"
+        root.pendingTransition = "favorites";
         if (!Browse.FavoritesModel.loading) {
-            root.favoritesScreen.restoreSelection()
-            root._completeTransition(root.screenFavorites)
-            return
+            root.favoritesScreen.restoreSelection();
+            root._completeTransition(root.screenFavorites);
+            return;
         }
-        root._favoritesReadyCallback = function() {
-            root.favoritesScreen.restoreSelection()
-            root._completeTransition(root.screenFavorites)
-        }
+        root._favoritesReadyCallback = function () {
+            root.favoritesScreen.restoreSelection();
+            root._completeTransition(root.screenFavorites);
+        };
     }
 
     // Hub → Recents transition. RecentsModel binds eagerly via
@@ -480,16 +462,16 @@ MainLayout {
     // with a slow Core link we wait on `loadingChanged` so the user
     // sees the centred "Loading…" cue rather than an empty grid.
     function _navigateToRecents(): void {
-        root.pendingTransition = "recents"
+        root.pendingTransition = "recents";
         if (!Browse.RecentsModel.loading) {
-            root.recentsScreen.restoreSelection()
-            root._completeTransition(root.screenRecents)
-            return
+            root.recentsScreen.restoreSelection();
+            root._completeTransition(root.screenRecents);
+            return;
         }
-        root._recentsReadyCallback = function() {
-            root.recentsScreen.restoreSelection()
-            root._completeTransition(root.screenRecents)
-        }
+        root._recentsReadyCallback = function () {
+            root.recentsScreen.restoreSelection();
+            root._completeTransition(root.screenRecents);
+        };
     }
 
     // Hub → Settings transition. The Settings screen has no async
@@ -497,13 +479,13 @@ MainLayout {
     // in initialize() — so the flip is instant; no pendingTransition,
     // no waiter.
     function _navigateToSettings(): void {
-        root._goto(root.screenSettings)
+        root._goto(root.screenSettings);
     }
 
     // Settings → About transition. Static info screen, no async data,
     // so the flip is instant — same shape as _navigateToSettings above.
     function _navigateToAbout(): void {
-        root._goto(root.screenAbout)
+        root._goto(root.screenAbout);
     }
 
     // Systems Accept routing. Pin destination to Games, fill the
@@ -512,16 +494,16 @@ MainLayout {
     // gamesScreen.onRequestSystemsScreen below) so this path needs
     // no per-transition flag.
     function _navigateFromSystems(systemId: string): void {
-        Browse.SystemsState.system_id = systemId
+        Browse.SystemsState.system_id = systemId;
         // Setting system_id on GamesState resets path_stack/selected_at_level
         // to root level — the new system's browse always starts at the
         // initial games-screen view, regardless of where the user was in
         // a prior system's folder tree.
-        Browse.GamesState.system_id = systemId
-        root.pendingTransition = "games"
-        root._ensureSystem(systemId, function() {
-            root._completeTransition(root.screenGames)
-        })
+        Browse.GamesState.system_id = systemId;
+        root.pendingTransition = "games";
+        root._ensureSystem(systemId, function () {
+            root._completeTransition(root.screenGames);
+        });
     }
 
     // Folder drill-down inside the games screen. Stays on screenGames
@@ -531,9 +513,9 @@ MainLayout {
     // a kill mid-load still resumes inside the folder.
     function _navigateIntoFolder(path: string): void {
         if (path === "")
-            return
-        Browse.GamesState.push_level(path, "")
-        Browse.GamesModel.set_path(path)
+            return;
+        Browse.GamesState.push_level(path, "");
+        Browse.GamesModel.set_path(path);
     }
 
     // Folder pop-up inside the games screen. Pops the deepest level off
@@ -543,18 +525,18 @@ MainLayout {
     // single-root-auto-nav decision rather than browsing the literal
     // empty path with no system filter.
     function _navigateOutOfFolder(): void {
-        const stack = Browse.GamesState.path_stack
+        const stack = Browse.GamesState.path_stack;
         if (stack.length <= 1)
-            return
-        Browse.GamesState.pop_level()
-        const newStack = Browse.GamesState.path_stack
-        const target = newStack[newStack.length - 1]
+            return;
+        Browse.GamesState.pop_level();
+        const newStack = Browse.GamesState.path_stack;
+        const target = newStack[newStack.length - 1];
         if (target === "") {
-            const sid = Browse.GamesState.system_id
+            const sid = Browse.GamesState.system_id;
             if (sid !== "")
-                Browse.GamesModel.set_system(sid)
+                Browse.GamesModel.set_system(sid);
         } else {
-            Browse.GamesModel.set_path(target)
+            Browse.GamesModel.set_path(target);
         }
     }
 
@@ -564,47 +546,63 @@ MainLayout {
     // pendingTransition (source screen visibility) settle to the
     // post-transition state in the same frame as the screen swap.
     function _completeTransition(screen: string): void {
-        root.pendingTransition = ""
-        root._goto(screen)
+        root.pendingTransition = "";
+        root._goto(screen);
     }
 
     Connections {
         target: root.hubScreen
         function onRequestAccept(category: string): void {
-            root._navigateFromHub(category)
+            root._navigateFromHub(category);
         }
-        function onRequestQuit(): void { root.openQuitConfirmModal() }
-        function onRequestFavoritesScreen(): void { root._navigateToFavorites() }
-        function onRequestRecentsScreen(): void { root._navigateToRecents() }
-        function onRequestSettingsScreen(): void { root._navigateToSettings() }
+        function onRequestQuit(): void {
+            root.openQuitConfirmModal();
+        }
+        function onRequestFavoritesScreen(): void {
+            root._navigateToFavorites();
+        }
+        function onRequestRecentsScreen(): void {
+            root._navigateToRecents();
+        }
+        function onRequestSettingsScreen(): void {
+            root._navigateToSettings();
+        }
     }
     Connections {
         target: root.favoritesScreen
-        function onRequestHubScreen(): void { root._goto(root.screenHub) }
+        function onRequestHubScreen(): void {
+            root._goto(root.screenHub);
+        }
         function onRequestContextMenu(index: int, anchorRect): void {
-            root.openContextMenu("favorites", index, anchorRect)
+            root.openContextMenu("favorites", index, anchorRect);
         }
     }
     Connections {
         target: root.recentsScreen
-        function onRequestHubScreen(): void { root._goto(root.screenHub) }
+        function onRequestHubScreen(): void {
+            root._goto(root.screenHub);
+        }
         function onRequestContextMenu(index: int, anchorRect): void {
-            root.openContextMenu("recents", index, anchorRect)
+            root.openContextMenu("recents", index, anchorRect);
         }
     }
     Connections {
         target: root.settingsScreen
-        function onRequestHubScreen(): void { root._goto(root.screenHub) }
+        function onRequestHubScreen(): void {
+            root._goto(root.screenHub);
+        }
         function onRequestAccept(actionId: string): void {
             if (actionId === "uploadLog")
-                root.openLogUploadModal()
+                root.openLogUploadModal();
             else if (actionId === "aboutLicense")
-                root._navigateToAbout()
+                root._navigateToAbout();
         }
     }
     Connections {
         target: root.aboutScreen
-        function onRequestSettingsScreen(): void { root._goto(root.screenSettings) }
+        function onRequestSettingsScreen(): void {
+            root._goto(root.screenSettings);
+        }
     }
     Connections {
         target: root.systemsScreen
@@ -615,16 +613,18 @@ MainLayout {
             // screen layer (no signal emitted), so this branch only
             // sees user intent on a non-Ready state.
             if (systemId === "") {
-                const cat = Browse.SystemsModel.current_category
+                const cat = Browse.SystemsModel.current_category;
                 if (cat !== "")
-                    Browse.SystemsModel.set_category(cat)
-                return
+                    Browse.SystemsModel.set_category(cat);
+                return;
             }
-            root._navigateFromSystems(systemId)
+            root._navigateFromSystems(systemId);
         }
-        function onRequestHubScreen(): void { root._goto(root.screenHub) }
+        function onRequestHubScreen(): void {
+            root._goto(root.screenHub);
+        }
         function onRequestContextMenu(index: int, anchorRect): void {
-            root.openContextMenu("systems", index, anchorRect)
+            root.openContextMenu("systems", index, anchorRect);
         }
     }
     Connections {
@@ -660,26 +660,21 @@ MainLayout {
         //  the commit history. Leave it alone.
         // ════════════════════════════════════════════════════════════
         function onRequestSystemsScreen(): void {
-            const arcadeBypassActive =
-                Browse.Platform.is_mister
-                && Browse.Platform.ready
-                && Browse.SystemsModel.current_category === "Arcade"
-                && Browse.SystemsModel.count === 1
-                && Browse.GamesModel.current_system_id === "Arcade"
+            const arcadeBypassActive = Browse.Platform.is_mister && Browse.Platform.ready && Browse.SystemsModel.current_category === "Arcade" && Browse.SystemsModel.count === 1 && Browse.GamesModel.current_system_id === "Arcade";
             if (arcadeBypassActive) {
-                root._goto(root.screenHub)
-                return
+                root._goto(root.screenHub);
+                return;
             }
-            root._goto(root.screenSystems)
+            root._goto(root.screenSystems);
         }
         function onRequestNavigateIntoFolder(path: string): void {
-            root._navigateIntoFolder(path)
+            root._navigateIntoFolder(path);
         }
         function onRequestNavigateOutOfFolder(): void {
-            root._navigateOutOfFolder()
+            root._navigateOutOfFolder();
         }
         function onRequestContextMenu(index: int, anchorRect): void {
-            root.openContextMenu("games", index, anchorRect)
+            root.openContextMenu("games", index, anchorRect);
         }
     }
 
@@ -698,134 +693,146 @@ MainLayout {
     // caller saw `entries.length === 0` despite the function pushing 3
     // items in. Plain `var` round-trips cleanly and silences the
     // "insufficiently annotated" coercion warning at the call site.
-    function buildContextMenuEntries(
-            owner: string, entryType: string, hasNfc: bool, isFavorite: bool) {
+    function buildContextMenuEntries(owner: string, entryType: string, hasNfc: bool, isFavorite: bool) {
         if (owner === "systems") {
-            return [{ id: "launch_system", label: qsTr("Launch core") }]
+            return [
+                {
+                    id: "launch_system",
+                    label: qsTr("Launch core")
+                }
+            ];
         }
         if (owner === "recents") {
-            return [{ id: "launch_game", label: qsTr("Launch game") }]
+            return [
+                {
+                    id: "launch_game",
+                    label: qsTr("Launch game")
+                }
+            ];
         }
         if (owner === "games" || owner === "favorites") {
             if (entryType === "directory" || entryType === "root")
-                return []
-            const entries = [{
-                id: "toggle_favorite",
-                label: isFavorite ? qsTr("Remove from favorites") : qsTr("Add to favorites")
-            }]
+                return [];
+            const entries = [
+                {
+                    id: "toggle_favorite",
+                    label: isFavorite ? qsTr("Remove from favorites") : qsTr("Add to favorites")
+                }
+            ];
             if (hasNfc)
-                entries.push({ id: "write_card", label: qsTr("Write to NFC token") })
-            entries.push({ id: "qr_code", label: qsTr("QR code") })
-            entries.push({ id: "launch_game", label: qsTr("Launch game") })
-            return entries
+                entries.push({
+                    id: "write_card",
+                    label: qsTr("Write to NFC token")
+                });
+            entries.push({
+                id: "qr_code",
+                label: qsTr("QR code")
+            });
+            entries.push({
+                id: "launch_game",
+                label: qsTr("Launch game")
+            });
+            return entries;
         }
-        return []
+        return [];
     }
 
     // Pure helper — wrap a zapscript in the zaparoo.app deep-link template.
     // The QR code points the scanning device at this URL; the web app
     // hands the scanned zapscript back to a Core/launcher pairing.
     function _buildQrPayload(zapscript: string): string {
-        return "https://zaparoo.app/write?v=" + encodeURIComponent(zapscript)
+        return "https://zaparoo.app/write?v=" + encodeURIComponent(zapscript);
     }
 
     function openContextMenu(owner: string, index: int, anchorRect): void {
         if (index < 0)
-            return
-        let entryType = ""
-        let isFavorite = false
+            return;
+        let entryType = "";
+        let isFavorite = false;
         if (owner === "games") {
             if (index >= Browse.GamesModel.count)
-                return
-            entryType = Browse.GamesModel.entry_type_at(index)
-            isFavorite = Browse.GamesModel.is_favorite_at(index)
+                return;
+            entryType = Browse.GamesModel.entry_type_at(index);
+            isFavorite = Browse.GamesModel.is_favorite_at(index);
         } else if (owner === "favorites") {
             if (index >= Browse.FavoritesModel.count)
-                return
-            isFavorite = Browse.FavoritesModel.is_favorite_at(index)
+                return;
+            isFavorite = Browse.FavoritesModel.is_favorite_at(index);
         } else if (owner === "recents") {
             if (index >= Browse.RecentsModel.count)
-                return
+                return;
         }
-        const entries = root.buildContextMenuEntries(
-            owner, entryType, Browse.SystemStatus.has_nfc, isFavorite)
+        const entries = root.buildContextMenuEntries(owner, entryType, Browse.SystemStatus.has_nfc, isFavorite);
         if (entries.length === 0)
-            return
-        root.contextMenuEntries = entries
-        root.contextMenuOwner = owner
-        root.contextMenuIndex = index
-        root.contextMenuAnchor = anchorRect
-        root.contextMenuVisible = true
+            return;
+        root.contextMenuEntries = entries;
+        root.contextMenuOwner = owner;
+        root.contextMenuIndex = index;
+        root.contextMenuAnchor = anchorRect;
+        root.contextMenuVisible = true;
         if (ScreenManager.topModal !== root.modalContextMenu)
-            ScreenManager.pushModal(root.modalContextMenu)
+            ScreenManager.pushModal(root.modalContextMenu);
     }
 
     function closeContextMenu(): void {
-        root.contextMenuVisible = false
-        root.contextMenuOwner = ""
-        root.contextMenuIndex = -1
-        root.contextMenuEntries = []
+        root.contextMenuVisible = false;
+        root.contextMenuOwner = "";
+        root.contextMenuIndex = -1;
+        root.contextMenuEntries = [];
         if (ScreenManager.topModal === root.modalContextMenu)
-            ScreenManager.popModal()
+            ScreenManager.popModal();
     }
 
     function handleContextMenuAccepted(id: string): void {
-        const owner = root.contextMenuOwner
-        const targetIndex = root.contextMenuIndex
-        root.closeContextMenu()
+        const owner = root.contextMenuOwner;
+        const targetIndex = root.contextMenuIndex;
+        root.closeContextMenu();
         if (targetIndex < 0)
-            return
-
+            return;
         if (id === "launch_system") {
-            Browse.SystemsModel.launch_at(targetIndex)
+            Browse.SystemsModel.launch_at(targetIndex);
         } else if (id === "launch_game") {
             if (owner === "favorites")
-                Browse.FavoritesModel.launch_at(targetIndex)
+                Browse.FavoritesModel.launch_at(targetIndex);
             else if (owner === "recents")
-                Browse.RecentsModel.launch_at(targetIndex)
+                Browse.RecentsModel.launch_at(targetIndex);
             else
-                Browse.GamesModel.launch_at(targetIndex)
+                Browse.GamesModel.launch_at(targetIndex);
         } else if (id === "toggle_favorite") {
             if (owner === "games")
-                Browse.GamesModel.toggle_favorite_at(targetIndex)
+                Browse.GamesModel.toggle_favorite_at(targetIndex);
             else if (owner === "favorites")
-                Browse.FavoritesModel.toggle_favorite_at(targetIndex)
+                Browse.FavoritesModel.toggle_favorite_at(targetIndex);
         } else if (id === "write_card") {
             if (owner === "systems") {
-                root.beginCardWrite("systems")
-                Browse.SystemsModel.write_card_at(targetIndex)
+                root.beginCardWrite("systems");
+                Browse.SystemsModel.write_card_at(targetIndex);
             } else if (owner === "games") {
-                root.beginCardWrite("games")
-                Browse.GamesModel.write_card_at(targetIndex)
+                root.beginCardWrite("games");
+                Browse.GamesModel.write_card_at(targetIndex);
             } else if (owner === "favorites") {
-                root.beginCardWrite("favorites")
-                Browse.FavoritesModel.write_card_at(targetIndex)
+                root.beginCardWrite("favorites");
+                Browse.FavoritesModel.write_card_at(targetIndex);
             }
         } else if (id === "qr_code") {
-            const text = owner === "systems"
-                ? Browse.SystemsModel.launch_text_at(targetIndex)
-                : owner === "games"
-                    ? Browse.GamesModel.launch_text_at(targetIndex)
-                    : owner === "favorites"
-                        ? Browse.FavoritesModel.launch_text_at(targetIndex)
-                        : ""
+            const text = owner === "systems" ? Browse.SystemsModel.launch_text_at(targetIndex) : owner === "games" ? Browse.GamesModel.launch_text_at(targetIndex) : owner === "favorites" ? Browse.FavoritesModel.launch_text_at(targetIndex) : "";
             if (text !== "") {
-                Browse.QrCode.generate(root._buildQrPayload(text))
-                root.openQrCodeModal()
+                Browse.QrCode.generate(root._buildQrPayload(text));
+                root.openQrCodeModal();
             }
         }
     }
 
     function openQrCodeModal(): void {
-        root.qrCodeModalVisible = true
+        root.qrCodeModalVisible = true;
         if (ScreenManager.topModal !== root.modalQrCode)
-            ScreenManager.pushModal(root.modalQrCode)
+            ScreenManager.pushModal(root.modalQrCode);
     }
 
     function closeQrCodeModal(): void {
-        root.qrCodeModalVisible = false
+        root.qrCodeModalVisible = false;
         if (ScreenManager.topModal === root.modalQrCode)
-            ScreenManager.popModal()
+            ScreenManager.popModal();
     }
 
     // First-run modal lifecycle. Push exactly once per session, the
@@ -842,28 +849,28 @@ MainLayout {
     // is the authoritative "are there games to show?" signal.
     function _maybeOpenFirstRunIndex(): void {
         if (root._firstRunIndexShown)
-            return
+            return;
         // Defer to the commercial-use notice. The notice's close handler
         // calls back into here once acked, so chaining is automatic and
         // we avoid stacking two modals at the same time.
         if (!Browse.Notice.commercial_ack)
-            return
-        if (Browse.AppStatus.connection_state !== 2 /* READY */)
-            return
+            return;
+        if (Browse.AppStatus.connection_state !== 2)
+            return;
         if (!Browse.CategoriesModel.loaded)
-            return
+            return;
         if (Browse.CategoriesModel.count > 0)
-            return
-        root._firstRunIndexShown = true
-        root.firstRunIndexModalVisible = true
+            return;
+        root._firstRunIndexShown = true;
+        root.firstRunIndexModalVisible = true;
         if (ScreenManager.topModal !== root.modalFirstRunIndex)
-            ScreenManager.pushModal(root.modalFirstRunIndex)
+            ScreenManager.pushModal(root.modalFirstRunIndex);
     }
 
     function closeFirstRunIndexModal(): void {
-        root.firstRunIndexModalVisible = false
+        root.firstRunIndexModalVisible = false;
         if (ScreenManager.topModal === root.modalFirstRunIndex)
-            ScreenManager.popModal()
+            ScreenManager.popModal();
     }
 
     // Commercial-use first-run notice. Persisted ack lives in
@@ -873,9 +880,9 @@ MainLayout {
     // what advances to the next first-run gate (mediadb index).
     function _maybeOpenCommercialNotice(): void {
         if (Browse.Notice.commercial_ack)
-            return
+            return;
         if (root.commercialNoticeModalVisible)
-            return
+            return;
         // Defer until the cold-launch curtain has lifted. Otherwise
         // the modal paints over the BootOverlay's "Connecting…" cue,
         // and the user perceives the launcher as stuck — they can't
@@ -884,20 +891,20 @@ MainLayout {
         // every "I understand" press lands on a hub that's already
         // ready to use.
         if (!root.bootComplete)
-            return
-        root.commercialNoticeModalVisible = true
+            return;
+        root.commercialNoticeModalVisible = true;
         if (ScreenManager.topModal !== root.modalCommercialNotice)
-            ScreenManager.pushModal(root.modalCommercialNotice)
+            ScreenManager.pushModal(root.modalCommercialNotice);
     }
 
     function closeCommercialNoticeModal(): void {
-        root.commercialNoticeModalVisible = false
+        root.commercialNoticeModalVisible = false;
         if (ScreenManager.topModal === root.modalCommercialNotice)
-            ScreenManager.popModal()
+            ScreenManager.popModal();
         // Now that the notice is dismissed, re-check the media-DB gate
         // — if the catalog had already settled empty behind the notice,
         // this opens that modal as the next step in the chain.
-        root._maybeOpenFirstRunIndex()
+        root._maybeOpenFirstRunIndex();
     }
 
     // Log-upload modal lifecycle. Triggered from the Settings "Upload
@@ -908,16 +915,16 @@ MainLayout {
         // Reset before showing so a previous success/error from earlier
         // in the session doesn't paint stale state behind the new
         // upload's "Uploading…" copy.
-        Browse.LogUpload.reset()
-        root.logUploadModalVisible = true
+        Browse.LogUpload.reset();
+        root.logUploadModalVisible = true;
         if (ScreenManager.topModal !== root.modalLogUpload)
-            ScreenManager.pushModal(root.modalLogUpload)
+            ScreenManager.pushModal(root.modalLogUpload);
     }
 
     function closeLogUploadModal(): void {
-        root.logUploadModalVisible = false
+        root.logUploadModalVisible = false;
         if (ScreenManager.topModal === root.modalLogUpload)
-            ScreenManager.popModal()
+            ScreenManager.popModal();
     }
 
     onCloseLogUploadRequested: root.closeLogUploadModal()
@@ -926,15 +933,15 @@ MainLayout {
     // `openQuitConfirmModal` instead of `Qt.quit()` so a stray B / Esc
     // can't kill the launcher; the modal owns the actual decision.
     function openQuitConfirmModal(): void {
-        root.quitConfirmModalVisible = true
+        root.quitConfirmModalVisible = true;
         if (ScreenManager.topModal !== root.modalQuitConfirm)
-            ScreenManager.pushModal(root.modalQuitConfirm)
+            ScreenManager.pushModal(root.modalQuitConfirm);
     }
 
     function closeQuitConfirmModal(): void {
-        root.quitConfirmModalVisible = false
+        root.quitConfirmModalVisible = false;
         if (ScreenManager.topModal === root.modalQuitConfirm)
-            ScreenManager.popModal()
+            ScreenManager.popModal();
     }
 
     onCloseQuitConfirmRequested: root.closeQuitConfirmModal()
@@ -943,8 +950,8 @@ MainLayout {
     Connections {
         target: Browse.AppStatus
         function onConnection_stateChanged(): void {
-            root._maybeOpenFirstRunIndex()
-            root._maybeCompleteBoot()
+            root._maybeOpenFirstRunIndex();
+            root._maybeCompleteBoot();
         }
     }
 
@@ -954,23 +961,23 @@ MainLayout {
     // user keeps their cached catalog.
     function _maybeCompleteBoot(): void {
         if (root.bootComplete)
-            return
-        if (Browse.AppStatus.connection_state === 2 /* READY */) {
-            root.bootComplete = true
+            return;
+        if (Browse.AppStatus.connection_state === 2) {
+            root.bootComplete = true;
             // Curtain just lifted — fire the notice gate now that the
             // hub is paintable. _maybeOpenCommercialNotice early-returns
             // until bootComplete is true, so this is the natural edge.
-            root._maybeOpenCommercialNotice()
+            root._maybeOpenCommercialNotice();
         }
     }
 
     Connections {
         target: Browse.CategoriesModel
         function onLoadedChanged(): void {
-            root._maybeOpenFirstRunIndex()
+            root._maybeOpenFirstRunIndex();
         }
         function onCountChanged(): void {
-            root._maybeOpenFirstRunIndex()
+            root._maybeOpenFirstRunIndex();
         }
     }
 
@@ -979,49 +986,49 @@ MainLayout {
 
     function beginCardWrite(owner: string): void {
         if (owner === "systems")
-            Browse.SystemsModel.cancel_card_write()
+            Browse.SystemsModel.cancel_card_write();
         else if (owner === "games")
-            Browse.GamesModel.cancel_card_write()
+            Browse.GamesModel.cancel_card_write();
         else if (owner === "favorites")
-            Browse.FavoritesModel.cancel_card_write()
-        root.cardWriteOwner = owner
-        root.cardWriteFailed = false
-        root.cardWriteModalVisible = true
-        cardWriteFailureTimer.stop()
+            Browse.FavoritesModel.cancel_card_write();
+        root.cardWriteOwner = owner;
+        root.cardWriteFailed = false;
+        root.cardWriteModalVisible = true;
+        cardWriteFailureTimer.stop();
         if (ScreenManager.topModal !== root.modalCardWrite)
-            ScreenManager.pushModal(root.modalCardWrite)
+            ScreenManager.pushModal(root.modalCardWrite);
     }
 
     function handleCardWriteStatus(): void {
         if (!root.cardWriteModalVisible || root.cardWriteOwner === "")
-            return
+            return;
         if (root.activeCardWritePending)
-            return
+            return;
         if (root.activeCardWriteError !== "") {
-            root.cardWriteFailed = true
-            cardWriteFailureTimer.restart()
+            root.cardWriteFailed = true;
+            cardWriteFailureTimer.restart();
         } else {
-            root.hideCardWriteModal()
+            root.hideCardWriteModal();
         }
     }
 
     function cancelCardWrite(): void {
         if (root.cardWriteOwner === "systems")
-            Browse.SystemsModel.cancel_card_write()
+            Browse.SystemsModel.cancel_card_write();
         else if (root.cardWriteOwner === "games")
-            Browse.GamesModel.cancel_card_write()
+            Browse.GamesModel.cancel_card_write();
         else if (root.cardWriteOwner === "favorites")
-            Browse.FavoritesModel.cancel_card_write()
-        root.hideCardWriteModal()
+            Browse.FavoritesModel.cancel_card_write();
+        root.hideCardWriteModal();
     }
 
     function hideCardWriteModal(): void {
-        cardWriteFailureTimer.stop()
-        root.cardWriteModalVisible = false
-        root.cardWriteFailed = false
-        root.cardWriteOwner = ""
+        cardWriteFailureTimer.stop();
+        root.cardWriteModalVisible = false;
+        root.cardWriteFailed = false;
+        root.cardWriteOwner = "";
         if (ScreenManager.topModal === root.modalCardWrite)
-            ScreenManager.popModal()
+            ScreenManager.popModal();
     }
 
     // Action router. Called from handleKey (which translates Qt key
@@ -1037,7 +1044,7 @@ MainLayout {
         // accidentally swallowed if a transition is pending behind
         // it (the modal owns input regardless).
         if (root.pendingTransition !== "" && !ScreenManager.hasModal)
-            return
+            return;
         if (ScreenManager.hasModal) {
             // Single-consumer dispatch. When a second modal lands
             // (action_error variant for game launch / settings reset
@@ -1048,41 +1055,39 @@ MainLayout {
             // pending kill the write the user actually wanted; on
             // success/error the modal auto-dismisses via
             // handleCardWriteStatus, so accept has nothing to do here.
-            if (ScreenManager.topModal === root.modalCardWrite
-                    && action === "cancel") {
-                root.cancelCardWrite()
-            } else if (ScreenManager.topModal === root.modalQrCode
-                    && action === "cancel") {
-                root.closeQrCodeModal()
+            if (ScreenManager.topModal === root.modalCardWrite && action === "cancel") {
+                root.cancelCardWrite();
+            } else if (ScreenManager.topModal === root.modalQrCode && action === "cancel") {
+                root.closeQrCodeModal();
             } else if (ScreenManager.topModal === root.modalContextMenu) {
-                root.contextMenu.handleAction(action)
+                root.contextMenu.handleAction(action);
             } else if (ScreenManager.topModal === root.modalFirstRunIndex) {
-                root.firstRunIndexModal.handleAction(action)
+                root.firstRunIndexModal.handleAction(action);
             } else if (ScreenManager.topModal === root.modalCommercialNotice) {
-                root.commercialNoticeModal.handleAction(action)
+                root.commercialNoticeModal.handleAction(action);
             } else if (ScreenManager.topModal === root.modalLogUpload) {
-                root.logUploadModal.handleAction(action)
+                root.logUploadModal.handleAction(action);
             } else if (ScreenManager.topModal === root.modalQuitConfirm) {
-                root.quitConfirmModal.handleAction(action)
+                root.quitConfirmModal.handleAction(action);
             }
             // While a modal owns input, swallow everything not handled
             // above rather than leak it to the root screen.
-            return
+            return;
         }
         if (root.activeScreen === root.screenGames) {
-            root.gamesScreen.handleAction(action, root._dispatchingRepeat)
+            root.gamesScreen.handleAction(action, root._dispatchingRepeat);
         } else if (root.activeScreen === root.screenSystems) {
-            root.systemsScreen.handleAction(action)
+            root.systemsScreen.handleAction(action);
         } else if (root.activeScreen === root.screenFavorites) {
-            root.favoritesScreen.handleAction(action)
+            root.favoritesScreen.handleAction(action);
         } else if (root.activeScreen === root.screenRecents) {
-            root.recentsScreen.handleAction(action)
+            root.recentsScreen.handleAction(action);
         } else if (root.activeScreen === root.screenSettings) {
-            root.settingsScreen.handleAction(action)
+            root.settingsScreen.handleAction(action);
         } else if (root.activeScreen === root.screenAbout) {
-            root.aboutScreen.handleAction(action)
+            root.aboutScreen.handleAction(action);
         } else {
-            root.hubScreen.handleAction(action)
+            root.hubScreen.handleAction(action);
         }
     }
 
@@ -1106,10 +1111,10 @@ MainLayout {
     property alias _repeatTicking: repeatTick.running
 
     function _stopRepeat(): void {
-        repeatInitial.stop()
-        repeatTick.stop()
-        root._heldAction = ""
-        root._heldKey = 0
+        repeatInitial.stop();
+        repeatTick.stop();
+        root._heldAction = "";
+        root._heldKey = 0;
         // Hold-release commits whatever cell the user landed on. Games
         // screen debounces its `set_selected_at_top` writes (one atomic
         // disk write per move would batter MiSTer's SD card on a Down-
@@ -1117,12 +1122,11 @@ MainLayout {
         // selection so a kill during launch resumes on the right entry.
         // No-op when no persist is pending or when another screen is
         // active.
-        root.gamesScreen.flushSelectedPersist()
+        root.gamesScreen.flushSelectedPersist();
     }
 
     function _isRepeatableAction(action: string): bool {
-        return action === "up" || action === "down"
-            || action === "left" || action === "right"
+        return action === "up" || action === "down" || action === "left" || action === "right";
     }
 
     // State-machine half of handleKey: records the held key/action and
@@ -1131,11 +1135,11 @@ MainLayout {
     // through handleAction → real screens. No-op for non-dpad actions.
     function _armRepeat(action: string, key: int): void {
         if (!root._isRepeatableAction(action))
-            return
-        root._heldAction = action
-        root._heldKey = key
-        repeatTick.stop()
-        repeatInitial.restart()
+            return;
+        root._heldAction = action;
+        root._heldKey = key;
+        repeatTick.stop();
+        repeatInitial.restart();
     }
 
     // Press handler. Single entry point for both Keys.onPressed and the
@@ -1143,11 +1147,11 @@ MainLayout {
     // on offscreen windows reliably). Fires the action immediately, then
     // arms the dpad-repeat state machine.
     function handleKey(key: int): void {
-        const action = Browse.Input.action_for_key(key)
+        const action = Browse.Input.action_for_key(key);
         if (action === "")
-            return
-        root.handleAction(action)
-        root._armRepeat(action, key)
+            return;
+        root.handleAction(action);
+        root._armRepeat(action, key);
     }
 
     // Release handler. Only the key that started the repeat cancels it;
@@ -1155,13 +1159,13 @@ MainLayout {
     // mid-hold) is ignored.
     function handleKeyRelease(key: int): void {
         if (root._heldAction !== "" && key === root._heldKey)
-            root._stopRepeat()
+            root._stopRepeat();
     }
 
     function _handleRepeatAction(): void {
-        root._dispatchingRepeat = true
-        root.handleAction(root._heldAction)
-        root._dispatchingRepeat = false
+        root._dispatchingRepeat = true;
+        root.handleAction(root._heldAction);
+        root._dispatchingRepeat = false;
     }
 
     Timer {
@@ -1177,9 +1181,9 @@ MainLayout {
         repeat: false
         onTriggered: {
             if (root._heldAction === "")
-                return
-            root._handleRepeatAction()
-            repeatTick.start()
+                return;
+            root._handleRepeatAction();
+            repeatTick.start();
         }
     }
 
@@ -1189,10 +1193,10 @@ MainLayout {
         repeat: true
         onTriggered: {
             if (root._heldAction === "") {
-                repeatTick.stop()
-                return
+                repeatTick.stop();
+                return;
             }
-            root._handleRepeatAction()
+            root._handleRepeatAction();
         }
     }
 
@@ -1202,7 +1206,7 @@ MainLayout {
     // ApplicationWindow's own active property.
     onActiveChanged: {
         if (!root.active)
-            root._stopRepeat()
+            root._stopRepeat();
     }
 
     Item {
@@ -1215,13 +1219,13 @@ MainLayout {
         // over for dpad directions only.
         Keys.onPressed: event => {
             if (event.isAutoRepeat)
-                return
-            root.handleKey(event.key)
+                return;
+            root.handleKey(event.key);
         }
         Keys.onReleased: event => {
             if (event.isAutoRepeat)
-                return
-            root.handleKeyRelease(event.key)
+                return;
+            root.handleKeyRelease(event.key);
         }
     }
 
@@ -1243,11 +1247,16 @@ MainLayout {
             y: Sizing.center(parent.height, height)
             text: {
                 switch (root.pendingTransition) {
-                case "systems": return qsTr("Loading systems…")
-                case "games":   return qsTr("Loading games…")
-                case "favorites": return qsTr("Loading favorites…")
-                case "recents": return qsTr("Loading recently played…")
-                default:        return qsTr("Loading…")
+                case "systems":
+                    return qsTr("Loading systems…");
+                case "games":
+                    return qsTr("Loading games…");
+                case "favorites":
+                    return qsTr("Loading favorites…");
+                case "recents":
+                    return qsTr("Loading recently played…");
+                default:
+                    return qsTr("Loading…");
                 }
             }
         }
@@ -1284,8 +1293,8 @@ MainLayout {
         onTriggered: forceRepaintCover.visible = false
     }
     function _forceFullRepaint(): void {
-        forceRepaintCover.visible = true
-        forceRepaintTimer.restart()
+        forceRepaintCover.visible = true;
+        forceRepaintTimer.restart();
     }
     Connections {
         target: Browse.Settings
@@ -1298,7 +1307,7 @@ MainLayout {
             // is_mister to keep the desktop dev-loop free of cosmetic
             // flashes when toggling resolutions for testing.
             if (Browse.Settings.is_mister)
-                root._forceFullRepaint()
+                root._forceFullRepaint();
         }
     }
 
@@ -1328,14 +1337,14 @@ MainLayout {
         property int done: 0
 
         function _markDone(): void {
-            systemsCoverPrefetcher.done++
+            systemsCoverPrefetcher.done++;
             if (systemsCoverPrefetcher.done >= systemsCoverPrefetcher.total) {
-                systemsCoverPrefetcher.active = false
-                systemsCoverPrefetchTimeout.stop()
-                const cb = systemsCoverPrefetcher.doneCallback
-                systemsCoverPrefetcher.doneCallback = null
+                systemsCoverPrefetcher.active = false;
+                systemsCoverPrefetchTimeout.stop();
+                const cb = systemsCoverPrefetcher.doneCallback;
+                systemsCoverPrefetcher.doneCallback = null;
                 if (cb !== null)
-                    cb()
+                    cb();
             }
         }
 
@@ -1358,35 +1367,33 @@ MainLayout {
                 property bool _counted: false
                 function _markDone(): void {
                     if (_counted)
-                        return
-                    _counted = true
-                    systemsCoverPrefetcher._markDone()
+                        return;
+                    _counted = true;
+                    systemsCoverPrefetcher._markDone();
                 }
 
                 Component.onCompleted: {
-                    if (status === Image.Ready
-                        || status === Image.Error
-                        || coverKey === "")
-                        _markDone()
+                    if (status === Image.Ready || status === Image.Error || coverKey === "")
+                        _markDone();
                 }
                 onStatusChanged: {
                     if (status === Image.Ready || status === Image.Error)
-                        _markDone()
+                        _markDone();
                 }
             }
         }
     }
 
     function _prefetchSystemCovers(cb): void {
-        systemsCoverPrefetcher.total = Browse.SystemsModel.count
-        systemsCoverPrefetcher.done = 0
+        systemsCoverPrefetcher.total = Browse.SystemsModel.count;
+        systemsCoverPrefetcher.done = 0;
         if (systemsCoverPrefetcher.total === 0) {
-            cb()
-            return
+            cb();
+            return;
         }
-        systemsCoverPrefetcher.doneCallback = cb
-        systemsCoverPrefetcher.active = true
-        systemsCoverPrefetchTimeout.restart()
+        systemsCoverPrefetcher.doneCallback = cb;
+        systemsCoverPrefetcher.active = true;
+        systemsCoverPrefetchTimeout.restart();
     }
 
     Timer {
@@ -1394,11 +1401,11 @@ MainLayout {
         interval: 1500
         repeat: false
         onTriggered: {
-            systemsCoverPrefetcher.active = false
-            const cb = systemsCoverPrefetcher.doneCallback
-            systemsCoverPrefetcher.doneCallback = null
+            systemsCoverPrefetcher.active = false;
+            const cb = systemsCoverPrefetcher.doneCallback;
+            systemsCoverPrefetcher.doneCallback = null;
             if (cb !== null)
-                cb()
+                cb();
         }
     }
 
@@ -1413,6 +1420,11 @@ MainLayout {
         interval: 50
         repeat: false
         property string targetCategory: ""
-        onTriggered: Browse.SystemsModel.set_category(deferredCategorySetTimer.targetCategory)
+        onTriggered: {
+            Browse.SystemsModel.set_category(deferredCategorySetTimer.targetCategory);
+            // Cleared after set_category so the resulting loading=false
+            // edge is the one our callback consumes.
+            root._deferredCategoryPending = false;
+        }
     }
 }

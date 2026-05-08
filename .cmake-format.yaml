@@ -6,8 +6,7 @@ parse:
   additional_commands: {}
 
 format:
-  column_limit: 100
-  indent_width: 4
+  line_width: 100
   tab_size: 4
   use_tabchars: false
   line_ending: unix
@@ -18,7 +17,7 @@ format:
   dangle_parens: true
   dangle_align: prefix
   keyword_case: upper
-  command_case: lower
+  command_case: canonical
   always_wrap:
     - target_sources
     - target_link_libraries
@@ -28,9 +27,6 @@ format:
     - qt_add_library
 
 markup:
-  enable_render: true
-  first_comment_is_literal: false
-
-misc:
-  per_file_clobber_comments: []
+  enable_markup: true
+  first_comment_is_literal: true
 ...

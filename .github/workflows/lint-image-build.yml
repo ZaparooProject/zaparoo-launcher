@@ -1,0 +1,119 @@
+# Zaparoo Launcher
+# Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+
+name: Build lint image
+
+on:
+  # On main, a push that touches lint/VERSION or Dockerfile.lint
+  # auto-publishes the matching image. The "check if version exists" gate
+  # below makes the workflow a no-op when the tag is already in the
+  # registry, so re-runs are cheap and idempotent.
+  push:
+    branches: [main]
+    paths:
+      - 'lint/VERSION'
+      - 'Dockerfile.lint'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., 1.0.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ -n "${INPUT_VERSION}" ]; then
+            VERSION="${INPUT_VERSION}"
+          elif [ -f lint/VERSION ]; then
+            VERSION=$(tr -d '[:space:]' < lint/VERSION)
+          else
+            echo "Error: no inputs.version provided and lint/VERSION is missing" >&2
+            exit 1
+          fi
+          # Docker tag grammar: first char [A-Za-z0-9_], then up to 127 of
+          # [A-Za-z0-9_.-]. Validating here surfaces a typo with a clear
+          # message instead of deep inside docker manifest inspect / push.
+          if ! printf '%s' "${VERSION}" | grep -Eq '^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$'; then
+            echo "Error: version '${VERSION}' is not a valid Docker tag" >&2
+            echo "       (must match [A-Za-z0-9_][A-Za-z0-9_.-]{0,127})" >&2
+            exit 1
+          fi
+          printf 'version=%s\n' "${VERSION}" >> "$GITHUB_OUTPUT"
+          printf 'Building lint image version: %s\n' "${VERSION}"
+
+      - name: Set lowercase repository owner
+        run: |
+          echo "OWNER_LC=${OWNER,,}" >> "$GITHUB_ENV"
+        env:
+          OWNER: ${{ github.repository_owner }}
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check if version exists
+        id: check
+        run: |
+          if docker manifest inspect ghcr.io/${{ env.OWNER_LC }}/zaparoo-lint:${{ steps.version.outputs.version }} > /dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Version ${{ steps.version.outputs.version }} already exists in registry"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "Version ${{ steps.version.outputs.version }} will be built"
+          fi
+
+      - name: Set up QEMU
+        if: steps.check.outputs.exists != 'true'
+        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3
+
+      - name: Set up Docker Buildx
+        if: steps.check.outputs.exists != 'true'
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
+
+      # Only move :latest on main — workflow_dispatch runs on arbitrary
+      # branches could otherwise point :latest at an older/test image.
+      - name: Compute tags
+        id: tags
+        env:
+          IMAGE: ghcr.io/${{ env.OWNER_LC }}/zaparoo-lint
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          {
+            echo 'tags<<EOF'
+            echo "${IMAGE}:${VERSION}"
+            if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+              echo "${IMAGE}:latest"
+            fi
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      # Multi-arch build so Mac arm64 contributors get a native image
+      # (no Rosetta/qemu translation when running `just fmt-docker`).
+      - name: Build and push
+        if: steps.check.outputs.exists != 'true'
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
+        with:
+          context: .
+          file: Dockerfile.lint
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          cache-from: type=gha,scope=lint
+          cache-to: type=gha,mode=max,scope=lint

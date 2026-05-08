@@ -35,7 +35,7 @@ Item {
 
     property bool open: false
 
-    signal closeRequested()
+    signal closeRequested
 
     readonly property int _stateIdle: 0
     readonly property int _stateUploading: 1
@@ -50,9 +50,9 @@ Item {
 
     onOpenChanged: {
         if (!modal.open)
-            return
+            return;
         if (modal.phase === modal._stateIdle)
-            Browse.LogUpload.upload()
+            Browse.LogUpload.upload();
     }
 
     // Generate the QR matrix as soon as we have a URL. `Browse.QrCode`
@@ -63,19 +63,19 @@ Item {
         target: Browse.LogUpload
         function onStateChanged(): void {
             if (Browse.LogUpload.state === modal._stateSuccess)
-                Browse.QrCode.generate(Browse.LogUpload.url)
+                Browse.QrCode.generate(Browse.LogUpload.url);
         }
     }
 
     function handleAction(action: string): void {
         if (action === "accept") {
             if (modal.phase === modal._stateSuccess) {
-                modal.closeRequested()
+                modal.closeRequested();
             } else if (modal.phase === modal._stateError) {
-                Browse.LogUpload.upload()
+                Browse.LogUpload.upload();
             }
         } else if (action === "cancel") {
-            modal.closeRequested()
+            modal.closeRequested();
         }
     }
 
@@ -93,8 +93,7 @@ Item {
 
             Text {
                 width: parent.width
-                visible: modal.phase === modal._stateUploading
-                         || modal.phase === modal._stateIdle
+                visible: modal.phase === modal._stateUploading || modal.phase === modal._stateIdle
                 text: qsTr("Uploading log file - this may take a moment.")
                 font.family: Theme.fontUi
                 font.pixelSize: Sizing.fontSize(2.6)
@@ -116,14 +115,9 @@ Item {
 
                 readonly property int matrixSize: Browse.QrCode.size
                 readonly property int quietZone: 4
-                readonly property int maxQrPixels:
-                    Math.min(Sizing.pctW(38), Sizing.pctH(54))
-                readonly property int moduleSize: matrixSize > 0
-                    ? Math.max(1,
-                        Math.floor(maxQrPixels / (matrixSize + quietZone * 2)))
-                    : 1
-                readonly property int qrPixels:
-                    moduleSize * (matrixSize + quietZone * 2)
+                readonly property int maxQrPixels: Math.min(Sizing.pctW(38), Sizing.pctH(54))
+                readonly property int moduleSize: matrixSize > 0 ? Math.max(1, Math.floor(maxQrPixels / (matrixSize + quietZone * 2))) : 1
+                readonly property int qrPixels: moduleSize * (matrixSize + quietZone * 2)
 
                 Rectangle {
                     id: qrHolder
@@ -154,8 +148,7 @@ Item {
                                 required property int index
 
                                 readonly property int row: index
-                                readonly property string bits:
-                                    Browse.QrCode.row_at(row)
+                                readonly property string bits: Browse.QrCode.row_at(row)
 
                                 x: 0
                                 y: row * successBlock.moduleSize
@@ -201,9 +194,7 @@ Item {
             Text {
                 width: parent.width
                 visible: modal.phase === modal._stateError
-                text: Browse.LogUpload.error_message !== ""
-                      ? qsTr("Upload failed: %1").arg(Browse.LogUpload.error_message)
-                      : qsTr("Upload failed.")
+                text: Browse.LogUpload.error_message !== "" ? qsTr("Upload failed: %1").arg(Browse.LogUpload.error_message) : qsTr("Upload failed.")
                 font.family: Theme.fontUi
                 font.pixelSize: Sizing.fontSize(2.4)
                 color: Theme.textPrimary
@@ -215,8 +206,7 @@ Item {
             Item {
                 width: parent.width
                 height: Sizing.pctH(7)
-                visible: modal.phase === modal._stateSuccess
-                         || modal.phase === modal._stateError
+                visible: modal.phase === modal._stateSuccess || modal.phase === modal._stateError
 
                 Rectangle {
                     x: Sizing.center(parent.width, width)
@@ -231,9 +221,7 @@ Item {
                     Text {
                         x: Sizing.center(parent.width, width)
                         y: Sizing.center(parent.height, height)
-                        text: modal.phase === modal._stateError
-                              ? qsTr("Retry")
-                              : qsTr("Done")
+                        text: modal.phase === modal._stateError ? qsTr("Retry") : qsTr("Done")
                         font.family: Theme.fontUi
                         font.pixelSize: Sizing.fontSize(2.5)
                         color: Theme.textPrimary

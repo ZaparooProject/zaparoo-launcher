@@ -29,7 +29,7 @@ Item {
 
     property bool open: false
 
-    signal closeRequested()
+    signal closeRequested
 
     visible: modal.open
     anchors.fill: parent
@@ -42,13 +42,13 @@ Item {
             // already written. The Rust slot is synchronous on the Qt
             // thread; if the disk write fails it logs and still flips
             // the in-memory flag for this session.
-            Browse.Notice.acknowledge_commercial()
-            modal.closeRequested()
+            Browse.Notice.acknowledge_commercial();
+            modal.closeRequested();
         }
-        // No cancel path. The notice is informational, not a license
-        // condition — but it must be acknowledged once so the user has
-        // demonstrably seen the non-commercial-use message before the
-        // launcher becomes interactive.
+    // No cancel path. The notice is informational, not a license
+    // condition — but it must be acknowledged once so the user has
+    // demonstrably seen the non-commercial-use message before the
+    // launcher becomes interactive.
     }
 
     Modal {

@@ -1,26 +1,23 @@
 // Zaparoo Launcher
 // Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-
-import QtQuick
-import Zaparoo.Theme
-import Zaparoo.Browse as Browse
-
 // cxx-qt 0.8 patches `isFinal: true` on singleton properties but the
 // qmltypes schema has no `isFinal` slot, so every read trips qmllint's
 // "Member can be shadowed" check. Until the schema grows the slot,
 // suppress the compiler category file-wide.
 // qmllint disable compiler
-
 // Single mutually-exclusive status pill anchored in the top-right HUD.
 // Surfaces — in priority order, only one ever paints — Core link state
 // (disconnected / connecting / error), media-database build progress
 // (indexing / optimizing / paused), and scraper progress.
-//
 // When no condition is interesting the pill is `visible: false` and
 // `width: 0`, so the surrounding Row collapses around it and the rest
 // of the HUD slides flush to the right edge.
-//
+
+import QtQuick
+import Zaparoo.Browse as Browse
+import Zaparoo.Theme
+
 // Software-renderer safe: a single Rectangle with two Text children,
 // no animations, no shaders. Counter and step text update via plain
 // property bindings so the dirty rect is bounded to the pill.
@@ -36,32 +33,45 @@ Item {
     readonly property int _linkConnected: 2
     readonly property int _linkReconnecting: 3
     readonly property int _linkUnreachable: 4
-
     readonly property int _connError: 3
-
     // Resolved (priority, label) for the current state. Empty `text`
     // means "nothing interesting is happening" and the pill hides.
     readonly property string _label: {
         const link = Browse.AppStatus.link_state ?? pill._linkDisconnected;
         const conn = Browse.AppStatus.connection_state ?? pill._linkDisconnected;
         // Priority 1 — Core link state.
-        if (link === pill._linkUnreachable) return qsTr("Disconnected");
-        if (link === pill._linkReconnecting) return qsTr("Reconnecting…");
-        if (link === pill._linkDisconnected) return qsTr("Disconnected");
-        if (link === pill._linkConnecting) return qsTr("Connecting…");
-        if (conn === pill._connError) return qsTr("Core error");
+        if (link === pill._linkUnreachable)
+            return qsTr("Disconnected");
+
+        if (link === pill._linkReconnecting)
+            return qsTr("Reconnecting…");
+
+        if (link === pill._linkDisconnected)
+            return qsTr("Disconnected");
+
+        if (link === pill._linkConnecting)
+            return qsTr("Connecting…");
+
+        if (conn === pill._connError)
+            return qsTr("Core error");
+
         // Priority 2 — media database.
-        if (Browse.MediaStatus.optimizing) return qsTr("Optimizing database");
+        if (Browse.MediaStatus.optimizing)
+            return qsTr("Optimizing database");
+
         if (Browse.MediaStatus.indexing) {
             const cur = Browse.MediaStatus.current_step;
             const tot = Browse.MediaStatus.total_steps;
             const display = Browse.MediaStatus.current_step_display;
             if (Browse.MediaStatus.paused)
                 return qsTr("Indexing paused");
+
             if (tot > 0 && display !== "")
                 return qsTr("Indexing %1/%2 - %3").arg(cur).arg(tot).arg(display);
+
             if (tot > 0)
                 return qsTr("Indexing %1/%2").arg(cur).arg(tot);
+
             return qsTr("Indexing…");
         }
         // Priority 3 — scraper.
@@ -71,20 +81,20 @@ Item {
             const sys = Browse.MediaStatus.scrape_system_id;
             if (Browse.MediaStatus.scrape_paused)
                 return qsTr("Scrape paused");
+
             if (total > 0 && sys !== "")
                 return qsTr("Scraping %1/%2 - %3").arg(proc).arg(total).arg(sys);
+
             if (total > 0)
                 return qsTr("Scraping %1/%2").arg(proc).arg(total);
+
             return qsTr("Scraping…");
         }
         return "";
     }
-
     // Border colour leans on the same convention as the old connection
     // strip: warmer accent for error-class link states, muted otherwise.
-    readonly property bool _isError:
-        Browse.AppStatus.link_state === pill._linkUnreachable
-        || Browse.AppStatus.connection_state === pill._connError
+    readonly property bool _isError: Browse.AppStatus.link_state === pill._linkUnreachable || Browse.AppStatus.connection_state === pill._connError
 
     visible: pill._label !== ""
     height: pill.visible ? Sizing.fontSize(3.4) : 0
@@ -99,6 +109,7 @@ Item {
 
         Text {
             id: labelText
+
             anchors.verticalCenter: parent.verticalCenter
             anchors.left: parent.left
             anchors.leftMargin: Sizing.pctW(1.2)

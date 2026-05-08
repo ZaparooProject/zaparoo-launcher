@@ -1,7 +1,6 @@
 // Design-time only. Not compiled into the launcher.
 // Mirrors the GamesState persistence singleton exposed from Rust.
 pragma Singleton
-
 import QtQuick
 
 QtObject {

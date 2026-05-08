@@ -71,24 +71,88 @@ test-rust:
 test-san: build-san
     ctest --preset desktop-sanitized
 
-# --- lint ---
-lint: lint-cpp lint-rust
+# --- lint and format ---
+# All lint and format recipes run inside the published lint image.
+# Host execution drifts because clang-format, qmlformat, and cmake-format
+# are not version-pinnable through any host tool ecosystem (no
+# rust-toolchain.toml equivalent), and Qt's qmllint changes its rule set
+# between minor releases. The image is the single source of truth for
+# tool versions, shared with CI by construction. `lint/VERSION` drives
+# the image tag — see `Dockerfile.lint` for what is pinned.
+#
+# `_LINT_IMAGE` is read from `lint/VERSION` so a single source of truth
+# drives both the publish workflow and local pulls.
+_LINT_IMAGE := "ghcr.io/zaparooproject/zaparoo-lint:" + trim(`cat lint/VERSION`)
 
-lint-cpp: build
-    cmake --build build --target lint
+_lint *cmd:
+    docker run --rm \
+        -v "$PWD":/workdir \
+        -u "$(id -u):$(id -g)" \
+        {{_LINT_IMAGE}} \
+        {{cmd}}
 
-lint-qml: build
-    cmake --build build --target all_qmllint
+# Container-internal: configure + build using the desktop-docker-debug
+# preset so cmake artifacts land in build-docker/ instead of stomping the
+# host's build/ directory. Underscore-prefixed recipes are private
+# (hidden from `just --list`).
+_build-in-image:
+    cmake --preset desktop-docker-debug
+    cmake --build --preset desktop-docker-debug
 
-lint-rust:
+# Container-internal: cmake `lint` target (clang-format dry-run +
+# clang-tidy + all_qmllint).
+_lint-cpp-target: _build-in-image
+    cmake --build build-docker --target lint
+
+# Container-internal: only the qmllint subset.
+_lint-qml-target: _build-in-image
+    cmake --build build-docker --target all_qmllint
+
+# Container-internal: the rust lint surface (fmt --check + clippy + deny).
+_lint-rust-internal:
     cd rust && cargo fmt --all --check
     cd rust && cargo clippy --workspace --all-targets -- -D warnings
     cd rust && cargo deny check
 
-# --- format (auto-apply) ---
-fmt:
-    pre-commit run --all-files
+_lint-all-internal: _lint-rust-internal _lint-cpp-target
+
+# Container-internal: format-and-autofix surface. xargs -r skips the
+# invocation when the file list is empty.
+_fmt-internal:
     cd rust && cargo fmt --all
+    git ls-files '*.cpp' '*.h' '*.hpp' '*.cc' | xargs -r clang-format -i
+    git ls-files '*.qml' | xargs -r qmlformat --inplace
+    git ls-files 'CMakeLists.txt' '*.cmake' | xargs -r cmake-format -i
+
+# Container-internal: autofix everything CI would reject. clippy --fix
+# runs first because its rewrites may not be pre-formatted; the
+# formatters are the cleanup pass.
+_fix-internal:
+    cd rust && cargo clippy --fix --workspace --all-targets --allow-dirty --allow-staged
+    just _fmt-internal
+
+# Full lint gate (rust + cpp + qml). Matches CI exactly.
+lint:
+    just _lint just _lint-all-internal
+
+lint-rust:
+    just _lint just _lint-rust-internal
+
+lint-cpp:
+    just _lint just _lint-cpp-target
+
+lint-qml:
+    just _lint just _lint-qml-target
+
+fmt:
+    just _lint just _fmt-internal
+
+fix:
+    just _lint just _fix-internal
+
+# Install the host-only cargo extensions used by `just test*`.
+install-tools:
+    cargo install --locked cargo-nextest
 
 # --- deploy ---
 deploy-mister:
@@ -96,5 +160,5 @@ deploy-mister:
 
 # --- clean ---
 clean:
-    rm -rf build build-release build-dev build-san output
+    rm -rf build build-release build-dev build-san build-docker output
     cd rust && cargo clean

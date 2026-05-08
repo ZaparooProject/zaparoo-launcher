@@ -6,11 +6,12 @@
 // Paths here are resolved by the C++ compiler via the include paths
 // set up by cxx_qt_build — not by cxx_qt_build's file-read phase.
 #pragma once
-#include "cxx-qt-lib/qmodelindex.h"
-#include "cxx-qt-lib/qvariant.h"
-#include "cxx-qt-lib/qhash.h"
 #include "cxx-qt-lib/qbytearray.h"
+#include "cxx-qt-lib/qhash.h"
+#include "cxx-qt-lib/qlist.h"
+#include "cxx-qt-lib/qmodelindex.h"
 #include "cxx-qt-lib/qstring.h"
 #include "cxx-qt-lib/qstringlist.h"
-#include "cxx-qt-lib/qlist.h"
+#include "cxx-qt-lib/qvariant.h"
+
 #include <QAbstractListModel>

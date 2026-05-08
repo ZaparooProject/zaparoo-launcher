@@ -21,9 +21,7 @@ Item {
 
     readonly property int matrixSize: Browse.QrCode.size
     readonly property int maxQrPixels: Math.min(Sizing.pctW(42), Sizing.pctH(68))
-    readonly property int moduleSize: matrixSize > 0
-        ? Math.max(1, Math.floor(maxQrPixels / (matrixSize + quietZone * 2)))
-        : 1
+    readonly property int moduleSize: matrixSize > 0 ? Math.max(1, Math.floor(maxQrPixels / (matrixSize + quietZone * 2))) : 1
     readonly property int qrPixels: moduleSize * (matrixSize + quietZone * 2)
 
     visible: root.open

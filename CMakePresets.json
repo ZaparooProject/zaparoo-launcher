@@ -41,13 +41,21 @@
                 "ZAPAROO_ENABLE_ASAN": "ON",
                 "ZAPAROO_ENABLE_UBSAN": "ON"
             }
+        },
+        {
+            "name": "desktop-docker-debug",
+            "displayName": "Desktop Debug (Docker lint container)",
+            "description": "Used by the Dockerfile.lint container so its build artifacts land in build-docker/ instead of stomping the host's build/ directory.",
+            "inherits": "desktop-debug",
+            "binaryDir": "${sourceDir}/build-docker"
         }
     ],
     "buildPresets": [
-        { "name": "desktop-debug",     "configurePreset": "desktop-debug" },
-        { "name": "desktop-release",   "configurePreset": "desktop-release" },
-        { "name": "desktop-dev",       "configurePreset": "desktop-dev" },
-        { "name": "desktop-sanitized", "configurePreset": "desktop-sanitized" }
+        { "name": "desktop-debug",        "configurePreset": "desktop-debug" },
+        { "name": "desktop-release",      "configurePreset": "desktop-release" },
+        { "name": "desktop-dev",          "configurePreset": "desktop-dev" },
+        { "name": "desktop-sanitized",    "configurePreset": "desktop-sanitized" },
+        { "name": "desktop-docker-debug", "configurePreset": "desktop-docker-debug" }
     ],
     "testPresets": [
         {
