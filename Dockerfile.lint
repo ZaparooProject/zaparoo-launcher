@@ -1,0 +1,49 @@
+# Zaparoo Launcher
+# Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+
+# Lint and format tooling for the Zaparoo Launcher. Used by every
+# `just *-docker` recipe so contributors can run the full lint surface
+# (rust + cpp + qml + format) without installing rustfmt, clippy,
+# cargo-deny, clang-format, clang-tidy, qmlformat, qmllint,
+# cmake-format, or Qt on the host.
+#
+# Qt6 dev packages are required because:
+#   - cargo clippy compiles the workspace and cxx-qt-lib's build.rs
+#     needs qmake/headers to link
+#   - cmake's `lint` and `all_qmllint` targets require a configured
+#     Qt build (compile_commands.json + cxx-qt-generated qmldir)
+#
+# Trixie is used (not bookworm) because the launcher requires Qt 6.7+
+# and bookworm only ships 6.4. Trixie ships 6.8.x in qt6-base-dev.
+#
+# This image is deliberately separate from the ARM32 cross-compile
+# toolchain (Dockerfile.toolchain). That image is ~8 GB and only
+# applicable to MiSTer builds; this one stays focused on the desktop
+# lint/build surface.
+
+FROM rust:1-slim-trixie
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        clang-format \
+        clang-tidy \
+        cmake \
+        git \
+        ninja-build \
+        pkg-config \
+        python3-pip \
+        qt6-base-dev \
+        qt6-declarative-dev \
+        qt6-declarative-dev-tools \
+        qt6-l10n-tools \
+        qt6-tools-dev \
+    && pip install --no-cache-dir --break-system-packages cmakelang \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN rustup component add rustfmt clippy \
+    && cargo install --locked cargo-deny just
+
+WORKDIR /workdir

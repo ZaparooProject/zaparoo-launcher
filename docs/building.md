@@ -16,7 +16,16 @@ not already cover the job.
 - Rust stable toolchain (`rustup install stable`)
 - Ninja (required; pinned by `CMakePresets.json`)
 - mold (used as linker on x86_64 Linux; pinned by `rust/.cargo/config.toml`)
-- `just`, `cargo-nextest`, `cargo-deny`
+- `just`
+
+Optional, but used by the lint and test recipes — install once after
+cloning with `just install-tools`:
+
+- `cargo-nextest` (test runner used by `just test` / `just test-rust`)
+- `cargo-deny` (license/advisory check used by `just lint-rust`; the
+  recipe skips it with a warning when not installed)
+- Tooling for the Docker-based lint path is fetched at runtime when you
+  use `just fmt-docker` / `just lint-docker` / `just fix-docker`
 
 Fedora / RHEL:
 ```bash
@@ -31,11 +40,13 @@ sudo apt install qt6-declarative-dev qt6-quick-controls2-dev \
     clang-tidy clang-format just
 ```
 
-Install Rust via rustup, then the cargo extensions:
+Install Rust via rustup, then run `just install-tools` after cloning the
+launcher to install the optional cargo extensions:
 
 ```bash
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-cargo install --locked cargo-nextest cargo-deny
+# After cloning the launcher repo:
+just install-tools
 ```
 
 If `just` isn't packaged for your distro, install it the same way:
@@ -147,16 +158,59 @@ just test-san        # ASan/UBSan suite
 ## Lints
 
 ```bash
-just lint            # everything
+just lint            # everything (rust + cpp + qml)
 just lint-cpp        # clang-format check + clang-tidy
 just lint-qml        # qmllint
 just lint-rust       # rustfmt check + clippy + cargo-deny
-just fmt             # auto-apply: pre-commit + cargo fmt
 ```
 
 `just lint` is the zero-warnings gate before a PR. `compile_commands.json` is
 always generated in `build/`, so clang-tidy and qmllint have the project
 metadata they need.
+
+### Auto-fix
+
+When CI complains about formatting or a fixable clippy lint, run:
+
+```bash
+just fix             # cargo clippy --fix, then all formatters
+just fmt             # only the formatters (cargo fmt + clang-format +
+                     # qmlformat + cmake-format) on tracked files
+```
+
+`just fix` runs `cargo clippy --fix` first because its rewrites may not be
+pre-formatted; the formatters are the cleanup pass. The recipes invoke each
+underlying tool directly — there is no `pre-commit` or other Python
+orchestrator in the loop.
+
+### Docker-based lint and fix
+
+If you do not want to install Qt, clang-format, clang-tidy, qmlformat,
+qmllint, cmake-format, or cargo-deny on the host, every lint and format
+recipe has a Docker variant. They run the published `Dockerfile.lint`
+image from GHCR — tag is read from `lint/VERSION` so a single source of
+truth drives both the publish workflow and your local pulls.
+
+```bash
+just fmt-docker         # just fmt inside the image
+just fix-docker         # just fix inside the image
+just lint-docker        # rust + cpp + qml lints inside the image
+just lint-cpp-docker    # only the cmake `lint` target (clang-format + clang-tidy + qmllint)
+just lint-qml-docker    # only the qmllint subset
+```
+
+The lint image carries Rust, rustfmt, clippy, cargo-deny, clang-format,
+clang-tidy, qmlformat, qmllint, cmake-format, and Qt6 dev libraries
+(cargo clippy and the cmake lint target both need Qt to link cxx-qt-lib
+and to generate `compile_commands.json` plus the cxx-qt qmldir). The
+image is published multi-arch (linux/amd64, linux/arm64), so Apple
+Silicon Mac contributors get a native image with no Rosetta translation.
+
+The Docker recipes that build (cpp/qml/full `lint-docker`, `fix-docker`)
+configure CMake into `build-docker/`, not `build/`, so they never stomp
+the artifacts from a host `just build`. First run is slow (full Qt-linked
+build inside the container). Subsequent runs reuse `build-docker/` via
+the bind mount and are fast.
 
 ## Deploy desktop bundle
 
