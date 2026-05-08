@@ -42,13 +42,61 @@ ApplicationWindow {
     property bool crtNativePath: false
     property string activeScreen: ScreenManager.activeScreen
 
+    // Desktop CRT preview. When `crtPreview` is true and `videoWidth` /
+    // `videoHeight` are nonzero, the visual scene renders at the
+    // logical (videoWidth x videoHeight) size and is integer-upscaled
+    // via a layered wrapper Item -- each logical pixel becomes an N x N
+    // block of physical pixels with nearest-neighbour filtering on the
+    // upscale step itself (so the preview faithfully shows the same
+    // pixels MiSTer would copy to its CRT). Off-MiSTer trigger only;
+    // the embedded build keeps these defaults so the binary still
+    // draws straight to the framebuffer.
+    property int videoWidth: 0
+    property int videoHeight: 0
+    property bool crtPreview: false
+    // Explicit override from `ZAPAROO_CRT_PREVIEW_SCALE`. 0 = auto-pick
+    // the largest integer scale that fits the primary screen.
+    property int crtPreviewScale: 0
+
+    readonly property bool _crtPreviewActive: root.crtPreview && root.videoWidth > 0 && root.videoHeight > 0
+
+    // Largest integer scale that keeps the upscaled window inside
+    // the primary screen with a 5% margin reserved for window
+    // decoration / panel chrome. Falls back to 4 when Screen
+    // metrics aren't available yet (very brief during construction
+    // on some platforms). The override path stays exact.
+    readonly property int _crtPreviewEffectiveScale: {
+        if (!_crtPreviewActive)
+            return 1;
+        if (root.crtPreviewScale > 0)
+            return root.crtPreviewScale;
+        const sw = Screen.width;
+        const sh = Screen.height;
+        if (sw <= 0 || sh <= 0)
+            return 4;
+        const sx = Math.floor((sw * 0.95) / root.videoWidth);
+        const sy = Math.floor((sh * 0.95) / root.videoHeight);
+        return Math.max(1, Math.min(sx, sy));
+    }
+
+    readonly property int _crtPreviewWindowWidth: _crtPreviewActive ? root.videoWidth * _crtPreviewEffectiveScale : 0
+    readonly property int _crtPreviewWindowHeight: _crtPreviewActive ? root.videoHeight * _crtPreviewEffectiveScale : 0
+
     // Defaults keep the design canvas at a sensible aspect for Design
     // Studio. Main.qml overrides these at runtime with Screen.width /
-    // Screen.height, so the live launcher still fills the screen.
-    width: 1280
-    height: 720
-    minimumWidth: 426
-    minimumHeight: 240
+    // Screen.height for fullscreen embedded builds. Preview mode
+    // overrides them here through the bindings below so the window
+    // opens at the correct pinned size from construction -- imperative
+    // resize in Component.onCompleted runs too late on tiling /
+    // auto-maximizing compositors.
+    width: _crtPreviewActive ? _crtPreviewWindowWidth : 1280
+    height: _crtPreviewActive ? _crtPreviewWindowHeight : 720
+    // Pin min == max in preview so a compositor that auto-maximises
+    // unconstrained windows still shows the requested fixed size.
+    minimumWidth: _crtPreviewActive ? _crtPreviewWindowWidth : 426
+    minimumHeight: _crtPreviewActive ? _crtPreviewWindowHeight : 240
+    maximumWidth: _crtPreviewActive ? _crtPreviewWindowWidth : 16777215
+    maximumHeight: _crtPreviewActive ? _crtPreviewWindowHeight : 16777215
     visible: true
     visibility: root.fullScreen ? Window.FullScreen : Window.Windowed
     title: qsTr("Zaparoo Launcher")
@@ -87,6 +135,12 @@ ApplicationWindow {
     property alias firstRunIndexModal: firstRunIndexModal
     property alias logUploadModal: logUploadModal
     property alias quitConfirmModal: quitConfirmModal
+    // Exposed so Main.qml binds Sizing.screenWidth/Height to the
+    // (logical) scene dimensions in CRT preview mode rather than the
+    // (physical) ApplicationWindow dimensions. Outside preview the
+    // scene fills the window, so the bindings produce the same values
+    // they did before this wrapper existed.
+    property alias scene: scene
 
     property bool cardWriteModalVisible: false
     property bool cardWriteFailed: false
@@ -170,325 +224,491 @@ ApplicationWindow {
         }
     }
 
-    // ── Background ────────────────────────────────────────────────────────────
-
-    Rectangle {
-        anchors.fill: parent
-        color: Theme.bgDeep
-    }
-
-    // Faint circuit-trace texture, tiled across the whole window. The
-    // PNG is pre-rendered from resources/images/bg-circuit.svg at the
-    // source pattern's native 304×304 size, with white at ~8 % alpha
-    // baked into the pixmap so QtSvg isn't needed at runtime. Sits
-    // between bgDeep and the rest of the tree so logos, captions, and
-    // selection cards stay fully legible. `Image.Tile` is software-
-    // rendered, so this is MiSTer-safe; `cache: true` keeps the
-    // pixmap in QPixmapCache after first decode.
-    Image {
-        anchors.fill: parent
-        source: "qrc:/qt/qml/Zaparoo/App/resources/images/bg-circuit.png"
-        fillMode: Image.Tile
-        cache: true
-        smooth: false        // 1:1 tile — filtering would just blur the lines
-        // Synchronous so the first frame paints with the texture instead
-        // of flashing the bare bgDeep underneath. One small PNG decode
-        // at startup is cheap.
-        asynchronous: false
-    }
-
-    // ── Top header (logo + status row + status pill) ───────────────────────────
-
-    // Single component owning the brand mark, host status icons +
-    // clock, and Core status pill. Height is fixed (Sizing.headerHeight)
-    // so the pill's slot stays reserved when idle and the logo always
-    // matches the stacked rows. Screens clear `Sizing.headerBottom`.
-    HeaderBar {
-        id: headerBar
-
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.top: parent.top
-        anchors.topMargin: Sizing.headerTopMargin
-        z: 200
-    }
-
-    // ── Screen containers ─────────────────────────────────────────────────────
-
-    // Stacked container — only the active screen paints. Hub →
-    // Systems → Games drill-downs (and Esc back) are instant cuts:
-    // bind `visible` directly on the live `activeScreen` and let
-    // Qt's scene graph swap which screen paints in one frame.
-    //
-    // Earlier iterations tried a horizontal slide, then a direct
-    // opacity fade on the screen container, then an overlay-rectangle
-    // fade. All three were structurally too expensive for Qt Quick's
-    // Software adaptation when the destination screen is a dense
-    // grid. Translucent overlays don't subtract from the renderer's
-    // dirty region, so every cell underneath re-rasterises per frame
-    // throughout the fade — text labels, cover images, card bodies.
-    // Instant cuts paint the new screen exactly once. See
-    // docs/qml-gotchas.md → "Software-renderer animation costs"
-    // for the full reasoning.
-    //
-    // No additional cue on screen change: the help-bar text changes
-    // instantly, the screen body swaps, and the user just pressed
-    // OK or Esc — the action is deliberate and the feedback is
-    // immediate. The page-dot pulse inside `PagedGrid` is the only
-    // animated transition cue in the launcher.
-    //
-    // The wrapper `Item` stays for grouping clarity; with no fade
-    // machinery it carries no buffered state. Model bindings stay
-    // live across deactivations so Esc back to systems doesn't
-    // re-instantiate the whole delegate tree — Items with
-    // `visible: false` skip painting but keep their scene graph
-    // alive and their decoded covers warm.
+    // CRT preview wrapper. Default (preview off): fills the parent
+    // window 1:1, scale 1, no layer -- identical to pre-preview
+    // rendering. Preview on: fixed (videoWidth x videoHeight) logical
+    // size, scaled by crtPreviewScale around the top-left corner with
+    // nearest-neighbour filtering, and layered so all the children
+    // paint through one cached pixmap that gets the integer-upscale.
+    // `smooth: false` and `layer.smooth: false` together preserve
+    // the pixel grid; without both, Qt bilinear-filters the upscale
+    // and the CRT artefacts the preview is meant to expose get
+    // smeared out. `layer.enabled` is software-renderer safe (Qt's
+    // Software adaptation has a real QSGSoftwareLayer) -- no
+    // ShaderEffect, no GraphicalEffects.
     Item {
-        id: stackedScreens
+        id: scene
 
-        anchors.fill: parent
-        // Screens stay hidden until the catalog has loaded for the
-        // first time. BootOverlay holds the window in the meantime;
-        // see the `bootComplete` property declaration above.
-        visible: root.bootComplete
-
-        HubScreen {
-            id: hubScreen
-            anchors.fill: parent
-            visible: root.activeScreen === root.screenHub
-            transitioning: root.pendingTransition !== ""
-        }
-
-        SystemsScreen {
-            id: systemsScreen
-            anchors.fill: parent
-            visible: root.activeScreen === root.screenSystems
-            transitioning: root.pendingTransition !== ""
-        }
-
-        GamesScreen {
-            id: gamesScreen
-            anchors.fill: parent
-            visible: root.activeScreen === root.screenGames
-            transitioning: root.pendingTransition !== ""
-        }
-
-        FavoritesScreen {
-            id: favoritesScreen
-            anchors.fill: parent
-            visible: root.activeScreen === root.screenFavorites
-            transitioning: root.pendingTransition !== ""
-        }
-
-        RecentsScreen {
-            id: recentsScreen
-            anchors.fill: parent
-            visible: root.activeScreen === root.screenRecents
-            transitioning: root.pendingTransition !== ""
-        }
-
-        SettingsScreen {
-            id: settingsScreen
-            anchors.fill: parent
-            visible: root.activeScreen === root.screenSettings
-            transitioning: root.pendingTransition !== ""
-        }
-
-        AboutScreen {
-            id: aboutScreen
-            anchors.fill: parent
-            visible: root.activeScreen === root.screenAbout
-            transitioning: root.pendingTransition !== ""
-        }
-    }
-
-    // ── Boot overlay ─────────────────────────────────────────────────────────
-    //
-    // Painted between the screens and the modal layer; unmounts itself
-    // the first time `bootComplete` flips true. Loader (rather than
-    // `visible: false`) so the overlay leaves the scene graph after
-    // dismissal — a subsequent disconnect must not bring it back over
-    // the user's cached catalog.
-
-    Loader {
-        anchors.fill: parent
-        active: !root.bootComplete
-        z: 50
-        sourceComponent: BootOverlay {}
-    }
-
-    // ── Card writer modal ────────────────────────────────────────────────────
-
-    Modal {
-        id: cardWriteModal
-
-        open: root.cardWriteModalVisible
-        kind: "transient"
-        failed: root.cardWriteFailed
-        title: root.cardWriteFailed ? qsTr("Writing failed") : qsTr("Put a writable card near the reader")
-        onCancelRequested: root.cancelCardWriteRequested()
-    }
-
-    ContextMenu {
-        id: contextMenu
-
-        open: root.contextMenuVisible
-        anchorRect: root.contextMenuAnchor
-        entries: root.contextMenuEntries
-        onAccepted: id => root.contextMenuAccepted(id)
-        onCloseRequested: root.contextMenuCloseRequested()
-    }
-
-    QrCodeModal {
-        id: qrCodeModal
-
-        anchors.fill: parent
-        open: root.qrCodeModalVisible
-    }
-
-    // First-run mediadb index modal. Pushed by Main.qml the first time
-    // we connect to a Core whose mediadb is empty. Blocks the screens
-    // beneath until the initial scan completes (or the user cancels and
-    // tries again).
-    FirstRunIndexModal {
-        id: firstRunIndexModal
-
-        anchors.fill: parent
-        open: root.firstRunIndexModalVisible
-        onCloseRequested: root.closeFirstRunIndexRequested()
-    }
-
-    // Commercial-use notice. Sits above every other modal (z: 310) so
-    // it always paints first on a fresh install. Once the user acks,
-    // `Browse.Notice.commercial_ack` flips to true on disk and the
-    // modal stays closed for the rest of this install.
-    CommercialNoticeModal {
-        id: commercialNoticeModal
-
-        anchors.fill: parent
-        open: root.commercialNoticeModalVisible
-        onCloseRequested: root.closeCommercialNoticeRequested()
-    }
-
-    // Log-upload modal. Pushed by Main.qml when the user triggers the
-    // "Upload log" action in Settings. Owns its own three-phase view
-    // (uploading / success / error) — the router only sees open / close.
-    LogUploadModal {
-        id: logUploadModal
-
-        anchors.fill: parent
-        open: root.logUploadModalVisible
-        onCloseRequested: root.closeLogUploadRequested()
-    }
-
-    // Quit-confirm modal. Pushed by Main.qml when the user presses
-    // cancel on Hub. Default focus is "No" so an accidental press
-    // can't quit; "Yes" routes through `quitConfirmAccepted` and the
-    // router calls Qt.quit().
-    Modal {
-        id: quitConfirmModal
-
-        open: root.quitConfirmModalVisible
-        kind: "confirm"
-        title: qsTr("Quit Zaparoo Launcher?")
-        body: qsTr("Are you sure you want to exit?")
-        onConfirmed: root.quitConfirmAccepted()
-        onCancelRequested: root.closeQuitConfirmRequested()
-    }
-
-    // ── Instructions bar ──────────────────────────────────────────────────────
-
-    Rectangle {
-        id: instructionsBar
-
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        height: Sizing.pctH(6)
-        // Sits above every modal scrim (modals max out at z: 310 — see
-        // CommercialNoticeModal) so the help cue stays readable while a
-        // dialog is open. The bar's content is already modal-aware
-        // (helpEntries above branches per topModal), so the cue under
-        // the modal is the right one.
-        z: 400
-        color: Theme.bgBar
-        border.width: Sizing.stroke(1)
-        border.color: Theme.borderSubtle
-
-        // (activeScreen, screenState, modal?)-keyed lookup. The modal
-        // row wins outright; otherwise per-screen entries vary with
-        // the screen's data-state (Loading / Error / Empty / Ready).
-        // Error and Empty share the retry-or-back row on Systems and
-        // Games (both wire `accept` to re-fire `set_category` /
-        // `set_system` in non-Ready state). Hub has no retry handler
-        // — CategoriesModel binds eagerly via bind_to_endpoint! and
-        // recovers automatically — so its non-Ready row drops the
-        // Retry entry rather than promising behavior the screen
-        // doesn't implement.
+        x: 0
+        y: 0
+        width: root._crtPreviewActive ? root.videoWidth : root.width
+        height: root._crtPreviewActive ? root.videoHeight : root.height
+        transformOrigin: Item.TopLeft
+        scale: root._crtPreviewActive ? root._crtPreviewEffectiveScale : 1
+        // smooth/layer.smooth control the integer-upscale sampling on
+        // the wrapper itself, NOT the rendering of the children. Both
+        // must stay false so each logical pixel maps to a clean
+        // N x N physical block; otherwise the upscale would smear
+        // genuine antialiasing artefacts and defeat the preview's
+        // diagnostic value. Antialiasing inside the scene (font
+        // hinting, line edges) is intentionally left untouched so
+        // the preview matches what MiSTer would actually render.
         //
-        // During a forward transition (`pendingTransition !== ""`)
-        // the router's input gate swallows every press — including
-        // cancel — so the bar blanks rather than advertising
-        // buttons that won't respond. Modals still win outright;
-        // they run on top of the input gate.
+        // `layer.textureSize` is critical: without it, on a hi-DPI
+        // screen Qt sizes the layer texture at the item's *physical*
+        // pixel count (logical × devicePixelRatio), so children
+        // rasterise at e.g. 768×448 with full AA before the layer is
+        // captured. The nearest-neighbour upscale then samples that
+        // already-antialiased high-rez source -- which is what makes
+        // the preview look universally blurry instead of pixelated.
+        // Pinning the texture to videoWidth × videoHeight forces
+        // logical-pixel rasterisation, so the AA the preview shows is
+        // *exactly* what MiSTer's framebuffer would capture.
+        smooth: false
+        layer.enabled: root._crtPreviewActive
+        layer.smooth: false
+        layer.textureSize: root._crtPreviewActive ? Qt.size(root.videoWidth, root.videoHeight) : Qt.size(0, 0)
+
+        // ── Background ────────────────────────────────────────────────────────────
+
+        Rectangle {
+            anchors.fill: parent
+            color: Theme.bgDeep
+        }
+
+        // Faint circuit-trace texture, tiled across the whole window. The
+        // PNG is pre-rendered from resources/images/bg-circuit.svg at the
+        // source pattern's native 304×304 size, with white at ~8 % alpha
+        // baked into the pixmap so QtSvg isn't needed at runtime. Sits
+        // between bgDeep and the rest of the tree so logos, captions, and
+        // selection cards stay fully legible. `Image.Tile` is software-
+        // rendered, so this is MiSTer-safe; `cache: true` keeps the
+        // pixmap in QPixmapCache after first decode.
+        Image {
+            anchors.fill: parent
+            source: "qrc:/qt/qml/Zaparoo/App/resources/images/bg-circuit.png"
+            fillMode: Image.Tile
+            cache: true
+            smooth: false        // 1:1 tile — filtering would just blur the lines
+            // Synchronous so the first frame paints with the texture instead
+            // of flashing the bare bgDeep underneath. One small PNG decode
+            // at startup is cheap.
+            asynchronous: false
+        }
+
+        // ── Top header (logo + status row + status pill) ───────────────────────────
+
+        // Single component owning the brand mark, host status icons +
+        // clock, and Core status pill. Height is fixed (Sizing.headerHeight)
+        // so the pill's slot stays reserved when idle and the logo always
+        // matches the stacked rows. Screens clear `Sizing.headerBottom`.
+        HeaderBar {
+            id: headerBar
+
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.topMargin: Sizing.headerTopMargin
+            z: 200
+        }
+
+        // ── Screen containers ─────────────────────────────────────────────────────
+
+        // Stacked container — only the active screen paints. Hub →
+        // Systems → Games drill-downs (and Esc back) are instant cuts:
+        // bind `visible` directly on the live `activeScreen` and let
+        // Qt's scene graph swap which screen paints in one frame.
         //
-        // Each entry resolves to a button glyph (Dpad / ButtonA /
-        // ButtonB / ButtonX) plus a label. The button names are routed
-        // through Resources.iconUrl(), which owns the qrc path rules.
+        // Earlier iterations tried a horizontal slide, then a direct
+        // opacity fade on the screen container, then an overlay-rectangle
+        // fade. All three were structurally too expensive for Qt Quick's
+        // Software adaptation when the destination screen is a dense
+        // grid. Translucent overlays don't subtract from the renderer's
+        // dirty region, so every cell underneath re-rasterises per frame
+        // throughout the fade — text labels, cover images, card bodies.
+        // Instant cuts paint the new screen exactly once. See
+        // docs/qml-gotchas.md → "Software-renderer animation costs"
+        // for the full reasoning.
         //
-        // Label vocabulary is deliberately minimal: D-pad is always
-        // "Move"; A is "Open" for both drill-downs and launches (the
-        // tile and screen title carry the specific identity, so the
-        // verb doesn't need to repeat that); B is "Back" except on
-        // the Hub root, where it's "Quit". Sentence case throughout.
-        readonly property var helpEntries: {
-            if (root.contextMenuVisible)
-                return [
-                    {
-                        button: "Dpad",
-                        label: qsTr("Move")
-                    },
-                    {
-                        button: "ButtonA",
-                        label: qsTr("Select")
-                    },
-                    {
-                        button: "ButtonB",
-                        label: qsTr("Close")
-                    },
-                    {
-                        button: "ButtonX",
-                        label: qsTr("Close")
-                    }
-                ];
-            if (root.cardWriteModalVisible)
-                return [
-                    {
-                        button: "ButtonB",
-                        label: qsTr("Cancel")
-                    }
-                ];
-            if (root.qrCodeModalVisible)
-                return [
-                    {
-                        button: "ButtonB",
-                        label: qsTr("Close")
-                    }
-                ];
-            if (root.logUploadModalVisible) {
-                const phase = root.logUploadModal.phase;
-                if (phase === root.logUploadModal._stateSuccess)
+        // No additional cue on screen change: the help-bar text changes
+        // instantly, the screen body swaps, and the user just pressed
+        // OK or Esc — the action is deliberate and the feedback is
+        // immediate. The page-dot pulse inside `PagedGrid` is the only
+        // animated transition cue in the launcher.
+        //
+        // The wrapper `Item` stays for grouping clarity; with no fade
+        // machinery it carries no buffered state. Model bindings stay
+        // live across deactivations so Esc back to systems doesn't
+        // re-instantiate the whole delegate tree — Items with
+        // `visible: false` skip painting but keep their scene graph
+        // alive and their decoded covers warm.
+        Item {
+            id: stackedScreens
+
+            anchors.fill: parent
+            // Screens stay hidden until the catalog has loaded for the
+            // first time. BootOverlay holds the window in the meantime;
+            // see the `bootComplete` property declaration above.
+            visible: root.bootComplete
+
+            HubScreen {
+                id: hubScreen
+                anchors.fill: parent
+                visible: root.activeScreen === root.screenHub
+                transitioning: root.pendingTransition !== ""
+            }
+
+            SystemsScreen {
+                id: systemsScreen
+                anchors.fill: parent
+                visible: root.activeScreen === root.screenSystems
+                transitioning: root.pendingTransition !== ""
+            }
+
+            GamesScreen {
+                id: gamesScreen
+                anchors.fill: parent
+                visible: root.activeScreen === root.screenGames
+                transitioning: root.pendingTransition !== ""
+            }
+
+            FavoritesScreen {
+                id: favoritesScreen
+                anchors.fill: parent
+                visible: root.activeScreen === root.screenFavorites
+                transitioning: root.pendingTransition !== ""
+            }
+
+            RecentsScreen {
+                id: recentsScreen
+                anchors.fill: parent
+                visible: root.activeScreen === root.screenRecents
+                transitioning: root.pendingTransition !== ""
+            }
+
+            SettingsScreen {
+                id: settingsScreen
+                anchors.fill: parent
+                visible: root.activeScreen === root.screenSettings
+                transitioning: root.pendingTransition !== ""
+            }
+
+            AboutScreen {
+                id: aboutScreen
+                anchors.fill: parent
+                visible: root.activeScreen === root.screenAbout
+                transitioning: root.pendingTransition !== ""
+            }
+        }
+
+        // ── Boot overlay ─────────────────────────────────────────────────────────
+        //
+        // Painted between the screens and the modal layer; unmounts itself
+        // the first time `bootComplete` flips true. Loader (rather than
+        // `visible: false`) so the overlay leaves the scene graph after
+        // dismissal — a subsequent disconnect must not bring it back over
+        // the user's cached catalog.
+
+        Loader {
+            anchors.fill: parent
+            active: !root.bootComplete
+            z: 50
+            sourceComponent: BootOverlay {}
+        }
+
+        // ── Card writer modal ────────────────────────────────────────────────────
+
+        Modal {
+            id: cardWriteModal
+
+            open: root.cardWriteModalVisible
+            kind: "transient"
+            failed: root.cardWriteFailed
+            title: root.cardWriteFailed ? qsTr("Writing failed") : qsTr("Put a writable card near the reader")
+            onCancelRequested: root.cancelCardWriteRequested()
+        }
+
+        ContextMenu {
+            id: contextMenu
+
+            open: root.contextMenuVisible
+            anchorRect: root.contextMenuAnchor
+            entries: root.contextMenuEntries
+            onAccepted: id => root.contextMenuAccepted(id)
+            onCloseRequested: root.contextMenuCloseRequested()
+        }
+
+        QrCodeModal {
+            id: qrCodeModal
+
+            anchors.fill: parent
+            open: root.qrCodeModalVisible
+        }
+
+        // First-run mediadb index modal. Pushed by Main.qml the first time
+        // we connect to a Core whose mediadb is empty. Blocks the screens
+        // beneath until the initial scan completes (or the user cancels and
+        // tries again).
+        FirstRunIndexModal {
+            id: firstRunIndexModal
+
+            anchors.fill: parent
+            open: root.firstRunIndexModalVisible
+            onCloseRequested: root.closeFirstRunIndexRequested()
+        }
+
+        // Commercial-use notice. Sits above every other modal (z: 310) so
+        // it always paints first on a fresh install. Once the user acks,
+        // `Browse.Notice.commercial_ack` flips to true on disk and the
+        // modal stays closed for the rest of this install.
+        CommercialNoticeModal {
+            id: commercialNoticeModal
+
+            anchors.fill: parent
+            open: root.commercialNoticeModalVisible
+            onCloseRequested: root.closeCommercialNoticeRequested()
+        }
+
+        // Log-upload modal. Pushed by Main.qml when the user triggers the
+        // "Upload log" action in Settings. Owns its own three-phase view
+        // (uploading / success / error) — the router only sees open / close.
+        LogUploadModal {
+            id: logUploadModal
+
+            anchors.fill: parent
+            open: root.logUploadModalVisible
+            onCloseRequested: root.closeLogUploadRequested()
+        }
+
+        // Quit-confirm modal. Pushed by Main.qml when the user presses
+        // cancel on Hub. Default focus is "No" so an accidental press
+        // can't quit; "Yes" routes through `quitConfirmAccepted` and the
+        // router calls Qt.quit().
+        Modal {
+            id: quitConfirmModal
+
+            open: root.quitConfirmModalVisible
+            kind: "confirm"
+            title: qsTr("Quit Zaparoo Launcher?")
+            body: qsTr("Are you sure you want to exit?")
+            onConfirmed: root.quitConfirmAccepted()
+            onCancelRequested: root.closeQuitConfirmRequested()
+        }
+
+        // ── Instructions bar ──────────────────────────────────────────────────────
+
+        Rectangle {
+            id: instructionsBar
+
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            height: Sizing.pctH(6)
+            // Sits above every modal scrim (modals max out at z: 310 — see
+            // CommercialNoticeModal) so the help cue stays readable while a
+            // dialog is open. The bar's content is already modal-aware
+            // (helpEntries above branches per topModal), so the cue under
+            // the modal is the right one.
+            z: 400
+            color: Theme.bgBar
+            border.width: Sizing.stroke(1)
+            border.color: Theme.borderSubtle
+
+            // (activeScreen, screenState, modal?)-keyed lookup. The modal
+            // row wins outright; otherwise per-screen entries vary with
+            // the screen's data-state (Loading / Error / Empty / Ready).
+            // Error and Empty share the retry-or-back row on Systems and
+            // Games (both wire `accept` to re-fire `set_category` /
+            // `set_system` in non-Ready state). Hub has no retry handler
+            // — CategoriesModel binds eagerly via bind_to_endpoint! and
+            // recovers automatically — so its non-Ready row drops the
+            // Retry entry rather than promising behavior the screen
+            // doesn't implement.
+            //
+            // During a forward transition (`pendingTransition !== ""`)
+            // the router's input gate swallows every press — including
+            // cancel — so the bar blanks rather than advertising
+            // buttons that won't respond. Modals still win outright;
+            // they run on top of the input gate.
+            //
+            // Each entry resolves to a button glyph (Dpad / ButtonA /
+            // ButtonB / ButtonX) plus a label. The button names are routed
+            // through Resources.iconUrl(), which owns the qrc path rules.
+            //
+            // Label vocabulary is deliberately minimal: D-pad is always
+            // "Move"; A is "Open" for both drill-downs and launches (the
+            // tile and screen title carry the specific identity, so the
+            // verb doesn't need to repeat that); B is "Back" except on
+            // the Hub root, where it's "Quit". Sentence case throughout.
+            readonly property var helpEntries: {
+                if (root.contextMenuVisible)
                     return [
                         {
-                            button: "ButtonA",
-                            label: qsTr("Done")
+                            button: "Dpad",
+                            label: qsTr("Move")
                         },
+                        {
+                            button: "ButtonA",
+                            label: qsTr("Select")
+                        },
+                        {
+                            button: "ButtonB",
+                            label: qsTr("Close")
+                        },
+                        {
+                            button: "ButtonX",
+                            label: qsTr("Close")
+                        }
+                    ];
+                if (root.cardWriteModalVisible)
+                    return [
+                        {
+                            button: "ButtonB",
+                            label: qsTr("Cancel")
+                        }
+                    ];
+                if (root.qrCodeModalVisible)
+                    return [
                         {
                             button: "ButtonB",
                             label: qsTr("Close")
                         }
                     ];
-                if (phase === root.logUploadModal._stateError)
+                if (root.logUploadModalVisible) {
+                    const phase = root.logUploadModal.phase;
+                    if (phase === root.logUploadModal._stateSuccess)
+                        return [
+                            {
+                                button: "ButtonA",
+                                label: qsTr("Done")
+                            },
+                            {
+                                button: "ButtonB",
+                                label: qsTr("Close")
+                            }
+                        ];
+                    if (phase === root.logUploadModal._stateError)
+                        return [
+                            {
+                                button: "ButtonA",
+                                label: qsTr("Retry")
+                            },
+                            {
+                                button: "ButtonB",
+                                label: qsTr("Close")
+                            }
+                        ];
+                    // Idle / uploading: only Cancel.
+                    return [
+                        {
+                            button: "ButtonB",
+                            label: qsTr("Cancel")
+                        }
+                    ];
+                }
+                if (root.commercialNoticeModalVisible)
+                    return [
+                        {
+                            button: "ButtonA",
+                            label: qsTr("I understand")
+                        }
+                    ];
+                if (root.quitConfirmModalVisible)
+                    return [
+                        {
+                            button: "Dpad",
+                            label: qsTr("Move")
+                        },
+                        {
+                            button: "ButtonA",
+                            label: qsTr("Select")
+                        },
+                        {
+                            button: "ButtonB",
+                            label: qsTr("Cancel")
+                        }
+                    ];
+                if (!root.bootComplete)
+                    return [];
+                if (root.firstRunIndexModalVisible) {
+                    const phase = root.firstRunIndexModal.phase;
+                    if (phase === "running")
+                        return [
+                            {
+                                button: "ButtonB",
+                                label: qsTr("Cancel")
+                            }
+                        ];
+                    if (phase === "completed")
+                        return [];
+                    return [
+                        {
+                            button: "ButtonA",
+                            label: qsTr("Start")
+                        }
+                    ];
+                }
+                if (root.pendingTransition !== "")
+                    return [];
+                if (root.activeScreen === root.screenHub) {
+                    // Hub always has the actions row (Recently Played /
+                    // Settings), so Move/Open/Quit applies even when the
+                    // categories row is empty (0 systems indexed) — the
+                    // help bar must reflect that the actions row is
+                    // navigable, otherwise the user reads "Quit only"
+                    // and misses the Settings tile entirely.
+                    return [
+                        {
+                            button: "Dpad",
+                            label: qsTr("Move")
+                        },
+                        {
+                            button: "ButtonA",
+                            label: qsTr("Open")
+                        },
+                        {
+                            button: "ButtonB",
+                            label: qsTr("Quit")
+                        }
+                    ];
+                }
+                if (root.activeScreen === root.screenSystems) {
+                    if (root.systemsScreenState === "loading")
+                        return [
+                            {
+                                button: "ButtonB",
+                                label: qsTr("Back")
+                            }
+                        ];
+                    if (root.systemsScreenState === "ready") {
+                        // L/R shoulders page jump; only advertise the cue
+                        // when there's a second page to jump to, so we
+                        // don't promise a press that no-ops on a single
+                        // page of systems.
+                        const pages = root.systemsScreen.systemsGrid.pageCount;
+                        let row = [
+                            {
+                                button: "Dpad",
+                                label: qsTr("Move")
+                            }
+                        ];
+                        if (pages > 1)
+                            row.push({
+                                buttons: ["ButtonL", "ButtonR"],
+                                label: qsTr("Page")
+                            });
+                        row.push({
+                            button: "ButtonA",
+                            label: qsTr("Open")
+                        }, {
+                            button: "ButtonX",
+                            label: qsTr("Options")
+                        }, {
+                            button: "ButtonB",
+                            label: qsTr("Back")
+                        });
+                        return row;
+                    }
                     return [
                         {
                             button: "ButtonA",
@@ -496,144 +716,128 @@ ApplicationWindow {
                         },
                         {
                             button: "ButtonB",
-                            label: qsTr("Close")
+                            label: qsTr("Back")
                         }
                     ];
-                // Idle / uploading: only Cancel.
-                return [
-                    {
-                        button: "ButtonB",
-                        label: qsTr("Cancel")
+                }
+                if (root.activeScreen === root.screenFavorites || root.activeScreen === root.screenRecents) {
+                    const isFavorites = root.activeScreen === root.screenFavorites;
+                    const state = isFavorites ? root.favoritesScreenState : root.recentsScreenState;
+                    const grid = isFavorites ? root.favoritesScreen.favoritesGrid : root.recentsScreen.recentsGrid;
+                    if (state === "loading")
+                        return [
+                            {
+                                button: "ButtonB",
+                                label: qsTr("Back")
+                            }
+                        ];
+                    if (state === "ready") {
+                        const pages = grid.pageCount;
+                        let row = [
+                            {
+                                button: "Dpad",
+                                label: qsTr("Move")
+                            }
+                        ];
+                        if (pages > 1)
+                            row.push({
+                                buttons: ["ButtonL", "ButtonR"],
+                                label: qsTr("Page")
+                            });
+                        row.push({
+                            button: "ButtonA",
+                            label: qsTr("Open")
+                        });
+                        if (isFavorites)
+                            row.push({
+                                button: "ButtonX",
+                                label: qsTr("Options")
+                            });
+                        row.push({
+                            button: "ButtonB",
+                            label: qsTr("Back")
+                        });
+                        return row;
                     }
-                ];
-            }
-            if (root.commercialNoticeModalVisible)
-                return [
-                    {
-                        button: "ButtonA",
-                        label: qsTr("I understand")
-                    }
-                ];
-            if (root.quitConfirmModalVisible)
-                return [
-                    {
-                        button: "Dpad",
-                        label: qsTr("Move")
-                    },
-                    {
-                        button: "ButtonA",
-                        label: qsTr("Select")
-                    },
-                    {
-                        button: "ButtonB",
-                        label: qsTr("Cancel")
-                    }
-                ];
-            if (!root.bootComplete)
-                return [];
-            if (root.firstRunIndexModalVisible) {
-                const phase = root.firstRunIndexModal.phase;
-                if (phase === "running")
                     return [
                         {
-                            button: "ButtonB",
-                            label: qsTr("Cancel")
-                        }
-                    ];
-                if (phase === "completed")
-                    return [];
-                return [
-                    {
-                        button: "ButtonA",
-                        label: qsTr("Start")
-                    }
-                ];
-            }
-            if (root.pendingTransition !== "")
-                return [];
-            if (root.activeScreen === root.screenHub) {
-                // Hub always has the actions row (Recently Played /
-                // Settings), so Move/Open/Quit applies even when the
-                // categories row is empty (0 systems indexed) — the
-                // help bar must reflect that the actions row is
-                // navigable, otherwise the user reads "Quit only"
-                // and misses the Settings tile entirely.
-                return [
-                    {
-                        button: "Dpad",
-                        label: qsTr("Move")
-                    },
-                    {
-                        button: "ButtonA",
-                        label: qsTr("Open")
-                    },
-                    {
-                        button: "ButtonB",
-                        label: qsTr("Quit")
-                    }
-                ];
-            }
-            if (root.activeScreen === root.screenSystems) {
-                if (root.systemsScreenState === "loading")
-                    return [
+                            button: "ButtonA",
+                            label: qsTr("Retry")
+                        },
                         {
                             button: "ButtonB",
                             label: qsTr("Back")
                         }
                     ];
-                if (root.systemsScreenState === "ready") {
-                    // L/R shoulders page jump; only advertise the cue
-                    // when there's a second page to jump to, so we
-                    // don't promise a press that no-ops on a single
-                    // page of systems.
-                    const pages = root.systemsScreen.systemsGrid.pageCount;
-                    let row = [
-                        {
-                            button: "Dpad",
-                            label: qsTr("Move")
-                        }
-                    ];
-                    if (pages > 1)
+                }
+                if (root.activeScreen === root.screenSettings) {
+                    let row = [];
+                    // Up/Down moves between fields; only useful when there
+                    // are 2+ fields.
+                    if (root.settingsScreen.fieldCount > 1) {
                         row.push({
-                            buttons: ["ButtonL", "ButtonR"],
-                            label: qsTr("Page")
+                            buttons: ["DpadUp", "DpadDown"],
+                            label: qsTr("Move")
+                        });
+                    }
+                    // Left/Right cycles the focused field's value. Skip
+                    // the cue when the focused field is an action row
+                    // (no left/right binding) or there are no fields.
+                    if (root.settingsScreen.fieldCount > 0 && !root.settingsScreen.focusedFieldIsAction) {
+                        row.push({
+                            buttons: ["DpadLeft", "DpadRight"],
+                            label: qsTr("Change")
+                        });
+                    }
+                    if (root.settingsScreen.focusedFieldIsToggle)
+                        row.push({
+                            button: "ButtonA",
+                            label: qsTr("Toggle")
+                        });
+                    else if (root.settingsScreen.focusedFieldIsAction && !root.settingsScreen.focusedActionDisabled)
+                        row.push({
+                            button: "ButtonA",
+                            label: root.settingsScreen.focusedActionLabel
                         });
                     row.push({
-                        button: "ButtonA",
-                        label: qsTr("Open")
-                    }, {
-                        button: "ButtonX",
-                        label: qsTr("Options")
-                    }, {
                         button: "ButtonB",
                         label: qsTr("Back")
                     });
                     return row;
                 }
-                return [
-                    {
-                        button: "ButtonA",
-                        label: qsTr("Retry")
-                    },
-                    {
+                if (root.activeScreen === root.screenAbout) {
+                    let row = [];
+                    // Up/Down only meaningful when the body actually
+                    // overflows the viewport (per the minimal help-bar
+                    // policy — never advertise a press that no-ops).
+                    if (root.aboutScreen.contentOverflows)
+                        row.push({
+                            buttons: ["DpadUp", "DpadDown"],
+                            label: qsTr("Scroll")
+                        });
+                    row.push({
                         button: "ButtonB",
                         label: qsTr("Back")
-                    }
-                ];
-            }
-            if (root.activeScreen === root.screenFavorites || root.activeScreen === root.screenRecents) {
-                const isFavorites = root.activeScreen === root.screenFavorites;
-                const state = isFavorites ? root.favoritesScreenState : root.recentsScreenState;
-                const grid = isFavorites ? root.favoritesScreen.favoritesGrid : root.recentsScreen.recentsGrid;
-                if (state === "loading")
+                    });
+                    return row;
+                }
+                // games
+                if (root.gamesScreenState === "loading")
                     return [
                         {
                             button: "ButtonB",
                             label: qsTr("Back")
                         }
                     ];
-                if (state === "ready") {
-                    const pages = grid.pageCount;
+                if (root.gamesScreenState === "ready") {
+                    const pages = root.gamesScreen.gamesGrid.pageCount;
+                    // Options menu is only meaningful on media leaves —
+                    // folder/root entries open via Accept and have no
+                    // per-entry actions. Drop the X cue so the bar
+                    // doesn't promise a press that no-ops.
+                    const idx = root.gamesScreen.gamesGrid.currentIndex;
+                    const entryType = Browse.GamesModel.entry_type_at(idx);
+                    const isFolder = entryType === "directory" || entryType === "root";
                     let row = [
                         {
                             button: "Dpad",
@@ -649,7 +853,7 @@ ApplicationWindow {
                         button: "ButtonA",
                         label: qsTr("Open")
                     });
-                    if (isFavorites)
+                    if (!isFolder)
                         row.push({
                             button: "ButtonX",
                             label: qsTr("Options")
@@ -671,169 +875,65 @@ ApplicationWindow {
                     }
                 ];
             }
-            if (root.activeScreen === root.screenSettings) {
-                let row = [];
-                // Up/Down moves between fields; only useful when there
-                // are 2+ fields.
-                if (root.settingsScreen.fieldCount > 1) {
-                    row.push({
-                        buttons: ["DpadUp", "DpadDown"],
-                        label: qsTr("Move")
-                    });
-                }
-                // Left/Right cycles the focused field's value. Skip
-                // the cue when the focused field is an action row
-                // (no left/right binding) or there are no fields.
-                if (root.settingsScreen.fieldCount > 0 && !root.settingsScreen.focusedFieldIsAction) {
-                    row.push({
-                        buttons: ["DpadLeft", "DpadRight"],
-                        label: qsTr("Change")
-                    });
-                }
-                if (root.settingsScreen.focusedFieldIsToggle)
-                    row.push({
-                        button: "ButtonA",
-                        label: qsTr("Toggle")
-                    });
-                else if (root.settingsScreen.focusedFieldIsAction && !root.settingsScreen.focusedActionDisabled)
-                    row.push({
-                        button: "ButtonA",
-                        label: root.settingsScreen.focusedActionLabel
-                    });
-                row.push({
-                    button: "ButtonB",
-                    label: qsTr("Back")
-                });
-                return row;
-            }
-            if (root.activeScreen === root.screenAbout) {
-                let row = [];
-                // Up/Down only meaningful when the body actually
-                // overflows the viewport (per the minimal help-bar
-                // policy — never advertise a press that no-ops).
-                if (root.aboutScreen.contentOverflows)
-                    row.push({
-                        buttons: ["DpadUp", "DpadDown"],
-                        label: qsTr("Scroll")
-                    });
-                row.push({
-                    button: "ButtonB",
-                    label: qsTr("Back")
-                });
-                return row;
-            }
-            // games
-            if (root.gamesScreenState === "loading")
-                return [
-                    {
-                        button: "ButtonB",
-                        label: qsTr("Back")
-                    }
-                ];
-            if (root.gamesScreenState === "ready") {
-                const pages = root.gamesScreen.gamesGrid.pageCount;
-                // Options menu is only meaningful on media leaves —
-                // folder/root entries open via Accept and have no
-                // per-entry actions. Drop the X cue so the bar
-                // doesn't promise a press that no-ops.
-                const idx = root.gamesScreen.gamesGrid.currentIndex;
-                const entryType = Browse.GamesModel.entry_type_at(idx);
-                const isFolder = entryType === "directory" || entryType === "root";
-                let row = [
-                    {
-                        button: "Dpad",
-                        label: qsTr("Move")
-                    }
-                ];
-                if (pages > 1)
-                    row.push({
-                        buttons: ["ButtonL", "ButtonR"],
-                        label: qsTr("Page")
-                    });
-                row.push({
-                    button: "ButtonA",
-                    label: qsTr("Open")
-                });
-                if (!isFolder)
-                    row.push({
-                        button: "ButtonX",
-                        label: qsTr("Options")
-                    });
-                row.push({
-                    button: "ButtonB",
-                    label: qsTr("Back")
-                });
-                return row;
-            }
-            return [
-                {
-                    button: "ButtonA",
-                    label: qsTr("Retry")
-                },
-                {
-                    button: "ButtonB",
-                    label: qsTr("Back")
-                }
-            ];
-        }
 
-        Row {
-            x: Sizing.center(parent.width, width)
-            y: Sizing.center(parent.height, height)
-            spacing: Sizing.pctW(2)
+            Row {
+                x: Sizing.center(parent.width, width)
+                y: Sizing.center(parent.height, height)
+                spacing: Sizing.pctW(2)
 
-            Repeater {
-                model: instructionsBar.helpEntries
+                Repeater {
+                    model: instructionsBar.helpEntries
 
-                // Each entry is either a single-glyph cue
-                // (`{ button: "ButtonA", label: "Open" }`) or a
-                // multi-glyph cue rendered as N icons in a row before
-                // the label (`{ buttons: ["DpadLeft", "DpadRight"],
-                // label: "Change" }`). The Settings screen uses the
-                // multi-glyph form to disambiguate "left/right cycles
-                // the value" from "up/down moves between fields".
-                delegate: Row {
-                    id: helpEntry
-                    required property var modelData
-                    spacing: Sizing.pctW(0.6)
+                    // Each entry is either a single-glyph cue
+                    // (`{ button: "ButtonA", label: "Open" }`) or a
+                    // multi-glyph cue rendered as N icons in a row before
+                    // the label (`{ buttons: ["DpadLeft", "DpadRight"],
+                    // label: "Change" }`). The Settings screen uses the
+                    // multi-glyph form to disambiguate "left/right cycles
+                    // the value" from "up/down moves between fields".
+                    delegate: Row {
+                        id: helpEntry
+                        required property var modelData
+                        spacing: Sizing.pctW(0.6)
 
-                    readonly property var buttonList: helpEntry.modelData.buttons !== undefined ? helpEntry.modelData.buttons : [helpEntry.modelData.button]
+                        readonly property var buttonList: helpEntry.modelData.buttons !== undefined ? helpEntry.modelData.buttons : [helpEntry.modelData.button]
 
-                    Repeater {
-                        model: helpEntry.buttonList
-                        delegate: Image {
-                            required property string modelData
-                            anchors.verticalCenter: parent.verticalCenter
-                            height: Sizing.pctH(4)
-                            width: height
-                            fillMode: Image.PreserveAspectFit
-                            sourceSize.height: Sizing.px(height)
-                            sourceSize.width: Sizing.px(width)
-                            source: Resources.iconUrl(modelData)
-                            smooth: true
+                        Repeater {
+                            model: helpEntry.buttonList
+                            delegate: Image {
+                                required property string modelData
+                                anchors.verticalCenter: parent.verticalCenter
+                                height: Sizing.pctH(4)
+                                width: height
+                                fillMode: Image.PreserveAspectFit
+                                sourceSize.height: Sizing.px(height)
+                                sourceSize.width: Sizing.px(width)
+                                source: Resources.iconUrl(modelData)
+                                smooth: true
+                            }
+                        }
+
+                        Text {
+                            anchors.verticalCenter: helpEntry.verticalCenter
+                            text: helpEntry.modelData.label
+                            font.family: Theme.fontUi
+                            font.pixelSize: Sizing.fontSize(2.5)
+                            color: Theme.textPrimary
+                            renderType: Text.NativeRendering
                         }
                     }
-
-                    Text {
-                        anchors.verticalCenter: helpEntry.verticalCenter
-                        text: helpEntry.modelData.label
-                        font.family: Theme.fontUi
-                        font.pixelSize: Sizing.fontSize(2.5)
-                        color: Theme.textPrimary
-                        renderType: Text.NativeRendering
-                    }
                 }
             }
         }
-    }
 
-    MouseArea {
-        anchors.fill: parent
-        z: 10000
-        visible: !Browse.Settings.current_mouse_enabled
-        enabled: visible
-        hoverEnabled: true
-        acceptedButtons: Qt.AllButtons
-        cursorShape: Qt.BlankCursor
+        MouseArea {
+            anchors.fill: parent
+            z: 10000
+            visible: !Browse.Settings.current_mouse_enabled
+            enabled: visible
+            hoverEnabled: true
+            acceptedButtons: Qt.AllButtons
+            cursorShape: Qt.BlankCursor
+        }
     }
 }

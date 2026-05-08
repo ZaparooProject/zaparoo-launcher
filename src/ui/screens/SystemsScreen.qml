@@ -260,12 +260,8 @@ Item {
     }
 
     ScreenStateOverlay {
-        x: (systems._listLayout ? systemsList.x : systemsGrid.x)
-           + Sizing.center(systems._listLayout ? systemsList.width : systemsGrid.width,
-                           width)
-        y: (systems._listLayout ? systemsList.y : systemsGrid.y)
-           + Sizing.center(systems._listLayout ? systemsList.height : systemsGrid.height,
-                           height)
+        x: (systems._listLayout ? systemsList.x : systemsGrid.x) + Sizing.center(systems._listLayout ? systemsList.width : systemsGrid.width, width)
+        y: (systems._listLayout ? systemsList.y : systemsGrid.y) + Sizing.center(systems._listLayout ? systemsList.height : systemsGrid.height, height)
         width: systems._listLayout ? systemsList.width : systemsGrid.width
         height: systems._listLayout ? systemsList.height : systemsGrid.height
         loading: Browse.SystemsModel.loading

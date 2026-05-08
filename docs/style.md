@@ -85,15 +85,19 @@ If a new surface has rounded corners, it picks `Sizing.cornerRadius` or it
 joins the pill family. There is no third option. Inconsistent radii were the
 problem this token was introduced to solve.
 
-## CRT drawing
+## Integer-pixel drawing
 
-The current CRT path has stricter rules than the general desktop UI:
+These rules apply to every screen, not just CRT-targeted code paths.
+The whole app must render cleanly at 240p; the launcher has one
+rendering path, not two.
 
-- Geometry must land on integer pixels.
-- Stroke widths must be integer pixels.
-- Text sizes are restricted to `8px` or `16px`.
-- Bitmap-style text should not rely on centered glyph layout; center the text
-  item, not the glyph run.
+- Geometry lands on integer pixels (`Sizing.px()`, `Sizing.center()`,
+  `Sizing.half()`).
+- Stroke widths are integer pixels (`Sizing.stroke()`).
+- Text sizes are restricted to `8px` or `16px` when `crtNativePath` is
+  active; `Sizing.fontSize()` handles the quantization.
+- Bitmap-style text doesn't rely on centered glyph layout; center the
+  text item, not the glyph run.
 
-These are implementation constraints, not aesthetic preferences. If a CRT-only
-surface is added and needs an exception, document the reason in the same change.
+These are implementation constraints, not aesthetic preferences. If a
+new surface needs an exception, document the reason in the same change.

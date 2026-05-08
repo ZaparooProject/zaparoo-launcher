@@ -36,10 +36,13 @@ fact; avoiding them is faster.
 - **`NumberAnimation on propName`** conflicts with `property T propName: value`.
   Drop the `: value` initializer; the animation takes over immediately.
 
-## Integer-pixel rules for CRT work
+## Integer-pixel rules
 
-The current CRT path depends on integer pixel placement. If a control looks
-fine on desktop but soft on MiSTer CRT, assume fractional geometry first.
+These apply to every screen in the launcher, not just CRT-targeted code
+paths. The whole app must render cleanly at 240p; fractional geometry is
+a bug everywhere. If a control looks fine on desktop but soft on MiSTer
+CRT, assume fractional geometry first — but the fix belongs in the
+shared QML, not behind a `crtNativePath` branch.
 
 - **Snap geometry through `Sizing`.** Use `Sizing.px()`, `Sizing.center()`,
   `Sizing.stroke()`, and `Sizing.half()` instead of raw `/ 2`, `%`, or implicit
@@ -48,13 +51,14 @@ fine on desktop but soft on MiSTer CRT, assume fractional geometry first.
 
 - **Do not trust centered text by default.** `anchors.horizontalCenter` and
   `Text.AlignHCenter` can leave the glyph run on a half-pixel when the control
-  width and measured text width have opposite parity. For CRT-sensitive labels,
-  center the `Text` item itself on an integer `x`, then render with
+  width and measured text width have opposite parity. Center the `Text` item
+  itself on an integer `x` (via `Sizing.center()`), then render with
   `horizontalAlignment: Text.AlignLeft` inside that box.
 
-- **Quantize CRT font sizes.** `Sizing.fontSize()` now snaps to `8` or `16`
-  pixels when `crtNativePath` is active. Any new CRT text should assume those
-  are the only valid sizes for now.
+- **Quantize CRT font sizes.** `Sizing.fontSize()` snaps to `8` or `16`
+  pixels when `crtNativePath` is active. This is a runtime quantization,
+  not a design rule — call `fontSize()` everywhere; the singleton handles
+  the quantization where it applies.
 
 - **Reserve space from worst-case metrics.** If dynamic text shares a row with
   icons, measure the widest expected string with `TextMetrics` and reserve that

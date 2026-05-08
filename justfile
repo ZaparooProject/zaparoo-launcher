@@ -44,11 +44,11 @@ arm32:
     ./scripts/build-arm32.sh
 
 # --- run ---
-run: build
-    ./build/bin/launcher
+run *args: build
+    ./build/bin/launcher {{args}}
 
-run-dev: build-dev
-    ZAPAROO_CORE_ENDPOINT=ws://127.0.0.1:27497/api/v0.1 ./build-dev/bin/launcher
+run-dev *args: build-dev
+    ZAPAROO_CORE_ENDPOINT=ws://127.0.0.1:27497/api/v0.1 ./build-dev/bin/launcher {{args}}
 
 # Run a local mock Zaparoo Core (ws://127.0.0.1:27497/api/v0.1).
 # Deliberately offset from the real Core's 7497 so dev never collides

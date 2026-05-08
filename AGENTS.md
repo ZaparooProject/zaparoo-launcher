@@ -85,7 +85,17 @@ raw cargo as the default path; the justfile carries the expected environment.
 - Do not hardcode pixel sizes or fixed element counts in UI. Use
   `Sizing.pctH()`, `Sizing.pctW()`, `Sizing.fontSize()`,
   `Sizing.visibleCovers`, and `Sizing.cornerRadius` (for any rounded-square
-  surface — see `docs/style.md`).
+  surface — see `docs/style.md`). Any value that drives `x`/`y`/`width`/
+  `height`, border widths, margins, or font sizes must go through
+  `Sizing.px()`, `Sizing.stroke()`, `Sizing.center()`, or `Sizing.half()`.
+  The whole app must run cleanly at 240p; fractional geometry is a bug
+  everywhere, not just on MiSTer.
+- Do not center user-visible text via `anchors.horizontalCenter` +
+  `Text.AlignHCenter`. Center the `Text` item itself with
+  `Sizing.center()` and render its glyphs left-aligned (or pre-measure
+  with `TextMetrics`). Glyph runs that straddle a half-pixel soften
+  under any 240p rendering and aren't acceptable on any screen. See
+  `docs/qml-gotchas.md` → "Integer-pixel rules".
 - Do not add Qt5 compatibility code or `#if QT_VERSION` guards. This project is
   Qt 6.7+ only.
 - Do not change `BUILD_SHARED_LIBS`. Desktop needs `ON`; the ARM32 toolchain

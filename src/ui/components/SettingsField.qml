@@ -137,9 +137,7 @@ Item {
             width: toggle.height - Sizing.pctH(0.9)
             height: width
             radius: Sizing.half(width)
-            x: root.checked
-               ? Sizing.px(toggle.width - width - Sizing.pctH(0.45))
-               : Sizing.pctH(0.45)
+            x: root.checked ? Sizing.px(toggle.width - width - Sizing.pctH(0.45)) : Sizing.pctH(0.45)
             anchors.verticalCenter: parent.verticalCenter
             color: Theme.textPrimary
         }

@@ -55,19 +55,19 @@ QtObject {
     }
 
     function px(value: real): int {
-        return Math.round(value)
+        return Math.round(value);
     }
 
     function stroke(value: real): int {
-        return Math.max(1, px(value))
+        return Math.max(1, px(value));
     }
 
     function center(parentSize: real, childSize: real): int {
-        return px((parentSize - childSize) / 2)
+        return px((parentSize - childSize) / 2);
     }
 
     function half(value: real): int {
-        return px(value / 2)
+        return px(value / 2);
     }
 
     // Minimum 8px to remain legible on CRT 240p displays.

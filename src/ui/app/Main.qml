@@ -60,24 +60,33 @@ MainLayout {
     readonly property int _gamesPageSize: Browse.Settings.current_browse_layout === "list" ? root._gamesListFetchSize : Sizing.gamesGridColumns * Sizing.gamesGridRows
     on_GamesPageSizeChanged: Browse.GamesModel.page_size = root._gamesPageSize
 
-    onWidthChanged: {
-        Sizing.screenWidth = width;
-        Sizing.screenHeight = height;
+    // Bind Sizing to the scene's logical dimensions, not the
+    // ApplicationWindow's. Outside CRT preview the scene fills the
+    // window so the values are identical to the prior imperative
+    // writes; in preview the scene is fixed at videoWidth x
+    // videoHeight and the bindings keep Sizing reading logical
+    // pixels for pctW/pctH/px/etc.
+    Binding {
+        target: Sizing
+        property: "screenWidth"
+        value: root.scene.width
     }
-    onHeightChanged: {
-        Sizing.screenHeight = height;
-        Sizing.screenWidth = width;
+    Binding {
+        target: Sizing
+        property: "screenHeight"
+        value: root.scene.height
     }
     Component.onCompleted: {
-        // One-shot fullscreen sizing for embedded builds. Done as an
-        // imperative write rather than a binding so a user resize on
-        // a windowed build can never be undone by a re-evaluation.
+        // One-shot window sizing for the embedded fullscreen path.
+        // Imperative (rather than a binding) so a user resize on a
+        // windowed build can never be undone by a re-evaluation. CRT
+        // preview pins via bindings in MainLayout instead — that path
+        // needs the size set at construction time, before the
+        // compositor has a chance to auto-maximise the window.
         if (root.fullScreen) {
             root.width = Screen.width;
             root.height = Screen.height;
         }
-        Sizing.screenWidth = width;
-        Sizing.screenHeight = height;
         Browse.GamesModel.page_size = root._gamesPageSize;
         // Restore screen synchronously before first paint. The parent
         // process on MiSTer kills the launcher without notice, so we

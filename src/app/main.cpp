@@ -47,6 +47,8 @@ extern "C" void zaparoo_rust_post_qt_start();
 extern "C" void zaparoo_log_qt(uint8_t level, const char* msg, size_t len);
 extern "C" const char* zaparoo_rust_language_code();
 extern "C" bool zaparoo_rust_crt_native_path_enabled();
+extern "C" uint32_t zaparoo_rust_video_width();
+extern "C" uint32_t zaparoo_rust_video_height();
 
 // Pull Zaparoo QML plugin symbols into the final binary so the linker does
 // not strip their static-initializer registration functions.
@@ -215,6 +217,34 @@ int main(int argc, char* argv[])
     };
 #ifdef ZAPAROO_EMBEDDED_BUILD
     initialProperties.insert(QStringLiteral("fullScreen"), true);
+#else
+    // Desktop CRT preview: when --crt is passed off-MiSTer, render the
+    // QML scene at the configured logical video size and integer-
+    // upscale via a layered wrapper Item in MainLayout. Scale defaults
+    // to 0 (sentinel for "auto-pick the largest integer that fits the
+    // primary screen with a 5% margin"); ZAPAROO_CRT_PREVIEW_SCALE
+    // overrides for ad-hoc testing without rebuilding (e.g. =2 for
+    // half-size, =8 to inspect a single tile).
+    if (zaparoo_rust_crt_native_path_enabled())
+    {
+        int previewScale = 0;
+        const QByteArray envScale = qgetenv("ZAPAROO_CRT_PREVIEW_SCALE");
+        if (!envScale.isEmpty())
+        {
+            bool ok = false;
+            const int parsed = envScale.toInt(&ok);
+            if (ok && parsed > 0)
+            {
+                previewScale = parsed;
+            }
+        }
+        initialProperties.insert(QStringLiteral("crtPreview"), true);
+        initialProperties.insert(QStringLiteral("crtPreviewScale"), previewScale);
+        initialProperties.insert(QStringLiteral("videoWidth"),
+                                 static_cast<int>(zaparoo_rust_video_width()));
+        initialProperties.insert(QStringLiteral("videoHeight"),
+                                 static_cast<int>(zaparoo_rust_video_height()));
+    }
 #endif
     engine.setInitialProperties(initialProperties);
 
