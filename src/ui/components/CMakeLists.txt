@@ -35,6 +35,6 @@ qt_add_qml_module(
 
 target_link_libraries(
     zaparoo_ui_components
-    PUBLIC Qt6::Quick Qt6::QuickShapes
+    PUBLIC Qt6::Quick
     PRIVATE Zaparoo::CompileOptions
 )

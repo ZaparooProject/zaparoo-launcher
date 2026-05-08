@@ -106,6 +106,9 @@ fn redirect_stderr() {
 /// C++ side can pull it via [`zaparoo_rust_language_code`] without re-
 /// loading config. An empty string means "use `QLocale::system()`".
 static LANGUAGE_CODE: OnceLock<CString> = OnceLock::new();
+static CRT_NATIVE_PATH_ENABLED: OnceLock<bool> = OnceLock::new();
+static VIDEO_WIDTH: OnceLock<u32> = OnceLock::new();
+static VIDEO_HEIGHT: OnceLock<u32> = OnceLock::new();
 
 /// Returns the resolved UI language override as a NUL-terminated UTF-8
 /// string. An empty string signals "follow `QLocale::system()`"; any
@@ -119,6 +122,28 @@ pub extern "C" fn zaparoo_rust_language_code() -> *const c_char {
     LANGUAGE_CODE
         .get()
         .map_or_else(|| c"".as_ptr(), |s| s.as_ptr())
+}
+
+#[no_mangle]
+pub extern "C" fn zaparoo_rust_crt_native_path_enabled() -> bool {
+    CRT_NATIVE_PATH_ENABLED.get().copied().unwrap_or(false)
+}
+
+/// Configured CRT logical video width from `[video] width` in
+/// `launcher.toml`. Used by the desktop preview wrapper to size the
+/// inner scene at the intended 240p (or whatever the user has set)
+/// before integer-upscaling for display. Cached after
+/// [`zaparoo_rust_init`]; reads before init return `0`.
+#[no_mangle]
+pub extern "C" fn zaparoo_rust_video_width() -> u32 {
+    VIDEO_WIDTH.get().copied().unwrap_or(0)
+}
+
+/// Configured CRT logical video height from `[video] height` in
+/// `launcher.toml`. See [`zaparoo_rust_video_width`] for usage.
+#[no_mangle]
+pub extern "C" fn zaparoo_rust_video_height() -> u32 {
+    VIDEO_HEIGHT.get().copied().unwrap_or(0)
 }
 
 /// Installs a panic hook that routes Rust panics through the tracing
@@ -251,7 +276,7 @@ fn install_crash_signal_handler() {
 /// client, `Store` (which owns the endpoint cache), and model globals.
 /// Returns 0 on success.
 #[no_mangle]
-pub extern "C" fn zaparoo_rust_init() -> c_int {
+pub extern "C" fn zaparoo_rust_init(crt_native_path_forced: bool) -> c_int {
     // FIRST: redirect our own stderr to a file so any panic, abort, or
     // glibc diagnostic in the rest of init lands on disk instead of in
     // the wrapper's /dev/null. Independent of tracing — must run before
@@ -259,7 +284,19 @@ pub extern "C" fn zaparoo_rust_init() -> c_int {
     redirect_stderr();
 
     let config_path = config_file_path();
-    let config = load_config(&config_path);
+    let mut config = load_config(&config_path);
+
+    // CRT mode without an explicit [video] section: fall back to the
+    // 384x224 canvas hard-coded in native_video_writer.cpp (the actual
+    // pixels that reach the CRT). A user who passes `--crt` but hasn't
+    // configured `[video]` would otherwise get a 1920x1080 canvas —
+    // unusable on MiSTer (`vmode` would set a huge linuxfb that gets
+    // truncated to 384x224 anyway) and unusable on desktop preview (the
+    // upscaled window would dwarf any monitor).
+    if crt_native_path_forced && !config.video_explicit {
+        config.video_width = 384;
+        config.video_height = 224;
+    }
 
     // Cache the language override so `zaparoo_rust_language_code` (called
     // from main.cpp before the QML engine loads) can return it without
@@ -267,6 +304,9 @@ pub extern "C" fn zaparoo_rust_init() -> c_int {
     // which a valid BCP-47 tag or the empty sentinel cannot contain —
     // fall back to empty ("use QLocale::system()") if a user manages it.
     let _ = LANGUAGE_CODE.set(CString::new(config.language.clone()).unwrap_or_default());
+    let _ = CRT_NATIVE_PATH_ENABLED.set(crt_native_path_forced);
+    let _ = VIDEO_WIDTH.set(config.video_width);
+    let _ = VIDEO_HEIGHT.set(config.video_height);
 
     // Leak the guard — it must live for the process lifetime to keep the
     // file-appender thread running. The OS reclaims it on exit.
@@ -300,7 +340,7 @@ pub extern "C" fn zaparoo_rust_init() -> c_int {
         }
     };
 
-    mister_runtime::apply_pre_qt_setup();
+    mister_runtime::apply_pre_qt_setup(&config, crt_native_path_forced);
 
     let client = Client::new(config.core_endpoint.clone(), &runtime);
     platform::spawn_fetcher(client.clone(), &runtime);

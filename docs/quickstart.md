@@ -26,8 +26,11 @@ sudo apt install qt6-declarative-dev qt6-quick-controls2-dev \
 
 ```bash
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-cargo install --locked cargo-nextest cargo-deny
 ```
+
+After cloning the launcher repo (step 2), run `just install-tools` to install
+the optional cargo extensions (`cargo-nextest`, `cargo-deny`) used by the
+lint and test recipes.
 
 ### macOS / Windows
 
@@ -125,7 +128,13 @@ just lint    # clang-format, clang-tidy, qmllint, rustfmt, clippy, cargo-deny
 just test    # ctest + cargo nextest
 ```
 
-Zero warnings is the bar.
+Zero warnings is the bar. If lint complains about formatting or a fixable
+clippy issue, `just fix` auto-applies everything CI would accept.
+
+If you would rather not install the lint tools on the host (Qt, clang-format,
+qmlformat, cargo-deny, etc.), use the Docker variants — `just fmt-docker`,
+`just lint-docker`, `just fix-docker`. See [`docs/building.md`](building.md)
+for the full list.
 
 ## Next steps
 

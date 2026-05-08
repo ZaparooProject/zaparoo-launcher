@@ -5,26 +5,41 @@
 /// Sets `QT_QPA_PLATFORM=linuxfb` and `QT_QUICK_BACKEND=software`. Must
 /// be called before `QGuiApplication`. No-op on non-MiSTer builds.
 ///
-/// Resolution is set by `[mister.video_*]` in `launcher.toml` (the
-/// `MiSTer` wrapper applies `vmode` before launching us); the Settings
-/// screen calls `run_vmode` to re-apply at runtime when the user picks
-/// a new value, but startup vmode is intentionally not invoked here.
-pub fn apply_pre_qt_setup() {
+/// In the normal path, resolution is set by the `MiSTer` wrapper before
+/// launching us. With `--crt`, the launcher applies `[video]`
+/// width/height itself so Qt opens a small linuxfb surface while the
+/// custom core owns real CRT output.
+pub fn apply_pre_qt_setup(config: &zaparoo_core::config::Config, crt_native_path_forced: bool) {
     #[cfg(zaparoo_runtime = "mister")]
     {
         std::env::set_var("QT_QPA_PLATFORM", "linuxfb");
         std::env::set_var("QT_QUICK_BACKEND", "software");
+
+        if crt_native_path_forced {
+            tracing::info!(
+                "--crt: applying linuxfb mode {}x{} rgb16",
+                config.video_width,
+                config.video_height
+            );
+            run_vmode_with_format(config.video_width, config.video_height, "rgb16");
+        }
     }
+    #[cfg(not(zaparoo_runtime = "mister"))]
+    let _ = (config, crt_native_path_forced);
 }
 
 /// Run `vmode -r W H rgb32`. No-op on non-MiSTer builds. Called by the
 /// Settings screen to apply a freshly-picked resolution at runtime.
 pub fn run_vmode(width: u32, height: u32) {
+    run_vmode_with_format(width, height, "rgb32");
+}
+
+fn run_vmode_with_format(width: u32, height: u32, pixel_format: &str) {
     #[cfg(zaparoo_runtime = "mister")]
     {
         use tracing::warn;
         let status = std::process::Command::new("vmode")
-            .args(["-r", &width.to_string(), &height.to_string(), "rgb32"])
+            .args(["-r", &width.to_string(), &height.to_string(), pixel_format])
             .status();
         match status {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
@@ -41,7 +56,7 @@ pub fn run_vmode(width: u32, height: u32) {
         }
     }
     #[cfg(not(zaparoo_runtime = "mister"))]
-    let _ = (width, height);
+    let _ = (width, height, pixel_format);
 }
 
 /// Parse a `"WxH"` resolution string like `"1920x1080"` (case-insensitive

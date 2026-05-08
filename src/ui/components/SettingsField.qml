@@ -34,20 +34,19 @@ Item {
     // owns the binding; the field treats it as a plain caption.
     property string actionStatus: ""
 
-    signal hovered()
-    signal clicked()
-    signal rightClicked()
+    signal hovered
+    signal clicked
+    signal rightClicked
     // Emitted when the action-control row receives an accept press.
     // The screen wires this to the matching invokable (start/cancel
     // index, start/cancel scrape) and gates by `actionStatus`.
-    signal accepted()
+    signal accepted
 
     // Item.enabled (built-in) gates the MouseArea below; the dimmed
     // opacity here gives a matching visual cue. Setting `enabled: false`
     // on the row makes Accept a no-op (the index/scrape pair use this
     // when one of the two is in flight — Core serialises them).
-    opacity: enabled ? 1.0 : 0.4
-
+    opacity: enabled ? 1 : 0.4
     implicitHeight: Sizing.pctH(8)
 
     Rectangle {
@@ -57,7 +56,7 @@ Item {
         radius: Sizing.cornerRadius
         color: Theme.surfaceCard
         border.color: root.isFocused ? Theme.accent : Theme.borderMid
-        border.width: root.isFocused ? 2 : 1
+        border.width: root.isFocused ? Sizing.stroke(2) : Sizing.stroke(1)
     }
 
     Text {
@@ -108,11 +107,11 @@ Item {
         // without leaving the long rail of empty pill the previous
         // pctW(8) (~3.7× height on a 16:9 panel) painted.
         height: Sizing.pctH(3.8)
-        width: height * 1.85
+        width: Sizing.px(height * 1.85)
 
         Rectangle {
             anchors.fill: parent
-            radius: height / 2
+            radius: Sizing.half(height)
             // Fill alone carries on/off state — no border. The row's
             // outer surface carries the focus indicator, and against
             // the always-on card behind the toggle a static pill
@@ -123,8 +122,8 @@ Item {
         Rectangle {
             width: toggle.height - Sizing.pctH(0.9)
             height: width
-            radius: width / 2
-            x: root.checked ? toggle.width - width - Sizing.pctH(0.45) : Sizing.pctH(0.45)
+            radius: Sizing.half(width)
+            x: root.checked ? Sizing.px(toggle.width - width - Sizing.pctH(0.45)) : Sizing.pctH(0.45)
             anchors.verticalCenter: parent.verticalCenter
             color: Theme.textPrimary
         }
@@ -171,23 +170,19 @@ Item {
         hoverEnabled: true
         acceptedButtons: Qt.LeftButton | Qt.RightButton
         cursorShape: Qt.PointingHandCursor
-
         onEntered: root.hovered()
         // Action rows fire `accepted()` (the screen runs start/cancel
         // there); every other control fires `clicked()` (the screen
         // moves focus and toggles a value). Emitting both for action
         // rows used to make `onClicked` and `onAccepted` race over
         // the same press.
-        onClicked: (mouse) => {
-            if (mouse.button === Qt.RightButton) {
-                root.rightClicked()
-            } else if (root.control === "action"
-                       || root.control === "navigate"
-                       || root.control === "picker") {
+        onClicked: mouse => {
+            if (mouse.button === Qt.RightButton)
+                root.rightClicked();
+            else if (root.control === "action" || root.control === "navigate" || root.control === "picker")
                 root.accepted();
-            } else {
+            else
                 root.clicked();
-            }
         }
     }
 }

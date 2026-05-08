@@ -14,6 +14,13 @@ pub struct Config {
     pub core_endpoint: String,
     pub video_width: u32,
     pub video_height: u32,
+    /// True when at least one of `[video] width` / `height` was present in
+    /// the loaded `launcher.toml`. The desktop CRT preview uses this to
+    /// distinguish "user wants the default 1920x1080" (in which case the
+    /// preview canvas would be too large to upscale into a desktop window)
+    /// from "user didn't write a [video] section at all" (in which case
+    /// `--crt` falls back to the 384x224 `native_video_writer` canvas).
+    pub video_explicit: bool,
     pub debug_logging: bool,
     /// Language override for the UI, passed to `QTranslator` via the
     /// C++ entry point. Empty string means "follow `QLocale::system()`";
@@ -53,6 +60,7 @@ impl Default for Config {
             core_endpoint: "ws://localhost:7497/api/v0.1".into(),
             video_width: 1920,
             video_height: 1080,
+            video_explicit: false,
             debug_logging: false,
             language: String::new(),
             key_to_action: input_actions::invert(&input_actions::default_bindings()),
@@ -159,6 +167,7 @@ pub fn load_config(path: &Path) -> Config {
             cfg.core_endpoint = ep;
         }
     }
+    cfg.video_explicit = raw.video.width.is_some() || raw.video.height.is_some();
     if let Some(w) = raw.video.width {
         cfg.video_width = w;
     }
@@ -252,6 +261,10 @@ pub fn save_settings_mirror(
         ));
     };
     logging.insert("debug".into(), toml::Value::Boolean(debug_logging));
+
+    if let Some(video) = table.get_mut("video").and_then(toml::Value::as_table_mut) {
+        video.remove("backend");
+    }
 
     let serialized =
         toml::to_string(&table).map_err(|e| format!("config serialisation failed: {e}"))?;
@@ -449,6 +462,24 @@ mod tests {
     }
 
     #[test]
+    fn video_explicit_tracks_section_presence() {
+        // No [video] in file: not explicit.
+        let f = write_tmp("[core]\nendpoint = \"ws://x/y\"\n");
+        let cfg = load_config(f.path());
+        assert!(!cfg.video_explicit);
+
+        // [video] with width set: explicit.
+        let f = write_tmp("[video]\nwidth = 384\n");
+        let cfg = load_config(f.path());
+        assert!(cfg.video_explicit);
+
+        // [video] with height only: still explicit.
+        let f = write_tmp("[video]\nheight = 224\n");
+        let cfg = load_config(f.path());
+        assert!(cfg.video_explicit);
+    }
+
+    #[test]
     fn malformed_toml_returns_defaults() {
         let f = write_tmp("this is not = valid toml [[[");
         let cfg = load_config(f.path());
@@ -520,9 +551,11 @@ mod tests {
     #[test]
     fn save_settings_mirror_preserves_other_sections() {
         let f = write_tmp(
-            "[core]\nendpoint = \"ws://example.com/api\"\n[video]\nwidth = 1280\nheight = 720\n",
+            "[core]\nendpoint = \"ws://example.com/api\"\n[video]\nbackend = \"native-core-poc\"\nwidth = 1280\nheight = 720\n",
         );
         save_settings_mirror(f.path(), "en", "grid", "a", true, false).expect("save");
+        let written = std::fs::read_to_string(f.path()).expect("read");
+        assert!(!written.contains("backend"));
         let cfg = load_config(f.path());
         assert_eq!(cfg.language, "en");
         assert_eq!(cfg.core_endpoint, "ws://example.com/api");

@@ -39,27 +39,19 @@ Item {
     property int currentIndex: 0
 
     signal accepted(string id)
-    signal closeRequested()
+    signal closeRequested
 
     readonly property int _rowHeight: Sizing.pctH(7)
     readonly property int _rowSpacing: Sizing.pctH(1)
     // Cap the picker viewport at a portion of the screen height so it
     // never grows past what the modal shell can reasonably contain.
-    // Visible row count falls out of this — `floor((max + spacing) /
+    // Visible row count falls out of this - `floor((max + spacing) /
     // (rowHeight + spacing))` gives the row count whose viewport fits
     // inside `_maxViewportHeight`, with at least 1 row.
     readonly property int _maxViewportHeight: Sizing.pctH(60)
-    readonly property int _visibleRows:
-        Math.max(1,
-                 Math.min(entries.length,
-                          Math.floor((_maxViewportHeight + _rowSpacing)
-                                     / (_rowHeight + _rowSpacing))))
-    readonly property int _viewportHeight:
-        _visibleRows * _rowHeight
-        + Math.max(0, _visibleRows - 1) * _rowSpacing
-    readonly property int _contentHeight:
-        Math.max(1, entries.length) * _rowHeight
-        + Math.max(0, entries.length - 1) * _rowSpacing
+    readonly property int _visibleRows: Math.max(1, Math.min(entries.length, Math.floor((_maxViewportHeight + _rowSpacing) / (_rowHeight + _rowSpacing))))
+    readonly property int _viewportHeight: _visibleRows * _rowHeight + Math.max(0, _visibleRows - 1) * _rowSpacing
+    readonly property int _contentHeight: Math.max(1, entries.length) * _rowHeight + Math.max(0, entries.length - 1) * _rowSpacing
 
     visible: modal.open
     anchors.fill: parent
@@ -67,39 +59,37 @@ Item {
 
     onOpenChanged: {
         if (!modal.open)
-            return
-        let next = 0
+            return;
+        let next = 0;
         if (modal.initialId !== "") {
             for (let i = 0; i < modal.entries.length; ++i) {
                 if (modal.entries[i].id === modal.initialId) {
-                    next = i
-                    break
+                    next = i;
+                    break;
                 }
             }
         }
-        modal.currentIndex = next
+        modal.currentIndex = next;
     }
 
     function move(delta: int): void {
         if (modal.entries.length <= 0)
-            return
-        const len = modal.entries.length
-        modal.currentIndex =
-            ((modal.currentIndex + delta) % len + len) % len
+            return;
+        const len = modal.entries.length;
+        modal.currentIndex = ((modal.currentIndex + delta) % len + len) % len;
     }
 
     function handleAction(action: string): void {
-        if (action === "up")
-            modal.move(-1)
-        else if (action === "down")
-            modal.move(1)
-        else if (action === "accept") {
-            if (modal.currentIndex >= 0
-                && modal.currentIndex < modal.entries.length)
-                modal.accepted(modal.entries[modal.currentIndex].id)
+        if (action === "up") {
+            modal.move(-1);
+        } else if (action === "down") {
+            modal.move(1);
+        } else if (action === "accept") {
+            if (modal.currentIndex >= 0 && modal.currentIndex < modal.entries.length)
+                modal.accepted(modal.entries[modal.currentIndex].id);
+        } else if (action === "cancel") {
+            modal.closeRequested();
         }
-        else if (action === "cancel")
-            modal.closeRequested()
     }
 
     Modal {
@@ -145,12 +135,8 @@ Item {
                             width: rowColumn.width
                             height: modal._rowHeight
                             color: Theme.surfaceCard
-                            border.width:
-                                row.index === modal.currentIndex ? 2 : 1
-                            border.color:
-                                row.index === modal.currentIndex
-                                ? Theme.accent
-                                : Theme.borderMid
+                            border.width: row.index === modal.currentIndex ? Sizing.stroke(2) : Sizing.stroke(1)
+                            border.color: row.index === modal.currentIndex ? Theme.accent : Theme.borderMid
                             radius: Sizing.cornerRadius
 
                             Text {
@@ -174,8 +160,7 @@ Item {
                                 acceptedButtons: Qt.LeftButton
                                 cursorShape: Qt.PointingHandCursor
                                 onEntered: modal.currentIndex = row.index
-                                onClicked:
-                                    modal.accepted(row.modelData.id)
+                                onClicked: modal.accepted(row.modelData.id)
                             }
                         }
                     }
@@ -191,13 +176,13 @@ Item {
     Connections {
         target: modal
         function onCurrentIndexChanged(): void {
-            const stride = modal._rowHeight + modal._rowSpacing
-            const top = modal.currentIndex * stride
-            const bottom = top + modal._rowHeight
+            const stride = modal._rowHeight + modal._rowSpacing;
+            const top = modal.currentIndex * stride;
+            const bottom = top + modal._rowHeight;
             if (top < viewport.contentY) {
-                viewport.contentY = top
+                viewport.contentY = top;
             } else if (bottom > viewport.contentY + viewport.height) {
-                viewport.contentY = bottom - viewport.height
+                viewport.contentY = bottom - viewport.height;
             }
         }
     }

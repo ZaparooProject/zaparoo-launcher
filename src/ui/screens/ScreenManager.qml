@@ -33,20 +33,18 @@ QtObject {
 
     readonly property int modalCount: manager.modalStack.length
     readonly property bool hasModal: manager.modalStack.length > 0
-    readonly property string topModal: manager.modalStack.length > 0
-                                       ? manager.modalStack[manager.modalStack.length - 1]
-                                       : ""
+    readonly property string topModal: manager.modalStack.length > 0 ? manager.modalStack[manager.modalStack.length - 1] : ""
 
     function go(screen: string): void {
-        manager.activeScreen = screen
+        manager.activeScreen = screen;
     }
 
     function pushModal(name: string): void {
-        manager.modalStack = manager.modalStack.concat([name])
+        manager.modalStack = manager.modalStack.concat([name]);
     }
 
     function popModal(): void {
         if (manager.modalStack.length > 0)
-            manager.modalStack = manager.modalStack.slice(0, manager.modalStack.length - 1)
+            manager.modalStack = manager.modalStack.slice(0, manager.modalStack.length - 1);
     }
 }

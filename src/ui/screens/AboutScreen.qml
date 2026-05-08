@@ -30,14 +30,13 @@ Item {
     // screens.
     property bool transitioning: false
 
-    signal requestSettingsScreen()
+    signal requestSettingsScreen
 
     // True when the body Column overflows the Flickable viewport, so
     // the help bar can show the Up/Down scroll cue only when it's
     // actually meaningful. Per the minimal-help-bar policy, hints
     // shouldn't promise a press that no-ops.
-    readonly property bool contentOverflows:
-        body.implicitHeight > flickable.height
+    readonly property bool contentOverflows: body.implicitHeight > flickable.height
 
     // Drive the top/bottom scroll chevrons. The 1-px epsilon swallows
     // sub-pixel rounding so the chevrons don't flicker on exact-fit
@@ -47,18 +46,18 @@ Item {
         flickable.contentY + flickable.height < flickable.contentHeight - 1
 
     function _scrollBy(delta: int): void {
-        const maxY = Math.max(0, flickable.contentHeight - flickable.height)
-        flickable.contentY = Math.max(0, Math.min(maxY, flickable.contentY + delta))
+        const maxY = Math.max(0, flickable.contentHeight - flickable.height);
+        flickable.contentY = Math.max(0, Math.min(maxY, flickable.contentY + delta));
     }
 
     function handleAction(action: string): void {
         if (action === "up")
-            about._scrollBy(-Sizing.pctH(8))
+            about._scrollBy(-Sizing.pctH(8));
         else if (action === "down")
-            about._scrollBy(Sizing.pctH(8))
+            about._scrollBy(Sizing.pctH(8));
         else if (action === "cancel")
-            about.requestSettingsScreen()
-        // accept and left/right are no-ops on a static page.
+            about.requestSettingsScreen();
+    // accept and left/right are no-ops on a static page.
     }
 
     // ── Visual tree ───────────────────────────────────────────────────────────
@@ -100,7 +99,7 @@ Item {
         color: Theme.surfaceCard
         radius: Sizing.cornerRadius
         border.color: Theme.borderMid
-        border.width: 1
+        border.width: Sizing.stroke(1)
 
         Flickable {
             id: flickable
@@ -146,7 +145,7 @@ Item {
                     sourceSize.width: 600
                     sourceSize.height: 135
                     width: Math.min(parent.width, Sizing.pctH(35))
-                    height: width * 135 / 600
+                    height: Sizing.px(width * 135 / 600)
                 }
 
                 Text {

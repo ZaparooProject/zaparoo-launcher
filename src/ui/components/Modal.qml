@@ -65,9 +65,9 @@ Item {
     // on a prebaked-kind modal can't leak into the panel.
     default property alias contentData: contentSlot.data
 
-    signal accepted()         // action_error: button click
-    signal cancelRequested()  // transient Cancel; confirm No / Back
-    signal confirmed()        // confirm: Yes selected
+    signal accepted         // action_error: button click
+    signal cancelRequested  // transient Cancel; confirm No / Back
+    signal confirmed        // confirm: Yes selected
 
     visible: modal.open
     anchors.fill: parent
@@ -75,25 +75,25 @@ Item {
 
     onOpenChanged: {
         if (modal.open && modal.kind === "confirm")
-            modal._focusYes = false
+            modal._focusYes = false;
     }
 
     // confirm-only input dispatch. Main.qml routes key/controller
     // actions here while this modal is on top of the stack.
     function handleAction(action: string): void {
         if (modal.kind !== "confirm")
-            return
+            return;
         if (action === "left") {
-            modal._focusYes = false
+            modal._focusYes = false;
         } else if (action === "right") {
-            modal._focusYes = true
+            modal._focusYes = true;
         } else if (action === "accept") {
             if (modal._focusYes)
-                modal.confirmed()
+                modal.confirmed();
             else
-                modal.cancelRequested()
+                modal.cancelRequested();
         } else if (action === "cancel") {
-            modal.cancelRequested()
+            modal.cancelRequested();
         }
     }
 
@@ -113,8 +113,9 @@ Item {
         }
 
         Rectangle {
-            anchors.centerIn: parent
-            width: Math.min(parent.width * 0.78, modal.panelMaxWidth)
+            x: Sizing.center(parent.width, width)
+            y: Sizing.center(parent.height, height)
+            width: Sizing.px(Math.min(parent.width * 0.78, modal.panelMaxWidth))
             height: contentColumn.height + Sizing.pctH(8)
             color: Theme.bgPanel
             radius: Sizing.cornerRadius
@@ -175,8 +176,8 @@ Item {
                     visible: modal.kind === "transient" && !modal.failed
 
                     Rectangle {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        anchors.verticalCenter: parent.verticalCenter
+                        x: Sizing.center(parent.width, width)
+                        y: Sizing.center(parent.height, height)
                         // Cap at pctW(28) for the typical case but never
                         // exceed the slot width — the modal panel is
                         // height-bound on widescreen, so a screen-width
@@ -187,12 +188,13 @@ Item {
                         // Single button — always the default action, so
                         // render with the focused recipe (accent border,
                         // 2px) instead of the unfocused borderMid edge.
-                        border.width: 2
+                        border.width: Sizing.stroke(2)
                         border.color: Theme.accent
                         radius: Sizing.cornerRadius
 
                         Text {
-                            anchors.centerIn: parent
+                            x: Sizing.center(parent.width, width)
+                            y: Sizing.center(parent.height, height)
                             text: qsTr("Cancel")
                             font.family: Theme.fontUi
                             font.pixelSize: Sizing.fontSize(2.6)
@@ -216,20 +218,21 @@ Item {
                     visible: modal.kind === "action_error"
 
                     Rectangle {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        anchors.verticalCenter: parent.verticalCenter
+                        x: Sizing.center(parent.width, width)
+                        y: Sizing.center(parent.height, height)
                         width: Math.min(Sizing.pctW(28), acceptSlot.width)
                         height: parent.height
                         color: Theme.surfaceCard
                         // Single button — always the default action, so
                         // render with the focused recipe (accent border,
                         // 2px) instead of the unfocused borderMid edge.
-                        border.width: 2
+                        border.width: Sizing.stroke(2)
                         border.color: Theme.accent
                         radius: Sizing.cornerRadius
 
                         Text {
-                            anchors.centerIn: parent
+                            x: Sizing.center(parent.width, width)
+                            y: Sizing.center(parent.height, height)
                             text: modal.buttonLabel
                             font.family: Theme.fontUi
                             font.pixelSize: Sizing.fontSize(2.6)
@@ -261,27 +264,24 @@ Item {
                     // slot, not the Row, so the Row can stay implicitly
                     // sized by its children and centered.
                     readonly property int _gap: Sizing.pctW(2)
-                    readonly property int _pillWidth:
-                        Math.min(Sizing.pctW(28),
-                                 Math.max(0, (width - _gap) / 2))
+                    readonly property int _pillWidth: Math.min(Sizing.pctW(28), Math.max(0, Sizing.px((width - _gap) / 2)))
 
                     Row {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        anchors.verticalCenter: parent.verticalCenter
+                        x: Sizing.center(parent.width, width)
+                        y: Sizing.center(parent.height, height)
                         spacing: confirmSlot._gap
 
                         Rectangle {
                             width: confirmSlot._pillWidth
                             height: Sizing.pctH(7)
                             color: Theme.surfaceCard
-                            border.width: modal._focusYes ? 1 : 2
-                            border.color: modal._focusYes
-                                          ? Theme.borderMid
-                                          : Theme.accent
+                            border.width: modal._focusYes ? Sizing.stroke(1) : Sizing.stroke(2)
+                            border.color: modal._focusYes ? Theme.borderMid : Theme.accent
                             radius: Sizing.cornerRadius
 
                             Text {
-                                anchors.centerIn: parent
+                                x: Sizing.center(parent.width, width)
+                                y: Sizing.center(parent.height, height)
                                 text: modal.confirmNoLabel
                                 font.family: Theme.fontUi
                                 font.pixelSize: Sizing.fontSize(2.6)
@@ -293,8 +293,8 @@ Item {
                                 anchors.fill: parent
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
-                                    modal._focusYes = false
-                                    modal.cancelRequested()
+                                    modal._focusYes = false;
+                                    modal.cancelRequested();
                                 }
                             }
                         }
@@ -303,14 +303,13 @@ Item {
                             width: confirmSlot._pillWidth
                             height: Sizing.pctH(7)
                             color: Theme.surfaceCard
-                            border.width: modal._focusYes ? 2 : 1
-                            border.color: modal._focusYes
-                                          ? Theme.accent
-                                          : Theme.borderMid
+                            border.width: modal._focusYes ? Sizing.stroke(2) : Sizing.stroke(1)
+                            border.color: modal._focusYes ? Theme.accent : Theme.borderMid
                             radius: Sizing.cornerRadius
 
                             Text {
-                                anchors.centerIn: parent
+                                x: Sizing.center(parent.width, width)
+                                y: Sizing.center(parent.height, height)
                                 text: modal.confirmYesLabel
                                 font.family: Theme.fontUi
                                 font.pixelSize: Sizing.fontSize(2.6)
@@ -322,8 +321,8 @@ Item {
                                 anchors.fill: parent
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
-                                    modal._focusYes = true
-                                    modal.confirmed()
+                                    modal._focusYes = true;
+                                    modal.confirmed();
                                 }
                             }
                         }

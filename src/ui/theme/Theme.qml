@@ -2,12 +2,13 @@
 // Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 pragma Singleton
-
 import QtQuick
 
 // Project-wide color and font constants.
 // Never hardcode colors or font families inline — use these instead.
 QtObject {
+    property bool crtNativePath: false
+
     // Backgrounds
     readonly property color bgDeep: "#0f0f23"
     readonly property color bgPanel: "#1a1a35"
@@ -20,7 +21,6 @@ QtObject {
     // Modal scrim — translucent black so the screen behind a modal
     // dims uniformly without a blur or shader pass.
     readonly property color scrim: "#cc000000"
-
     // Borders
     readonly property color borderSubtle: "#1a1a2e"
     readonly property color borderMid: "#404060"
@@ -28,12 +28,9 @@ QtObject {
     // Text
     readonly property color textPrimary: "#ffffff"
     readonly property color textLabel: "#888888"
-
     // Accent — static warm amber used for selection highlights.
     readonly property color accent: "#FFB347"
-
     // Fonts
-    readonly property string fontUi: "Atkinson Hyperlegible"
-    readonly property string fontMono: "monospace"
-
+    readonly property string fontUi: crtNativePath ? "Bongo-8 Mono" : "Atkinson Hyperlegible"
+    readonly property string fontMono: crtNativePath ? "Bongo-8 Mono" : "monospace"
 }

@@ -297,3 +297,20 @@ ladder. There is no seventh size.
 
 Inconsistent radii, focus colours, and font sizes were the problems
 these tokens were introduced to solve.
+
+## Integer-pixel drawing
+
+These rules apply to every screen, not just CRT-targeted code paths.
+The whole app must render cleanly at 240p; the launcher has one
+rendering path, not two.
+
+- Geometry lands on integer pixels (`Sizing.px()`, `Sizing.center()`,
+  `Sizing.half()`).
+- Stroke widths are integer pixels (`Sizing.stroke()`).
+- Text sizes are restricted to `8px` or `16px` when `crtNativePath` is
+  active; `Sizing.fontSize()` handles the quantization.
+- Bitmap-style text doesn't rely on centered glyph layout; center the
+  text item, not the glyph run.
+
+These are implementation constraints, not aesthetic preferences. If a
+new surface needs an exception, document the reason in the same change.

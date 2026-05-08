@@ -11,6 +11,7 @@ set(_RESOURCE_ROOT "${CMAKE_SOURCE_DIR}/resources")
 set(_APP_RESOURCES
     "${_RESOURCE_ROOT}/fonts/AtkinsonHyperlegible-Regular.ttf"
     "${_RESOURCE_ROOT}/fonts/AtkinsonHyperlegible-Bold.ttf"
+    "${_RESOURCE_ROOT}/fonts/Bongo-8 Mono.ttf"
     "${_RESOURCE_ROOT}/images/logo.png"
     # Tiled circuit-trace background. The .png is pre-rendered from the
     # .svg at the pattern's native 304×304 (rsvg-convert / Inkscape /

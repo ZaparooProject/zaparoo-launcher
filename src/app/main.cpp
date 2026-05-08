@@ -7,6 +7,7 @@
 // Qt's CMake (qt_import_qml_plugins) can emit the correct link flags.
 
 #include "media_image_provider.h"
+#include "native_video_writer.h"
 
 #include <QByteArray>
 #include <QFontDatabase>
@@ -17,13 +18,19 @@
 #include <QPixmapCache>
 #include <QQmlApplicationEngine>
 #include <QQuickStyle>
+#include <QQuickWindow>
 #include <QString>
 #include <QStringList>
 #include <QTranslator>
 #include <QUrl>
+#include <QVariantMap>
 #include <QtQml/qqmlextensionplugin.h>
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
+#include <cstring>
+#include <vector>
 
 // Default QPixmapCache cap is 10 MiB. With ~100 system PNGs decoded at
 // 256 px sourceSize the working set straddles that limit, so navigating
@@ -35,10 +42,13 @@
 // flagged.
 constexpr int kPixmapCacheLimitKiB = 50 * 1024;
 
-extern "C" int zaparoo_rust_init();
+extern "C" int zaparoo_rust_init(bool crtNativePathForced);
 extern "C" void zaparoo_rust_post_qt_start();
 extern "C" void zaparoo_log_qt(uint8_t level, const char* msg, size_t len);
 extern "C" const char* zaparoo_rust_language_code();
+extern "C" bool zaparoo_rust_crt_native_path_enabled();
+extern "C" uint32_t zaparoo_rust_video_width();
+extern "C" uint32_t zaparoo_rust_video_height();
 
 // Pull Zaparoo QML plugin symbols into the final binary so the linker does
 // not strip their static-initializer registration functions.
@@ -72,14 +82,53 @@ static void qtMessageHandler(QtMsgType type, const QMessageLogContext& /*ctx*/, 
     zaparoo_log_qt(static_cast<uint8_t>(type), utf8.constData(), static_cast<size_t>(utf8.size()));
 }
 
+struct ParsedArguments
+{
+    bool crtNativePathForced = false;
+    std::vector<char*> argv;
+};
+
+static ParsedArguments extractCrtArgument(int argc, char* argv[])
+{
+    ParsedArguments parsed;
+    parsed.argv.reserve(static_cast<size_t>(argc));
+    std::copy_n(argv, argc, std::back_inserter(parsed.argv));
+
+    std::vector<char*> filtered;
+    filtered.reserve(parsed.argv.size());
+    if (!parsed.argv.empty())
+    {
+        filtered.push_back(parsed.argv.front());
+    }
+
+    for (size_t i = 1; i < parsed.argv.size(); ++i)
+    {
+        if (std::strcmp(parsed.argv[i], "--crt") == 0)
+        {
+            parsed.crtNativePathForced = true;
+            continue;
+        }
+        filtered.push_back(parsed.argv[i]);
+    }
+
+    parsed.argv = std::move(filtered);
+    parsed.argv.push_back(nullptr);
+    return parsed;
+}
+
 int main(int argc, char* argv[])
 {
+    ParsedArguments parsedArgs = extractCrtArgument(argc, argv);
+    const bool crtNativePathForced = parsedArgs.crtNativePathForced;
+    int qtArgc = static_cast<int>(parsedArgs.argv.size()) - 1;
+    char** qtArgv = parsedArgs.argv.data();
+
     QGuiApplication::setApplicationName("Zaparoo Launcher");
     QGuiApplication::setApplicationVersion("0.1.0");
     QGuiApplication::setOrganizationName("Zaparoo");
     QGuiApplication::setOrganizationDomain("zaparoo.org");
 
-    if (zaparoo_rust_init() != 0)
+    if (zaparoo_rust_init(crtNativePathForced) != 0)
     {
         return EXIT_FAILURE;
     }
@@ -88,23 +137,32 @@ int main(int argc, char* argv[])
     // messages are emitted.
     qInstallMessageHandler(qtMessageHandler);
 
-    QGuiApplication app(argc, argv);
+    QGuiApplication app(qtArgc, qtArgv);
     QPixmapCache::setCacheLimit(kPixmapCacheLimitKiB);
     // addApplicationFont returns -1 on failure (broken qrc path,
     // unreadable file). Logging the failure mode keeps a refactor that
     // breaks the resource alias from silently degrading to the default
     // font with no clue in the logs.
-    const QString regularPath =
-        QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/AtkinsonHyperlegible-Regular.ttf");
-    const QString boldPath =
-        QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/AtkinsonHyperlegible-Bold.ttf");
-    if (QFontDatabase::addApplicationFont(regularPath) == -1)
+    const auto registerFont = [](const QString& path)
     {
-        qWarning("Failed to register font: %s", qUtf8Printable(regularPath));
-    }
-    if (QFontDatabase::addApplicationFont(boldPath) == -1)
+        const int fontId = QFontDatabase::addApplicationFont(path);
+        if (fontId == -1)
+        {
+            qWarning("Failed to register font: %s", qUtf8Printable(path));
+            return;
+        }
+        qInfo("Registered font %s: %s", qUtf8Printable(path),
+              qUtf8Printable(QFontDatabase::applicationFontFamilies(fontId).join(", ")));
+    };
+    registerFont(
+        QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/AtkinsonHyperlegible-Regular.ttf"));
+    registerFont(
+        QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/AtkinsonHyperlegible-Bold.ttf"));
+    registerFont(QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/Bongo-8 Mono.ttf"));
+    if (zaparoo_rust_crt_native_path_enabled())
     {
-        qWarning("Failed to register font: %s", qUtf8Printable(boldPath));
+        QQuickWindow::setTextRenderType(QQuickWindow::NativeTextRendering);
+        qInfo("CRT native path: using native text rendering");
     }
     QQuickStyle::setStyle("Basic");
 
@@ -154,9 +212,41 @@ int main(int argc, char* argv[])
     qInfo("QImageReader supportedImageFormats: %s",
           qUtf8Printable(formatNames.join(QStringLiteral(", "))));
 
+    QVariantMap initialProperties = {
+        {"crtNativePath", zaparoo_rust_crt_native_path_enabled()},
+    };
 #ifdef ZAPAROO_EMBEDDED_BUILD
-    engine.setInitialProperties({{"fullScreen", true}});
+    initialProperties.insert(QStringLiteral("fullScreen"), true);
+#else
+    // Desktop CRT preview: when --crt is passed off-MiSTer, render the
+    // QML scene at the configured logical video size and integer-
+    // upscale via a layered wrapper Item in MainLayout. Scale defaults
+    // to 0 (sentinel for "auto-pick the largest integer that fits the
+    // primary screen with a 5% margin"); ZAPAROO_CRT_PREVIEW_SCALE
+    // overrides for ad-hoc testing without rebuilding (e.g. =2 for
+    // half-size, =8 to inspect a single tile).
+    if (zaparoo_rust_crt_native_path_enabled())
+    {
+        int previewScale = 0;
+        const QByteArray envScale = qgetenv("ZAPAROO_CRT_PREVIEW_SCALE");
+        if (!envScale.isEmpty())
+        {
+            bool ok = false;
+            const int parsed = envScale.toInt(&ok);
+            if (ok && parsed > 0)
+            {
+                previewScale = parsed;
+            }
+        }
+        initialProperties.insert(QStringLiteral("crtPreview"), true);
+        initialProperties.insert(QStringLiteral("crtPreviewScale"), previewScale);
+        initialProperties.insert(QStringLiteral("videoWidth"),
+                                 static_cast<int>(zaparoo_rust_video_width()));
+        initialProperties.insert(QStringLiteral("videoHeight"),
+                                 static_cast<int>(zaparoo_rust_video_height()));
+    }
 #endif
+    engine.setInitialProperties(initialProperties);
 
     // objectCreationFailed fires before loadFromModule returns when a QML
     // type fails to resolve or compile. Individual QML errors are already
@@ -173,6 +263,12 @@ int main(int argc, char* argv[])
     {
         qCritical("QML engine produced no root objects; startup aborted (see earlier errors)");
         return EXIT_FAILURE;
+    }
+
+    if (zaparoo_rust_crt_native_path_enabled())
+    {
+        startNativeVideoWriter();
+        std::atexit(stopNativeVideoWriter);
     }
 
     zaparoo_rust_post_qt_start();

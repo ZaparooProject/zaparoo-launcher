@@ -2,7 +2,6 @@
 // Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 pragma Singleton
-
 import QtQuick
 
 // Centralizes the qrc layout for embedded resources so the rule
@@ -12,16 +11,7 @@ import QtQuick
 // resource path or image format silently misses one of the two sites
 // and breaks the QPixmapCache match between prefetch and visible Image.
 QtObject {
-    // Base URL for everything under `resources/` in the embedded qrc.
-    readonly property string baseUrl: "qrc:/qt/qml/Zaparoo/App/resources/"
-    // Single-letter directory under resources/images/buttons/ — "a"/"b"/"c"/"d"
-    // back the user-facing "Style A/B/C/D" picker. MainLayout binds this to
-    // Browse.Settings.current_button_layout; the default keeps early
-    // evaluation on Style A (the legacy Nintendo-style glyph set).
-    property string buttonLayout: "a"
-
     // Build a cover image URL from a `coverKey`.
-    //
     // Extension/scheme is chosen by directory:
     //   * `systems/<id>` — the 144-asset curated PNG set under
     //     resources/images/systems/, ships as PNG.
@@ -36,23 +26,34 @@ QtObject {
     //     SVG. QtSvg rasterizes the source on first load and the
     //     result lands in QPixmapCache, so paint cost matches PNG
     //     after the one-shot decode.
-    //
+
+    // Base URL for everything under `resources/` in the embedded qrc.
+    readonly property string baseUrl: "qrc:/qt/qml/Zaparoo/App/resources/"
+    // Single-letter directory under resources/images/buttons/ — "a"/"b"/"c"/"d"
+    // back the user-facing "Style A/B/C/D" picker. MainLayout binds this to
+    // Browse.Settings.current_button_layout; the default keeps early
+    // evaluation on Style A (the legacy Nintendo-style glyph set).
+    property string buttonLayout: "a"
+
     // Empty key returns an empty URL so the caller can use it as a
     // "no cover" sentinel.
     function coverUrl(key: string): url {
         if (key === "")
-            return ""
+            return "";
+
         if (key.startsWith("media-image/"))
-            return "image://media-image/" + key.substring("media-image/".length)
-        const ext = key.startsWith("systems/") ? "png" : "svg"
-        return baseUrl + "images/" + key + "." + ext
+            return "image://media-image/" + key.substring("media-image/".length);
+
+        const ext = key.startsWith("systems/") ? "png" : "svg";
+        return baseUrl + "images/" + key + "." + ext;
     }
 
     // Top-right HUD host-status icons (NFC/Wi-Fi/LAN/Bluetooth).
     function statusIconUrl(name: string): url {
         if (name === "")
-            return ""
-        return baseUrl + "images/status/" + name + ".svg"
+            return "";
+
+        return baseUrl + "images/status/" + name + ".svg";
     }
 
     // General-purpose UI glyphs (folder, file, loading spinner, settings,
@@ -62,10 +63,12 @@ QtObject {
     // antialiased button-face shading survives intact.
     function iconUrl(name: string): url {
         if (name === "")
-            return ""
+            return "";
+
         if (name.startsWith("Button"))
-            return baseUrl + "images/buttons/" + buttonLayout + "/" + name + ".png"
-        const ext = name.startsWith("Dpad") ? "png" : "svg"
-        return baseUrl + "images/icons/" + name + "." + ext
+            return baseUrl + "images/buttons/" + buttonLayout + "/" + name + ".png";
+
+        const ext = name.startsWith("Dpad") ? "png" : "svg";
+        return baseUrl + "images/icons/" + name + "." + ext;
     }
 }

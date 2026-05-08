@@ -4,6 +4,7 @@
 
 import QtQuick
 import Zaparoo.Browse as Browse
+import Zaparoo.Theme
 
 // cxx-qt 0.8 patches `isFinal: true` on singleton properties but the
 // qmltypes schema has no `isFinal` slot, so every read trips qmllint's
@@ -51,10 +52,10 @@ Item {
         target: Browse.AppStatus
         function onLink_stateChanged(): void {
             if (Browse.AppStatus.link_state === overlay._linkUnreachable) {
-                unreachableEscalateTimer.restart()
+                unreachableEscalateTimer.restart();
             } else {
-                unreachableEscalateTimer.stop()
-                overlay._unreachableLong = false
+                unreachableEscalateTimer.stop();
+                overlay._unreachableLong = false;
             }
         }
     }
@@ -67,20 +68,21 @@ Item {
     }
 
     LoadingIndicator {
-        anchors.centerIn: parent
+        x: Sizing.center(parent.width, width)
+        y: Sizing.center(parent.height, height)
         text: {
-            const link = Browse.AppStatus.link_state ?? overlay._linkDisconnected
+            const link = Browse.AppStatus.link_state ?? overlay._linkDisconnected;
             if (link === overlay._linkUnreachable && overlay._unreachableLong)
-                return qsTr("Can't reach Zaparoo Core. Check your connection.")
+                return qsTr("Can't reach Zaparoo Core. Check your connection.");
             if (link === overlay._linkReconnecting)
-                return qsTr("Reconnecting…")
+                return qsTr("Reconnecting…");
             if (link === overlay._linkConnected)
-                return qsTr("Loading library…")
+                return qsTr("Loading library…");
             // DISCONNECTED, CONNECTING, and the first few seconds of
             // UNREACHABLE all read the same — the user pressed launch,
             // we're trying to reach Core. Don't blame the network until
             // we're sure.
-            return qsTr("Connecting to Zaparoo Core…")
+            return qsTr("Connecting to Zaparoo Core…");
         }
     }
 }

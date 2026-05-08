@@ -34,20 +34,16 @@ endif()
 file(GLOB_RECURSE _all_qmldirs "${CARGO_DIR}/*qmldir")
 
 # cargo retains stale per-build-hash directories under
-# debug/build/<crate>-<hash>/out/qt-build-utils/qml_modules/. Multiple
-# qmldir candidates can resolve to the same module path, and a stale one
-# would overwrite the freshest in iteration order. Bucket candidates by
-# module path and pick the most recently modified source per module.
+# debug/build/<crate>-<hash>/out/qt-build-utils/qml_modules/. Multiple qmldir candidates can resolve
+# to the same module path, and a stale one would overwrite the freshest in iteration order. Bucket
+# candidates by module path and pick the most recently modified source per module.
 set(_module_paths "")
 foreach(_candidate IN LISTS _all_qmldirs)
     if(NOT _candidate MATCHES "/(qt-build-utils|cxxqt)/qml_modules/.+/qmldir$")
         continue()
     endif()
-    string(REGEX REPLACE
-        ".*/(qt-build-utils|cxxqt)/qml_modules/(.+)/qmldir$"
-        "\\2"
-        _module_path
-        "${_candidate}"
+    string(REGEX REPLACE ".*/(qt-build-utils|cxxqt)/qml_modules/(.+)/qmldir$" "\\2" _module_path
+                         "${_candidate}"
     )
     string(MAKE_C_IDENTIFIER "${_module_path}" _slot)
     file(TIMESTAMP "${_candidate}" _ts UTC)
@@ -59,10 +55,9 @@ foreach(_candidate IN LISTS _all_qmldirs)
     elseif(_ts STRGREATER "${_existing_ts}")
         set(_replace TRUE)
     elseif(_ts STREQUAL "${_existing_ts}" AND _candidate STRLESS "${_existing}")
-        # Stable tie-break: when filesystem timestamps match (second
-        # precision can collide on a fast incremental rebuild) pick the
-        # lexicographically smaller path so two runs from the same tree
-        # always sync the same source.
+        # Stable tie-break: when filesystem timestamps match (second precision can collide on a fast
+        # incremental rebuild) pick the lexicographically smaller path so two runs from the same
+        # tree always sync the same source.
         set(_replace TRUE)
     endif()
     if(_replace)
@@ -84,19 +79,17 @@ foreach(_slot IN LISTS _module_paths)
     foreach(_src_file IN LISTS _contents)
         get_filename_component(_name "${_src_file}" NAME)
         execute_process(
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${_src_file}" "${_dst_dir}/${_name}"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_src_file}" "${_dst_dir}/${_name}"
         )
     endforeach()
 endforeach()
 
-# ── Patch plugin.qmltypes: isFinal: true on singleton properties ─────────────
-# Collect QML_SINGLETON element names from the cxx-qt-generated headers, then
-# rewrite each synced plugin.qmltypes to mark every Property final when *all*
-# Components in the file are known singletons. Only run the patch under that
-# guard: non-singleton types can legitimately be subclassed and marking their
-# members final would be incorrect. Methods are untouched — the qmltypes
-# schema has no isFinal slot for Method.
+# ── Patch plugin.qmltypes: isFinal: true on singleton properties ───────────── Collect
+# QML_SINGLETON element names from the cxx-qt-generated headers, then rewrite each synced
+# plugin.qmltypes to mark every Property final when *all* Components in the file are known
+# singletons. Only run the patch under that guard: non-singleton types can legitimately be
+# subclassed and marking their members final would be incorrect. Methods are untouched — the
+# qmltypes schema has no isFinal slot for Method.
 
 set(_singleton_names "")
 file(GLOB_RECURSE _all_cxxqt_headers "${CARGO_DIR}/*.cxxqt.h")
@@ -105,9 +98,11 @@ foreach(_hdr IN LISTS _all_cxxqt_headers)
     if(NOT _hdr_content MATCHES "QML_SINGLETON")
         continue()
     endif()
-    string(REGEX MATCHALL
-        "Q_CLASSINFO\\(\"QML.Element\", \"[A-Za-z_][A-Za-z0-9_]*\"\\)[ \t\r\n]*QML_SINGLETON"
-        _matches "${_hdr_content}")
+    string(
+        REGEX MATCHALL
+              "Q_CLASSINFO\\(\"QML.Element\", \"[A-Za-z_][A-Za-z0-9_]*\"\\)[ \t\r\n]*QML_SINGLETON"
+              _matches "${_hdr_content}"
+    )
     foreach(_m IN LISTS _matches)
         if(_m MATCHES "\"QML.Element\", \"([A-Za-z_][A-Za-z0-9_]*)\"")
             list(APPEND _singleton_names "${CMAKE_MATCH_1}")
@@ -121,9 +116,13 @@ foreach(_qt_file IN LISTS _synced_qmltypes)
     file(READ "${_qt_file}" _qt_content)
     set(_original "${_qt_content}")
 
-    string(REGEX MATCHALL
-        "    Component \\{\n[ \t]+file: \"[^\"]+\"\n[ \t]+lineNumber: [0-9]+\n[ \t]+name: \"[^\"]+\""
-        _component_headers "${_qt_content}")
+    string(
+        REGEX
+            MATCHALL
+            "    Component \\{\n[ \t]+file: \"[^\"]+\"\n[ \t]+lineNumber: [0-9]+\n[ \t]+name: \"[^\"]+\""
+            _component_headers
+            "${_qt_content}"
+    )
     set(_non_singleton_components "")
     foreach(_hdr IN LISTS _component_headers)
         if(_hdr MATCHES "name: \"([^\"]+)\"")
@@ -133,11 +132,14 @@ foreach(_qt_file IN LISTS _synced_qmltypes)
             endif()
         endif()
     endforeach()
-    if(NOT _non_singleton_components)
-        string(REGEX REPLACE
-            "(Property \\{\n)([ \t]+)(name:)"
-            "\\1\\2isFinal: true\n\\2\\3"
-            _qt_content "${_qt_content}")
+    # Only inject `isFinal: true` when we actually parsed Component headers and confirmed every one
+    # is a singleton. An empty `_component_headers` (regex miss on a future Qt qmltypes format, or a
+    # generated file with no Components) leaves `_non_singleton_components` empty too, but in that
+    # case we have no evidence the rewrite is safe.
+    if(_component_headers AND NOT _non_singleton_components)
+        string(REGEX REPLACE "(Property \\{\n)([ \t]+)(name:)" "\\1\\2isFinal: true\n\\2\\3"
+                             _qt_content "${_qt_content}"
+        )
     endif()
 
     if(NOT _qt_content STREQUAL _original)

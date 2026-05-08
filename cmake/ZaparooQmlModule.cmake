@@ -15,13 +15,7 @@
 include_guard(GLOBAL)
 
 function(zaparoo_add_qml_module target)
-    cmake_parse_arguments(
-        _ARG
-        ""
-        "URI"
-        "QML_FILES;RESOURCES;IMPORTS;SOURCES"
-        ${ARGN}
-    )
+    cmake_parse_arguments(_ARG "" "URI" "QML_FILES;RESOURCES;IMPORTS;SOURCES" ${ARGN})
 
     if(NOT _ARG_URI)
         message(FATAL_ERROR "zaparoo_add_qml_module: URI is required")
@@ -29,13 +23,19 @@ function(zaparoo_add_qml_module target)
 
     qt_add_qml_module(
         ${target}
-        URI ${_ARG_URI}
-        VERSION 1.0
+        URI
+        ${_ARG_URI}
+        VERSION
+        1.0
         STATIC
-        QML_FILES ${_ARG_QML_FILES}
-        RESOURCES ${_ARG_RESOURCES}
-        IMPORTS ${_ARG_IMPORTS}
-        SOURCES ${_ARG_SOURCES}
+        QML_FILES
+        ${_ARG_QML_FILES}
+        RESOURCES
+        ${_ARG_RESOURCES}
+        IMPORTS
+        ${_ARG_IMPORTS}
+        SOURCES
+        ${_ARG_SOURCES}
     )
 
     target_link_libraries(${target} PRIVATE Zaparoo::CompileOptions)

@@ -34,7 +34,7 @@ Item {
     // change adds a Settings-as-source path.
     property bool transitioning: false
 
-    signal requestHubScreen()
+    signal requestHubScreen
     // Forward signal carrying the focused action row's id. The router
     // decides what the payload means — `"uploadLog"` opens the log-
     // upload modal, `"aboutLicense"` navigates to the About screen.
@@ -42,8 +42,7 @@ Item {
     // Picker request. The router mounts `ListPickerModal` with these
     // properties and dispatches the user's selection back through the
     // matching `Browse.Settings` setter (keyed off `fieldId`).
-    signal requestListPicker(title: string, entries: var,
-                             initialId: string, fieldId: string)
+    signal requestListPicker(title: string, entries: var, initialId: string, fieldId: string)
 
     // Field registry. Each entry's `kind` is `"header"` (non-focusable
     // group label) or `"field"` (a navigable row). Field entries also
@@ -56,8 +55,11 @@ Item {
     // splitting commonly-used controls (General, Library) from rarer
     // diagnostics-flavoured ones (Advanced).
     readonly property var fields: {
-        const out = []
-        out.push({ kind: "header", label: qsTr("General") })
+        const out = [];
+        out.push({
+            kind: "header",
+            label: qsTr("General")
+        });
         // Resolution row hidden — `vmode` switching isn't reliable yet.
         // Restore by re-enabling this block once the MiSTer-side path is
         // trusted again; the picker plumbing in `_cycleResolution` and
@@ -74,50 +76,56 @@ Item {
             kind: "field",
             id: "language",
             label: qsTr("Language")
-        })
+        });
         out.push({
             kind: "field",
             id: "browseLayout",
             label: qsTr("Browsing layout")
-        })
+        });
         out.push({
             kind: "field",
             id: "buttonLayout",
             label: qsTr("Button style")
-        })
-        out.push({ kind: "header", label: qsTr("Library") })
+        });
+        out.push({
+            kind: "header",
+            label: qsTr("Library")
+        });
         out.push({
             kind: "field",
             id: "updateMediaDb",
             label: qsTr("Update media database")
-        })
+        });
         out.push({
             kind: "field",
             id: "runScraper",
             label: qsTr("Scrape metadata")
-        })
-        out.push({ kind: "header", label: qsTr("Advanced") })
+        });
+        out.push({
+            kind: "header",
+            label: qsTr("Advanced")
+        });
         out.push({
             kind: "field",
             id: "mouseEnabled",
             label: qsTr("Mouse support")
-        })
+        });
         out.push({
             kind: "field",
             id: "debugLogging",
             label: qsTr("Debug logging")
-        })
+        });
         out.push({
             kind: "field",
             id: "uploadLog",
             label: qsTr("Upload log file")
-        })
+        });
         out.push({
             kind: "field",
             id: "aboutLicense",
             label: qsTr("About / License")
-        })
-        return out
+        });
+        return out;
     }
 
     // Live-state caption helpers for the action rows. While the matching
@@ -131,29 +139,28 @@ Item {
     // via `media.scrape.status` on connect.
     function _indexActionStatus(): string {
         if (Browse.MediaStatus.optimizing)
-            return qsTr("Optimizing")
+            return qsTr("Optimizing");
         if (Browse.MediaStatus.indexing)
-            return Browse.MediaStatus.paused ? qsTr("Paused") : qsTr("In progress")
-        const total = Browse.MediaStatus.total_media
+            return Browse.MediaStatus.paused ? qsTr("Paused") : qsTr("In progress");
+        const total = Browse.MediaStatus.total_media;
         if (total > 0)
-            return qsTr("%1 indexed").arg(total)
-        return ""
+            return qsTr("%1 indexed").arg(total);
+        return "";
     }
 
     function _scrapeActionStatus(): string {
         if (Browse.MediaStatus.scraping)
-            return Browse.MediaStatus.scrape_paused ? qsTr("Paused") : qsTr("In progress")
-        const total = Browse.MediaStatus.scrape_total_scraped
+            return Browse.MediaStatus.scrape_paused ? qsTr("Paused") : qsTr("In progress");
+        const total = Browse.MediaStatus.scrape_total_scraped;
         if (total > 0)
-            return qsTr("%1 scraped").arg(total)
-        return ""
+            return qsTr("%1 scraped").arg(total);
+        return "";
     }
 
     // Index and scrape can't run concurrently — Core serialises them.
     // While one is in flight the *other* row is non-actionable so we
     // don't queue a request that Core will reject.
-    readonly property bool _indexBusy:
-        Browse.MediaStatus.indexing || Browse.MediaStatus.optimizing
+    readonly property bool _indexBusy: Browse.MediaStatus.indexing || Browse.MediaStatus.optimizing
     readonly property bool _scrapeBusy: Browse.MediaStatus.scraping
 
     // Drive the top/bottom scroll chevrons. Mirrors PagedGrid's
@@ -167,20 +174,20 @@ Item {
 
     function _triggerIndex(): void {
         if (settings._scrapeBusy)
-            return
+            return;
         if (settings._indexBusy)
-            Browse.MediaStatus.cancel_index()
+            Browse.MediaStatus.cancel_index();
         else
-            Browse.MediaStatus.start_index()
+            Browse.MediaStatus.start_index();
     }
 
     function _triggerScrape(): void {
         if (settings._indexBusy)
-            return
+            return;
         if (settings._scrapeBusy)
-            Browse.MediaStatus.cancel_scrape()
+            Browse.MediaStatus.cancel_scrape();
         else
-            Browse.MediaStatus.start_scrape()
+            Browse.MediaStatus.start_scrape();
     }
 
     readonly property int fieldCount: settings.fields.length
@@ -191,8 +198,8 @@ Item {
     // can't mis-light the help bar.
     function _isField(idx: int): bool {
         if (idx < 0 || idx >= settings.fieldCount)
-            return false
-        return settings.fields[idx].kind === "field"
+            return false;
+        return settings.fields[idx].kind === "field";
     }
 
     // First focusable row in the registry. Used to seed `currentIndex`
@@ -201,28 +208,28 @@ Item {
     function _firstNavigableIndex(): int {
         for (let i = 0; i < settings.fieldCount; i++)
             if (settings.fields[i].kind === "field")
-                return i
-        return -1
+                return i;
+        return -1;
     }
 
     // Walk from `from` in `direction` (±1) until we hit a focusable
     // row or run off the registry. Headers are transparent — Up/Down
     // skip across them so the user feels a single flat list.
     function _seekNavigable(from: int, direction: int): int {
-        let i = from + direction
+        let i = from + direction;
         while (i >= 0 && i < settings.fieldCount) {
             if (settings.fields[i].kind === "field")
-                return i
-            i += direction
+                return i;
+            i += direction;
         }
-        return from
+        return from;
     }
 
     readonly property bool focusedFieldIsToggle: {
         if (!settings._isField(settings.currentIndex))
-            return false
-        const id = settings.fields[settings.currentIndex].id
-        return id === "mouseEnabled" || id === "debugLogging"
+            return false;
+        const id = settings.fields[settings.currentIndex].id;
+        return id === "mouseEnabled" || id === "debugLogging";
     }
     // True when the focused field is a list-picker row (Accept opens a
     // modal; left/right is a no-op — pickers don't cycle inline). Drives
@@ -241,12 +248,9 @@ Item {
     // hint and the SettingsField chevron.
     readonly property bool focusedFieldIsAction: {
         if (!settings._isField(settings.currentIndex))
-            return false
-        const id = settings.fields[settings.currentIndex].id
-        return id === "updateMediaDb"
-               || id === "runScraper"
-               || id === "uploadLog"
-               || id === "aboutLicense"
+            return false;
+        const id = settings.fields[settings.currentIndex].id;
+        return id === "updateMediaDb" || id === "runScraper" || id === "uploadLog" || id === "aboutLicense";
     }
     // Verb shown on the help-bar Accept hint for the focused action
     // row. Index/scrape flip between Start and Cancel because the press
@@ -255,28 +259,28 @@ Item {
     // in-row job; aboutLicense reads "Open" because the press navigates.
     readonly property string focusedActionLabel: {
         if (!settings._isField(settings.currentIndex))
-            return ""
-        const id = settings.fields[settings.currentIndex].id
+            return "";
+        const id = settings.fields[settings.currentIndex].id;
         if (id === "updateMediaDb" || id === "runScraper")
-            return settings.focusedActionBusy ? qsTr("Cancel") : qsTr("Start")
+            return settings.focusedActionBusy ? qsTr("Cancel") : qsTr("Start");
         if (id === "uploadLog")
-            return qsTr("Upload")
+            return qsTr("Upload");
         if (id === "aboutLicense")
-            return qsTr("Open")
-        return ""
+            return qsTr("Open");
+        return "";
     }
     // True when the focused action's matching operation is currently
     // running, so the help bar can label Accept as "Cancel" rather
     // than "Start".
     readonly property bool focusedActionBusy: {
         if (!settings._isField(settings.currentIndex))
-            return false
-        const id = settings.fields[settings.currentIndex].id
+            return false;
+        const id = settings.fields[settings.currentIndex].id;
         if (id === "updateMediaDb")
-            return settings._indexBusy
+            return settings._indexBusy;
         if (id === "runScraper")
-            return settings._scrapeBusy
-        return false
+            return settings._scrapeBusy;
+        return false;
     }
     // True when the focused action can't run right now because the
     // *other* media operation has the bus. Drives the dimmed-row
@@ -284,13 +288,13 @@ Item {
     // promising a press that will silently no-op.
     readonly property bool focusedActionDisabled: {
         if (!settings._isField(settings.currentIndex))
-            return false
-        const id = settings.fields[settings.currentIndex].id
+            return false;
+        const id = settings.fields[settings.currentIndex].id;
         if (id === "updateMediaDb")
-            return settings._scrapeBusy
+            return settings._scrapeBusy;
         if (id === "runScraper")
-            return settings._indexBusy
-        return false
+            return settings._indexBusy;
+        return false;
     }
 
     // Initial focus: first navigable row. The binding evaluates once
@@ -300,13 +304,13 @@ Item {
     // to 0 covers the all-headers degenerate case; helpers below
     // early-return on `_isField(0) === false` if it ever lands there.
     property int currentIndex: {
-        const idx = settings._firstNavigableIndex()
-        return idx >= 0 ? idx : 0
+        const idx = settings._firstNavigableIndex();
+        return idx >= 0 ? idx : 0;
     }
 
     function _resolutionList(): list<string> {
-        const raw = Browse.Settings.available_resolutions
-        return raw === undefined || raw === null ? [] : raw
+        const raw = Browse.Settings.available_resolutions;
+        return raw === undefined || raw === null ? [] : raw;
     }
 
     function _resolutionDisplay(value: string): string {
@@ -314,46 +318,46 @@ Item {
         // which the Settings model treats as the platform default. Render
         // it as a translated label rather than an empty cell so the user
         // sees something selectable.
-        return value === "" ? qsTr("Default") : value
+        return value === "" ? qsTr("Default") : value;
     }
 
     function _buttonLayoutList(): list<string> {
-        const raw = Browse.Settings.available_button_layouts
-        return raw === undefined || raw === null ? [] : raw
+        const raw = Browse.Settings.available_button_layouts;
+        return raw === undefined || raw === null ? [] : raw;
     }
 
     function _browseLayoutList(): list<string> {
-        const raw = Browse.Settings.available_browse_layouts
-        return raw === undefined || raw === null ? [] : raw
+        const raw = Browse.Settings.available_browse_layouts;
+        return raw === undefined || raw === null ? [] : raw;
     }
 
     function _languageList(): list<string> {
-        const raw = Browse.Settings.available_languages
-        return raw === undefined || raw === null ? [] : raw
+        const raw = Browse.Settings.available_languages;
+        return raw === undefined || raw === null ? [] : raw;
     }
 
     function _languageDisplay(value: string): string {
         if (value === "en")
-            return qsTr("English")
+            return qsTr("English");
         if (value === "it_IT")
-            return qsTr("Italian")
-        return qsTr("Auto")
+            return qsTr("Italian");
+        return qsTr("Auto");
     }
 
     function _browseLayoutDisplay(value: string): string {
         if (value === "list")
-            return qsTr("Detailed list view")
-        return qsTr("Grid view")
+            return qsTr("Detailed list view");
+        return qsTr("Grid view");
     }
 
     function _buttonLayoutDisplay(value: string): string {
         if (value === "b")
-            return qsTr("Style B")
+            return qsTr("Style B");
         if (value === "c")
-            return qsTr("Style C")
+            return qsTr("Style C");
         if (value === "d")
-            return qsTr("Style D")
-        return qsTr("Style A")
+            return qsTr("Style D");
+        return qsTr("Style A");
     }
 
     // Build the picker entry list for a field. Each entry is
@@ -362,101 +366,111 @@ Item {
     // The router emits `requestListPicker` and `Main.qml` mounts the
     // shared `ListPickerModal` with these.
     function _openPickerForField(id: string): void {
-        let title = ""
-        let entries = []
-        let initialId = ""
+        let title = "";
+        let entries = [];
+        let initialId = "";
         if (id === "resolution") {
-            title = qsTr("Resolution")
-            const list = settings._resolutionList()
+            title = qsTr("Resolution");
+            const list = settings._resolutionList();
             for (let i = 0; i < list.length; i++)
-                entries.push({ id: list[i], label: settings._resolutionDisplay(list[i]) })
-            initialId = Browse.Settings.current_resolution
+                entries.push({
+                    id: list[i],
+                    label: settings._resolutionDisplay(list[i])
+                });
+            initialId = Browse.Settings.current_resolution;
         } else if (id === "language") {
-            title = qsTr("Language")
-            const list = settings._languageList()
+            title = qsTr("Language");
+            const list = settings._languageList();
             for (let i = 0; i < list.length; i++)
-                entries.push({ id: list[i], label: settings._languageDisplay(list[i]) })
-            initialId = Browse.Settings.current_language
+                entries.push({
+                    id: list[i],
+                    label: settings._languageDisplay(list[i])
+                });
+            initialId = Browse.Settings.current_language;
         } else if (id === "browseLayout") {
-            title = qsTr("Browsing layout")
-            const list = settings._browseLayoutList()
+            title = qsTr("Browsing layout");
+            const list = settings._browseLayoutList();
             for (let i = 0; i < list.length; i++)
-                entries.push({ id: list[i], label: settings._browseLayoutDisplay(list[i]) })
-            initialId = Browse.Settings.current_browse_layout
+                entries.push({
+                    id: list[i],
+                    label: settings._browseLayoutDisplay(list[i])
+                });
+            initialId = Browse.Settings.current_browse_layout;
         } else if (id === "buttonLayout") {
-            title = qsTr("Button style")
-            const list = settings._buttonLayoutList()
+            title = qsTr("Button style");
+            const list = settings._buttonLayoutList();
             for (let i = 0; i < list.length; i++)
-                entries.push({ id: list[i], label: settings._buttonLayoutDisplay(list[i]) })
-            initialId = Browse.Settings.current_button_layout
+                entries.push({
+                    id: list[i],
+                    label: settings._buttonLayoutDisplay(list[i])
+                });
+            initialId = Browse.Settings.current_button_layout;
         } else {
-            return
+            return;
         }
         if (entries.length === 0)
-            return
-        settings.requestListPicker(title, entries, initialId, id)
+            return;
+        settings.requestListPicker(title, entries, initialId, id);
     }
 
     function _setMouseEnabled(direction: int): void {
-        Browse.Settings.set_mouse_enabled(direction > 0)
+        Browse.Settings.set_mouse_enabled(direction > 0);
     }
 
     function _toggleMouseEnabled(): void {
-        Browse.Settings.set_mouse_enabled(!Browse.Settings.current_mouse_enabled)
+        Browse.Settings.set_mouse_enabled(!Browse.Settings.current_mouse_enabled);
     }
 
     function _setDebugLogging(direction: int): void {
-        Browse.Settings.set_debug_logging(direction > 0)
+        Browse.Settings.set_debug_logging(direction > 0);
     }
 
     function _toggleDebugLogging(): void {
-        Browse.Settings.set_debug_logging(!Browse.Settings.current_debug_logging)
+        Browse.Settings.set_debug_logging(!Browse.Settings.current_debug_logging);
     }
 
     function _cycleFocused(direction: int): void {
         if (!settings._isField(settings.currentIndex))
-            return
-        const id = settings.fields[settings.currentIndex].id
-        // Picker fields ignore left/right — accept opens the
+            return;
+        const id = settings.fields[settings.currentIndex].id;
+        // Picker fields ignore left/right - accept opens the
         // list-picker modal instead. Only toggles still respond to
         // direction presses (left = off, right = on).
         if (id === "mouseEnabled")
-            settings._setMouseEnabled(direction)
+            settings._setMouseEnabled(direction);
         else if (id === "debugLogging")
-            settings._setDebugLogging(direction)
+            settings._setDebugLogging(direction);
     }
 
     function handleAction(action: string): void {
         if (action === "up") {
-            settings.currentIndex =
-                settings._seekNavigable(settings.currentIndex, -1)
+            settings.currentIndex = settings._seekNavigable(settings.currentIndex, -1);
         } else if (action === "down") {
-            settings.currentIndex =
-                settings._seekNavigable(settings.currentIndex, 1)
+            settings.currentIndex = settings._seekNavigable(settings.currentIndex, 1);
         } else if (action === "left") {
-            settings._cycleFocused(-1)
+            settings._cycleFocused(-1);
         } else if (action === "right") {
-            settings._cycleFocused(1)
+            settings._cycleFocused(1);
         } else if (action === "accept") {
             if (!settings._isField(settings.currentIndex))
-                return
-            const id = settings.fields[settings.currentIndex].id
+                return;
+            const id = settings.fields[settings.currentIndex].id;
             if (id === "mouseEnabled")
-                settings._toggleMouseEnabled()
+                settings._toggleMouseEnabled();
             else if (id === "debugLogging")
-                settings._toggleDebugLogging()
+                settings._toggleDebugLogging();
             else if (id === "updateMediaDb")
-                settings._triggerIndex()
+                settings._triggerIndex();
             else if (id === "runScraper")
-                settings._triggerScrape()
+                settings._triggerScrape();
             else if (id === "uploadLog")
-                settings.requestAccept("uploadLog")
+                settings.requestAccept("uploadLog");
             else if (id === "aboutLicense")
-                settings.requestAccept("aboutLicense")
+                settings.requestAccept("aboutLicense");
             else
-                settings._openPickerForField(id)
+                settings._openPickerForField(id);
         } else if (action === "cancel") {
-            settings.requestHubScreen()
+            settings.requestHubScreen();
         }
     }
 
@@ -488,16 +502,16 @@ Item {
     // budget can't pay for a moving column behind a focus border.
     function _scrollFocusedIntoView(): void {
         if (!settings._isField(settings.currentIndex))
-            return
-        const row = rowRepeater.itemAt(settings.currentIndex)
+            return;
+        const row = rowRepeater.itemAt(settings.currentIndex);
         if (row === null)
-            return
-        const top = row.y
-        const bottom = top + row.height
+            return;
+        const top = row.y;
+        const bottom = top + row.height;
         if (top < flickable.contentY)
-            flickable.contentY = top
+            flickable.contentY = top;
         else if (bottom > flickable.contentY + flickable.height)
-            flickable.contentY = bottom - flickable.height
+            flickable.contentY = bottom - flickable.height;
     }
 
     onCurrentIndexChanged: settings._scrollFocusedIntoView()
@@ -556,13 +570,10 @@ Item {
                     required property int index
                     required property var modelData
 
-                    readonly property bool isHeader:
-                        modelData.kind === "header"
+                    readonly property bool isHeader: modelData.kind === "header"
 
                     width: form.width
-                    implicitHeight: row.isHeader
-                                    ? header.implicitHeight
-                                    : field.implicitHeight
+                    implicitHeight: row.isHeader ? header.implicitHeight : field.implicitHeight
 
                     SettingsSectionHeader {
                         id: header
@@ -583,45 +594,19 @@ Item {
                         // dims and its MouseArea stops responding.
                         // Keyboard Accept is separately gated in
                         // `_triggerIndex`/`_triggerScrape`.
-                        enabled: row.modelData.id === "updateMediaDb"
-                                 ? !settings._scrapeBusy
-                                 : row.modelData.id === "runScraper"
-                                 ? !settings._indexBusy
-                                 : true
+                        enabled: row.modelData.id === "updateMediaDb" ? !settings._scrapeBusy : row.modelData.id === "runScraper" ? !settings._indexBusy : true
                         label: row.modelData.label
-                        value: row.modelData.id === "resolution"
-                               ? settings._resolutionDisplay(Browse.Settings.current_resolution)
-                               : row.modelData.id === "language"
-                               ? settings._languageDisplay(Browse.Settings.current_language)
-                               : row.modelData.id === "browseLayout"
-                               ? settings._browseLayoutDisplay(Browse.Settings.current_browse_layout)
-                               : row.modelData.id === "buttonLayout"
-                               ? settings._buttonLayoutDisplay(Browse.Settings.current_button_layout)
-                               : ""
-                        control: row.modelData.id === "mouseEnabled"
-                                 || row.modelData.id === "debugLogging"
-                                 ? "toggle"
-                                 : row.modelData.id === "aboutLicense"
-                                 ? "navigate"
-                                 : (row.modelData.id === "updateMediaDb"
-                                    || row.modelData.id === "runScraper"
-                                    || row.modelData.id === "uploadLog") ? "action"
-                                 : "picker"
-                        checked: row.modelData.id === "debugLogging"
-                                 ? Browse.Settings.current_debug_logging
-                                 : Browse.Settings.current_mouse_enabled
-                        actionStatus: row.modelData.id === "updateMediaDb"
-                                      ? settings._indexActionStatus()
-                                      : row.modelData.id === "runScraper"
-                                      ? settings._scrapeActionStatus()
-                                      : ""
+                        value: row.modelData.id === "resolution" ? settings._resolutionDisplay(Browse.Settings.current_resolution) : row.modelData.id === "language" ? settings._languageDisplay(Browse.Settings.current_language) : row.modelData.id === "browseLayout" ? settings._browseLayoutDisplay(Browse.Settings.current_browse_layout) : row.modelData.id === "buttonLayout" ? settings._buttonLayoutDisplay(Browse.Settings.current_button_layout) : ""
+                        control: row.modelData.id === "mouseEnabled" || row.modelData.id === "debugLogging" ? "toggle" : row.modelData.id === "aboutLicense" ? "navigate" : (row.modelData.id === "updateMediaDb" || row.modelData.id === "runScraper" || row.modelData.id === "uploadLog") ? "action" : "picker"
+                        checked: row.modelData.id === "debugLogging" ? Browse.Settings.current_debug_logging : Browse.Settings.current_mouse_enabled
+                        actionStatus: row.modelData.id === "updateMediaDb" ? settings._indexActionStatus() : row.modelData.id === "runScraper" ? settings._scrapeActionStatus() : ""
                         onHovered: settings.currentIndex = row.index
                         onClicked: {
-                            settings.currentIndex = row.index
+                            settings.currentIndex = row.index;
                             if (row.modelData.id === "mouseEnabled")
-                                settings._toggleMouseEnabled()
+                                settings._toggleMouseEnabled();
                             else if (row.modelData.id === "debugLogging")
-                                settings._toggleDebugLogging()
+                                settings._toggleDebugLogging();
                         }
                         onRightClicked: settings.requestHubScreen()
                         // Picker, action, and navigate rows route
@@ -630,17 +615,17 @@ Item {
                         // too — clicking commits focus before firing
                         // the action.
                         onAccepted: {
-                            settings.currentIndex = row.index
+                            settings.currentIndex = row.index;
                             if (row.modelData.id === "updateMediaDb")
-                                settings._triggerIndex()
+                                settings._triggerIndex();
                             else if (row.modelData.id === "runScraper")
-                                settings._triggerScrape()
+                                settings._triggerScrape();
                             else if (row.modelData.id === "uploadLog")
-                                settings.requestAccept("uploadLog")
+                                settings.requestAccept("uploadLog");
                             else if (row.modelData.id === "aboutLicense")
-                                settings.requestAccept("aboutLicense")
+                                settings.requestAccept("aboutLicense");
                             else
-                                settings._openPickerForField(row.modelData.id)
+                                settings._openPickerForField(row.modelData.id);
                         }
                     }
                 }
@@ -691,7 +676,8 @@ Item {
     // expose. Centered in the body so it doesn't compete with the
     // top strip or help bar.
     Text {
-        anchors.centerIn: parent
+        x: Sizing.center(parent.width, width)
+        y: Sizing.center(parent.height, height)
         visible: settings.fieldCount === 0
         text: qsTr("No settings available on this platform")
         color: Theme.textLabel

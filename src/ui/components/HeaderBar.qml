@@ -1,22 +1,20 @@
 // Zaparoo Launcher
 // Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-
-import QtQuick
-import Zaparoo.Theme
-import Zaparoo.Browse as Browse
-
 // cxx-qt 0.8 patches `isFinal: true` on singleton properties but the
 // qmltypes schema has no `isFinal` slot, so every read of a Browse
 // singleton trips qmllint's "Member can be shadowed" check. Suppress
 // the compiler category file-wide until the schema grows the slot.
 // qmllint disable compiler
-
 // Top header bar — Zaparoo logo on the left, host status row + Core
 // status pill stacked on the right. Height is fixed at
 // `Sizing.headerHeight` so the pill's slot is reserved even when the
 // pill is idle and the logo can match the two stacked rows exactly.
-//
+
+import QtQuick
+import Zaparoo.Browse as Browse
+import Zaparoo.Theme
+
 // Software-renderer safe: only Image, Row, Item, Text, and the
 // existing CoreStatusPill subtree. No transforms, no shaders.
 Item {
@@ -39,9 +37,19 @@ Item {
         source: "qrc:/qt/qml/Zaparoo/App/resources/images/logo.png"
     }
 
+    TextMetrics {
+        id: clockMetrics
+
+        text: "23:59"
+        font.family: Theme.fontUi
+        font.pixelSize: Sizing.headerRowHeight
+    }
+
     // Host status row — NFC / Wi-Fi / LAN / Bluetooth icons plus the
     // wall clock, right-anchored so badges can appear and disappear
-    // without nudging the clock away from the edge.
+    // without nudging the clock away from the edge. Clock width is
+    // measured from "23:59", the widest minutes-only value we care
+    // about for fixed CRT bitmap font sizing.
     Row {
         id: topHud
 
@@ -94,7 +102,7 @@ Item {
 
             anchors.verticalCenter: parent.verticalCenter
             height: parent.height
-            width: Sizing.headerRowHeight * 3
+            width: Sizing.px(clockMetrics.advanceWidth)
             verticalAlignment: Text.AlignVCenter
             horizontalAlignment: Text.AlignRight
             text: clockLabel.currentTime
@@ -108,8 +116,7 @@ Item {
                 running: true
                 repeat: true
                 triggeredOnStart: true
-                onTriggered: clockLabel.currentTime =
-                    Qt.formatDateTime(new Date(), "HH:mm")
+                onTriggered: clockLabel.currentTime = Qt.formatDateTime(new Date(), "HH:mm")
             }
         }
     }
