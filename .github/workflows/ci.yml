@@ -16,6 +16,13 @@ concurrency:
 
 permissions:
   contents: read
+  # Consumer jobs (rust-lint, rust-test, desktop-build) pull the lint image
+  # from GHCR; that pull requires read scope even though the publishing
+  # `ensure-lint-image` job overrides to `packages: write` below. Setting
+  # an explicit `permissions:` block strips defaults, so without this
+  # line the consumer jobs would only get `contents: read` and `docker
+  # pull` would fail with "denied" against any private package version.
+  packages: read
 
 env:
   # CI doesn't reuse incremental metadata across runs — it only bloats the
