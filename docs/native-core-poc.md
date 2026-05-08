@@ -48,7 +48,7 @@ After QML loads, the launcher also starts a native-video copy thread:
 ```text
 0x3A000000  control word: (frame_counter << 2) | active_buffer
 0x3A000100  buffer 0: 320x240 RGB8888
-0x3A02A200  buffer 1: 320x240 RGB8888
+0x3A04B100  buffer 1: 320x240 RGB8888
 ```
 
 ## Current CRT UI Constraints
