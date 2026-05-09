@@ -1,62 +1,62 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE TS>
-<TS version="2.1" language="en" sourcelanguage="en">
+<TS version="2.1" language="ko" sourcelanguage="en">
 <context>
     <name>AboutScreen</name>
     <message>
         <location filename="../screens/AboutScreen.qml" line="72"/>
         <source>About / License</source>
-        <translation type="unfinished"></translation>
+        <translation>정보 / 라이선스</translation>
     </message>
     <message>
         <location filename="../screens/AboutScreen.qml" line="154"/>
         <source>Zaparoo Launcher</source>
-        <translation type="unfinished">Zaparoo Launcher</translation>
+        <translation>Zaparoo Launcher</translation>
     </message>
     <message>
         <location filename="../screens/AboutScreen.qml" line="165"/>
         <source>Version %1 · %2 · %3</source>
-        <translation type="unfinished"></translation>
+        <translation>버전 %1 · %2 · %3</translation>
     </message>
     <message>
         <location filename="../screens/AboutScreen.qml" line="178"/>
         <source>Built %1</source>
-        <translation type="unfinished"></translation>
+        <translation>빌드 %1</translation>
     </message>
     <message>
         <location filename="../screens/AboutScreen.qml" line="189"/>
         <source>Copyright 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.</source>
-        <translation type="unfinished"></translation>
+        <translation>Copyright 2026 Wizzo Pty Ltd 및 Zaparoo Project 기여자.</translation>
     </message>
     <message>
         <location filename="../screens/AboutScreen.qml" line="200"/>
         <source>Source available under the PolyForm Noncommercial License 1.0.0. Free for personal, non-commercial use. Commercial use or redistribution requires a separate license.</source>
-        <translation type="unfinished"></translation>
+        <translation>소스는 PolyForm Noncommercial License 1.0.0에 따라 제공됩니다. 개인적이고 비상업적인 용도로 무료로 사용할 수 있습니다. 상업적 사용 또는 재배포에는 별도 라이선스가 필요합니다.</translation>
     </message>
     <message>
         <location filename="../screens/AboutScreen.qml" line="211"/>
         <source>Commercial licensing: legal@zaparoo.org</source>
-        <translation type="unfinished"></translation>
+        <translation>상업용 라이선스: legal@zaparoo.org</translation>
     </message>
     <message>
         <location filename="../screens/AboutScreen.qml" line="222"/>
         <source>Project: https://zaparoo.org</source>
-        <translation type="unfinished"></translation>
+        <translation>프로젝트: https://zaparoo.org</translation>
     </message>
     <message>
         <location filename="../screens/AboutScreen.qml" line="232"/>
         <source>Created by</source>
-        <translation type="unfinished"></translation>
+        <translation>만든 사람</translation>
     </message>
     <message>
         <location filename="../screens/AboutScreen.qml" line="256"/>
         <source>Translations</source>
-        <translation type="unfinished"></translation>
+        <translation>번역</translation>
     </message>
     <message>
         <location filename="../screens/AboutScreen.qml" line="280"/>
         <source>Full license text in COPYING.</source>
-        <translation type="unfinished"></translation>
+        <translation>전체 라이선스 텍스트는 COPYING에 있습니다.</translation>
     </message>
 </context>
 <context>
@@ -64,22 +64,22 @@
     <message>
         <location filename="../components/BootOverlay.qml" line="76"/>
         <source>Can&apos;t reach Zaparoo Core. Check your connection.</source>
-        <translation type="unfinished"></translation>
+        <translation>Zaparoo Core에 연결할 수 없습니다. 연결을 확인하세요.</translation>
     </message>
     <message>
         <location filename="../components/BootOverlay.qml" line="78"/>
         <source>Reconnecting…</source>
-        <translation type="unfinished"></translation>
+        <translation>재연결 중…</translation>
     </message>
     <message>
         <location filename="../components/BootOverlay.qml" line="80"/>
         <source>Loading library…</source>
-        <translation type="unfinished"></translation>
+        <translation>라이브러리 불러오는 중…</translation>
     </message>
     <message>
         <location filename="../components/BootOverlay.qml" line="85"/>
         <source>Connecting to Zaparoo Core…</source>
-        <translation type="unfinished">Connecting to Zaparoo Core…</translation>
+        <translation>Zaparoo Core에 연결하는 중…</translation>
     </message>
 </context>
 <context>
@@ -87,37 +87,37 @@
     <message>
         <location filename="../components/CommercialNoticeModal.qml" line="59"/>
         <source>Welcome to Zaparoo Launcher</source>
-        <translation type="unfinished"></translation>
+        <translation>Zaparoo Launcher에 오신 것을 환영합니다</translation>
     </message>
     <message>
         <location filename="../components/CommercialNoticeModal.qml" line="68"/>
         <source>Copyright 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.</source>
-        <translation type="unfinished"></translation>
+        <translation>Copyright 2026 Wizzo Pty Ltd 및 Zaparoo Project 기여자.</translation>
     </message>
     <message>
         <location filename="../components/CommercialNoticeModal.qml" line="79"/>
         <source>This free source-available build is for personal and non-commercial use only. Commercial use or redistribution requires a license.</source>
-        <translation type="unfinished"></translation>
+        <translation>이 무료 소스 제공 빌드는 개인적이고 비상업적인 용도로만 사용할 수 있습니다. 상업적 사용 또는 재배포에는 라이선스가 필요합니다.</translation>
     </message>
     <message>
         <location filename="../components/CommercialNoticeModal.qml" line="90"/>
         <source>Contact: legal@zaparoo.org</source>
-        <translation type="unfinished"></translation>
+        <translation>문의: legal@zaparoo.org</translation>
     </message>
     <message>
         <location filename="../components/CommercialNoticeModal.qml" line="101"/>
         <source>Full details available any time under Settings &gt; About / License.</source>
-        <translation type="unfinished"></translation>
+        <translation>전체 내용은 언제든 설정 &gt; 정보 / 라이선스에서 확인할 수 있습니다.</translation>
     </message>
     <message>
         <location filename="../components/CommercialNoticeModal.qml" line="119"/>
         <source>Created by</source>
-        <translation type="unfinished"></translation>
+        <translation>만든 사람</translation>
     </message>
     <message>
         <location filename="../components/CommercialNoticeModal.qml" line="162"/>
         <source>I understand</source>
-        <translation type="unfinished"></translation>
+        <translation>이해했습니다</translation>
     </message>
 </context>
 <context>
@@ -126,67 +126,67 @@
         <location filename="../components/CoreStatusPill.qml" line="44"/>
         <location filename="../components/CoreStatusPill.qml" line="50"/>
         <source>Disconnected</source>
-        <translation type="unfinished"></translation>
+        <translation>연결 끊김</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="47"/>
         <source>Reconnecting…</source>
-        <translation type="unfinished"></translation>
+        <translation>재연결 중…</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="53"/>
         <source>Connecting…</source>
-        <translation type="unfinished"></translation>
+        <translation>연결 중…</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="56"/>
         <source>Core error</source>
-        <translation type="unfinished">Core error</translation>
+        <translation>코어 오류</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="60"/>
         <source>Optimizing database</source>
-        <translation type="unfinished"></translation>
+        <translation>데이터베이스 최적화 중</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="67"/>
         <source>Indexing paused</source>
-        <translation type="unfinished"></translation>
+        <translation>인덱싱 일시중지됨</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="70"/>
         <source>Indexing %1/%2 - %3</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../components/CoreStatusPill.qml" line="86"/>
-        <source>Scraping %1/%2 - %3</source>
-        <translation type="unfinished"></translation>
+        <translation>인덱싱 %1/%2 - %3</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="73"/>
         <source>Indexing %1/%2</source>
-        <translation type="unfinished"></translation>
+        <translation>인덱싱 %1/%2</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="75"/>
         <source>Indexing…</source>
-        <translation type="unfinished"></translation>
+        <translation>인덱싱 중…</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="83"/>
         <source>Scrape paused</source>
-        <translation type="unfinished"></translation>
+        <translation>수집 일시중지됨</translation>
+    </message>
+    <message>
+        <location filename="../components/CoreStatusPill.qml" line="86"/>
+        <source>Scraping %1/%2 - %3</source>
+        <translation>메타데이터 수집 %1/%2 - %3</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="89"/>
         <source>Scraping %1/%2</source>
-        <translation type="unfinished"></translation>
+        <translation>메타데이터 수집 %1/%2</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="91"/>
         <source>Scraping…</source>
-        <translation type="unfinished"></translation>
+        <translation>메타데이터 수집 중…</translation>
     </message>
 </context>
 <context>
@@ -194,22 +194,22 @@
     <message>
         <location filename="../screens/FavoritesScreen.qml" line="182"/>
         <source>Favorites</source>
-        <translation>Favorites</translation>
+        <translation>즐겨찾기</translation>
     </message>
     <message>
         <location filename="../screens/FavoritesScreen.qml" line="185"/>
         <source>%1 entries</source>
-        <translation>%1 entries</translation>
+        <translation>항목 %1개</translation>
     </message>
     <message>
         <location filename="../screens/FavoritesScreen.qml" line="283"/>
         <source>No favorites yet</source>
-        <translation>No favorites yet</translation>
+        <translation>아직 즐겨찾기가 없습니다</translation>
     </message>
     <message>
         <location filename="../screens/FavoritesScreen.qml" line="284"/>
         <source>Loading favorites…</source>
-        <translation type="unfinished"></translation>
+        <translation>즐겨찾기 불러오는 중…</translation>
     </message>
 </context>
 <context>
@@ -217,52 +217,52 @@
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="127"/>
         <source>First-time setup</source>
-        <translation type="unfinished"></translation>
+        <translation>최초 설정</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="136"/>
         <source>Zaparoo needs to scan your games before you can use the launcher. This usually takes a few minutes.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../components/FirstRunIndexModal.qml" line="211"/>
-        <source>Indexing paused</source>
-        <translation type="unfinished"></translation>
+        <translation>Zaparoo를 사용하기 전에 게임을 스캔해야 합니다. 보통 몇 분 정도 걸립니다.</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="158"/>
         <source>Optimizing database - almost done</source>
-        <translation type="unfinished"></translation>
+        <translation>데이터베이스 최적화 중 - 거의 완료됨</translation>
+    </message>
+    <message>
+        <location filename="../components/FirstRunIndexModal.qml" line="211"/>
+        <source>Indexing paused</source>
+        <translation>인덱싱 일시중지됨</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="213"/>
         <source>Step %1 of %2 - %3</source>
-        <translation type="unfinished"></translation>
+        <translation>%2 중 %1단계 - %3</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="215"/>
         <source>Step %1 of %2</source>
-        <translation type="unfinished"></translation>
+        <translation>%2 중 %1단계</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="216"/>
         <source>Preparing…</source>
-        <translation type="unfinished"></translation>
+        <translation>준비 중…</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="233"/>
         <source>Done. %1 files indexed.</source>
-        <translation type="unfinished"></translation>
+        <translation>완료. 파일 %1개를 인덱싱했습니다.</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="263"/>
         <source>Cancel</source>
-        <translation type="unfinished">Cancel</translation>
+        <translation>취소</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="263"/>
         <source>Start scan</source>
-        <translation type="unfinished"></translation>
+        <translation>스캔 시작</translation>
     </message>
 </context>
 <context>
@@ -270,22 +270,22 @@
     <message>
         <location filename="../screens/GamesScreen.qml" line="363"/>
         <source>%1 files</source>
-        <translation>%1 files</translation>
-    </message>
-    <message>
-        <location filename="../screens/GamesScreen.qml" line="534"/>
-        <source>Loading games…</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../screens/GamesScreen.qml" line="556"/>
-        <source>Loading more…</source>
-        <translation type="unfinished"></translation>
+        <translation>파일 %1개</translation>
     </message>
     <message>
         <location filename="../screens/GamesScreen.qml" line="533"/>
         <source>No games in this system</source>
-        <translation>No games in this system</translation>
+        <translation>이 시스템에는 게임이 없습니다</translation>
+    </message>
+    <message>
+        <location filename="../screens/GamesScreen.qml" line="534"/>
+        <source>Loading games…</source>
+        <translation>게임 불러오는 중…</translation>
+    </message>
+    <message>
+        <location filename="../screens/GamesScreen.qml" line="556"/>
+        <source>Loading more…</source>
+        <translation>더 불러오는 중…</translation>
     </message>
 </context>
 <context>
@@ -293,22 +293,22 @@
     <message>
         <location filename="../screens/HubScreen.qml" line="91"/>
         <source>Favorites</source>
-        <translation>Favorites</translation>
+        <translation>즐겨찾기</translation>
     </message>
     <message>
         <location filename="../screens/HubScreen.qml" line="96"/>
         <source>Recently Played</source>
-        <translation>Recently Played</translation>
+        <translation>최근 플레이</translation>
     </message>
     <message>
         <location filename="../screens/HubScreen.qml" line="101"/>
         <source>Settings</source>
-        <translation>Settings</translation>
+        <translation>설정</translation>
     </message>
     <message>
         <location filename="../screens/HubScreen.qml" line="537"/>
         <source>No systems available. Run Update media database from Settings.</source>
-        <translation type="unfinished"></translation>
+        <translation>사용 가능한 시스템이 없습니다. 설정에서 미디어 데이터베이스 업데이트를 실행하세요.</translation>
     </message>
 </context>
 <context>
@@ -316,7 +316,7 @@
     <message>
         <location filename="../components/LoadingIndicator.qml" line="26"/>
         <source>Loading…</source>
-        <translation>Loading…</translation>
+        <translation>불러오는 중…</translation>
     </message>
 </context>
 <context>
@@ -324,32 +324,32 @@
     <message>
         <location filename="../components/LogUploadModal.qml" line="87"/>
         <source>Upload log file</source>
-        <translation type="unfinished"></translation>
+        <translation>로그 파일 업로드</translation>
     </message>
     <message>
         <location filename="../components/LogUploadModal.qml" line="97"/>
         <source>Uploading log file - this may take a moment.</source>
-        <translation type="unfinished"></translation>
+        <translation>로그 파일을 업로드하는 중입니다. 잠시 걸릴 수 있습니다.</translation>
     </message>
     <message>
         <location filename="../components/LogUploadModal.qml" line="197"/>
         <source>Upload failed: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>업로드 실패: %1</translation>
     </message>
     <message>
         <location filename="../components/LogUploadModal.qml" line="197"/>
         <source>Upload failed.</source>
-        <translation type="unfinished"></translation>
+        <translation>업로드 실패.</translation>
     </message>
     <message>
         <location filename="../components/LogUploadModal.qml" line="227"/>
         <source>Retry</source>
-        <translation type="unfinished">Retry</translation>
+        <translation>다시 시도</translation>
     </message>
     <message>
         <location filename="../components/LogUploadModal.qml" line="227"/>
         <source>Done</source>
-        <translation type="unfinished"></translation>
+        <translation>완료</translation>
     </message>
 </context>
 <context>
@@ -357,58 +357,58 @@
     <message>
         <location filename="../app/Main.qml" line="723"/>
         <source>Launch core</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/Main.qml" line="741"/>
-        <source>Remove from favorites</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/Main.qml" line="741"/>
-        <source>Add to favorites</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/Main.qml" line="747"/>
-        <source>Write to NFC token</source>
-        <translation type="unfinished">Write to NFC token</translation>
-    </message>
-    <message>
-        <location filename="../app/Main.qml" line="751"/>
-        <source>QR code</source>
-        <translation type="unfinished"></translation>
+        <translation>코어 실행</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="731"/>
         <location filename="../app/Main.qml" line="755"/>
         <source>Launch game</source>
-        <translation type="unfinished"></translation>
+        <translation>게임 실행</translation>
+    </message>
+    <message>
+        <location filename="../app/Main.qml" line="741"/>
+        <source>Remove from favorites</source>
+        <translation>즐겨찾기에서 제거</translation>
+    </message>
+    <message>
+        <location filename="../app/Main.qml" line="741"/>
+        <source>Add to favorites</source>
+        <translation>즐겨찾기에 추가</translation>
+    </message>
+    <message>
+        <location filename="../app/Main.qml" line="747"/>
+        <source>Write to NFC token</source>
+        <translation>NFC 토큰에 쓰기</translation>
+    </message>
+    <message>
+        <location filename="../app/Main.qml" line="751"/>
+        <source>QR code</source>
+        <translation>QR 코드</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="1437"/>
         <source>Loading systems…</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/Main.qml" line="1441"/>
-        <source>Loading favorites…</source>
-        <translation type="unfinished"></translation>
+        <translation>시스템 불러오는 중…</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="1439"/>
         <source>Loading games…</source>
-        <translation type="unfinished"></translation>
+        <translation>게임 불러오는 중…</translation>
+    </message>
+    <message>
+        <location filename="../app/Main.qml" line="1441"/>
+        <source>Loading favorites…</source>
+        <translation>즐겨찾기 불러오는 중…</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="1443"/>
         <source>Loading recently played…</source>
-        <translation type="unfinished"></translation>
+        <translation>최근 플레이 불러오는 중…</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="1445"/>
         <source>Loading…</source>
-        <translation type="unfinished">Loading…</translation>
+        <translation>불러오는 중…</translation>
     </message>
 </context>
 <context>
@@ -421,67 +421,22 @@
     <message>
         <location filename="../app/MainLayout.qml" line="475"/>
         <source>Writing failed</source>
-        <translation>Writing failed</translation>
+        <translation>쓰기 실패</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="475"/>
         <source>Put a writable card near the reader</source>
-        <translation>Put a writable card near the reader</translation>
+        <translation>기록 가능한 카드를 리더 근처에 놓으세요</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="540"/>
         <source>Quit Zaparoo Launcher?</source>
-        <translation type="unfinished"></translation>
+        <translation>Zaparoo Launcher를 종료할까요?</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="541"/>
         <source>Are you sure you want to exit?</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/MainLayout.qml" line="617"/>
-        <location filename="../app/MainLayout.qml" line="689"/>
-        <location filename="../app/MainLayout.qml" line="704"/>
-        <source>Select</source>
-        <translation>Select</translation>
-    </message>
-    <message>
-        <location filename="../app/MainLayout.qml" line="621"/>
-        <location filename="../app/MainLayout.qml" line="625"/>
-        <location filename="../app/MainLayout.qml" line="639"/>
-        <location filename="../app/MainLayout.qml" line="652"/>
-        <location filename="../app/MainLayout.qml" line="663"/>
-        <source>Close</source>
-        <translation>Close</translation>
-    </message>
-    <message>
-        <location filename="../app/MainLayout.qml" line="632"/>
-        <location filename="../app/MainLayout.qml" line="670"/>
-        <location filename="../app/MainLayout.qml" line="693"/>
-        <location filename="../app/MainLayout.qml" line="708"/>
-        <location filename="../app/MainLayout.qml" line="719"/>
-        <source>Cancel</source>
-        <translation>Cancel</translation>
-    </message>
-    <message>
-        <location filename="../app/MainLayout.qml" line="648"/>
-        <source>Done</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/MainLayout.qml" line="678"/>
-        <source>I understand</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/MainLayout.qml" line="727"/>
-        <source>Start</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/MainLayout.qml" line="896"/>
-        <source>Scroll</source>
-        <translation type="unfinished"></translation>
+        <translation>정말 종료하시겠습니까?</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="613"/>
@@ -493,7 +448,55 @@
         <location filename="../app/MainLayout.qml" line="860"/>
         <location filename="../app/MainLayout.qml" line="924"/>
         <source>Move</source>
-        <translation>Move</translation>
+        <translation>이동</translation>
+    </message>
+    <message>
+        <location filename="../app/MainLayout.qml" line="617"/>
+        <location filename="../app/MainLayout.qml" line="689"/>
+        <location filename="../app/MainLayout.qml" line="704"/>
+        <source>Select</source>
+        <translation>선택</translation>
+    </message>
+    <message>
+        <location filename="../app/MainLayout.qml" line="621"/>
+        <location filename="../app/MainLayout.qml" line="625"/>
+        <location filename="../app/MainLayout.qml" line="639"/>
+        <location filename="../app/MainLayout.qml" line="652"/>
+        <location filename="../app/MainLayout.qml" line="663"/>
+        <source>Close</source>
+        <translation>닫기</translation>
+    </message>
+    <message>
+        <location filename="../app/MainLayout.qml" line="632"/>
+        <location filename="../app/MainLayout.qml" line="670"/>
+        <location filename="../app/MainLayout.qml" line="693"/>
+        <location filename="../app/MainLayout.qml" line="708"/>
+        <location filename="../app/MainLayout.qml" line="719"/>
+        <source>Cancel</source>
+        <translation>취소</translation>
+    </message>
+    <message>
+        <location filename="../app/MainLayout.qml" line="648"/>
+        <source>Done</source>
+        <translation>완료</translation>
+    </message>
+    <message>
+        <location filename="../app/MainLayout.qml" line="659"/>
+        <location filename="../app/MainLayout.qml" line="795"/>
+        <location filename="../app/MainLayout.qml" line="845"/>
+        <location filename="../app/MainLayout.qml" line="950"/>
+        <source>Retry</source>
+        <translation>다시 시도</translation>
+    </message>
+    <message>
+        <location filename="../app/MainLayout.qml" line="678"/>
+        <source>I understand</source>
+        <translation>이해했습니다</translation>
+    </message>
+    <message>
+        <location filename="../app/MainLayout.qml" line="727"/>
+        <source>Start</source>
+        <translation>시작</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="747"/>
@@ -501,12 +504,12 @@
         <location filename="../app/MainLayout.qml" line="829"/>
         <location filename="../app/MainLayout.qml" line="934"/>
         <source>Open</source>
-        <translation>Open</translation>
+        <translation>열기</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="751"/>
         <source>Quit</source>
-        <translation>Quit</translation>
+        <translation>종료</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="760"/>
@@ -521,39 +524,36 @@
         <location filename="../app/MainLayout.qml" line="943"/>
         <location filename="../app/MainLayout.qml" line="954"/>
         <source>Back</source>
-        <translation>Back</translation>
+        <translation>뒤로</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="778"/>
         <location filename="../app/MainLayout.qml" line="825"/>
         <location filename="../app/MainLayout.qml" line="930"/>
         <source>Page</source>
-        <translation type="unfinished"></translation>
+        <translation>페이지</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="785"/>
         <location filename="../app/MainLayout.qml" line="834"/>
         <location filename="../app/MainLayout.qml" line="939"/>
         <source>Options</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/MainLayout.qml" line="659"/>
-        <location filename="../app/MainLayout.qml" line="795"/>
-        <location filename="../app/MainLayout.qml" line="845"/>
-        <location filename="../app/MainLayout.qml" line="950"/>
-        <source>Retry</source>
-        <translation>Retry</translation>
+        <translation>옵션</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="869"/>
         <source>Change</source>
-        <translation>Change</translation>
+        <translation>변경</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="875"/>
         <source>Toggle</source>
-        <translation>Toggle</translation>
+        <translation>전환</translation>
+    </message>
+    <message>
+        <location filename="../app/MainLayout.qml" line="896"/>
+        <source>Scroll</source>
+        <translation>스크롤</translation>
     </message>
 </context>
 <context>
@@ -561,22 +561,22 @@
     <message>
         <location filename="../components/Modal.qml" line="49"/>
         <source>OK</source>
-        <translation>OK</translation>
+        <translation>확인</translation>
     </message>
     <message>
         <location filename="../components/Modal.qml" line="50"/>
         <source>Yes</source>
-        <translation type="unfinished"></translation>
+        <translation>예</translation>
     </message>
     <message>
         <location filename="../components/Modal.qml" line="51"/>
         <source>No</source>
-        <translation type="unfinished"></translation>
+        <translation>아니요</translation>
     </message>
     <message>
         <location filename="../components/Modal.qml" line="198"/>
         <source>Cancel</source>
-        <translation>Cancel</translation>
+        <translation>취소</translation>
     </message>
 </context>
 <context>
@@ -584,22 +584,22 @@
     <message>
         <location filename="../screens/RecentsScreen.qml" line="183"/>
         <source>Recently Played</source>
-        <translation>Recently Played</translation>
+        <translation>최근 플레이</translation>
     </message>
     <message>
         <location filename="../screens/RecentsScreen.qml" line="186"/>
         <source>%1 entries</source>
-        <translation>%1 entries</translation>
-    </message>
-    <message>
-        <location filename="../screens/RecentsScreen.qml" line="282"/>
-        <source>Loading recently played…</source>
-        <translation type="unfinished"></translation>
+        <translation>항목 %1개</translation>
     </message>
     <message>
         <location filename="../screens/RecentsScreen.qml" line="281"/>
         <source>Nothing played yet</source>
-        <translation>Nothing played yet</translation>
+        <translation>아직 플레이한 항목이 없습니다</translation>
+    </message>
+    <message>
+        <location filename="../screens/RecentsScreen.qml" line="282"/>
+        <source>Loading recently played…</source>
+        <translation>최근 플레이 불러오는 중…</translation>
     </message>
 </context>
 <context>
@@ -607,196 +607,201 @@
     <message>
         <location filename="../components/ScreenStateOverlay.qml" line="26"/>
         <source>Nothing here</source>
-        <translation>Nothing here</translation>
+        <translation>여기에 아무것도 없습니다</translation>
     </message>
     <message>
         <location filename="../components/ScreenStateOverlay.qml" line="27"/>
         <source>Loading…</source>
-        <translation type="unfinished">Loading…</translation>
+        <translation>불러오는 중…</translation>
     </message>
     <message>
         <location filename="../components/ScreenStateOverlay.qml" line="57"/>
         <source>Failed to load</source>
-        <translation>Failed to load</translation>
+        <translation>불러오지 못했습니다</translation>
     </message>
 </context>
 <context>
     <name>SettingsScreen</name>
     <message>
+        <location filename="../screens/SettingsScreen.qml" line="61"/>
+        <source>General</source>
+        <translation>일반</translation>
+    </message>
+    <message>
         <location filename="../screens/SettingsScreen.qml" line="78"/>
         <location filename="../screens/SettingsScreen.qml" line="436"/>
         <source>Language</source>
-        <translation>Language</translation>
+        <translation>언어</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="83"/>
         <location filename="../screens/SettingsScreen.qml" line="445"/>
         <source>Browsing layout</source>
-        <translation>Browsing layout</translation>
-    </message>
-    <message>
-        <location filename="../screens/SettingsScreen.qml" line="116"/>
-        <source>Mouse support</source>
-        <translation>Mouse support</translation>
-    </message>
-    <message>
-        <location filename="../screens/SettingsScreen.qml" line="102"/>
-        <source>Update media database</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../screens/SettingsScreen.qml" line="61"/>
-        <source>General</source>
-        <translation type="unfinished"></translation>
+        <translation>탐색 레이아웃</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="88"/>
         <location filename="../screens/SettingsScreen.qml" line="454"/>
         <source>Button style</source>
-        <translation type="unfinished"></translation>
+        <translation>버튼 스타일</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="93"/>
         <location filename="../screens/SettingsScreen.qml" line="463"/>
         <source>Screensaver</source>
-        <translation type="unfinished"></translation>
+        <translation>화면 보호기</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="97"/>
         <source>Library</source>
-        <translation type="unfinished"></translation>
+        <translation>라이브러리</translation>
+    </message>
+    <message>
+        <location filename="../screens/SettingsScreen.qml" line="102"/>
+        <source>Update media database</source>
+        <translation>미디어 데이터베이스 업데이트</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="107"/>
         <source>Scrape metadata</source>
-        <translation type="unfinished"></translation>
+        <translation>메타데이터 수집</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="111"/>
         <source>Advanced</source>
-        <translation type="unfinished"></translation>
+        <translation>고급</translation>
+    </message>
+    <message>
+        <location filename="../screens/SettingsScreen.qml" line="116"/>
+        <source>Mouse support</source>
+        <translation>마우스 지원</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="121"/>
         <source>Debug logging</source>
-        <translation type="unfinished"></translation>
+        <translation>디버그 로깅</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="126"/>
         <source>Upload log file</source>
-        <translation type="unfinished"></translation>
+        <translation>로그 파일 업로드</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="131"/>
         <source>About / License</source>
-        <translation type="unfinished"></translation>
+        <translation>정보 / 라이선스</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="147"/>
         <source>Optimizing</source>
-        <translation type="unfinished"></translation>
+        <translation>최적화 중</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="149"/>
         <location filename="../screens/SettingsScreen.qml" line="158"/>
         <source>Paused</source>
-        <translation type="unfinished"></translation>
+        <translation>일시중지됨</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="149"/>
         <location filename="../screens/SettingsScreen.qml" line="158"/>
         <source>In progress</source>
-        <translation type="unfinished"></translation>
+        <translation>진행 중</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="152"/>
         <source>%1 indexed</source>
-        <translation type="unfinished"></translation>
+        <translation>%1개 인덱싱됨</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="161"/>
         <source>%1 scraped</source>
-        <translation type="unfinished"></translation>
+        <translation>%1개 수집됨</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="270"/>
         <source>Cancel</source>
-        <translation type="unfinished">Cancel</translation>
+        <translation>취소</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="270"/>
         <source>Start</source>
-        <translation type="unfinished"></translation>
+        <translation>시작</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="272"/>
         <source>Upload</source>
-        <translation type="unfinished"></translation>
+        <translation>업로드</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="274"/>
         <source>Open</source>
-        <translation type="unfinished">Open</translation>
+        <translation>열기</translation>
+    </message>
+    <message>
+        <location filename="../screens/SettingsScreen.qml" line="326"/>
+        <source>Default</source>
+        <translation>기본값</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="346"/>
         <source>English</source>
-        <translation>English</translation>
+        <translation>영어</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="348"/>
         <source>Italian</source>
-        <translation>Italian</translation>
+        <translation>이탈리아어</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="350"/>
         <source>German</source>
-        <translation type="unfinished"></translation>
+        <translation>독일어</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="352"/>
         <source>Greek</source>
-        <translation type="unfinished"></translation>
+        <translation>그리스어</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="354"/>
         <source>Japanese</source>
-        <translation type="unfinished"></translation>
+        <translation>일본어</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="356"/>
         <source>Korean</source>
-        <translation type="unfinished"></translation>
+        <translation>한국어</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="358"/>
         <source>Dutch</source>
-        <translation type="unfinished"></translation>
+        <translation>네덜란드어</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="360"/>
         <source>Romanian</source>
-        <translation type="unfinished"></translation>
+        <translation>루마니아어</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="362"/>
         <source>Slovak</source>
-        <translation type="unfinished"></translation>
+        <translation>슬로바키아어</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="364"/>
         <source>Ukrainian</source>
-        <translation type="unfinished"></translation>
+        <translation>우크라이나어</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="366"/>
         <source>Chinese (Simplified)</source>
-        <translation type="unfinished"></translation>
+        <translation>중국어(간체)</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="368"/>
         <source>Hebrew</source>
-        <translation type="unfinished"></translation>
+        <translation>히브리어</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="370"/>
@@ -811,102 +816,97 @@
     <message>
         <location filename="../screens/SettingsScreen.qml" line="373"/>
         <source>Auto</source>
-        <translation>Auto</translation>
+        <translation>자동</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="378"/>
         <source>Detailed list view</source>
-        <translation>Detailed list view</translation>
+        <translation>자세한 목록 보기</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="379"/>
         <source>Grid view</source>
-        <translation>Grid view</translation>
+        <translation>그리드 보기</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="384"/>
         <source>Style B</source>
-        <translation type="unfinished"></translation>
+        <translation>스타일 B</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="386"/>
         <source>Style C</source>
-        <translation type="unfinished"></translation>
+        <translation>스타일 C</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="388"/>
         <source>Style D</source>
-        <translation type="unfinished"></translation>
+        <translation>스타일 D</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="389"/>
         <source>Style A</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../screens/SettingsScreen.qml" line="326"/>
-        <source>Default</source>
-        <translation>Default</translation>
+        <translation>스타일 A</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="399"/>
         <source>Off</source>
-        <translation type="unfinished"></translation>
+        <translation>끔</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="401"/>
         <source>1 second (testing)</source>
-        <translation type="unfinished"></translation>
+        <translation>1초 (테스트용)</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="403"/>
         <source>1 minute</source>
-        <translation type="unfinished"></translation>
+        <translation>1분</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="405"/>
         <source>2 minutes</source>
-        <translation type="unfinished"></translation>
+        <translation>2분</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="407"/>
         <source>5 minutes</source>
-        <translation type="unfinished"></translation>
+        <translation>5분</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="409"/>
         <source>10 minutes</source>
-        <translation type="unfinished"></translation>
+        <translation>10분</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="411"/>
         <source>15 minutes</source>
-        <translation type="unfinished"></translation>
+        <translation>15분</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="413"/>
         <source>30 minutes</source>
-        <translation type="unfinished"></translation>
+        <translation>30분</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="414"/>
         <source>%1 seconds</source>
-        <translation type="unfinished"></translation>
+        <translation>%1초</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="427"/>
         <source>Resolution</source>
-        <translation type="unfinished"></translation>
+        <translation>해상도</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="555"/>
         <source>Settings</source>
-        <translation>Settings</translation>
+        <translation>설정</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="745"/>
         <source>No settings available on this platform</source>
-        <translation>No settings available on this platform</translation>
+        <translation>이 플랫폼에서는 설정을 사용할 수 없습니다</translation>
     </message>
 </context>
 <context>
@@ -914,17 +914,17 @@
     <message>
         <location filename="../screens/SystemsScreen.qml" line="182"/>
         <source>%1 systems</source>
-        <translation>%1 systems</translation>
+        <translation>시스템 %1개</translation>
     </message>
     <message>
         <location filename="../screens/SystemsScreen.qml" line="279"/>
         <source>No systems in this category</source>
-        <translation>No systems in this category</translation>
+        <translation>이 카테고리에는 시스템이 없습니다</translation>
     </message>
     <message>
         <location filename="../screens/SystemsScreen.qml" line="280"/>
         <source>Loading systems…</source>
-        <translation type="unfinished"></translation>
+        <translation>시스템 불러오는 중…</translation>
     </message>
 </context>
 <context>
@@ -932,7 +932,7 @@
     <message>
         <location filename="../components/TopStatusStrip.qml" line="88"/>
         <source>Page %1 / %2</source>
-        <translation>Page %1 / %2</translation>
+        <translation>페이지 %1 / %2</translation>
     </message>
 </context>
 </TS>

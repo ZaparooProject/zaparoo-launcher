@@ -11,6 +11,8 @@ set(_RESOURCE_ROOT "${CMAKE_SOURCE_DIR}/resources")
 set(_APP_RESOURCES
     "${_RESOURCE_ROOT}/fonts/MxPlus_HP_100LX_6x8.ttf"
     "${_RESOURCE_ROOT}/fonts/NotoSans.ttf"
+    "${_RESOURCE_ROOT}/fonts/NotoSansArabic.ttf"
+    "${_RESOURCE_ROOT}/fonts/NotoSansDevanagari.ttf"
     "${_RESOURCE_ROOT}/fonts/NotoSansHebrew.ttf"
     "${_RESOURCE_ROOT}/fonts/NotoSansJP.ttf"
     "${_RESOURCE_ROOT}/fonts/NotoSansKR.ttf"

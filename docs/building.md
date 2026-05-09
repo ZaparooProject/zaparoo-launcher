@@ -10,7 +10,7 @@ not already cover the job.
 
 ### Desktop
 
-- Qt 6.7+ (Quick, QuickControls2, Qml, LinguistTools)
+- Qt 6.10+ (Quick, QuickControls2, Qml, LinguistTools)
 - CMake 3.22+
 - C++17 compiler (GCC 10+, Clang 12+, MSVC 2019+)
 - Rust stable toolchain (`rustup install stable`)

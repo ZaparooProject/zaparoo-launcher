@@ -352,6 +352,8 @@ Item {
             return qsTr("Greek");
         if (value === "ja")
             return qsTr("Japanese");
+        if (value === "ko")
+            return qsTr("Korean");
         if (value === "nl")
             return qsTr("Dutch");
         if (value === "ro")
@@ -360,6 +362,14 @@ Item {
             return qsTr("Slovak");
         if (value === "uk")
             return qsTr("Ukrainian");
+        if (value === "zh_CN")
+            return qsTr("Chinese (Simplified)");
+        if (value === "he")
+            return qsTr("Hebrew");
+        if (value === "ar")
+            return qsTr("Arabic");
+        if (value === "hi")
+            return qsTr("Hindi");
         return qsTr("Auto");
     }
 

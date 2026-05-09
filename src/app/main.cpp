@@ -158,11 +158,12 @@ int main(int argc, char* argv[])
     };
     registerFont(QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/MxPlus_HP_100LX_6x8.ttf"));
     registerFont(QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/NotoSans.ttf"));
+    registerFont(QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/NotoSansArabic.ttf"));
+    registerFont(QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/NotoSansDevanagari.ttf"));
     registerFont(QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/NotoSansHebrew.ttf"));
     registerFont(QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/NotoSansJP.ttf"));
     registerFont(QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/NotoSansKR.ttf"));
     registerFont(QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/NotoSansTC.ttf"));
-#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
     // Keep the primary UI fonts separated by mode (CRT = HP 100LX,
     // standard = Noto Sans). Only register bundled CJK fallbacks so
     // scripts the primary family lacks still resolve consistently.
@@ -174,10 +175,11 @@ int main(int argc, char* argv[])
                                                     QStringLiteral("Noto Sans KR"));
     QFontDatabase::addApplicationFallbackFontFamily(QChar::Script_Han,
                                                     QStringLiteral("Noto Sans TC"));
-    qInfo("Registered application font fallbacks for CJK scripts");
-#else
-    qInfo("Qt < 6.8: application-defined script fallbacks unavailable; using Qt default fallback matching");
-#endif
+    QFontDatabase::addApplicationFallbackFontFamily(QChar::Script_Arabic,
+                                                    QStringLiteral("Noto Sans Arabic"));
+    QFontDatabase::addApplicationFallbackFontFamily(QChar::Script_Devanagari,
+                                                    QStringLiteral("Noto Sans Devanagari"));
+    qInfo("Registered application font fallbacks for CJK, Arabic, and Devanagari scripts");
     const bool crtNativePathEnabled = zaparoo_rust_crt_native_path_enabled();
     qInfo("CRT startup decision: Rust CRT native path %s",
           crtNativePathEnabled ? "enabled" : "disabled");
