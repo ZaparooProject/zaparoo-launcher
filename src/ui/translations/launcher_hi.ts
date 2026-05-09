@@ -25,22 +25,22 @@
     <message>
         <location filename="../screens/AboutScreen.qml" line="189" />
         <source>Copyright 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.</source>
-        <translation>Copyright 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.</translation>
+        <translation>कॉपीराइट 2026 Wizzo Pty Ltd और Zaparoo परियोजना के योगदानकर्ता।</translation>
     </message>
     <message>
         <location filename="../screens/AboutScreen.qml" line="200" />
         <source>Source available under the PolyForm Noncommercial License 1.0.0. Free for personal, non-commercial use. Commercial use or redistribution requires a separate license.</source>
-        <translation>Source available under the PolyForm Noncommercial License 1.0.0. Free for personal, non-commercial use. Commercial use or redistribution requires a separate license.</translation>
+        <translation>स्रोत PolyForm Noncommercial License 1.0.0 के अंतर्गत उपलब्ध है। व्यक्तिगत, गैर-व्यावसायिक उपयोग के लिए निःशुल्क। व्यावसायिक उपयोग या पुनर्वितरण के लिए अलग लाइसेंस आवश्यक है।</translation>
     </message>
     <message>
         <location filename="../screens/AboutScreen.qml" line="211" />
         <source>Commercial licensing: legal@zaparoo.org</source>
-        <translation>Commercial licensing: legal@zaparoo.org</translation>
+        <translation>व्यावसायिक लाइसेंसिंग: legal@zaparoo.org</translation>
     </message>
     <message>
         <location filename="../screens/AboutScreen.qml" line="222" />
         <source>Project: https://zaparoo.org</source>
-        <translation>Project: https://zaparoo.org</translation>
+        <translation>परियोजना: https://zaparoo.org</translation>
     </message>
     <message>
         <location filename="../screens/AboutScreen.qml" line="232" />
@@ -91,22 +91,22 @@
     <message>
         <location filename="../components/CommercialNoticeModal.qml" line="68" />
         <source>Copyright 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.</source>
-        <translation>Copyright 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.</translation>
+        <translation>कॉपीराइट 2026 Wizzo Pty Ltd और Zaparoo परियोजना के योगदानकर्ता।</translation>
     </message>
     <message>
         <location filename="../components/CommercialNoticeModal.qml" line="79" />
         <source>This free source-available build is for personal and non-commercial use only. Commercial use or redistribution requires a license.</source>
-        <translation>This free source-available build is for personal and non-commercial use only. Commercial use or redistribution requires a license.</translation>
+        <translation>यह निःशुल्क स्रोत-उपलब्ध बिल्ड केवल व्यक्तिगत और गैर-व्यावसायिक उपयोग के लिए है। व्यावसायिक उपयोग या पुनर्वितरण के लिए लाइसेंस आवश्यक है।</translation>
     </message>
     <message>
         <location filename="../components/CommercialNoticeModal.qml" line="90" />
         <source>Contact: legal@zaparoo.org</source>
-        <translation>Contact: legal@zaparoo.org</translation>
+        <translation>संपर्क: legal@zaparoo.org</translation>
     </message>
     <message>
         <location filename="../components/CommercialNoticeModal.qml" line="101" />
         <source>Full details available any time under Settings &gt; About / License.</source>
-        <translation>Full details available any time under Settings &gt; About / License.</translation>
+        <translation>पूरी जानकारी कभी भी सेटिंग्स &gt; परिचय / लाइसेंस में उपलब्ध है।</translation>
     </message>
     <message>
         <location filename="../components/CommercialNoticeModal.qml" line="119" />
@@ -160,17 +160,17 @@
     <message>
         <location filename="../components/CoreStatusPill.qml" line="73" />
         <source>Indexing %1/%2</source>
-        <translation>Indexing %1/%2</translation>
+        <translation>इंडेक्सिंग %1/%2</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="75" />
         <source>Indexing…</source>
-        <translation>Indexing…</translation>
+        <translation>इंडेक्सिंग…</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="83" />
         <source>Scrape paused</source>
-        <translation>Scrape paused</translation>
+        <translation>स्क्रैप रोका गया</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="86" />
@@ -180,12 +180,12 @@
     <message>
         <location filename="../components/CoreStatusPill.qml" line="89" />
         <source>Scraping %1/%2</source>
-        <translation>Scraping %1/%2</translation>
+        <translation>स्क्रैपिंग %1/%2</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="91" />
         <source>Scraping…</source>
-        <translation>Scraping…</translation>
+        <translation>स्क्रैपिंग…</translation>
     </message>
 </context>
 <context>
@@ -193,22 +193,22 @@
     <message>
         <location filename="../screens/FavoritesScreen.qml" line="182" />
         <source>Favorites</source>
-        <translation>Favorites</translation>
+        <translation>पसंदीदा</translation>
     </message>
     <message>
         <location filename="../screens/FavoritesScreen.qml" line="185" />
         <source>%1 entries</source>
-        <translation>%1 entries</translation>
+        <translation>%1 प्रविष्टियाँ</translation>
     </message>
     <message>
         <location filename="../screens/FavoritesScreen.qml" line="283" />
         <source>No favorites yet</source>
-        <translation>No favorites yet</translation>
+        <translation>अभी तक कोई पसंदीदा नहीं</translation>
     </message>
     <message>
         <location filename="../screens/FavoritesScreen.qml" line="284" />
         <source>Loading favorites…</source>
-        <translation>Loading favorites…</translation>
+        <translation>पसंदीदा लोड हो रहे हैं…</translation>
     </message>
 </context>
 <context>
@@ -216,12 +216,12 @@
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="127" />
         <source>First-time setup</source>
-        <translation>First-time setup</translation>
+        <translation>पहली बार सेटअप</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="136" />
         <source>Zaparoo needs to scan your games before you can use the launcher. This usually takes a few minutes.</source>
-        <translation>Zaparoo needs to scan your games before you can use the launcher. This usually takes a few minutes.</translation>
+        <translation>लॉन्चर का उपयोग करने से पहले Zaparoo को आपके गेम स्कैन करने होंगे। इसमें आमतौर पर कुछ मिनट लगते हैं।</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="158" />
@@ -241,27 +241,27 @@
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="215" />
         <source>Step %1 of %2</source>
-        <translation>Step %1 of %2</translation>
+        <translation>%2 में से चरण %1</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="216" />
         <source>Preparing…</source>
-        <translation>Preparing…</translation>
+        <translation>तैयार किया जा रहा है…</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="233" />
         <source>Done. %1 files indexed.</source>
-        <translation>Done. %1 files indexed.</translation>
+        <translation>पूरा हुआ। %1 फ़ाइलें इंडेक्स की गईं।</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="263" />
         <source>Cancel</source>
-        <translation>Cancel</translation>
+        <translation>रद्द करें</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="263" />
         <source>Start scan</source>
-        <translation>Start scan</translation>
+        <translation>स्कैन शुरू करें</translation>
     </message>
 </context>
 <context>
@@ -269,7 +269,7 @@
     <message>
         <location filename="../screens/GamesScreen.qml" line="363" />
         <source>%1 files</source>
-        <translation>%1 files</translation>
+        <translation>%1 फ़ाइलें</translation>
     </message>
     <message>
         <location filename="../screens/GamesScreen.qml" line="533" />
@@ -279,7 +279,7 @@
     <message>
         <location filename="../screens/GamesScreen.qml" line="534" />
         <source>Loading games…</source>
-        <translation>Loading games…</translation>
+        <translation>गेम लोड हो रहे हैं…</translation>
     </message>
     <message>
         <location filename="../screens/GamesScreen.qml" line="556" />
@@ -292,12 +292,12 @@
     <message>
         <location filename="../screens/HubScreen.qml" line="91" />
         <source>Favorites</source>
-        <translation>Favorites</translation>
+        <translation>पसंदीदा</translation>
     </message>
     <message>
         <location filename="../screens/HubScreen.qml" line="96" />
         <source>Recently Played</source>
-        <translation>Recently Played</translation>
+        <translation>हाल ही में खेले गए</translation>
     </message>
     <message>
         <location filename="../screens/HubScreen.qml" line="101" />
@@ -323,27 +323,27 @@
     <message>
         <location filename="../components/LogUploadModal.qml" line="87" />
         <source>Upload log file</source>
-        <translation>Upload log file</translation>
+        <translation>लॉग फ़ाइल अपलोड करें</translation>
     </message>
     <message>
         <location filename="../components/LogUploadModal.qml" line="97" />
         <source>Uploading log file - this may take a moment.</source>
-        <translation>Uploading log file - this may take a moment.</translation>
+        <translation>लॉग फ़ाइल अपलोड की जा रही है - इसमें थोड़ा समय लग सकता है।</translation>
     </message>
     <message>
         <location filename="../components/LogUploadModal.qml" line="197" />
         <source>Upload failed: %1</source>
-        <translation>Upload failed: %1</translation>
+        <translation>अपलोड विफल हुआ: %1</translation>
     </message>
     <message>
         <location filename="../components/LogUploadModal.qml" line="197" />
         <source>Upload failed.</source>
-        <translation>Upload failed.</translation>
+        <translation>अपलोड विफल हुआ।</translation>
     </message>
     <message>
         <location filename="../components/LogUploadModal.qml" line="227" />
         <source>Retry</source>
-        <translation>Retry</translation>
+        <translation>फिर से प्रयास करें</translation>
     </message>
     <message>
         <location filename="../components/LogUploadModal.qml" line="227" />
@@ -356,53 +356,53 @@
     <message>
         <location filename="../app/Main.qml" line="723" />
         <source>Launch core</source>
-        <translation>Launch core</translation>
+        <translation>कोर चलाएँ</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="731" />
         <location filename="../app/Main.qml" line="755" />
         <source>Launch game</source>
-        <translation>Launch game</translation>
+        <translation>गेम चलाएँ</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="741" />
         <source>Remove from favorites</source>
-        <translation>Remove from favorites</translation>
+        <translation>पसंदीदा से हटाएँ</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="741" />
         <source>Add to favorites</source>
-        <translation>Add to favorites</translation>
+        <translation>पसंदीदा में जोड़ें</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="747" />
         <source>Write to NFC token</source>
-        <translation>Write to NFC token</translation>
+        <translation>NFC टोकन पर लिखें</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="751" />
         <source>QR code</source>
-        <translation>QR code</translation>
+        <translation>QR कोड</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="1437" />
         <source>Loading systems…</source>
-        <translation>Loading systems…</translation>
+        <translation>सिस्टम लोड हो रहे हैं…</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="1439" />
         <source>Loading games…</source>
-        <translation>Loading games…</translation>
+        <translation>गेम लोड हो रहे हैं…</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="1441" />
         <source>Loading favorites…</source>
-        <translation>Loading favorites…</translation>
+        <translation>पसंदीदा लोड हो रहे हैं…</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="1443" />
         <source>Loading recently played…</source>
-        <translation>Loading recently played…</translation>
+        <translation>हाल ही में खेले गए लोड हो रहे हैं…</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="1445" />
@@ -420,12 +420,12 @@
     <message>
         <location filename="../app/MainLayout.qml" line="475" />
         <source>Writing failed</source>
-        <translation>Writing failed</translation>
+        <translation>लिखना विफल हुआ</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="475" />
         <source>Put a writable card near the reader</source>
-        <translation>Put a writable card near the reader</translation>
+        <translation>रीडर के पास लिखने योग्य कार्ड रखें</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="540" />
@@ -454,7 +454,7 @@
         <location filename="../app/MainLayout.qml" line="689" />
         <location filename="../app/MainLayout.qml" line="704" />
         <source>Select</source>
-        <translation>Select</translation>
+        <translation>चुनें</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="621" />
@@ -463,7 +463,7 @@
         <location filename="../app/MainLayout.qml" line="652" />
         <location filename="../app/MainLayout.qml" line="663" />
         <source>Close</source>
-        <translation>Close</translation>
+        <translation>बंद करें</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="632" />
@@ -472,7 +472,7 @@
         <location filename="../app/MainLayout.qml" line="708" />
         <location filename="../app/MainLayout.qml" line="719" />
         <source>Cancel</source>
-        <translation>Cancel</translation>
+        <translation>रद्द करें</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="648" />
@@ -485,7 +485,7 @@
         <location filename="../app/MainLayout.qml" line="845" />
         <location filename="../app/MainLayout.qml" line="950" />
         <source>Retry</source>
-        <translation>Retry</translation>
+        <translation>फिर से प्रयास करें</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="678" />
@@ -495,7 +495,7 @@
     <message>
         <location filename="../app/MainLayout.qml" line="727" />
         <source>Start</source>
-        <translation>Start</translation>
+        <translation>शुरू करें</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="747" />
@@ -542,12 +542,12 @@
     <message>
         <location filename="../app/MainLayout.qml" line="869" />
         <source>Change</source>
-        <translation>Change</translation>
+        <translation>बदलें</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="875" />
         <source>Toggle</source>
-        <translation>Toggle</translation>
+        <translation>टॉगल</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="896" />
@@ -560,7 +560,7 @@
     <message>
         <location filename="../components/Modal.qml" line="49" />
         <source>OK</source>
-        <translation>OK</translation>
+        <translation>ठीक है</translation>
     </message>
     <message>
         <location filename="../components/Modal.qml" line="50" />
@@ -575,7 +575,7 @@
     <message>
         <location filename="../components/Modal.qml" line="198" />
         <source>Cancel</source>
-        <translation>Cancel</translation>
+        <translation>रद्द करें</translation>
     </message>
 </context>
 <context>
@@ -583,22 +583,22 @@
     <message>
         <location filename="../screens/RecentsScreen.qml" line="183" />
         <source>Recently Played</source>
-        <translation>Recently Played</translation>
+        <translation>हाल ही में खेले गए</translation>
     </message>
     <message>
         <location filename="../screens/RecentsScreen.qml" line="186" />
         <source>%1 entries</source>
-        <translation>%1 entries</translation>
+        <translation>%1 प्रविष्टियाँ</translation>
     </message>
     <message>
         <location filename="../screens/RecentsScreen.qml" line="281" />
         <source>Nothing played yet</source>
-        <translation>Nothing played yet</translation>
+        <translation>अभी तक कुछ नहीं खेला गया</translation>
     </message>
     <message>
         <location filename="../screens/RecentsScreen.qml" line="282" />
         <source>Loading recently played…</source>
-        <translation>Loading recently played…</translation>
+        <translation>हाल ही में खेले गए लोड हो रहे हैं…</translation>
     </message>
 </context>
 <context>
@@ -606,7 +606,7 @@
     <message>
         <location filename="../components/ScreenStateOverlay.qml" line="26" />
         <source>Nothing here</source>
-        <translation>Nothing here</translation>
+        <translation>यहाँ कुछ नहीं है</translation>
     </message>
     <message>
         <location filename="../components/ScreenStateOverlay.qml" line="27" />
@@ -616,7 +616,7 @@
     <message>
         <location filename="../components/ScreenStateOverlay.qml" line="57" />
         <source>Failed to load</source>
-        <translation>Failed to load</translation>
+        <translation>लोड करने में विफल</translation>
     </message>
 </context>
 <context>
@@ -642,7 +642,7 @@
         <location filename="../screens/SettingsScreen.qml" line="88" />
         <location filename="../screens/SettingsScreen.qml" line="454" />
         <source>Button style</source>
-        <translation>Button style</translation>
+        <translation>बटन शैली</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="93" />
@@ -663,7 +663,7 @@
     <message>
         <location filename="../screens/SettingsScreen.qml" line="107" />
         <source>Scrape metadata</source>
-        <translation>Scrape metadata</translation>
+        <translation>मेटाडेटा स्क्रैप करें</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="111" />
@@ -673,7 +673,7 @@
     <message>
         <location filename="../screens/SettingsScreen.qml" line="116" />
         <source>Mouse support</source>
-        <translation>Mouse support</translation>
+        <translation>माउस समर्थन</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="121" />
@@ -683,7 +683,7 @@
     <message>
         <location filename="../screens/SettingsScreen.qml" line="126" />
         <source>Upload log file</source>
-        <translation>Upload log file</translation>
+        <translation>लॉग फ़ाइल अपलोड करें</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="131" />
@@ -693,19 +693,19 @@
     <message>
         <location filename="../screens/SettingsScreen.qml" line="147" />
         <source>Optimizing</source>
-        <translation>Optimizing</translation>
+        <translation>अनुकूलित किया जा रहा है</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="149" />
         <location filename="../screens/SettingsScreen.qml" line="158" />
         <source>Paused</source>
-        <translation>Paused</translation>
+        <translation>रोक दिया गया</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="149" />
         <location filename="../screens/SettingsScreen.qml" line="158" />
         <source>In progress</source>
-        <translation>In progress</translation>
+        <translation>प्रगति पर</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="152" />
@@ -720,12 +720,12 @@
     <message>
         <location filename="../screens/SettingsScreen.qml" line="270" />
         <source>Cancel</source>
-        <translation>Cancel</translation>
+        <translation>रद्द करें</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="270" />
         <source>Start</source>
-        <translation>Start</translation>
+        <translation>शुरू करें</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="272" />
@@ -855,47 +855,47 @@
     <message>
         <location filename="../screens/SettingsScreen.qml" line="401" />
         <source>1 second (testing)</source>
-        <translation>1 second (testing)</translation>
+        <translation>1 सेकंड (परीक्षण)</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="403" />
         <source>1 minute</source>
-        <translation>1 minute</translation>
+        <translation>1 मिनट</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="405" />
         <source>2 minutes</source>
-        <translation>2 minutes</translation>
+        <translation>2 मिनट</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="407" />
         <source>5 minutes</source>
-        <translation>5 minutes</translation>
+        <translation>5 मिनट</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="409" />
         <source>10 minutes</source>
-        <translation>10 minutes</translation>
+        <translation>10 मिनट</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="411" />
         <source>15 minutes</source>
-        <translation>15 minutes</translation>
+        <translation>15 मिनट</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="413" />
         <source>30 minutes</source>
-        <translation>30 minutes</translation>
+        <translation>30 मिनट</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="414" />
         <source>%1 seconds</source>
-        <translation>%1 seconds</translation>
+        <translation>%1 सेकंड</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="427" />
         <source>Resolution</source>
-        <translation>Resolution</translation>
+        <translation>रिज़ॉल्यूशन</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="555" />
@@ -905,7 +905,7 @@
     <message>
         <location filename="../screens/SettingsScreen.qml" line="745" />
         <source>No settings available on this platform</source>
-        <translation>No settings available on this platform</translation>
+        <translation>इस प्लेटफ़ॉर्म पर कोई सेटिंग उपलब्ध नहीं है</translation>
     </message>
 </context>
 <context>
@@ -913,17 +913,17 @@
     <message>
         <location filename="../screens/SystemsScreen.qml" line="182" />
         <source>%1 systems</source>
-        <translation>%1 systems</translation>
+        <translation>%1 सिस्टम</translation>
     </message>
     <message>
         <location filename="../screens/SystemsScreen.qml" line="279" />
         <source>No systems in this category</source>
-        <translation>No systems in this category</translation>
+        <translation>इस श्रेणी में कोई सिस्टम नहीं है</translation>
     </message>
     <message>
         <location filename="../screens/SystemsScreen.qml" line="280" />
         <source>Loading systems…</source>
-        <translation>Loading systems…</translation>
+        <translation>सिस्टम लोड हो रहे हैं…</translation>
     </message>
 </context>
 <context>
@@ -931,7 +931,7 @@
     <message>
         <location filename="../components/TopStatusStrip.qml" line="88" />
         <source>Page %1 / %2</source>
-        <translation>Page %1 / %2</translation>
+        <translation>पृष्ठ %1 / %2</translation>
     </message>
 </context>
 </TS>

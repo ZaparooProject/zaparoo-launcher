@@ -25,22 +25,22 @@
     <message>
         <location filename="../screens/AboutScreen.qml" line="189" />
         <source>Copyright 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.</source>
-        <translation>Copyright 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.</translation>
+        <translation>حقوق النشر 2026 لشركة Wizzo Pty Ltd والمساهمين في مشروع Zaparoo.</translation>
     </message>
     <message>
         <location filename="../screens/AboutScreen.qml" line="200" />
         <source>Source available under the PolyForm Noncommercial License 1.0.0. Free for personal, non-commercial use. Commercial use or redistribution requires a separate license.</source>
-        <translation>Source available under the PolyForm Noncommercial License 1.0.0. Free for personal, non-commercial use. Commercial use or redistribution requires a separate license.</translation>
+        <translation>المصدر متاح بموجب ترخيص PolyForm Noncommercial 1.0.0. مجاني للاستخدام الشخصي وغير التجاري. يتطلب الاستخدام التجاري أو إعادة التوزيع ترخيصًا منفصلًا.</translation>
     </message>
     <message>
         <location filename="../screens/AboutScreen.qml" line="211" />
         <source>Commercial licensing: legal@zaparoo.org</source>
-        <translation>Commercial licensing: legal@zaparoo.org</translation>
+        <translation>الترخيص التجاري: legal@zaparoo.org</translation>
     </message>
     <message>
         <location filename="../screens/AboutScreen.qml" line="222" />
         <source>Project: https://zaparoo.org</source>
-        <translation>Project: https://zaparoo.org</translation>
+        <translation>المشروع: https://zaparoo.org</translation>
     </message>
     <message>
         <location filename="../screens/AboutScreen.qml" line="232" />
@@ -91,22 +91,22 @@
     <message>
         <location filename="../components/CommercialNoticeModal.qml" line="68" />
         <source>Copyright 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.</source>
-        <translation>Copyright 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.</translation>
+        <translation>حقوق النشر 2026 لشركة Wizzo Pty Ltd والمساهمين في مشروع Zaparoo.</translation>
     </message>
     <message>
         <location filename="../components/CommercialNoticeModal.qml" line="79" />
         <source>This free source-available build is for personal and non-commercial use only. Commercial use or redistribution requires a license.</source>
-        <translation>This free source-available build is for personal and non-commercial use only. Commercial use or redistribution requires a license.</translation>
+        <translation>هذه النسخة المجانية ذات المصدر المتاح مخصصة للاستخدام الشخصي وغير التجاري فقط. يتطلب الاستخدام التجاري أو إعادة التوزيع ترخيصًا.</translation>
     </message>
     <message>
         <location filename="../components/CommercialNoticeModal.qml" line="90" />
         <source>Contact: legal@zaparoo.org</source>
-        <translation>Contact: legal@zaparoo.org</translation>
+        <translation>للتواصل: legal@zaparoo.org</translation>
     </message>
     <message>
         <location filename="../components/CommercialNoticeModal.qml" line="101" />
         <source>Full details available any time under Settings &gt; About / License.</source>
-        <translation>Full details available any time under Settings &gt; About / License.</translation>
+        <translation>التفاصيل الكاملة متاحة في أي وقت ضمن الإعدادات &gt; حول / الترخيص.</translation>
     </message>
     <message>
         <location filename="../components/CommercialNoticeModal.qml" line="119" />
@@ -160,17 +160,17 @@
     <message>
         <location filename="../components/CoreStatusPill.qml" line="73" />
         <source>Indexing %1/%2</source>
-        <translation>Indexing %1/%2</translation>
+        <translation>فهرسة %1/%2</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="75" />
         <source>Indexing…</source>
-        <translation>Indexing…</translation>
+        <translation>جارٍ الفهرسة…</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="83" />
         <source>Scrape paused</source>
-        <translation>Scrape paused</translation>
+        <translation>تم إيقاف الاستخراج مؤقتًا</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="86" />
@@ -180,12 +180,12 @@
     <message>
         <location filename="../components/CoreStatusPill.qml" line="89" />
         <source>Scraping %1/%2</source>
-        <translation>Scraping %1/%2</translation>
+        <translation>استخراج %1/%2</translation>
     </message>
     <message>
         <location filename="../components/CoreStatusPill.qml" line="91" />
         <source>Scraping…</source>
-        <translation>Scraping…</translation>
+        <translation>جارٍ الاستخراج…</translation>
     </message>
 </context>
 <context>
@@ -193,22 +193,22 @@
     <message>
         <location filename="../screens/FavoritesScreen.qml" line="182" />
         <source>Favorites</source>
-        <translation>Favorites</translation>
+        <translation>المفضلة</translation>
     </message>
     <message>
         <location filename="../screens/FavoritesScreen.qml" line="185" />
         <source>%1 entries</source>
-        <translation>%1 entries</translation>
+        <translation>%1 عناصر</translation>
     </message>
     <message>
         <location filename="../screens/FavoritesScreen.qml" line="283" />
         <source>No favorites yet</source>
-        <translation>No favorites yet</translation>
+        <translation>لا توجد مفضلات بعد</translation>
     </message>
     <message>
         <location filename="../screens/FavoritesScreen.qml" line="284" />
         <source>Loading favorites…</source>
-        <translation>Loading favorites…</translation>
+        <translation>جارٍ تحميل المفضلة…</translation>
     </message>
 </context>
 <context>
@@ -216,12 +216,12 @@
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="127" />
         <source>First-time setup</source>
-        <translation>First-time setup</translation>
+        <translation>إعداد أول مرة</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="136" />
         <source>Zaparoo needs to scan your games before you can use the launcher. This usually takes a few minutes.</source>
-        <translation>Zaparoo needs to scan your games before you can use the launcher. This usually takes a few minutes.</translation>
+        <translation>يحتاج Zaparoo إلى فحص ألعابك قبل أن تتمكن من استخدام المشغّل. يستغرق هذا عادة بضع دقائق.</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="158" />
@@ -241,27 +241,27 @@
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="215" />
         <source>Step %1 of %2</source>
-        <translation>Step %1 of %2</translation>
+        <translation>الخطوة %1 من %2</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="216" />
         <source>Preparing…</source>
-        <translation>Preparing…</translation>
+        <translation>جارٍ التحضير…</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="233" />
         <source>Done. %1 files indexed.</source>
-        <translation>Done. %1 files indexed.</translation>
+        <translation>تم. تمت فهرسة %1 ملفات.</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="263" />
         <source>Cancel</source>
-        <translation>Cancel</translation>
+        <translation>إلغاء</translation>
     </message>
     <message>
         <location filename="../components/FirstRunIndexModal.qml" line="263" />
         <source>Start scan</source>
-        <translation>Start scan</translation>
+        <translation>ابدأ الفحص</translation>
     </message>
 </context>
 <context>
@@ -269,7 +269,7 @@
     <message>
         <location filename="../screens/GamesScreen.qml" line="363" />
         <source>%1 files</source>
-        <translation>%1 files</translation>
+        <translation>%1 ملفات</translation>
     </message>
     <message>
         <location filename="../screens/GamesScreen.qml" line="533" />
@@ -279,7 +279,7 @@
     <message>
         <location filename="../screens/GamesScreen.qml" line="534" />
         <source>Loading games…</source>
-        <translation>Loading games…</translation>
+        <translation>جارٍ تحميل الألعاب…</translation>
     </message>
     <message>
         <location filename="../screens/GamesScreen.qml" line="556" />
@@ -292,12 +292,12 @@
     <message>
         <location filename="../screens/HubScreen.qml" line="91" />
         <source>Favorites</source>
-        <translation>Favorites</translation>
+        <translation>المفضلة</translation>
     </message>
     <message>
         <location filename="../screens/HubScreen.qml" line="96" />
         <source>Recently Played</source>
-        <translation>Recently Played</translation>
+        <translation>تم لعبها مؤخرًا</translation>
     </message>
     <message>
         <location filename="../screens/HubScreen.qml" line="101" />
@@ -323,27 +323,27 @@
     <message>
         <location filename="../components/LogUploadModal.qml" line="87" />
         <source>Upload log file</source>
-        <translation>Upload log file</translation>
+        <translation>رفع ملف السجل</translation>
     </message>
     <message>
         <location filename="../components/LogUploadModal.qml" line="97" />
         <source>Uploading log file - this may take a moment.</source>
-        <translation>Uploading log file - this may take a moment.</translation>
+        <translation>جارٍ رفع ملف السجل - قد يستغرق هذا لحظة.</translation>
     </message>
     <message>
         <location filename="../components/LogUploadModal.qml" line="197" />
         <source>Upload failed: %1</source>
-        <translation>Upload failed: %1</translation>
+        <translation>فشل الرفع: %1</translation>
     </message>
     <message>
         <location filename="../components/LogUploadModal.qml" line="197" />
         <source>Upload failed.</source>
-        <translation>Upload failed.</translation>
+        <translation>فشل الرفع.</translation>
     </message>
     <message>
         <location filename="../components/LogUploadModal.qml" line="227" />
         <source>Retry</source>
-        <translation>Retry</translation>
+        <translation>إعادة المحاولة</translation>
     </message>
     <message>
         <location filename="../components/LogUploadModal.qml" line="227" />
@@ -356,53 +356,53 @@
     <message>
         <location filename="../app/Main.qml" line="723" />
         <source>Launch core</source>
-        <translation>Launch core</translation>
+        <translation>تشغيل النواة</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="731" />
         <location filename="../app/Main.qml" line="755" />
         <source>Launch game</source>
-        <translation>Launch game</translation>
+        <translation>تشغيل اللعبة</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="741" />
         <source>Remove from favorites</source>
-        <translation>Remove from favorites</translation>
+        <translation>إزالة من المفضلة</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="741" />
         <source>Add to favorites</source>
-        <translation>Add to favorites</translation>
+        <translation>أضف إلى المفضلة</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="747" />
         <source>Write to NFC token</source>
-        <translation>Write to NFC token</translation>
+        <translation>الكتابة إلى رمز NFC</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="751" />
         <source>QR code</source>
-        <translation>QR code</translation>
+        <translation>رمز QR</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="1437" />
         <source>Loading systems…</source>
-        <translation>Loading systems…</translation>
+        <translation>جارٍ تحميل الأنظمة…</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="1439" />
         <source>Loading games…</source>
-        <translation>Loading games…</translation>
+        <translation>جارٍ تحميل الألعاب…</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="1441" />
         <source>Loading favorites…</source>
-        <translation>Loading favorites…</translation>
+        <translation>جارٍ تحميل المفضلة…</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="1443" />
         <source>Loading recently played…</source>
-        <translation>Loading recently played…</translation>
+        <translation>جارٍ تحميل آخر ما تم لعبه…</translation>
     </message>
     <message>
         <location filename="../app/Main.qml" line="1445" />
@@ -420,12 +420,12 @@
     <message>
         <location filename="../app/MainLayout.qml" line="475" />
         <source>Writing failed</source>
-        <translation>Writing failed</translation>
+        <translation>فشلت الكتابة</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="475" />
         <source>Put a writable card near the reader</source>
-        <translation>Put a writable card near the reader</translation>
+        <translation>ضع بطاقة قابلة للكتابة بالقرب من القارئ</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="540" />
@@ -454,7 +454,7 @@
         <location filename="../app/MainLayout.qml" line="689" />
         <location filename="../app/MainLayout.qml" line="704" />
         <source>Select</source>
-        <translation>Select</translation>
+        <translation>تحديد</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="621" />
@@ -463,7 +463,7 @@
         <location filename="../app/MainLayout.qml" line="652" />
         <location filename="../app/MainLayout.qml" line="663" />
         <source>Close</source>
-        <translation>Close</translation>
+        <translation>إغلاق</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="632" />
@@ -472,7 +472,7 @@
         <location filename="../app/MainLayout.qml" line="708" />
         <location filename="../app/MainLayout.qml" line="719" />
         <source>Cancel</source>
-        <translation>Cancel</translation>
+        <translation>إلغاء</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="648" />
@@ -485,7 +485,7 @@
         <location filename="../app/MainLayout.qml" line="845" />
         <location filename="../app/MainLayout.qml" line="950" />
         <source>Retry</source>
-        <translation>Retry</translation>
+        <translation>إعادة المحاولة</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="678" />
@@ -495,7 +495,7 @@
     <message>
         <location filename="../app/MainLayout.qml" line="727" />
         <source>Start</source>
-        <translation>Start</translation>
+        <translation>ابدأ</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="747" />
@@ -542,12 +542,12 @@
     <message>
         <location filename="../app/MainLayout.qml" line="869" />
         <source>Change</source>
-        <translation>Change</translation>
+        <translation>تغيير</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="875" />
         <source>Toggle</source>
-        <translation>Toggle</translation>
+        <translation>تبديل</translation>
     </message>
     <message>
         <location filename="../app/MainLayout.qml" line="896" />
@@ -560,7 +560,7 @@
     <message>
         <location filename="../components/Modal.qml" line="49" />
         <source>OK</source>
-        <translation>OK</translation>
+        <translation>حسنًا</translation>
     </message>
     <message>
         <location filename="../components/Modal.qml" line="50" />
@@ -575,7 +575,7 @@
     <message>
         <location filename="../components/Modal.qml" line="198" />
         <source>Cancel</source>
-        <translation>Cancel</translation>
+        <translation>إلغاء</translation>
     </message>
 </context>
 <context>
@@ -583,22 +583,22 @@
     <message>
         <location filename="../screens/RecentsScreen.qml" line="183" />
         <source>Recently Played</source>
-        <translation>Recently Played</translation>
+        <translation>تم لعبها مؤخرًا</translation>
     </message>
     <message>
         <location filename="../screens/RecentsScreen.qml" line="186" />
         <source>%1 entries</source>
-        <translation>%1 entries</translation>
+        <translation>%1 عناصر</translation>
     </message>
     <message>
         <location filename="../screens/RecentsScreen.qml" line="281" />
         <source>Nothing played yet</source>
-        <translation>Nothing played yet</translation>
+        <translation>لم يتم لعب أي شيء بعد</translation>
     </message>
     <message>
         <location filename="../screens/RecentsScreen.qml" line="282" />
         <source>Loading recently played…</source>
-        <translation>Loading recently played…</translation>
+        <translation>جارٍ تحميل آخر ما تم لعبه…</translation>
     </message>
 </context>
 <context>
@@ -606,7 +606,7 @@
     <message>
         <location filename="../components/ScreenStateOverlay.qml" line="26" />
         <source>Nothing here</source>
-        <translation>Nothing here</translation>
+        <translation>لا يوجد شيء هنا</translation>
     </message>
     <message>
         <location filename="../components/ScreenStateOverlay.qml" line="27" />
@@ -616,7 +616,7 @@
     <message>
         <location filename="../components/ScreenStateOverlay.qml" line="57" />
         <source>Failed to load</source>
-        <translation>Failed to load</translation>
+        <translation>فشل التحميل</translation>
     </message>
 </context>
 <context>
@@ -642,7 +642,7 @@
         <location filename="../screens/SettingsScreen.qml" line="88" />
         <location filename="../screens/SettingsScreen.qml" line="454" />
         <source>Button style</source>
-        <translation>Button style</translation>
+        <translation>نمط الأزرار</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="93" />
@@ -663,7 +663,7 @@
     <message>
         <location filename="../screens/SettingsScreen.qml" line="107" />
         <source>Scrape metadata</source>
-        <translation>Scrape metadata</translation>
+        <translation>استخراج البيانات الوصفية</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="111" />
@@ -673,7 +673,7 @@
     <message>
         <location filename="../screens/SettingsScreen.qml" line="116" />
         <source>Mouse support</source>
-        <translation>Mouse support</translation>
+        <translation>دعم الفأرة</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="121" />
@@ -683,7 +683,7 @@
     <message>
         <location filename="../screens/SettingsScreen.qml" line="126" />
         <source>Upload log file</source>
-        <translation>Upload log file</translation>
+        <translation>رفع ملف السجل</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="131" />
@@ -693,19 +693,19 @@
     <message>
         <location filename="../screens/SettingsScreen.qml" line="147" />
         <source>Optimizing</source>
-        <translation>Optimizing</translation>
+        <translation>جارٍ التحسين</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="149" />
         <location filename="../screens/SettingsScreen.qml" line="158" />
         <source>Paused</source>
-        <translation>Paused</translation>
+        <translation>متوقف مؤقتًا</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="149" />
         <location filename="../screens/SettingsScreen.qml" line="158" />
         <source>In progress</source>
-        <translation>In progress</translation>
+        <translation>قيد التنفيذ</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="152" />
@@ -720,12 +720,12 @@
     <message>
         <location filename="../screens/SettingsScreen.qml" line="270" />
         <source>Cancel</source>
-        <translation>Cancel</translation>
+        <translation>إلغاء</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="270" />
         <source>Start</source>
-        <translation>Start</translation>
+        <translation>ابدأ</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="272" />
@@ -855,47 +855,47 @@
     <message>
         <location filename="../screens/SettingsScreen.qml" line="401" />
         <source>1 second (testing)</source>
-        <translation>1 second (testing)</translation>
+        <translation>ثانية واحدة (اختبار)</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="403" />
         <source>1 minute</source>
-        <translation>1 minute</translation>
+        <translation>دقيقة واحدة</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="405" />
         <source>2 minutes</source>
-        <translation>2 minutes</translation>
+        <translation>دقيقتان</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="407" />
         <source>5 minutes</source>
-        <translation>5 minutes</translation>
+        <translation>5 دقائق</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="409" />
         <source>10 minutes</source>
-        <translation>10 minutes</translation>
+        <translation>10 دقائق</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="411" />
         <source>15 minutes</source>
-        <translation>15 minutes</translation>
+        <translation>15 دقيقة</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="413" />
         <source>30 minutes</source>
-        <translation>30 minutes</translation>
+        <translation>30 دقيقة</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="414" />
         <source>%1 seconds</source>
-        <translation>%1 seconds</translation>
+        <translation>%1 ثوانٍ</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="427" />
         <source>Resolution</source>
-        <translation>Resolution</translation>
+        <translation>الدقة</translation>
     </message>
     <message>
         <location filename="../screens/SettingsScreen.qml" line="555" />
@@ -905,7 +905,7 @@
     <message>
         <location filename="../screens/SettingsScreen.qml" line="745" />
         <source>No settings available on this platform</source>
-        <translation>No settings available on this platform</translation>
+        <translation>لا توجد إعدادات متاحة على هذه المنصة</translation>
     </message>
 </context>
 <context>
@@ -913,17 +913,17 @@
     <message>
         <location filename="../screens/SystemsScreen.qml" line="182" />
         <source>%1 systems</source>
-        <translation>%1 systems</translation>
+        <translation>%1 أنظمة</translation>
     </message>
     <message>
         <location filename="../screens/SystemsScreen.qml" line="279" />
         <source>No systems in this category</source>
-        <translation>No systems in this category</translation>
+        <translation>لا توجد أنظمة في هذه الفئة</translation>
     </message>
     <message>
         <location filename="../screens/SystemsScreen.qml" line="280" />
         <source>Loading systems…</source>
-        <translation>Loading systems…</translation>
+        <translation>جارٍ تحميل الأنظمة…</translation>
     </message>
 </context>
 <context>
@@ -931,7 +931,7 @@
     <message>
         <location filename="../components/TopStatusStrip.qml" line="88" />
         <source>Page %1 / %2</source>
-        <translation>Page %1 / %2</translation>
+        <translation>الصفحة %1 / %2</translation>
     </message>
 </context>
 </TS>
