@@ -139,7 +139,7 @@ fn default_mouse_enabled() -> bool {
 }
 
 fn default_screensaver_timeout() -> String {
-    "60".into()
+    "300".into()
 }
 
 pub fn load() -> PersistedState {
@@ -271,7 +271,7 @@ mod tests {
                 button_layout: "b".into(),
                 mouse_enabled: false,
                 debug_logging: true,
-                screensaver_timeout: "30".into(),
+                screensaver_timeout: "300".into(),
             },
         };
         save_to(&path, &original);

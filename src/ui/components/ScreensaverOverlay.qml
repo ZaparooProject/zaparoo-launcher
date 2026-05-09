@@ -1,51 +1,31 @@
 // Zaparoo Launcher
 // Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-// `Item.grabToImage` is invoked through a property whose static type
-// is `QQuickItem`, so qmllint's compiler check flags the call as
-// shadowable until the qmltypes schema grows method-level finality.
-// Same pattern as HeaderBar.qml — suppress file-wide.
-// qmllint disable compiler
 
 import QtQuick
 import Zaparoo.Theme
 
-// Screen-burn protection. After an idle timeout the launcher captures
-// the live scene with `Item.grabToImage` and stacks three static
-// layers — solid-black backstop, opaque snapshot, 85% black scrim —
-// behind a single bouncing copy of the Zaparoo logo.
+// Screen-burn protection. After an idle timeout the launcher paints a
+// solid-black backstop and bounces a single copy of the Zaparoo logo
+// across it. Black is the only background that fully removes the
+// burn-in load on OLED (pixels off = zero degradation) and gives CRT
+// phosphor a true rest; a translucent scrim over a snapshot of the
+// scene still leaves the static UI shapes contributing to wear,
+// which defeats the feature's purpose.
 //
-// Why three static layers instead of baking everything into one
-// image: the original implementation tried to bake (snapshot + 80%
-// scrim) into a single opaque QImage by painting the scrim above
-// the live scene and grabbing that composite. On Qt's Software
-// adaptation the grab raced the scrim's first paint — `_armed` only
-// dirties the binding; the Rectangle is not actually rasterised
-// until the next sync — so the captured pixmap held just the live
-// scene with no darken. Even with a longer pre-grab delay the
-// behaviour was unreliable across cold-start frames. Stacking the
-// scrim as its own QML node avoids that race entirely: the user
-// sees the darken from the moment the overlay is armed, regardless
-// of whether the grab has completed yet.
-//
-// CLAUDE.md's "no translucent overlay over a screen body" rule
-// targets translucent nodes above *animated* content (screens,
-// transitions): every animated frame underneath propagates up
-// through the translucent layer and forces a repaint of the
-// blended pixels. Here the only thing under the scrim is the
-// snapshot Image (or the solid-black backstop while the snapshot
-// is still arriving). Both are static, so the only dirty rect
-// per frame is the bouncing logo's own bounding box — three
-// blits at that small rect (snapshot patch, scrim patch, logo)
-// and nothing else. State is purely in-memory; the timeout
-// itself is persisted on `Browse.Settings.current_screensaver_timeout`.
+// Software-renderer cost: the only per-frame dirty rect is the logo's
+// own bounding box. The black backstop is static, so the only blits
+// per frame are the small region the logo just left (repainted black)
+// and the small region it just entered. State is purely in-memory;
+// the timeout itself is persisted on
+// `Browse.Settings.current_screensaver_timeout`.
 Item {
     id: overlay
 
     // Public API ─────────────────────────────────────────────────────
     // True between activate() and deactivate(). Visible-bound below.
     readonly property bool armed: overlay._armed
-    // Source for the bouncing logo copy on top of the baked scrim.
+    // Source for the bouncing logo on top of the black backstop.
     property url logoSource: ""
 
     // Emitted when the user clicks/taps anywhere on the overlay while
@@ -54,19 +34,7 @@ Item {
     signal userDismissed
 
     // Internal ───────────────────────────────────────────────────────
-    // The Item to capture into the baked background. Provided by the
-    // caller at activate() time so the overlay does not assume any
-    // particular root.
-    property Item _grabRoot: null
     property bool _armed: false
-    property url _snapshotSource: ""
-    // Holds the QQuickItemGrabResult object alive. Its `url` is only
-    // resolvable while the grab-result QObject is referenced — drop
-    // the reference and the Image stops painting. Letting the
-    // callback's local go out of scope was the original bug: the
-    // snapshot image showed nothing because the url backing it had
-    // already been freed.
-    property var _grabResult: null
     // Logo geometry copied from the live header logo, in the overlay's
     // own coordinate space.
     property real _logoStartX: 0
@@ -80,15 +48,11 @@ Item {
 
     visible: overlay._armed
 
-    // Activate: capture the scene with a darkened scrim baked into a
-    // single opaque image, hold the still copy of the logo at its
-    // original position for 1 s, then begin the 45° bounce.
-    function activate(grabRootItem: Item, logoSrc: url, startRect: rect): void {
+    // Activate: paint a black backstop, hold the still copy of the logo
+    // at its original position for 1 s, then begin the 45° bounce.
+    function activate(logoSrc: url, startRect: rect): void {
         if (overlay._armed)
             return;
-        if (!grabRootItem)
-            return;
-        overlay._grabRoot = grabRootItem;
         overlay.logoSource = logoSrc;
         overlay._logoStartX = Sizing.px(startRect.x);
         overlay._logoStartY = Sizing.px(startRect.y);
@@ -100,36 +64,8 @@ Item {
         ssLogo.height = overlay._logoStartH;
         overlay._dx = 1;
         overlay._dy = 1;
-        overlay._snapshotSource = "";
-        overlay._grabResult = null;
-        // Critical: grab the scene BEFORE arming the overlay. The
-        // overlay lives inside `scene`, so grabbing scene with the
-        // overlay armed would capture the overlay's own backstop and
-        // scrim too — the resulting "snapshot" would be mostly black
-        // and the user would see no live content underneath the
-        // darken. Arming after the grab lands keeps the snapshot a
-        // faithful copy of what the user was looking at.
-        grabRootItem.grabToImage(function (result) {
-            // Save to a tempfs path and point the Image at the
-            // resulting file:// URL. The in-memory `result.url` is
-            // only resolvable while the QQuickItemGrabResult QObject
-            // is referenced, and the lifetime contract is fiddly
-            // enough across Qt versions that the file-backed path is
-            // the dependable option. /tmp is RAM-backed on MiSTer, so
-            // a single ~few-MB PNG per session is well within budget.
-            const fsPath = "/tmp/zaparoo_screensaver_snapshot.png";
-            const url = "file://" + fsPath;
-            if (result.saveToFile(fsPath)) {
-                overlay._snapshotSource = url;
-            } else {
-                // Fall back to the in-memory grab url and pin the
-                // result QObject so the url stays resolvable.
-                overlay._grabResult = result;
-                overlay._snapshotSource = result.url;
-            }
-            overlay._armed = true;
-            holdBeforeBounce.restart();
-        });
+        overlay._armed = true;
+        holdBeforeBounce.restart();
     }
 
     function deactivate(): void {
@@ -138,54 +74,17 @@ Item {
         bounceSegment.stop();
         holdBeforeBounce.stop();
         overlay._armed = false;
-        overlay._snapshotSource = "";
-        overlay._grabResult = null;
-        overlay._grabRoot = null;
     }
 
     // ── Solid-black backstop ─────────────────────────────────────────
-    // Opaque, painted the instant the screensaver arms. Guarantees a
-    // dark canvas under the scrim before the snapshot grab arrives,
-    // and acts as a fallback if the grab fails for any reason.
+    // The only background. Opaque, painted the instant the screensaver
+    // arms. Zero static luminance under the logo means zero burn-in
+    // contribution on OLED and minimal phosphor wear on CRT.
     Rectangle {
         id: hardBackstop
 
         anchors.fill: parent
         color: "black"
-        visible: overlay._armed
-    }
-
-    // ── Live-scene snapshot ──────────────────────────────────────────
-    // Opaque copy of the scene captured by `Item.grabToImage` at
-    // activation time. Sits above the backstop so the snapshot fades
-    // through the scrim above it. Source binds to the grab result's
-    // url; `_grabResult` is held on the overlay so the underlying
-    // QImage stays alive (the url alone goes stale when the result
-    // QObject is GC'd).
-    Image {
-        id: snapshotImage
-
-        anchors.fill: parent
-        cache: false
-        smooth: false
-        asynchronous: false
-        fillMode: Image.Stretch
-        source: overlay._snapshotSource
-        visible: overlay._snapshotSource !== ""
-    }
-
-    // ── Static darken scrim ──────────────────────────────────────────
-    // Translucent black on top of the snapshot. Static while the
-    // overlay is armed — only the logo above moves — so on the
-    // software adaptation the only per-frame dirty rect is the
-    // logo's bounding box. The scrim's blend cost stays bounded to
-    // that small patch instead of the full screen.
-    Rectangle {
-        id: darkenScrim
-
-        anchors.fill: parent
-        color: "black"
-        opacity: 0.85
         visible: overlay._armed
     }
 
@@ -249,7 +148,7 @@ Item {
     }
 
     function _scheduleNextBounce(): void {
-        if (!overlay._armed || overlay._snapshotSource === "")
+        if (!overlay._armed)
             return;
         const minX = 0;
         const minY = 0;
@@ -276,12 +175,11 @@ Item {
             return;
         const endX = Sizing.px(ssLogo.x + overlay._dx * dist);
         const endY = Sizing.px(ssLogo.y + overlay._dy * dist);
-        // Speed = full window width per 3 s, scaled so a 45° vector
+        // Speed = full window width per 10 s, scaled so a 45° vector
         // covers the same screen-width-per-second regardless of the
-        // current resolution. `dist` is along the diagonal; using the
-        // window-width baseline gives a pleasant pace from 240p to
-        // 1080p.
-        const speedPxPerS = overlay.width > 0 ? overlay.width / 3.0 : 1;
+        // current resolution. Slow DVD-player drift, ~3x slower than a
+        // typical bouncing-logo screensaver feels at this size.
+        const speedPxPerS = overlay.width > 0 ? overlay.width / 10.0 : 1;
         const dur = Math.max(16, Math.round((dist / speedPxPerS) * 1000));
         bounceSegment.stop();
         animX.from = ssLogo.x;

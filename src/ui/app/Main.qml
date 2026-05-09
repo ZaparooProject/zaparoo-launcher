@@ -1285,12 +1285,12 @@ MainLayout {
         if (screensaverOverlay.armed)
             return;
         // Skip while the cold-launch curtain is up or a forward
-        // transition is in flight: the BootOverlay and the
-        // transition "Loading…" cue are not screen-burn targets, and
-        // grabbing the scene at those moments would freeze a stale
-        // chrome state into the snapshot. `_maybeCompleteBoot` and
-        // `_completeTransition` call `_resetIdle()` so the countdown
-        // restarts cleanly the moment the gate clears.
+        // transition is in flight: the BootOverlay and the transition
+        // "Loading…" cue are not screen-burn targets, and a screensaver
+        // arm during them would race the user-visible animation.
+        // `_maybeCompleteBoot` and `_completeTransition` call
+        // `_resetIdle()` so the countdown restarts cleanly the moment
+        // the gate clears.
         if (!root.bootComplete || root.pendingTransition !== "")
             return;
         const lg = root.headerBar.logoItem;
@@ -1303,7 +1303,7 @@ MainLayout {
         // bounding box.
         const w = lg.paintedWidth > 0 ? lg.paintedWidth : lg.width;
         const h = lg.paintedHeight > 0 ? lg.paintedHeight : lg.height;
-        screensaverOverlay.activate(root.scene, "qrc:/qt/qml/Zaparoo/App/resources/images/logo.png", Qt.rect(pt.x, pt.y, w, h));
+        screensaverOverlay.activate("qrc:/qt/qml/Zaparoo/App/resources/images/logo.png", Qt.rect(pt.x, pt.y, w, h));
     }
 
     Timer {

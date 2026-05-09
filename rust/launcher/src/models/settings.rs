@@ -84,12 +84,19 @@ const DEFAULT_BROWSE_LAYOUT: &str = "grid";
 const BUTTON_LAYOUTS: &[&str] = &["a", "b", "c", "d"];
 const DEFAULT_BUTTON_LAYOUT: &str = "a";
 // Screensaver idle-timeout choices. Values are seconds as ASCII
-// strings, with the `"off"` sentinel meaning "never activate". The
-// `"1"` entry is intentionally testing-only — Settings labels it as
-// such — and stays in the curated list so QA can exercise the
-// activation path without waiting a minute for the timer to fire.
-const SCREENSAVER_TIMEOUTS: &[&str] = &["off", "1", "15", "30", "60"];
-const DEFAULT_SCREENSAVER_TIMEOUT: &str = "60";
+// strings, with the `"off"` sentinel meaning "never activate".
+// Default of 5 minutes matches typical TV/console screensavers and
+// is long enough that idle browsing does not trip it.
+const SCREENSAVER_TIMEOUTS: &[&str] = &["off", "60", "120", "300", "600", "900", "1800"];
+const DEFAULT_SCREENSAVER_TIMEOUT: &str = "300";
+
+// Debug-only QA shortcut so the activation path can be exercised
+// without waiting for the production timer. Only appears in debug
+// builds; release builds drop both the picker entry and the
+// normalization branch so a stray persisted "1" rounds back to the
+// safe default.
+#[cfg(debug_assertions)]
+const SCREENSAVER_TIMEOUTS_DEBUG: &[&str] = &["1"];
 
 #[derive(Default)]
 pub struct SettingsRust {
@@ -405,6 +412,10 @@ fn languages() -> QStringList {
 
 fn screensaver_timeouts() -> QStringList {
     let mut list = QStringList::default();
+    #[cfg(debug_assertions)]
+    for value in SCREENSAVER_TIMEOUTS_DEBUG {
+        list.append(QString::from(*value));
+    }
     for value in SCREENSAVER_TIMEOUTS {
         list.append(QString::from(*value));
     }
@@ -434,6 +445,14 @@ fn normalize_browse_layout(value: &str) -> &'static str {
 
 fn normalize_screensaver_timeout(value: &str) -> &'static str {
     let trimmed = value.trim();
+    #[cfg(debug_assertions)]
+    if let Some(found) = SCREENSAVER_TIMEOUTS_DEBUG
+        .iter()
+        .copied()
+        .find(|v| *v == trimmed)
+    {
+        return found;
+    }
     SCREENSAVER_TIMEOUTS
         .iter()
         .copied()

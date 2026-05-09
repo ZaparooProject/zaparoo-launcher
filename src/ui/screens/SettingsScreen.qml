@@ -375,12 +375,18 @@ Item {
             return qsTr("Off");
         if (value === "1")
             return qsTr("1 second (testing)");
-        if (value === "15")
-            return qsTr("15 seconds");
-        if (value === "30")
-            return qsTr("30 seconds");
         if (value === "60")
             return qsTr("1 minute");
+        if (value === "120")
+            return qsTr("2 minutes");
+        if (value === "300")
+            return qsTr("5 minutes");
+        if (value === "600")
+            return qsTr("10 minutes");
+        if (value === "900")
+            return qsTr("15 minutes");
+        if (value === "1800")
+            return qsTr("30 minutes");
         return qsTr("%1 seconds").arg(value);
     }
 

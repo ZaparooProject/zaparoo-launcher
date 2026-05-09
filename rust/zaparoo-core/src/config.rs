@@ -550,13 +550,13 @@ mod tests {
     fn save_settings_mirror_creates_sections() {
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("launcher.toml");
-        save_settings_mirror(&path, "it_IT", "list", "b", false, true, "30").expect("save");
+        save_settings_mirror(&path, "it_IT", "list", "b", false, true, "300").expect("save");
         let cfg = load_config(&path);
         assert_eq!(cfg.language, "it_IT");
         assert_eq!(cfg.settings.browse_layout.as_deref(), Some("list"));
         assert_eq!(cfg.settings.button_layout.as_deref(), Some("b"));
         assert_eq!(cfg.settings.mouse_enabled, Some(false));
-        assert_eq!(cfg.settings.screensaver_timeout.as_deref(), Some("30"));
+        assert_eq!(cfg.settings.screensaver_timeout.as_deref(), Some("300"));
         assert!(cfg.debug_logging);
     }
 
