@@ -288,7 +288,7 @@ Item {
     // when long. The Text item itself is centered on an integer x and
     // the glyph run is left-aligned inside it; `Text.AlignHCenter` can
     // place bitmap glyphs on a half-pixel when the tile width and text
-    // width have opposite parity, which softens Bongo in CRT mode.
+    // width have opposite parity, which softens the bitmap font in CRT mode.
     // Tints to `textPrimary` on the focused tile so the selection reads
     // at a glance even when the focus outline ring is outside the eye's
     // centre — matches the procedural fallback's focus tint above.

@@ -159,6 +159,8 @@ int main(int argc, char* argv[])
     registerFont(
         QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/AtkinsonHyperlegible-Bold.ttf"));
     registerFont(QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/Bongo-8 Mono.ttf"));
+    registerFont(
+        QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/Mx437_HP_100LX_6x8.ttf"));
     if (zaparoo_rust_crt_native_path_enabled())
     {
         QQuickWindow::setTextRenderType(QQuickWindow::NativeTextRendering);
