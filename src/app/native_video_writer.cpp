@@ -243,6 +243,8 @@ void stopNativeVideoWriter()
 
 #else
 
+#include <QLoggingCategory>
+
 void startNativeVideoWriter()
 {
     qInfo("native video writer: start requested on unsupported build/platform");
