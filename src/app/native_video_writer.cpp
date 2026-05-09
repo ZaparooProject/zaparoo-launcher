@@ -22,14 +22,14 @@ namespace
 {
 
 constexpr uintptr_t kNativeVideoBase = 0x3A000000u;
-constexpr size_t kNativeVideoRegionSize = 0x00060000u;
+constexpr size_t kNativeVideoRegionSize = 0x000A0000u;
 constexpr size_t kControlOffset = 0x00000000u;
 constexpr size_t kBuffer0Offset = 0x00000100u;
-constexpr int kOutputWidth = 384;
-constexpr int kOutputHeight = 224;
-constexpr int kOutputBytes = kOutputWidth * kOutputHeight * 2;
-constexpr size_t kBuffer1Offset = 0x0002A200u;
-constexpr size_t kSourceBytesPerPixel = 2;
+constexpr int kOutputWidth = 320;
+constexpr int kOutputHeight = 240;
+constexpr size_t kSourceBytesPerPixel = 4;
+constexpr int kOutputBytes = kOutputWidth * kOutputHeight * kSourceBytesPerPixel;
+constexpr size_t kBuffer1Offset = 0x0004B100u;
 constexpr size_t kOutputRowBytes = kOutputWidth * kSourceBytesPerPixel;
 
 std::atomic<bool> g_running{false};
@@ -38,11 +38,11 @@ std::thread g_thread;
 bool validateFramebufferWindow(const fb_fix_screeninfo& fixed, const fb_var_screeninfo& var,
                                size_t fbSize)
 {
-    if (var.bits_per_pixel != 16 || var.xres < kOutputWidth || var.yres < kOutputHeight ||
+    if (var.bits_per_pixel != 32 || var.xres < kOutputWidth || var.yres < kOutputHeight ||
         fixed.line_length < kOutputRowBytes)
     {
         qWarning("native video writer: unsupported fb0 mode %ux%u %u bpp; expected at least "
-                 "384x224 16 bpp",
+                 "320x240 32 bpp",
                  var.xres, var.yres, var.bits_per_pixel);
         return false;
     }
@@ -51,7 +51,7 @@ bool validateFramebufferWindow(const fb_fix_screeninfo& fixed, const fb_var_scre
         var.xres_virtual - var.xoffset < kOutputWidth ||
         var.yres_virtual - var.yoffset < kOutputHeight)
     {
-        qWarning("native video writer: visible fb0 window %u,%u in %ux%u cannot cover 384x224",
+        qWarning("native video writer: visible fb0 window %u,%u in %ux%u cannot cover 320x240",
                  var.xoffset, var.yoffset, var.xres_virtual, var.yres_virtual);
         return false;
     }
@@ -60,7 +60,7 @@ bool validateFramebufferWindow(const fb_fix_screeninfo& fixed, const fb_var_scre
         (static_cast<size_t>(var.xoffset) + kOutputWidth) * kSourceBytesPerPixel;
     if (fixed.line_length < sourceRowBytes)
     {
-        qWarning("native video writer: fb0 stride %u too small for visible 384x224 window",
+        qWarning("native video writer: fb0 stride %u too small for visible 320x240 window",
                  fixed.line_length);
         return false;
     }
@@ -162,7 +162,7 @@ void writerLoop()
     memset(const_cast<uint8_t*>(nativeBase + kBuffer1Offset), 0, kOutputBytes);
     *reinterpret_cast<volatile uint32_t*>(const_cast<uint8_t*>(nativeBase + kControlOffset)) = 0;
 
-    qInfo("native video writer: copying top-left 384x224 RGB565 from /dev/fb0 %ux%u to native DDR",
+    qInfo("native video writer: copying top-left 320x240 RGB8888 from /dev/fb0 %ux%u to native DDR",
           var.xres, var.yres);
 
     uint32_t frame = 0;
@@ -219,23 +219,39 @@ void startNativeVideoWriter()
     bool expected = false;
     if (!g_running.compare_exchange_strong(expected, true))
     {
+        qInfo("native video writer: start requested but writer already running");
         return;
     }
+    qInfo("native video writer: start requested, launching writer thread");
     g_thread = std::thread(writerLoop);
 }
 
 void stopNativeVideoWriter()
 {
+    qInfo("native video writer: stop requested");
     g_running.store(false);
     if (g_thread.joinable())
     {
         g_thread.join();
+        qInfo("native video writer: writer thread joined");
+    }
+    else
+    {
+        qInfo("native video writer: no running thread to join");
     }
 }
 
 #else
 
-void startNativeVideoWriter() {}
-void stopNativeVideoWriter() {}
+#include <QLoggingCategory>
+
+void startNativeVideoWriter()
+{
+    qInfo("native video writer: start requested on unsupported build/platform");
+}
+void stopNativeVideoWriter()
+{
+    qInfo("native video writer: stop requested on unsupported build/platform");
+}
 
 #endif
