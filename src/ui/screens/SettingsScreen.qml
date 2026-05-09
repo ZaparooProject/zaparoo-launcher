@@ -346,6 +346,20 @@ Item {
             return qsTr("English");
         if (value === "it_IT")
             return qsTr("Italian");
+        if (value === "de")
+            return qsTr("German");
+        if (value === "el")
+            return qsTr("Greek");
+        if (value === "ja")
+            return qsTr("Japanese");
+        if (value === "nl")
+            return qsTr("Dutch");
+        if (value === "ro")
+            return qsTr("Romanian");
+        if (value === "sk")
+            return qsTr("Slovak");
+        if (value === "uk")
+            return qsTr("Ukrainian");
         return qsTr("Auto");
     }
 

@@ -16,5 +16,6 @@ if [ ! -x "${LAUNCHER}" ]; then
 fi
 
 export ZAPAROO_CORE_ENDPOINT="ws://192.168.1.176:7497/api/v0.1"
-exec "${LAUNCHER}"
-# exec "${LAUNCHER}" --crt
+export ZAPAROO_CRT_PREVIEW_SCALE=3
+# exec "${LAUNCHER}"
+exec "${LAUNCHER}" --crt

@@ -80,13 +80,15 @@ MainLayout {
     Component.onCompleted: {
         // One-shot window sizing for the embedded fullscreen path.
         // Imperative (rather than a binding) so a user resize on a
-        // windowed build can never be undone by a re-evaluation. CRT
-        // preview pins via bindings in MainLayout instead — that path
-        // needs the size set at construction time, before the
-        // compositor has a chance to auto-maximise the window.
+        // windowed build can never be undone by a re-evaluation.
+        // Desktop CRT preview applies one initial integer scale here,
+        // then MainLayout snaps later user resizes to the supported
+        // 3x..5x steps.
         if (root.fullScreen) {
             root.width = Screen.width;
             root.height = Screen.height;
+        } else if (root._crtPreviewActive) {
+            root.applyCrtPreviewScale(root._crtPreviewInitialScale);
         }
         Browse.GamesModel.page_size = root._gamesPageSize;
         // Restore screen synchronously before first paint. The parent

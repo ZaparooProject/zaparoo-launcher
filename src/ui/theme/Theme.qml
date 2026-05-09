@@ -31,6 +31,6 @@ QtObject {
     // Accent — static warm amber used for selection highlights.
     readonly property color accent: "#FFB347"
     // Fonts
-    readonly property string fontUi: crtNativePath ? "Bongo-8 Mono" : "Atkinson Hyperlegible"
-    readonly property string fontMono: crtNativePath ? "Bongo-8 Mono" : "monospace"
+    readonly property string fontUi: crtNativePath ? "MxPlus HP 100LX 6x8" : "Noto Sans"
+    readonly property string fontMono: crtNativePath ? "MxPlus HP 100LX 6x8" : "monospace"
 }

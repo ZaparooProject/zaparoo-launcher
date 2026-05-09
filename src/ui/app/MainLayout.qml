@@ -57,49 +57,83 @@ ApplicationWindow {
     // Explicit override from `ZAPAROO_CRT_PREVIEW_SCALE`. 0 = auto-pick
     // the largest integer scale that fits the primary screen.
     property int crtPreviewScale: 0
+    readonly property int _crtPreviewMinScale: 3
+    readonly property int _crtPreviewMaxScale: 5
+    property bool _crtPreviewResizeGuard: false
 
     readonly property bool _crtPreviewActive: root.crtPreview && root.videoWidth > 0 && root.videoHeight > 0
+
+    function _clampCrtPreviewScale(scale: int): int {
+        return Math.max(root._crtPreviewMinScale, Math.min(root._crtPreviewMaxScale, scale));
+    }
 
     // Largest integer scale that keeps the upscaled window inside
     // the primary screen with a 5% margin reserved for window
     // decoration / panel chrome. Falls back to 4 when Screen
     // metrics aren't available yet (very brief during construction
-    // on some platforms). The override path stays exact.
-    readonly property int _crtPreviewEffectiveScale: {
+    // on some platforms). Clamped to the desktop resize band so the
+    // preview always starts at one of the supported integer steps.
+    readonly property int _crtPreviewInitialScale: {
         if (!_crtPreviewActive)
             return 1;
         if (root.crtPreviewScale > 0)
-            return root.crtPreviewScale;
+            return root._clampCrtPreviewScale(root.crtPreviewScale);
         const sw = Screen.width;
         const sh = Screen.height;
         if (sw <= 0 || sh <= 0)
             return 4;
         const sx = Math.floor((sw * 0.95) / root.videoWidth);
         const sy = Math.floor((sh * 0.95) / root.videoHeight);
-        return Math.max(1, Math.min(sx, sy));
+        return root._clampCrtPreviewScale(Math.max(1, Math.min(sx, sy)));
     }
 
-    readonly property int _crtPreviewWindowWidth: _crtPreviewActive ? root.videoWidth * _crtPreviewEffectiveScale : 0
-    readonly property int _crtPreviewWindowHeight: _crtPreviewActive ? root.videoHeight * _crtPreviewEffectiveScale : 0
+    readonly property int _crtPreviewEffectiveScale: {
+        if (!_crtPreviewActive)
+            return 1;
+        if (root.crtPreviewScale > 0)
+            return root._clampCrtPreviewScale(root.crtPreviewScale);
+        const sx = Math.floor(root.width / root.videoWidth);
+        const sy = Math.floor(root.height / root.videoHeight);
+        return root._clampCrtPreviewScale(Math.max(1, Math.min(sx, sy)));
+    }
+
+    function applyCrtPreviewScale(scale: int): void {
+        if (!root._crtPreviewActive)
+            return;
+        const clamped = root._clampCrtPreviewScale(scale);
+        const targetWidth = root.videoWidth * clamped;
+        const targetHeight = root.videoHeight * clamped;
+        if (root.width === targetWidth && root.height === targetHeight)
+            return;
+        root._crtPreviewResizeGuard = true;
+        root.width = targetWidth;
+        root.height = targetHeight;
+        root._crtPreviewResizeGuard = false;
+    }
 
     // Defaults keep the design canvas at a sensible aspect for Design
     // Studio. Main.qml overrides these at runtime with Screen.width /
     // Screen.height for fullscreen embedded builds. Preview mode
-    // overrides them here through the bindings below so the window
-    // opens at the correct pinned size from construction -- imperative
-    // resize in Component.onCompleted runs too late on tiling /
-    // auto-maximizing compositors.
-    width: _crtPreviewActive ? _crtPreviewWindowWidth : 1280
-    height: _crtPreviewActive ? _crtPreviewWindowHeight : 720
-    // Pin min == max in preview so a compositor that auto-maximises
-    // unconstrained windows still shows the requested fixed size.
-    minimumWidth: _crtPreviewActive ? _crtPreviewWindowWidth : 426
-    minimumHeight: _crtPreviewActive ? _crtPreviewWindowHeight : 240
-    maximumWidth: _crtPreviewActive ? _crtPreviewWindowWidth : 16777215
-    maximumHeight: _crtPreviewActive ? _crtPreviewWindowHeight : 16777215
+    // now applies an initial integer scale, then lets desktop users
+    // resize within the supported 3x..5x band.
+    width: 1280
+    height: 720
+    minimumWidth: _crtPreviewActive ? root.videoWidth * (root.crtPreviewScale > 0 ? root._clampCrtPreviewScale(root.crtPreviewScale) : root._crtPreviewMinScale) : 426
+    minimumHeight: _crtPreviewActive ? root.videoHeight * (root.crtPreviewScale > 0 ? root._clampCrtPreviewScale(root.crtPreviewScale) : root._crtPreviewMinScale) : 240
+    maximumWidth: _crtPreviewActive ? root.videoWidth * (root.crtPreviewScale > 0 ? root._clampCrtPreviewScale(root.crtPreviewScale) : root._crtPreviewMaxScale) : 16777215
+    maximumHeight: _crtPreviewActive ? root.videoHeight * (root.crtPreviewScale > 0 ? root._clampCrtPreviewScale(root.crtPreviewScale) : root._crtPreviewMaxScale) : 16777215
     visible: true
     visibility: root.fullScreen ? Window.FullScreen : Window.Windowed
     title: qsTr("Zaparoo Launcher")
+
+    onWidthChanged: {
+        if (root._crtPreviewActive && root.crtPreviewScale === 0 && !root._crtPreviewResizeGuard)
+            root.applyCrtPreviewScale(root._crtPreviewEffectiveScale);
+    }
+    onHeightChanged: {
+        if (root._crtPreviewActive && root.crtPreviewScale === 0 && !root._crtPreviewResizeGuard)
+            root.applyCrtPreviewScale(root._crtPreviewEffectiveScale);
+    }
 
     Binding {
         target: Resources
