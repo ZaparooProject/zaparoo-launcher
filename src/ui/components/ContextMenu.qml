@@ -95,11 +95,9 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         acceptedButtons: Qt.AllButtons
-        onClicked: (mouse) => {
-            if (mouse.x < panel.x || mouse.y < panel.y
-                || mouse.x > panel.x + panel.width
-                || mouse.y > panel.y + panel.height)
-                menu.closeRequested()
+        onClicked: mouse => {
+            if (mouse.x < panel.x || mouse.y < panel.y || mouse.x > panel.x + panel.width || mouse.y > panel.y + panel.height)
+                menu.closeRequested();
         }
     }
 

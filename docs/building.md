@@ -165,6 +165,16 @@ host distros routinely package different majors than the image. Routing
 through Docker means host runs, Docker runs, and CI produce identical
 output by construction.
 
+The Docker-backed recipes default to `DOCKER_PLATFORM=linux/amd64`. That keeps
+Apple Silicon macOS hosts working even when a lint-image tag has only been
+published for amd64 so far; Docker Desktop runs it under emulation. If the
+matching lint-image tag is available as native arm64 and you want that path,
+override the platform explicitly:
+
+```bash
+DOCKER_PLATFORM=linux/arm64 just fmt
+```
+
 ```bash
 just lint            # everything (rust + cpp + qml)
 just lint-cpp        # clang-format check + clang-tidy
@@ -173,6 +183,9 @@ just lint-rust       # rustfmt check + clippy + cargo-deny
 just fix             # clippy --fix, then all formatters
 just fmt             # formatters only (cargo fmt + clang-format +
                      # qmlformat + cmake-format) on tracked files
+just lint-docker     # alias for `just lint`
+just fmt-docker      # alias for `just fmt`
+just fix-docker      # alias for `just fix`
 ```
 
 `just lint` is the zero-warnings gate before a PR. `just fix` runs

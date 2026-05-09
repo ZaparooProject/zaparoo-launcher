@@ -174,8 +174,7 @@ Item {
     // swallows sub-pixel rounding so the chevrons don't flicker on
     // exact-fit content.
     readonly property bool _hasContentAbove: flickable.contentY > 1
-    readonly property bool _hasContentBelow:
-        flickable.contentY + flickable.height < flickable.contentHeight - 1
+    readonly property bool _hasContentBelow: flickable.contentY + flickable.height < flickable.contentHeight - 1
 
     function _triggerIndex(): void {
         if (settings._scrapeBusy)
@@ -241,12 +240,9 @@ Item {
     // the help-bar A: Open hint.
     readonly property bool focusedFieldIsPicker: {
         if (!settings._isField(settings.currentIndex))
-            return false
-        const id = settings.fields[settings.currentIndex].id
-        return id === "language"
-               || id === "browseLayout"
-               || id === "buttonLayout"
-               || id === "resolution"
+            return false;
+        const id = settings.fields[settings.currentIndex].id;
+        return id === "language" || id === "browseLayout" || id === "buttonLayout" || id === "resolution";
     }
     // True when the focused field is an action button (updateMediaDb,
     // runScraper, uploadLog, aboutLicense). Drives the help-bar Accept

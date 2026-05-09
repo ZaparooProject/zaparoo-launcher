@@ -239,8 +239,7 @@ Item {
         fillMode: Image.PreserveAspectFit
         smooth: true
         asynchronous: false
-        visible: root.showCaption
-                 && (root._coverPending || cover.status === Image.Loading)
+        visible: root.showCaption && (root._coverPending || cover.status === Image.Loading)
     }
 
     Image {

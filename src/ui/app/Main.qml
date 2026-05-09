@@ -614,10 +614,8 @@ MainLayout {
             else if (actionId === "aboutLicense")
                 root._navigateToAbout();
         }
-        function onRequestListPicker(title: string, entries: var,
-                                     initialId: string,
-                                     fieldId: string): void {
-            root.openListPickerModal(title, entries, initialId, fieldId)
+        function onRequestListPicker(title: string, entries: var, initialId: string, fieldId: string): void {
+            root.openListPickerModal(title, entries, initialId, fieldId);
         }
     }
     Connections {
@@ -973,39 +971,38 @@ MainLayout {
     // with a fieldId that round-trips through the modal so the accept
     // handler can dispatch the chosen id back to the matching
     // Browse.Settings.set_X without re-parsing the title.
-    function openListPickerModal(title: string, entries: var,
-                                 initialId: string, fieldId: string): void {
-        root.listPickerTitle = title
-        root.listPickerEntries = entries
-        root.listPickerInitialId = initialId
-        root.listPickerFieldId = fieldId
-        root.listPickerModalVisible = true
+    function openListPickerModal(title: string, entries: var, initialId: string, fieldId: string): void {
+        root.listPickerTitle = title;
+        root.listPickerEntries = entries;
+        root.listPickerInitialId = initialId;
+        root.listPickerFieldId = fieldId;
+        root.listPickerModalVisible = true;
         if (ScreenManager.topModal !== root.modalListPicker)
-            ScreenManager.pushModal(root.modalListPicker)
+            ScreenManager.pushModal(root.modalListPicker);
     }
 
     function closeListPickerModal(): void {
-        root.listPickerModalVisible = false
-        root.listPickerTitle = ""
-        root.listPickerEntries = []
-        root.listPickerInitialId = ""
-        root.listPickerFieldId = ""
+        root.listPickerModalVisible = false;
+        root.listPickerTitle = "";
+        root.listPickerEntries = [];
+        root.listPickerInitialId = "";
+        root.listPickerFieldId = "";
         if (ScreenManager.topModal === root.modalListPicker)
-            ScreenManager.popModal()
+            ScreenManager.popModal();
     }
 
     onListPickerAccepted: (fieldId, selectedId) => {
         if (fieldId === "language")
-            Browse.Settings.set_language(selectedId)
+            Browse.Settings.set_language(selectedId);
         else if (fieldId === "browseLayout")
-            Browse.Settings.set_browse_layout(selectedId)
+            Browse.Settings.set_browse_layout(selectedId);
         else if (fieldId === "buttonLayout")
-            Browse.Settings.set_button_layout(selectedId)
+            Browse.Settings.set_button_layout(selectedId);
         else if (fieldId === "resolution")
-            Browse.Settings.set_resolution(selectedId)
+            Browse.Settings.set_resolution(selectedId);
         else if (fieldId === "screensaverTimeout")
-            Browse.Settings.set_screensaver_timeout(selectedId)
-        root.closeListPickerModal()
+            Browse.Settings.set_screensaver_timeout(selectedId);
+        root.closeListPickerModal();
     }
     onListPickerCloseRequested: root.closeListPickerModal()
 
