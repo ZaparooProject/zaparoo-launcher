@@ -39,16 +39,16 @@ vmode -r 960 720 rgb16
 
 After QML loads, the launcher also starts a native-video copy thread:
 
-- reads `/dev/fb0` as 16-bit RGB565
-- requires `/dev/fb0` to be at least `384x224`
-- copies only the top-left `384x224` pixels, with no scaling
+- reads `/dev/fb0` as 16-bit RGB8888
+- requires `/dev/fb0` to be at least `320x240`
+- copies only the top-left `320x240` pixels, with no scaling
 - copies pixels directly; no RGB conversion
 - writes frames to the 3S-ARM native-video DDR layout:
 
 ```text
 0x3A000000  control word: (frame_counter << 2) | active_buffer
-0x3A000100  buffer 0: 384x224 RGB565
-0x3A02A200  buffer 1: 384x224 RGB565
+0x3A000100  buffer 0: 320x240 RGB8888
+0x3A04B100  buffer 1: 320x240 RGB8888
 ```
 
 ## Current CRT UI Constraints
@@ -86,7 +86,7 @@ DDR layout above while it drives CRT timing itself.
 
 1. Launcher starts and logs `--crt: applying linuxfb mode ... rgb16`.
 2. `/dev/fb0` mode is the configured framebuffer size.
-3. Launcher logs `native video writer: copying top-left 384x224 RGB565 from /dev/fb0 ...`.
+3. Launcher logs `native video writer: copying top-left 320x240 RGB8888 from /dev/fb0 ...`.
 4. Custom core produces analog video without MiSTer `vga_fb` scaler output.
 5. Navigation changes launcher pixels in the native-video DDR buffers.
 6. No regression when `--crt` is omitted; default remains the normal `linuxfb`

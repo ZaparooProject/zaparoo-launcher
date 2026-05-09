@@ -122,6 +122,7 @@ int main(int argc, char* argv[])
     const bool crtNativePathForced = parsedArgs.crtNativePathForced;
     int qtArgc = static_cast<int>(parsedArgs.argv.size()) - 1;
     char** qtArgv = parsedArgs.argv.data();
+    qInfo("CRT startup decision: --crt argument %s", crtNativePathForced ? "present" : "absent");
 
     QGuiApplication::setApplicationName("Zaparoo Launcher");
     QGuiApplication::setApplicationVersion("0.1.0");
@@ -159,7 +160,10 @@ int main(int argc, char* argv[])
     registerFont(
         QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/AtkinsonHyperlegible-Bold.ttf"));
     registerFont(QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/Bongo-8 Mono.ttf"));
-    if (zaparoo_rust_crt_native_path_enabled())
+    const bool crtNativePathEnabled = zaparoo_rust_crt_native_path_enabled();
+    qInfo("CRT startup decision: Rust CRT native path %s",
+          crtNativePathEnabled ? "enabled" : "disabled");
+    if (crtNativePathEnabled)
     {
         QQuickWindow::setTextRenderType(QQuickWindow::NativeTextRendering);
         qInfo("CRT native path: using native text rendering");
@@ -213,7 +217,7 @@ int main(int argc, char* argv[])
           qUtf8Printable(formatNames.join(QStringLiteral(", "))));
 
     QVariantMap initialProperties = {
-        {"crtNativePath", zaparoo_rust_crt_native_path_enabled()},
+        {"crtNativePath", crtNativePathEnabled},
     };
 #ifdef ZAPAROO_EMBEDDED_BUILD
     initialProperties.insert(QStringLiteral("fullScreen"), true);
@@ -265,10 +269,15 @@ int main(int argc, char* argv[])
         return EXIT_FAILURE;
     }
 
-    if (zaparoo_rust_crt_native_path_enabled())
+    if (crtNativePathEnabled)
     {
+        qInfo("CRT startup decision: starting native video writer");
         startNativeVideoWriter();
         std::atexit(stopNativeVideoWriter);
+    }
+    else
+    {
+        qInfo("CRT startup decision: skipping native video writer");
     }
 
     zaparoo_rust_post_qt_start();
