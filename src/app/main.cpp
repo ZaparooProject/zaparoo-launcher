@@ -122,8 +122,7 @@ int main(int argc, char* argv[])
     const bool crtNativePathForced = parsedArgs.crtNativePathForced;
     int qtArgc = static_cast<int>(parsedArgs.argv.size()) - 1;
     char** qtArgv = parsedArgs.argv.data();
-    qInfo("CRT startup decision: --crt argument %s",
-          crtNativePathForced ? "present" : "absent");
+    qInfo("CRT startup decision: --crt argument %s", crtNativePathForced ? "present" : "absent");
 
     QGuiApplication::setApplicationName("Zaparoo Launcher");
     QGuiApplication::setApplicationVersion("0.1.0");
