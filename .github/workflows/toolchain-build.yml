@@ -5,25 +5,25 @@
 name: Build ARM32 toolchain image
 
 on:
-  # On main, a push that touches toolchain/VERSION or Dockerfile.toolchain
-  # auto-publishes the matching image. The "check if version exists" gate
-  # below makes the workflow a no-op when the tag is already in the
-  # registry, so re-runs are cheap and idempotent.
+  # On main, a push that touches scripts/toolchain/VERSION or
+  # Dockerfile.toolchain auto-publishes the matching image. The "check
+  # if version exists" gate below makes the workflow a no-op when the
+  # tag is already in the registry, so re-runs are cheap and idempotent.
   push:
     branches: [main]
     paths:
-      - 'toolchain/VERSION'
+      - 'scripts/toolchain/VERSION'
       - 'Dockerfile.toolchain'
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version tag (e.g., 6.7.2-1)'
+        description: 'Version tag (e.g., 6.10.3-1)'
         required: true
         type: string
   workflow_call:
     inputs:
       version:
-        description: 'Optional override; defaults to toolchain/VERSION contents'
+        description: 'Optional override; defaults to scripts/toolchain/VERSION contents'
         required: false
         type: string
     outputs:
@@ -53,10 +53,10 @@ jobs:
           # file pinned in the repo.
           if [ -n "${INPUT_VERSION}" ]; then
             VERSION="${INPUT_VERSION}"
-          elif [ -f toolchain/VERSION ]; then
-            VERSION=$(tr -d '[:space:]' < toolchain/VERSION)
+          elif [ -f scripts/toolchain/VERSION ]; then
+            VERSION=$(tr -d '[:space:]' < scripts/toolchain/VERSION)
           else
-            echo "Error: no inputs.version provided and toolchain/VERSION is missing" >&2
+            echo "Error: no inputs.version provided and scripts/toolchain/VERSION is missing" >&2
             exit 1
           fi
           # Docker tag grammar: first char [A-Za-z0-9_], then up to 127 of

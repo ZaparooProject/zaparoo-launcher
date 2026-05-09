@@ -5,7 +5,7 @@
 #
 # Build the Qt + MiSTer ARM32 toolchain base image. Qt upstream version is
 # pinned in Dockerfile.toolchain (QT_VERSION arg); the image tag is read from
-# toolchain/VERSION so CI and local dev share the same source of truth.
+# scripts/toolchain/VERSION so CI and local dev share the same source of truth.
 # Run this ONCE (or when the toolchain version needs bumping). Takes ~45
 # minutes. After this, build-arm32.sh will be fast (< 1 min).
 
@@ -13,7 +13,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-VERSION_FILE="${PROJECT_ROOT}/toolchain/VERSION"
+VERSION_FILE="${PROJECT_ROOT}/scripts/toolchain/VERSION"
 DOCKER_PLATFORM="${DOCKER_PLATFORM:-linux/amd64}"
 if [ ! -f "${VERSION_FILE}" ]; then
     echo "Error: toolchain version file not found at ${VERSION_FILE}" >&2
@@ -34,7 +34,7 @@ if ! docker buildx version > /dev/null 2>&1; then
 fi
 IMAGE_TAG="zaparoo/qt6-arm32-mister:${TOOLCHAIN_VERSION}"
 
-echo "=== Building Qt 6.7.2 ARM32 toolchain image (${TOOLCHAIN_VERSION}) ==="
+echo "=== Building Qt 6.10.3 ARM32 toolchain image (${TOOLCHAIN_VERSION}) ==="
 echo "Tag: ${IMAGE_TAG}"
 echo "Docker platform: ${DOCKER_PLATFORM}"
 echo "This will take ~45 minutes on first run."

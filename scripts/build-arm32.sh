@@ -15,7 +15,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 OUTPUT_DIR="${PROJECT_ROOT}/output"
-VERSION_FILE="${PROJECT_ROOT}/toolchain/VERSION"
+VERSION_FILE="${PROJECT_ROOT}/scripts/toolchain/VERSION"
 DOCKER_PLATFORM="${DOCKER_PLATFORM:-linux/amd64}"
 if [ ! -f "${VERSION_FILE}" ]; then
     echo "Error: toolchain version file not found at ${VERSION_FILE}" >&2

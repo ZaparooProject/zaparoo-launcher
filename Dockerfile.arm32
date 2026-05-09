@@ -5,7 +5,7 @@
 # Cross-compiles the zaparoo-launcher application for ARM32 / MiSTer FPGA.
 #
 # Requires the prebuilt toolchain image to exist locally — the tag is
-# derived from toolchain/VERSION (e.g. zaparoo/qt6-arm32-mister:6.7.2-1).
+# derived from scripts/toolchain/VERSION (e.g. zaparoo/qt6-arm32-mister:6.10.3-1).
 #
 # Build the toolchain image first (one-time, ~45 min):
 #   ./scripts/build-toolchain.sh

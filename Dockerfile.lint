@@ -9,7 +9,7 @@
 # cmake-format, or Qt on the host. CI also runs lint jobs against this
 # image so host, Docker, and CI all agree on tool versions by
 # construction — bumping a tool happens in this file (plus
-# `lint/VERSION`) and CI follows automatically.
+# `scripts/lint/VERSION`) and CI follows automatically.
 #
 # Qt is required because:
 #   - cargo clippy compiles the workspace and cxx-qt-lib's build.rs
@@ -23,9 +23,9 @@
 # output across host (via `just *-docker`), Docker, and CI.
 #
 # This image is deliberately separate from the ARM32 cross-compile
-# toolchain (Dockerfile.toolchain). That image is ~8 GB and only
-# applicable to MiSTer builds; this one stays focused on the desktop
-# lint/build surface.
+# toolchain (Dockerfile.toolchain), which carries the ARM gcc tree,
+# static cross Qt, and the host Qt build needed for cross-config —
+# none of which the desktop lint/build surface needs.
 
 FROM rust:1.90-slim-trixie
 
@@ -34,8 +34,8 @@ ENV DEBIAN_FRONTEND=noninteractive
 # default `C` locale; set it explicitly so the tool output is clean.
 ENV LANG=C.UTF-8
 
-# Pinned tool versions. Bump these together with `lint/VERSION` and the
-# image will pick up the new versions on the next CI publish.
+# Pinned tool versions. Bump these together with `scripts/lint/VERSION` and
+# the image will pick up the new versions on the next CI publish.
 ARG QT_VERSION=6.10.3
 ARG CLANG_VERSION=19
 ARG CMAKELANG_VERSION=0.6.13
@@ -94,11 +94,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         "cmakelang==${CMAKELANG_VERSION}" \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Qt via aqtinstall. The default install for the desktop target
-# bundles qtbase, qtdeclarative (Qt Quick / QML + qmllint + qmlformat),
-# and qttools (lupdate / lrelease) — only qtshadertools needs the
-# explicit `-m` because it is an optional add-on. Matches CI's
-# install-qt-action `modules: qtshadertools`.
+# Install Qt via aqtinstall. `--archives` scopes the install to only
+# the sub-archives this repo's lint and desktop-build surface actually
+# consumes:
+#   - qtbase: qmake, Qt Core/Gui/Widgets
+#   - qtdeclarative: Qml, Quick, QuickControls2, QuickTest, qmllint,
+#     qmlformat
+#   - qtsvg: Svg component (CMakeLists.txt:41 find_package requires it)
+#   - qttools: LinguistTools (lupdate, lrelease)
+#   - icu: libicui18n / libicuuc runtime that qmake itself dynamically
+#     links against (aqt's Qt is built against ICU; passing --archives
+#     overrides the default set so icu must be listed explicitly)
+# Skipping the rest drops QtSql, QtNetwork, QtDBus, QtConcurrent,
+# QtPositioning, QtMultimedia, and similar archives that aqt would
+# otherwise pull. `-m qtshadertools` stays as an explicit module because
+# it is an optional add-on, matching CI's install-qt-action
+# `modules: qtshadertools`.
 #
 # TARGETARCH is automatically populated by Docker BuildKit. The aqt
 # host/arch identifiers vary by target: amd64 → host=linux,
@@ -112,6 +123,7 @@ RUN case "${TARGETARCH}" in \
         *) echo "unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
     esac \
     && aqt install-qt "${AQT_HOST}" desktop "${QT_VERSION}" "${AQT_ARCH}" \
+        --archives icu qtbase qtdeclarative qtsvg qttools \
         -m qtshadertools \
         -O /opt/qt \
     && ln -s "/opt/qt/${QT_VERSION}/$(ls /opt/qt/${QT_VERSION})" /opt/qt/current
@@ -126,17 +138,26 @@ ENV QML2_IMPORT_PATH=${QT_DIR}/qml
 # armv7-unknown-linux-gnueabihf is requested by rust/rust-toolchain.toml so
 # the workspace can cross-compile to MiSTer. Pre-installing here means cargo
 # does not have to sync the target every time CI/`just *-docker` invokes it.
+#
+# After the installs, `rm -rf /usr/local/cargo/{registry,git}` drops the
+# crates.io index and source caches that `cargo install` populated. The
+# binaries under /usr/local/cargo/bin are self-contained, and the inner
+# `_lint` flow always runs `cargo` against a host-bind-mounted workspace
+# whose `Cargo.lock` resolves crates fresh into a separate
+# `target/`-tree cache, so these caches are unused after image build.
+#
+# The final `chmod -R` runs in the same RUN layer so it doesn't duplicate
+# the rust + cargo tree into a fresh layer (a standalone chmod RUN on a
+# preceding rust install layer was the largest single bloat source — Docker
+# treats every metadata change as a file copy). `just *-docker` recipes
+# pass `-u $(id -u):$(id -g)` so cargo needs world-writable
+# /usr/local/cargo and /usr/local/rustup at runtime.
 RUN rustup component add rustfmt clippy \
     && rustup target add armv7-unknown-linux-gnueabihf \
     && cargo install --locked --version ${CARGO_DENY_VERSION} cargo-deny \
     && cargo install --locked --version ${CARGO_NEXTEST_VERSION} cargo-nextest \
-    && cargo install --locked --version ${JUST_VERSION} just
-
-# `just *-docker` recipes pass `-u $(id -u):$(id -g)` so the formatter writes
-# files with host-user ownership in the bind mount. cargo then needs to write
-# to its registry/cache during clippy, but /usr/local/cargo is root-owned by
-# default. Make it world-writable so any host UID can use it. CARGO_HOME also
-# moved here in case another image inherits and overrides ENV.
-RUN chmod -R a+rwX /usr/local/cargo /usr/local/rustup
+    && cargo install --locked --version ${JUST_VERSION} just \
+    && rm -rf /usr/local/cargo/registry /usr/local/cargo/git \
+    && chmod -R a+rwX /usr/local/cargo /usr/local/rustup
 
 WORKDIR /workdir
