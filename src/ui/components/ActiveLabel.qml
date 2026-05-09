@@ -19,7 +19,9 @@ Item {
     id: root
 
     property string text: ""
-    readonly property int _textWidth: Math.min(root.width - 2 * Sizing.pctW(5), Sizing.px(labelMetrics.advanceWidth))
+    readonly property int _textMeasureSlack: Theme.crtNativePath ? 0 : 2
+    readonly property int _measuredTextWidth: Math.ceil(Math.max(labelMetrics.advanceWidth, labelMetrics.boundingRect.width) + root._textMeasureSlack)
+    readonly property int _textWidth: Math.min(root.width - 2 * Sizing.pctW(5), root._measuredTextWidth)
 
     TextMetrics {
         id: labelMetrics

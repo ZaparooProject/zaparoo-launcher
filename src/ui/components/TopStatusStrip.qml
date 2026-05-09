@@ -25,7 +25,9 @@ Item {
     property string totalText: "" // formatted; empty hides the slot
     readonly property int _slotWidth: Sizing.px(status.width / 3)
     readonly property int _slotMargin: Sizing.pctW(5)
-    readonly property int _titleTextWidth: Math.min(status._slotWidth, Sizing.px(titleMetrics.advanceWidth))
+    readonly property int _textMeasureSlack: Theme.crtNativePath ? 0 : 2
+    readonly property int _titleMeasuredWidth: Math.ceil(Math.max(titleMetrics.advanceWidth, titleMetrics.boundingRect.width) + status._textMeasureSlack)
+    readonly property int _titleTextWidth: Math.min(status._slotWidth, status._titleMeasuredWidth)
 
     // Page counter and total badge sit on the same baseline as the
     // title's lower edge — bottom-aligned to the strip — so the trio
