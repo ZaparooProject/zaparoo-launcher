@@ -33,9 +33,10 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  # Resolve the lint image tag from `lint/VERSION` and make sure that tag
-  # exists on GHCR before downstream jobs try to spin up containers from
-  # it. PRs that bump `lint/VERSION` therefore self-bootstrap: the very
+  # Resolve the lint image tag from `scripts/lint/VERSION` and make sure
+  # that tag exists on GHCR before downstream jobs try to spin up
+  # containers from it. PRs that bump `scripts/lint/VERSION` therefore
+  # self-bootstrap: the very
   # first CI run for the bump publishes the image, then re-runs and
   # downstream jobs reuse it. The dedicated `lint-image-build.yml`
   # workflow still publishes multi-arch images on pushes to main; this
@@ -57,7 +58,7 @@ jobs:
         env:
           OWNER: ${{ github.repository_owner }}
         run: |
-          VERSION=$(tr -d '[:space:]' < lint/VERSION)
+          VERSION=$(tr -d '[:space:]' < scripts/lint/VERSION)
           OWNER_LC=$(printf '%s' "$OWNER" | tr '[:upper:]' '[:lower:]')
           IMAGE="ghcr.io/${OWNER_LC}/zaparoo-lint:${VERSION}"
           {
@@ -79,13 +80,13 @@ jobs:
             echo "Lint image ${{ steps.resolve.outputs.image }} missing — building"
           fi
       # Fork PRs cannot push to GHCR (GITHUB_TOKEN is read-only), so a
-      # lint/VERSION bump from a fork would fail mid-`docker push` with
+      # scripts/lint/VERSION bump from a fork would fail mid-`docker push` with
       # an opaque "denied: forbidden". Fail fast here with a useful
       # message instead. Maintainer-branch PRs (head.repo.fork == false)
       # fall through to the existing build/push steps.
       - if: steps.check.outputs.exists != 'true' && github.event.pull_request.head.repo.fork == true
         run: |
-          echo "::error::Lint image ${{ steps.resolve.outputs.image }} is not yet published. Fork PRs cannot push to GHCR — ask a maintainer to land the lint/VERSION bump from the main repo first."
+          echo "::error::Lint image ${{ steps.resolve.outputs.image }} is not yet published. Fork PRs cannot push to GHCR — ask a maintainer to land the scripts/lint/VERSION bump from the main repo first."
           exit 1
       - if: steps.check.outputs.exists != 'true' && github.event.pull_request.head.repo.fork != true
         uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4

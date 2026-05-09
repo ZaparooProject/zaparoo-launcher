@@ -5,14 +5,14 @@
 name: Build lint image
 
 on:
-  # On main, a push that touches lint/VERSION or Dockerfile.lint
+  # On main, a push that touches scripts/lint/VERSION or Dockerfile.lint
   # auto-publishes the matching image. The "check if version exists" gate
   # below makes the workflow a no-op when the tag is already in the
   # registry, so re-runs are cheap and idempotent.
   push:
     branches: [main]
     paths:
-      - 'lint/VERSION'
+      - 'scripts/lint/VERSION'
       - 'Dockerfile.lint'
   workflow_dispatch:
     inputs:
@@ -38,10 +38,10 @@ jobs:
         run: |
           if [ -n "${INPUT_VERSION}" ]; then
             VERSION="${INPUT_VERSION}"
-          elif [ -f lint/VERSION ]; then
-            VERSION=$(tr -d '[:space:]' < lint/VERSION)
+          elif [ -f scripts/lint/VERSION ]; then
+            VERSION=$(tr -d '[:space:]' < scripts/lint/VERSION)
           else
-            echo "Error: no inputs.version provided and lint/VERSION is missing" >&2
+            echo "Error: no inputs.version provided and scripts/lint/VERSION is missing" >&2
             exit 1
           fi
           # Docker tag grammar: first char [A-Za-z0-9_], then up to 127 of

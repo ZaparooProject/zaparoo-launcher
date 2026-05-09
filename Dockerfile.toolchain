@@ -5,8 +5,8 @@
 #
 # Builds the reusable Qt + MiSTer ARM32 toolchain base image. Qt upstream
 # version is pinned via the QT_VERSION arg below; the image tag is supplied
-# by scripts/build-toolchain.sh, which reads it from toolchain/VERSION so CI
-# and local dev agree on the tag.
+# by scripts/build-toolchain.sh, which reads it from scripts/toolchain/VERSION
+# so CI and local dev agree on the tag.
 #
 # This image is built ONCE (or when Qt version bumps) and reused by
 # Dockerfile.arm32 to keep per-commit builds fast (< 1 minute vs 45 min).
@@ -14,10 +14,18 @@
 # Build command (run from repo root):
 #   ./scripts/build-toolchain.sh
 #
+# Multi-stage layout: the `builder` stage runs every Qt build RUN as
+# before, then the final `runtime` stage starts from a clean
+# debian:bookworm-slim and `COPY --from=builder` only the artifacts
+# Dockerfile.arm32 actually consumes at build time. The Qt source
+# clones, host build trees, ARM build trees, and `-dev` apt headers
+# never reach the published image, which is what slims it from ~30 GB
+# to a few GB.
+#
 # Qt version pinned here — bump this line when updating Qt:
-ARG QT_VERSION=6.7.2
+ARG QT_VERSION=6.10.3
 
-FROM debian:bookworm-slim AS toolchain-base
+FROM debian:bookworm-slim AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -261,3 +269,88 @@ CC_armv7-unknown-linux-gnueabihf = "arm-none-linux-gnueabihf-gcc"\n\
 CXX_armv7-unknown-linux-gnueabihf = "arm-none-linux-gnueabihf-g++"\n\
 AR_armv7-unknown-linux-gnueabihf = "arm-none-linux-gnueabihf-ar"\n\
 ' > /root/.cargo/config.toml
+
+# Pre-warm rustup with the exact toolchain pinned by rust/rust-toolchain.toml
+# (1.90.0 + armv7-unknown-linux-gnueabihf target). Without this, the first
+# `cargo` invocation inside Dockerfile.arm32 has to download the pinned
+# toolchain on every build because rustup's override falls through to the
+# default `stable` channel installed above. The shipped toolchain.toml is
+# the source of truth, so any bump there will trigger a fresh download
+# until this image is rebuilt — which is the same behavior we'd get
+# without this line, just deferred. Pre-installing here shifts that
+# work into the toolchain-image build (which is rare) instead of every
+# arm32 build (which is per-commit).
+RUN rustup toolchain install 1.90.0 --profile minimal \
+    && rustup target add --toolchain 1.90.0 armv7-unknown-linux-gnueabihf
+
+# Strip DWARF debug info from Qt artifacts before they're copied into the
+# slim runtime stage. `--strip-debug` preserves all symbols needed for
+# linking (this is what Debian's qt6 packages do); the ELF size impact
+# of debug info on Qt's static archives and host shared libs is large
+# (often >50%). Errors are swallowed so files that don't have debug info
+# (e.g. cmake configs) don't fail the build.
+RUN find /opt/qt6-arm32 -name '*.a' \
+        -exec /opt/gcc-arm-10.2-2020.11-x86_64-arm-none-linux-gnueabihf/bin/arm-none-linux-gnueabihf-strip \
+              --strip-debug {} + 2>/dev/null || true
+RUN find /opt/qt6-host \( -name '*.a' -o -name '*.so*' \) \
+        -exec strip --strip-debug {} + 2>/dev/null || true \
+    && find /opt/qt6-host/bin -type f -executable \
+        -exec strip --strip-unneeded {} + 2>/dev/null || true
+
+
+# ---------------------------------------------------------------------------
+# Runtime stage — the published image. Starts from a clean
+# debian:bookworm-slim and copies only the build-time artifacts
+# Dockerfile.arm32 needs. The builder stage's source clones,
+# qt*-host-build/ qt*-arm-build/ trees, and `-dev` apt headers are left
+# behind here.
+# ---------------------------------------------------------------------------
+FROM debian:bookworm-slim AS toolchain-base
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Build-time runtime deps for Dockerfile.arm32:
+#   - cmake, ninja-build, pkg-config: invoked by qt-cmake / build.rs
+#   - build-essential: host gcc/g++ for build.rs scripts that need a
+#     native compiler (cxx-qt-build's host-side codegen)
+#   - git, ca-certificates: misc build.rs hooks (commit lookup,
+#     crates.io HTTPS) — kept for resilience even though
+#     scripts/build-arm32.sh exports ZAPAROO_BUILD_COMMIT explicitly
+#   - python3: a few Qt cmake helpers shell out to python3
+#   - xz-utils: tar.xz extraction during transitive setup
+#   - libglib2.0-0: runtime dependency of qmake and qmlimportscanner
+#     (host Qt was built against libglib2.0-dev; the runtime variant
+#     stays here, the dev headers stay in the builder stage)
+# All `-dev` packages stay in the builder stage; the host Qt's installed
+# cmake configs are self-contained.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        ca-certificates \
+        cmake \
+        git \
+        libglib2.0-0 \
+        ninja-build \
+        pkg-config \
+        python3 \
+        xz-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy the artifacts Dockerfile.arm32 actually consumes:
+#   - ARM cross compiler tree (binaries + sysroot)
+#   - host Qt (qt-cmake, qmake, qmllint, qmlformat, lupdate, lrelease,
+#     LinguistTools cmake config)
+#   - ARM32 static Qt (.a libraries, plugins, lib/cmake configs)
+#   - cargo config + rustup toolchain caches (1.90.0 + armv7 target)
+#   - the cmake toolchain file referenced from qt-cmake
+COPY --from=builder /opt/gcc-arm-10.2-2020.11-x86_64-arm-none-linux-gnueabihf \
+                    /opt/gcc-arm-10.2-2020.11-x86_64-arm-none-linux-gnueabihf
+COPY --from=builder /opt/qt6-host  /opt/qt6-host
+COPY --from=builder /opt/qt6-arm32 /opt/qt6-arm32
+COPY --from=builder /root/.cargo   /root/.cargo
+COPY --from=builder /root/.rustup  /root/.rustup
+COPY --from=builder /build/arm32-toolchain.cmake /build/arm32-toolchain.cmake
+
+ENV PATH="/opt/gcc-arm-10.2-2020.11-x86_64-arm-none-linux-gnueabihf/bin:/root/.cargo/bin:${PATH}"
+ENV ARM_SYSROOT="/opt/gcc-arm-10.2-2020.11-x86_64-arm-none-linux-gnueabihf/arm-none-linux-gnueabihf/libc"
+
+WORKDIR /build

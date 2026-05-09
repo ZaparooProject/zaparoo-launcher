@@ -56,7 +56,7 @@ If `just` isn't packaged for your distro, install it the same way:
 
 - Docker with Buildx (Docker Desktop includes it)
 - x86_64 Linux Docker platform (`linux/amd64`)
-- ~8 GB disk space for the toolchain image
+- ~5 GB disk space for the toolchain image
 
 The toolchain Docker image provides the ARM build environment. Cargo still gets
 its target and linker settings from `rust/.cargo/config.toml`; the desktop
@@ -100,7 +100,7 @@ repository:
 ```
 
 This pulls
-`ghcr.io/zaparooproject/qt6-arm32-mister:<toolchain/VERSION>` if it is not
+`ghcr.io/zaparooproject/qt6-arm32-mister:<scripts/toolchain/VERSION>` if it is not
 already cached locally, builds the application in Docker, and writes the MiSTer
 binary to `output/launcher`. It does not require `just`, Qt, CMake, Rust, or
 the ARM toolchain on the host.
@@ -121,7 +121,7 @@ takes about 45 minutes:
 ```
 
 This creates the local `zaparoo/qt6-arm32-mister:<version>` Docker image. The
-tag comes from `toolchain/VERSION`.
+tag comes from `scripts/toolchain/VERSION`.
 
 Use that local toolchain image for the application build with:
 
@@ -158,7 +158,7 @@ just test-san        # ASan/UBSan suite
 ## Lints
 
 All lint and format recipes run inside the published lint image
-(`ghcr.io/zaparooproject/zaparoo-lint:<lint/VERSION>`). Host execution
+(`ghcr.io/zaparooproject/zaparoo-lint:<scripts/lint/VERSION>`). Host execution
 is not exposed because clang-format, qmlformat, and cmake-format have
 no per-project version pin (no rust-toolchain.toml equivalent), and
 host distros routinely package different majors than the image. Routing
@@ -190,7 +190,7 @@ so they never stomp the artifacts from a host `just build`. First run
 is slow (full Qt-linked build inside the container). Subsequent runs
 reuse `build-docker/` via the bind mount and are fast.
 
-When you bump `lint/VERSION` (because `Dockerfile.lint` changed), the
+When you bump `scripts/lint/VERSION` (because `Dockerfile.lint` changed), the
 first CI run on the PR builds and pushes the new image to GHCR
 automatically before the lint/test/build jobs start. After the PR
 merges to main, `lint-image-build.yml` rebuilds the image multi-arch

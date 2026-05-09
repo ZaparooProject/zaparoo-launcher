@@ -77,12 +77,12 @@ test-san: build-san
 # are not version-pinnable through any host tool ecosystem (no
 # rust-toolchain.toml equivalent), and Qt's qmllint changes its rule set
 # between minor releases. The image is the single source of truth for
-# tool versions, shared with CI by construction. `lint/VERSION` drives
+# tool versions, shared with CI by construction. `scripts/lint/VERSION` drives
 # the image tag — see `Dockerfile.lint` for what is pinned.
 #
-# `_LINT_IMAGE` is read from `lint/VERSION` so a single source of truth
+# `_LINT_IMAGE` is read from `scripts/lint/VERSION` so a single source of truth
 # drives both the publish workflow and local pulls.
-_LINT_IMAGE := "ghcr.io/zaparooproject/zaparoo-lint:" + trim(`cat lint/VERSION`)
+_LINT_IMAGE := "ghcr.io/zaparooproject/zaparoo-lint:" + trim(`cat scripts/lint/VERSION`)
 
 _lint *cmd:
     docker run --rm \
