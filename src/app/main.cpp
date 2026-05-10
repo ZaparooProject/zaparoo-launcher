@@ -240,8 +240,17 @@ int main(int argc, char* argv[])
         {"crtNativePath", crtNativePathEnabled},
     };
 #ifdef ZAPAROO_EMBEDDED_BUILD
+    // MainLayout's `fullScreen` defaults true so the binding pass during
+    // QML construction evaluates width/height/visibility against the
+    // embedded branch — no transient 1280x720 frame for the writer
+    // thread to copy into the CRT scan-out region.
     initialProperties.insert(QStringLiteral("fullScreen"), true);
 #else
+    // Desktop preview: override the QML default so the dev workflow
+    // gets a windowed 1280x720 design canvas. The brief
+    // FullScreen→Windowed transition during construction isn't visible
+    // — the desktop compositor buffers until the first paint.
+    initialProperties.insert(QStringLiteral("fullScreen"), false);
     // Desktop CRT preview: when --crt is passed off-MiSTer, render the
     // QML scene at the configured logical video size and integer-
     // upscale via a layered wrapper Item in MainLayout. Scale defaults

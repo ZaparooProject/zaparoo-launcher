@@ -27,10 +27,10 @@ MainLayout {
 
     // Fullscreen builds (MiSTer) fill the screen; desktop windowed
     // builds inherit MainLayout's 1280x720 design defaults so the user
-    // can resize freely. The fullscreen override is a one-shot in
-    // Component.onCompleted (below) rather than a binding — a binding
-    // here would re-assert 1280 after any user resize, fighting the
-    // OS resize gesture.
+    // can resize freely. MainLayout binds width/height to Screen.* when
+    // fullScreen is true so the first paint is at the correct dims;
+    // doing it imperatively here would land after the first frame and
+    // leave a 1280x720 slice on screen for one frame.
 
     readonly property string modalCardWrite: "card_write"
     readonly property string modalContextMenu: "context_menu"
@@ -78,16 +78,12 @@ MainLayout {
         value: root.scene.height
     }
     Component.onCompleted: {
-        // One-shot window sizing for the embedded fullscreen path.
-        // Imperative (rather than a binding) so a user resize on a
-        // windowed build can never be undone by a re-evaluation.
         // Desktop CRT preview applies one initial integer scale here,
         // then MainLayout snaps later user resizes to the supported
-        // 3x..5x steps.
-        if (root.fullScreen) {
-            root.width = Screen.width;
-            root.height = Screen.height;
-        } else if (root._crtPreviewActive) {
+        // 3x..5x steps. Fullscreen embedded sizing is handled by
+        // MainLayout's width/height bindings so first paint matches
+        // the FB layout.
+        if (!root.fullScreen && root._crtPreviewActive) {
             root.applyCrtPreviewScale(root._crtPreviewInitialScale);
         }
         Browse.GamesModel.page_size = root._gamesPageSize;

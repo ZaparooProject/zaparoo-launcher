@@ -38,7 +38,16 @@ ApplicationWindow {
     // Runtime state. `activeScreen` mirrors ScreenManager's property
     // (two-way synced below so direct assignment from tests still
     // works).
-    property bool fullScreen: false
+    //
+    // `fullScreen` defaults true so the embedded build's first binding
+    // pass for `width`/`height`/`visibility` evaluates against the
+    // correct branch — Qt's createWithInitialProperties runs bindings
+    // BEFORE applying initialProperties, so a `false` default would
+    // commit width=1280/height=720 for one pass, then re-bind. On
+    // linuxfb that one pass is what the writer thread copies to the
+    // CRT region (visible as a whole-frame size snap on first paint).
+    // Desktop preview sets fullScreen=false via initialProperties.
+    property bool fullScreen: true
     property bool crtNativePath: false
     property string activeScreen: ScreenManager.activeScreen
 
@@ -112,12 +121,17 @@ ApplicationWindow {
     }
 
     // Defaults keep the design canvas at a sensible aspect for Design
-    // Studio. Main.qml overrides these at runtime with Screen.width /
-    // Screen.height for fullscreen embedded builds. Preview mode
-    // now applies an initial integer scale, then lets desktop users
-    // resize within the supported 3x..5x band.
-    width: 1280
-    height: 720
+    // Studio. Fullscreen embedded builds (MiSTer) need the screen
+    // dims applied at construction so the first paint matches the
+    // FB layout — Component.onCompleted fires after the first frame,
+    // so an imperative override there leaves a wrong-size first
+    // frame on screen (visible as a zoomed top-left slice on CRT,
+    // where the launcher's writer thread copies that slice into the
+    // FPGA's 320x240 scan-out region). For windowed/preview builds
+    // the binding only evaluates once at construction (Screen.width
+    // is constant per session) so it doesn't fight user resizes.
+    width: root.fullScreen ? Screen.width : 1280
+    height: root.fullScreen ? Screen.height : 720
     minimumWidth: _crtPreviewActive ? root.videoWidth * (root.crtPreviewScale > 0 ? root._clampCrtPreviewScale(root.crtPreviewScale) : root._crtPreviewMinScale) : 426
     minimumHeight: _crtPreviewActive ? root.videoHeight * (root.crtPreviewScale > 0 ? root._clampCrtPreviewScale(root.crtPreviewScale) : root._crtPreviewMinScale) : 240
     maximumWidth: _crtPreviewActive ? root.videoWidth * (root.crtPreviewScale > 0 ? root._clampCrtPreviewScale(root.crtPreviewScale) : root._crtPreviewMaxScale) : 16777215
