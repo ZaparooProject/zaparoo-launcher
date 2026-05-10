@@ -36,6 +36,7 @@ TestCase {
     Main {
         id: mainWindow
 
+        fullScreen: false
         width: 1280
         height: 720
     }

@@ -28,6 +28,7 @@ TestCase {
 
     Main {
         id: main
+        fullScreen: false
         width: 1280
         height: 720
     }
