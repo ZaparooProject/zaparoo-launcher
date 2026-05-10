@@ -149,6 +149,31 @@ ApplicationWindow {
             root.applyCrtPreviewScale(root._crtPreviewEffectiveScale);
     }
 
+    // When the window crosses to a different screen (e.g. dev drags
+    // it from a 4K to a 1080p monitor), Qt updates Screen.width and
+    // Screen.height. The previously-picked integer scale may no
+    // longer fit the smaller screen, so recompute against the new
+    // dimensions and shrink the window if needed. Auto-scale only;
+    // an explicit ZAPAROO_CRT_PREVIEW_SCALE override is honored.
+    readonly property real _crtPreviewScreenW: Screen.width
+    readonly property real _crtPreviewScreenH: Screen.height
+    on_CrtPreviewScreenWChanged: _maybeShrinkCrtPreviewToScreen()
+    on_CrtPreviewScreenHChanged: _maybeShrinkCrtPreviewToScreen()
+
+    function _maybeShrinkCrtPreviewToScreen(): void {
+        if (!root._crtPreviewActive || root.crtPreviewScale > 0)
+            return;
+        const sw = Screen.width;
+        const sh = Screen.height;
+        if (sw <= 0 || sh <= 0)
+            return;
+        const sx = Math.floor((sw * 0.95) / root.videoWidth);
+        const sy = Math.floor((sh * 0.95) / root.videoHeight);
+        const fitScale = root._clampCrtPreviewScale(Math.max(1, Math.min(sx, sy)));
+        if (root._crtPreviewEffectiveScale > fitScale)
+            root.applyCrtPreviewScale(fitScale);
+    }
+
     Binding {
         target: Resources
         property: "buttonLayout"
