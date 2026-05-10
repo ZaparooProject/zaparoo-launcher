@@ -125,7 +125,6 @@ int main(int argc, char* argv[])
     const bool crtNativePathForced = parsedArgs.crtNativePathForced;
     int qtArgc = static_cast<int>(parsedArgs.argv.size()) - 1;
     char** qtArgv = parsedArgs.argv.data();
-    qInfo("CRT startup decision: --crt argument %s", crtNativePathForced ? "present" : "absent");
 
     // Desktop CRT preview: pin Qt's high-DPI handling so logical pixels
     // map 1:1 to physical pixels. Without this, on a screen with
@@ -199,8 +198,6 @@ int main(int argc, char* argv[])
                                                     QStringLiteral("Noto Sans Devanagari"));
     qInfo("Registered application font fallbacks for CJK, Arabic, and Devanagari scripts");
     const bool crtNativePathEnabled = zaparoo_rust_crt_native_path_enabled();
-    qInfo("CRT startup decision: Rust CRT native path %s",
-          crtNativePathEnabled ? "enabled" : "disabled");
     if (crtNativePathEnabled)
     {
         QQuickWindow::setTextRenderType(QQuickWindow::NativeTextRendering);
@@ -330,13 +327,8 @@ int main(int argc, char* argv[])
 
     if (crtNativePathEnabled)
     {
-        qInfo("CRT startup decision: starting native video writer");
         startNativeVideoWriter();
         std::atexit(stopNativeVideoWriter);
-    }
-    else
-    {
-        qInfo("CRT startup decision: skipping native video writer");
     }
 
     // Drain the tokio runtime and detach the Qt-to-Rust log bridge while
