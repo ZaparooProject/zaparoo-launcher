@@ -83,7 +83,7 @@ fn publish(p: Platform) {
 /// Failure of the RPC is logged at `warn` and the platform is left at its
 /// prior value (or `None`). `systems` and other catalog fetches continue
 /// regardless.
-pub fn spawn_fetcher(client: Arc<Client>, runtime: &Arc<tokio::runtime::Runtime>) {
+pub fn spawn_fetcher(client: Arc<Client>, runtime: &tokio::runtime::Handle) {
     let mut connection_rx = client.connection.subscribe();
     runtime.spawn(async move {
         let mut state = connection_rx.borrow_and_update().clone();

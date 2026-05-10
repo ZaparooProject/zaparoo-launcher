@@ -23,7 +23,7 @@
 // here yet — recents launches by `run`-ing the entry's launcher route.
 
 use crate::media_image_cache::{global_media_image_cache, MediaImageCache, MediaKey};
-use crate::models::{global_runtime, global_store};
+use crate::models::{global_handle, global_store};
 use cxx_qt::{CxxQtType, Threading};
 use cxx_qt_lib::{
     QByteArray, QHash, QHashPair_i32_QByteArray, QList, QModelIndex, QString, QVariant,
@@ -345,7 +345,7 @@ impl ffi::RecentsModel {
         self.as_mut().set_loading_more(true);
         let qt_thread = self.qt_thread();
         let store = global_store();
-        global_runtime().spawn(async move {
+        global_handle().spawn(async move {
             let result = store
                 .client()
                 .media_history(MediaHistoryParams {
@@ -374,7 +374,7 @@ impl ffi::RecentsModel {
         }
         let name = entry.media_name.clone();
         let store = global_store();
-        global_runtime().spawn(async move {
+        global_handle().spawn(async move {
             if let Err(e) = store.run_mutation::<RunMutation>(RunParams { text }).await {
                 warn!("run failed for {name}: {}", e.message);
             }
@@ -414,7 +414,7 @@ impl ffi::RecentsModel {
         let cache = global_media_image_cache();
         let mut rx = cache.subscribe();
         let qt_thread = self.qt_thread();
-        let handle = global_runtime().spawn(async move {
+        let handle = global_handle().spawn(async move {
             loop {
                 match rx.recv().await {
                     Ok(update) => {
@@ -577,7 +577,7 @@ fn notify_cover_update(mut model: Pin<&mut ffi::RecentsModel>, key: &MediaKey) {
         let seq = model.rust().cover_gate_seq.clone();
         let ticket = seq.fetch_add(1, Ordering::SeqCst) + 1;
         let qt_thread = model.qt_thread();
-        let handle = global_runtime().spawn(async move {
+        let handle = global_handle().spawn(async move {
             tokio::time::sleep(Duration::from_millis(200)).await;
             let _ = qt_thread.queue(move |mut model: Pin<&mut ffi::RecentsModel>| {
                 if seq.load(Ordering::SeqCst) != ticket {
@@ -650,7 +650,7 @@ fn arm_cover_gate(mut model: Pin<&mut ffi::RecentsModel>) {
     let seq = model.rust().cover_gate_seq.clone();
     let ticket = seq.fetch_add(1, Ordering::SeqCst) + 1;
     let qt_thread = model.qt_thread();
-    let handle = global_runtime().spawn(async move {
+    let handle = global_handle().spawn(async move {
         tokio::time::sleep(Duration::from_secs(3)).await;
         let _ = qt_thread.queue(move |model| {
             if seq.load(Ordering::SeqCst) != ticket {

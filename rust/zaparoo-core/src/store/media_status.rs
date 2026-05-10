@@ -24,7 +24,7 @@ use crate::media_types::{
     IndexingStatusResponse, MediaIndexParams, MediaScrapeParams, ScrapingStatusResponse,
 };
 use std::sync::Arc;
-use tokio::runtime::Runtime;
+use tokio::runtime::Handle;
 use tokio::sync::{broadcast, watch};
 use tokio::time::{sleep, Duration};
 use tracing::{debug, warn};
@@ -118,7 +118,7 @@ impl std::fmt::Debug for MediaStatusResource {
 }
 
 impl MediaStatusResource {
-    pub fn new(client: &Arc<Client>, runtime: &Arc<Runtime>) -> Arc<Self> {
+    pub fn new(client: &Arc<Client>, runtime: &Handle) -> Arc<Self> {
         let (state_tx, _) = watch::channel(MediaStatusState::default());
         let state_arc = Arc::new(state_tx);
 

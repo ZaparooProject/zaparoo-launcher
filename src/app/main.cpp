@@ -46,6 +46,7 @@ constexpr int kPixmapCacheLimitKiB = 50 * 1024;
 
 extern "C" int zaparoo_rust_init(bool crtNativePathForced);
 extern "C" void zaparoo_rust_post_qt_start();
+extern "C" void zaparoo_rust_shutdown();
 extern "C" void zaparoo_log_qt(uint8_t level, const char* msg, size_t len);
 extern "C" const char* zaparoo_rust_language_code();
 extern "C" bool zaparoo_rust_crt_native_path_enabled();
@@ -337,6 +338,26 @@ int main(int argc, char* argv[])
     {
         qInfo("CRT startup decision: skipping native video writer");
     }
+
+    // Drain the tokio runtime and detach the Qt-to-Rust log bridge while
+    // the main thread is still alive and every thread's TLS storage is
+    // still addressable. `aboutToQuit` fires after `Qt.quit()` (or the
+    // last window close) but before `exec()` returns, which is the only
+    // window where we can run `Runtime::shutdown_timeout` and uninstall
+    // the message handler ahead of `__cxa_finalize`.
+    //
+    // The handler matters because Qt's own destruction emits log
+    // messages from internal threads (QThreadPool workers, plugin
+    // teardown). Left installed, those calls re-enter `zaparoo_log_qt`
+    // and the tracing dispatcher whose TLS is mid-destruction, panic
+    // with `AccessError`, and the panic-hook's own `tracing::error!`
+    // re-panics into SIGABRT (exit 134).
+    QObject::connect(&app, &QGuiApplication::aboutToQuit, &app,
+                     []()
+                     {
+                         zaparoo_rust_shutdown();
+                         qInstallMessageHandler(nullptr);
+                     });
 
     zaparoo_rust_post_qt_start();
     return QGuiApplication::exec();

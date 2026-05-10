@@ -49,26 +49,44 @@ pub mod systems_state;
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, OnceLock};
-use tokio::runtime::Runtime;
+use std::time::Duration;
+use tokio::runtime::{Handle, Runtime};
 use tracing::error;
 use zaparoo_core::{persist::PersistedState, store::Store};
 
-static RUNTIME: OnceLock<Arc<Runtime>> = OnceLock::new();
+// `RUNTIME_OWNER` holds the actual `Runtime` and is the only thing that
+// can call `shutdown_timeout`. `HANDLE` is what callers spawn through —
+// cloning a `Handle` is cheap and doesn't entangle Drop ordering. The
+// split exists so `zaparoo_rust_shutdown` can take the owning `Runtime`
+// out and shut it down on the main thread, draining workers while their
+// TLS storage is still alive. Without this split, the static dropped at
+// `__cxa_finalize` and worker exits raced with TLS teardown — any
+// tracing event from a half-exited worker hit `LocalKey::with` and
+// double-panicked into SIGABRT (exit 134).
+static RUNTIME_OWNER: Mutex<Option<Runtime>> = Mutex::new(None);
+static HANDLE: OnceLock<Handle> = OnceLock::new();
 static STORE: OnceLock<Arc<Store>> = OnceLock::new();
 static PERSIST_STATE: OnceLock<Arc<Mutex<PersistedState>>> = OnceLock::new();
 static INPUT_BINDINGS: OnceLock<HashMap<i32, String>> = OnceLock::new();
 static CORE_IS_LOCAL: OnceLock<bool> = OnceLock::new();
 
 pub fn init_globals(
-    runtime: Arc<Runtime>,
+    runtime: Runtime,
     store: Arc<Store>,
     persist_state: Arc<Mutex<PersistedState>>,
     input_bindings: HashMap<i32, String>,
     core_is_local: bool,
 ) {
-    RUNTIME
-        .set(runtime)
-        .unwrap_or_else(|_| panic!("RUNTIME already initialized"));
+    HANDLE
+        .set(runtime.handle().clone())
+        .unwrap_or_else(|_| panic!("HANDLE already initialized"));
+    {
+        let mut owner = RUNTIME_OWNER
+            .lock()
+            .unwrap_or_else(|_| panic!("RUNTIME_OWNER mutex poisoned"));
+        assert!(owner.is_none(), "RUNTIME_OWNER already initialized");
+        *owner = Some(runtime);
+    }
     STORE
         .set(store)
         .unwrap_or_else(|_| panic!("STORE already initialized"));
@@ -83,8 +101,35 @@ pub fn init_globals(
         .unwrap_or_else(|_| panic!("CORE_IS_LOCAL already initialized"));
 }
 
-pub fn global_runtime() -> Arc<Runtime> {
-    RUNTIME.get().expect("RUNTIME not initialized").clone()
+pub fn global_handle() -> Handle {
+    HANDLE.get().expect("HANDLE not initialized").clone()
+}
+
+/// Drains the tokio runtime on the calling thread with a hard deadline.
+/// Idempotent: a second call after the runtime has been taken is a
+/// silent no-op so the FFI shutdown entry point can be safely invoked
+/// from both `aboutToQuit` and any future cleanup paths.
+///
+/// Must run on a thread whose TLS is still alive — i.e. before main
+/// returns and before `__cxa_finalize`. That's what makes this the
+/// right answer to the SIGABRT-on-quit race: workers finish (or get
+/// cancelled) while every thread's `thread_local!` storage is still
+/// addressable, so a final tracing event from a finishing task can't
+/// land on a half-destroyed dispatcher TLS.
+pub fn shutdown_runtime(timeout: Duration) {
+    let runtime = {
+        let mut owner = match RUNTIME_OWNER.lock() {
+            Ok(g) => g,
+            Err(poisoned) => {
+                error!("RUNTIME_OWNER mutex poisoned at shutdown; recovering");
+                poisoned.into_inner()
+            }
+        };
+        owner.take()
+    };
+    if let Some(runtime) = runtime {
+        runtime.shutdown_timeout(timeout);
+    }
 }
 
 pub fn global_store() -> Arc<Store> {

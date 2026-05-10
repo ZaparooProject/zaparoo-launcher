@@ -39,7 +39,7 @@
 use crate::client::{backoff_delay, Client, ClientError, ConnectionState};
 use std::future::Future;
 use std::sync::Arc;
-use tokio::runtime::Runtime;
+use tokio::runtime::Handle;
 use tokio::sync::{oneshot, watch, Notify};
 use tracing::warn;
 
@@ -103,7 +103,7 @@ impl<T: Clone + Send + Sync + 'static> RemoteResource<T> {
     /// lifetime end explicitly. Both shutdown paths are exercised by
     /// `dropping_resource_cancels_spawned_task` and the surrounding
     /// tests.
-    pub fn driven_by<F, Fut>(client: Arc<Client>, runtime: &Arc<Runtime>, fetch: F) -> Self
+    pub fn driven_by<F, Fut>(client: Arc<Client>, runtime: &Handle, fetch: F) -> Self
     where
         F: Fn(Arc<Client>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<T, ClientError>> + Send + 'static,
@@ -118,7 +118,7 @@ impl<T: Clone + Send + Sync + 'static> RemoteResource<T> {
     /// watch without standing up a real WebSocket.
     pub(crate) fn spawn_with<F, Fut>(
         mut connection_rx: watch::Receiver<ConnectionState>,
-        runtime: &Arc<Runtime>,
+        runtime: &Handle,
         fetch: F,
     ) -> Self
     where
@@ -297,13 +297,11 @@ mod tests {
     use std::time::Duration;
     use tokio::time::timeout;
 
-    fn rt() -> Arc<Runtime> {
-        Arc::new(
-            tokio::runtime::Builder::new_multi_thread()
-                .enable_all()
-                .build()
-                .unwrap(),
-        )
+    fn rt() -> tokio::runtime::Runtime {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
     }
 
     /// Wait for the resource status to satisfy a predicate, with a
@@ -337,9 +335,10 @@ mod tests {
     #[test]
     fn idle_until_first_connect() {
         let runtime = rt();
-        runtime.clone().block_on(async {
+        runtime.block_on(async {
             let (conn_tx, conn_rx) = watch::channel(ConnectionState::Disconnected);
-            let res = RemoteResource::<i32>::spawn_with(conn_rx, &runtime, || async { Ok(42) });
+            let res =
+                RemoteResource::<i32>::spawn_with(conn_rx, runtime.handle(), || async { Ok(42) });
             let sub = res.subscribe();
             // Disconnected -> Idle is both the seeded initial value
             // and the task's first publish; either way the observable
@@ -353,9 +352,10 @@ mod tests {
     #[test]
     fn connected_triggers_fetch_and_publishes_ready() {
         let runtime = rt();
-        runtime.clone().block_on(async {
+        runtime.block_on(async {
             let (conn_tx, conn_rx) = watch::channel(ConnectionState::Disconnected);
-            let res = RemoteResource::<i32>::spawn_with(conn_rx, &runtime, || async { Ok(42) });
+            let res =
+                RemoteResource::<i32>::spawn_with(conn_rx, runtime.handle(), || async { Ok(42) });
             let mut sub = res.subscribe();
             conn_tx.send_replace(ConnectionState::Connected);
             let final_status = wait_for(&mut sub, |s| matches!(s, ResourceStatus::Ready(42))).await;
@@ -367,11 +367,11 @@ mod tests {
     #[test]
     fn reconnect_triggers_refetch() {
         let runtime = rt();
-        runtime.clone().block_on(async {
+        runtime.block_on(async {
             let (conn_tx, conn_rx) = watch::channel(ConnectionState::Disconnected);
             let calls = Arc::new(AtomicUsize::new(0));
             let calls_clone = calls.clone();
-            let res = RemoteResource::<usize>::spawn_with(conn_rx, &runtime, move || {
+            let res = RemoteResource::<usize>::spawn_with(conn_rx, runtime.handle(), move || {
                 let n = calls_clone.fetch_add(1, Ordering::SeqCst) + 1;
                 async move { Ok(n) }
             });
@@ -394,22 +394,23 @@ mod tests {
     #[test]
     fn error_with_socket_up_publishes_retrying_then_recovers() {
         let runtime = rt();
-        runtime.clone().block_on(async {
+        runtime.block_on(async {
             let (conn_tx, conn_rx) = watch::channel(ConnectionState::Disconnected);
             let calls = Arc::new(AtomicUsize::new(0));
             let calls_clone = calls.clone();
-            let res = RemoteResource::<&'static str>::spawn_with(conn_rx, &runtime, move || {
-                let n = calls_clone.fetch_add(1, Ordering::SeqCst) + 1;
-                async move {
-                    if n == 1 {
-                        Err(ClientError {
-                            message: "transient".into(),
-                        })
-                    } else {
-                        Ok("ok")
+            let res =
+                RemoteResource::<&'static str>::spawn_with(conn_rx, runtime.handle(), move || {
+                    let n = calls_clone.fetch_add(1, Ordering::SeqCst) + 1;
+                    async move {
+                        if n == 1 {
+                            Err(ClientError {
+                                message: "transient".into(),
+                            })
+                        } else {
+                            Ok("ok")
+                        }
                     }
-                }
-            });
+                });
             let mut sub = res.subscribe();
 
             conn_tx.send_replace(ConnectionState::Connected);
@@ -428,11 +429,11 @@ mod tests {
     #[test]
     fn dropping_resource_cancels_spawned_task() {
         let runtime = rt();
-        runtime.clone().block_on(async {
+        runtime.block_on(async {
             let (conn_tx, conn_rx) = watch::channel(ConnectionState::Connected);
             let calls = Arc::new(AtomicUsize::new(0));
             let calls_clone = calls.clone();
-            let res = RemoteResource::<i32>::spawn_with(conn_rx, &runtime, move || {
+            let res = RemoteResource::<i32>::spawn_with(conn_rx, runtime.handle(), move || {
                 calls_clone.fetch_add(1, Ordering::SeqCst);
                 async move { Ok(0) }
             });
@@ -462,9 +463,9 @@ mod tests {
     #[test]
     fn unreachable_publishes_non_retrying_error() {
         let runtime = rt();
-        runtime.clone().block_on(async {
+        runtime.block_on(async {
             let (conn_tx, conn_rx) = watch::channel(ConnectionState::Disconnected);
-            let res = RemoteResource::<i32>::spawn_with(conn_rx, &runtime, || async {
+            let res = RemoteResource::<i32>::spawn_with(conn_rx, runtime.handle(), || async {
                 Ok(0) // never called — Unreachable doesn't trigger fetch
             });
             let mut sub = res.subscribe();
@@ -493,11 +494,11 @@ mod tests {
     #[test]
     fn seed_loading_when_already_connected() {
         let runtime = rt();
-        runtime.clone().block_on(async {
+        runtime.block_on(async {
             let (_conn_tx, conn_rx) = watch::channel(ConnectionState::Connected);
             // Long-running fetch keeps the spawned task in Loading; it
             // never publishes Ready while we're checking the seed.
-            let res = RemoteResource::<i32>::spawn_with(conn_rx, &runtime, || async {
+            let res = RemoteResource::<i32>::spawn_with(conn_rx, runtime.handle(), || async {
                 tokio::time::sleep(Duration::from_secs(60)).await;
                 Ok(0)
             });
@@ -518,10 +519,11 @@ mod tests {
     #[test]
     fn seed_errored_when_unreachable() {
         let runtime = rt();
-        runtime.clone().block_on(async {
+        runtime.block_on(async {
             let (_conn_tx, conn_rx) =
                 watch::channel(ConnectionState::Unreachable("startup-failure".into()));
-            let res = RemoteResource::<i32>::spawn_with(conn_rx, &runtime, || async { Ok(0) });
+            let res =
+                RemoteResource::<i32>::spawn_with(conn_rx, runtime.handle(), || async { Ok(0) });
             let sub = res.subscribe();
             let initial = sub.borrow().clone();
             match initial {
@@ -537,11 +539,11 @@ mod tests {
     #[test]
     fn refetch_notify_triggers_refetch() {
         let runtime = rt();
-        runtime.clone().block_on(async {
+        runtime.block_on(async {
             let (conn_tx, conn_rx) = watch::channel(ConnectionState::Disconnected);
             let calls = Arc::new(AtomicUsize::new(0));
             let calls_clone = calls.clone();
-            let res = RemoteResource::<usize>::spawn_with(conn_rx, &runtime, move || {
+            let res = RemoteResource::<usize>::spawn_with(conn_rx, runtime.handle(), move || {
                 let n = calls_clone.fetch_add(1, Ordering::SeqCst) + 1;
                 async move { Ok(n) }
             });
@@ -571,11 +573,11 @@ mod tests {
     #[test]
     fn refetch_pulse_while_disconnected_does_not_fetch_until_connected() {
         let runtime = rt();
-        runtime.clone().block_on(async {
+        runtime.block_on(async {
             let (conn_tx, conn_rx) = watch::channel(ConnectionState::Disconnected);
             let calls = Arc::new(AtomicUsize::new(0));
             let calls_clone = calls.clone();
-            let res = RemoteResource::<usize>::spawn_with(conn_rx, &runtime, move || {
+            let res = RemoteResource::<usize>::spawn_with(conn_rx, runtime.handle(), move || {
                 let n = calls_clone.fetch_add(1, Ordering::SeqCst) + 1;
                 async move { Ok(n) }
             });

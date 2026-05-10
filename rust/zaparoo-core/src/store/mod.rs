@@ -29,7 +29,7 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::sync::{Arc, Mutex};
-use tokio::runtime::Runtime;
+use tokio::runtime::Handle;
 use tokio::sync::broadcast;
 
 /// Cache lookup key for `Store::subscribe`. Combines the endpoint's
@@ -76,7 +76,7 @@ struct Inner {
 
 pub struct Store {
     client: Arc<Client>,
-    runtime: Arc<Runtime>,
+    runtime: Handle,
     inner: Arc<Mutex<Inner>>,
     /// Singleton media-status publisher. Eagerly constructed on
     /// `Store::new` so the seeding task starts as soon as the launcher
@@ -91,7 +91,7 @@ impl std::fmt::Debug for Store {
 }
 
 impl Store {
-    pub fn new(client: Arc<Client>, runtime: Arc<Runtime>) -> Arc<Self> {
+    pub fn new(client: Arc<Client>, runtime: Handle) -> Arc<Self> {
         let media_status = MediaStatusResource::new(&client, &runtime);
         let store = Arc::new(Self {
             client,
@@ -412,17 +412,20 @@ mod tests {
     }
 
     fn test_store() -> Arc<Store> {
-        let runtime = Arc::new(
+        // Leak the test runtime so the Handles stored in Client/Store
+        // remain valid for the test's lifetime — Handle does not keep
+        // the Runtime alive on its own.
+        let runtime: &'static tokio::runtime::Runtime = Box::leak(Box::new(
             tokio::runtime::Builder::new_current_thread()
                 .enable_all()
                 .build()
                 .expect("build runtime"),
-        );
+        ));
         // The Client spawns a reconnect task against this endpoint; the
         // test never lets the task connect, so the URL just needs to
         // parse. `subscribe` itself doesn't await anything network-y.
-        let client = Client::new("ws://127.0.0.1:1/never".to_string(), &runtime);
-        Store::new(client, runtime)
+        let client = Client::new("ws://127.0.0.1:1/never".to_string(), runtime.handle());
+        Store::new(client, runtime.handle().clone())
     }
 
     #[test]
