@@ -11,6 +11,7 @@
 
 #include <QByteArray>
 #include <QChar>
+#include <QFont>
 #include <QFontDatabase>
 #include <QGuiApplication>
 #include <QImageReader>
@@ -125,6 +126,22 @@ int main(int argc, char* argv[])
     char** qtArgv = parsedArgs.argv.data();
     qInfo("CRT startup decision: --crt argument %s", crtNativePathForced ? "present" : "absent");
 
+    // Desktop CRT preview: pin Qt's high-DPI handling so logical pixels
+    // map 1:1 to physical pixels. Without this, on a screen with
+    // devicePixelRatio != 1 the GL backend bilinear-filters the final
+    // logical-to-physical present step, smearing the integer-upscaled
+    // CRT output even when `layer.smooth: false` is set on the
+    // upscale wrapper. Forcing scale factor to 1 keeps the window at
+    // physical pixel size and the wrapper's nearest-neighbour scale
+    // produces the literal pixel grid the preview is meant to expose.
+    if (crtNativePathForced)
+    {
+        qputenv("QT_ENABLE_HIGHDPI_SCALING", "0");
+        qputenv("QT_SCALE_FACTOR", "1");
+        QGuiApplication::setHighDpiScaleFactorRoundingPolicy(
+            Qt::HighDpiScaleFactorRoundingPolicy::Floor);
+    }
+
     QGuiApplication::setApplicationName("Zaparoo Launcher");
     QGuiApplication::setApplicationVersion("0.1.0");
     QGuiApplication::setOrganizationName("Zaparoo");
@@ -187,6 +204,18 @@ int main(int argc, char* argv[])
     {
         QQuickWindow::setTextRenderType(QQuickWindow::NativeTextRendering);
         qInfo("CRT native path: using native text rendering");
+        // Desktop CRT preview: FreeType on X11/Wayland defaults to subpixel
+        // RGB antialiasing ("ClearType"), which paints faint coloured
+        // fringes either side of every glyph. MiSTer's linuxfb FreeType
+        // does not enable subpixel AA, so the same scene reads pixel-
+        // perfect there but blurry in the desktop preview. The bitmap
+        // pixel font (MxPlus HP 100LX 6x8) is also designed to never be
+        // smoothed. Set NoAntialias on the application default font so
+        // every Text item that doesn't override styleStrategy inherits it.
+        QFont defaultFont = QGuiApplication::font();
+        defaultFont.setStyleStrategy(QFont::NoAntialias);
+        defaultFont.setHintingPreference(QFont::PreferFullHinting);
+        QGuiApplication::setFont(defaultFont);
     }
     QQuickStyle::setStyle("Basic");
 

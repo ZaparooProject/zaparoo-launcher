@@ -281,9 +281,12 @@ ApplicationWindow {
     // `smooth: false` and `layer.smooth: false` together preserve
     // the pixel grid; without both, Qt bilinear-filters the upscale
     // and the CRT artefacts the preview is meant to expose get
-    // smeared out. `layer.enabled` is software-renderer safe (Qt's
-    // Software adaptation has a real QSGSoftwareLayer) -- no
-    // ShaderEffect, no GraphicalEffects.
+    // smeared out.
+    //
+    // The desktop preview pins Qt's high-DPI scaling to 1 in main.cpp
+    // when --crt is set, so logical pixels map 1:1 to physical pixels
+    // and the GL backend's final logical-to-physical present step is
+    // a no-op (no bilinear filtering smearing the integer upscale).
     Item {
         id: scene
 
