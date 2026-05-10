@@ -19,17 +19,30 @@ Item {
     id: root
 
     property string text: ""
+    readonly property int _textMeasureSlack: Theme.crtNativePath ? 0 : 2
+    readonly property int _measuredTextWidth: Math.ceil(Math.max(labelMetrics.advanceWidth, labelMetrics.boundingRect.width) + root._textMeasureSlack)
+    readonly property int _textWidth: Math.min(root.width - 2 * Sizing.pctW(5), root._measuredTextWidth)
+
+    TextMetrics {
+        id: labelMetrics
+
+        text: root.text
+        font.family: Theme.fontUi
+        font.pixelSize: Sizing.fontSize(4)
+        font.weight: Font.Medium
+    }
 
     Text {
-        anchors.fill: parent
-        anchors.leftMargin: Sizing.pctW(5)
-        anchors.rightMargin: Sizing.pctW(5)
+        x: Sizing.center(parent.width, width)
+        y: Sizing.center(parent.height, height)
+        width: root._textWidth
+        height: Sizing.fontSize(4)
         text: root.text
         font.family: Theme.fontUi
         font.pixelSize: Sizing.fontSize(4)
         font.weight: Font.Medium
         color: Theme.textPrimary
-        horizontalAlignment: Text.AlignHCenter
+        horizontalAlignment: Text.AlignLeft
         verticalAlignment: Text.AlignVCenter
         elide: Text.ElideRight
         renderType: Text.NativeRendering

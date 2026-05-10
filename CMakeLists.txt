@@ -38,14 +38,14 @@ include(ZaparooQmlModule)
 # Always emit compile_commands.json so clangd and clang-tidy work without extra flags.
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-find_package(Qt6 6.7 REQUIRED COMPONENTS Quick QuickControls2 Qml Svg)
-find_package(Qt6LinguistTools 6.7 REQUIRED)
+find_package(Qt6 6.10 REQUIRED COMPONENTS Quick QuickControls2 Qml Svg)
+find_package(Qt6LinguistTools 6.10 REQUIRED)
 
 if(ZAPAROO_BUILD_TESTS)
-    find_package(Qt6 6.7 REQUIRED COMPONENTS QuickTest Test)
+    find_package(Qt6 6.10 REQUIRED COMPONENTS QuickTest Test)
 endif()
 
-qt_standard_project_setup(REQUIRES 6.7)
+qt_standard_project_setup(REQUIRES 6.10)
 
 # Place all QML module outputs in a predictable location so qmllint and Qt Creator's code model can
 # find them. See: https://www.basyskom.de/en/how-to-use-modern-qml-tooling-in-practice/

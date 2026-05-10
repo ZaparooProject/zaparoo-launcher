@@ -42,8 +42,7 @@ Item {
     // sub-pixel rounding so the chevrons don't flicker on exact-fit
     // content.
     readonly property bool _hasContentAbove: flickable.contentY > 1
-    readonly property bool _hasContentBelow:
-        flickable.contentY + flickable.height < flickable.contentHeight - 1
+    readonly property bool _hasContentBelow: flickable.contentY + flickable.height < flickable.contentHeight - 1
 
     function _scrollBy(delta: int): void {
         const maxY = Math.max(0, flickable.contentHeight - flickable.height);
@@ -162,10 +161,7 @@ Item {
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
                     horizontalAlignment: Text.AlignHCenter
-                    text: qsTr("Version %1 · %2 · %3")
-                        .arg(Qt.application.version)
-                        .arg(Browse.BuildInfo.commit)
-                        .arg(Browse.BuildInfo.channel)
+                    text: qsTr("Version %1 · %2 · %3").arg(Qt.application.version).arg(Browse.BuildInfo.commit).arg(Browse.BuildInfo.channel)
                     color: Theme.textLabel
                     font.family: Theme.fontUi
                     font.pixelSize: Sizing.fontSize(2.4)

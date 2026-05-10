@@ -26,8 +26,8 @@ TestCase {
     visible: true
 
     Component.onCompleted: {
-        Sizing.screenWidth = testCase.width
-        Sizing.screenHeight = testCase.height
+        Sizing.screenWidth = testCase.width;
+        Sizing.screenHeight = testCase.height;
     }
 
     ListPickerModal {
@@ -49,121 +49,124 @@ TestCase {
     }
 
     function init(): void {
-        Sizing.screenWidth = testCase.width
-        Sizing.screenHeight = testCase.height
-        picker.open = false
-        picker.entries = []
-        picker.initialId = ""
-        picker.currentIndex = 0
-        acceptedSpy.clear()
-        closeSpy.clear()
+        Sizing.screenWidth = testCase.width;
+        Sizing.screenHeight = testCase.height;
+        picker.open = false;
+        picker.entries = [];
+        picker.initialId = "";
+        picker.currentIndex = 0;
+        acceptedSpy.clear();
+        closeSpy.clear();
     }
 
     function _entries(count) {
-        const list = []
+        const list = [];
         for (let i = 0; i < count; ++i)
-            list.push({ id: "id-" + i, label: "Item " + i })
-        return list
+            list.push({
+                id: "id-" + i,
+                label: "Item " + i
+            });
+        return list;
     }
 
     function test_open_with_no_initial_id_starts_at_zero(): void {
-        picker.entries = _entries(3)
-        picker.open = true
-        compare(picker.currentIndex, 0)
+        picker.entries = _entries(3);
+        picker.open = true;
+        compare(picker.currentIndex, 0);
     }
 
     function test_open_with_matching_initial_id_selects_entry(): void {
-        picker.entries = _entries(4)
-        picker.initialId = "id-2"
-        picker.open = true
-        compare(picker.currentIndex, 2)
+        picker.entries = _entries(4);
+        picker.initialId = "id-2";
+        picker.open = true;
+        compare(picker.currentIndex, 2);
     }
 
     function test_open_with_unknown_initial_id_falls_back_to_zero(): void {
-        picker.entries = _entries(3)
-        picker.initialId = "id-missing"
-        picker.open = true
-        compare(picker.currentIndex, 0)
+        picker.entries = _entries(3);
+        picker.initialId = "id-missing";
+        picker.open = true;
+        compare(picker.currentIndex, 0);
     }
 
     function test_move_advances_and_wraps_forward(): void {
-        picker.entries = _entries(3)
-        picker.open = true
-        picker.move(1)
-        compare(picker.currentIndex, 1)
-        picker.move(1)
-        compare(picker.currentIndex, 2)
-        picker.move(1)
-        compare(picker.currentIndex, 0)
+        picker.entries = _entries(3);
+        picker.open = true;
+        picker.move(1);
+        compare(picker.currentIndex, 1);
+        picker.move(1);
+        compare(picker.currentIndex, 2);
+        picker.move(1);
+        compare(picker.currentIndex, 0);
     }
 
     function test_move_retreats_and_wraps_backward(): void {
-        picker.entries = _entries(3)
-        picker.open = true
-        picker.move(-1)
-        compare(picker.currentIndex, 2)
-        picker.move(-1)
-        compare(picker.currentIndex, 1)
+        picker.entries = _entries(3);
+        picker.open = true;
+        picker.move(-1);
+        compare(picker.currentIndex, 2);
+        picker.move(-1);
+        compare(picker.currentIndex, 1);
     }
 
     function test_move_with_empty_entries_is_noop(): void {
-        picker.entries = []
-        picker.open = true
-        picker.currentIndex = 0
-        picker.move(1)
-        compare(picker.currentIndex, 0)
-        picker.move(-1)
-        compare(picker.currentIndex, 0)
+        picker.entries = [];
+        picker.open = true;
+        picker.currentIndex = 0;
+        picker.move(1);
+        compare(picker.currentIndex, 0);
+        picker.move(-1);
+        compare(picker.currentIndex, 0);
     }
 
     function test_handle_action_up_down_drives_navigation(): void {
-        picker.entries = _entries(3)
-        picker.open = true
-        picker.handleAction("down")
-        compare(picker.currentIndex, 1)
-        picker.handleAction("down")
-        compare(picker.currentIndex, 2)
-        picker.handleAction("up")
-        compare(picker.currentIndex, 1)
+        picker.entries = _entries(3);
+        picker.open = true;
+        picker.handleAction("down");
+        compare(picker.currentIndex, 1);
+        picker.handleAction("down");
+        compare(picker.currentIndex, 2);
+        picker.handleAction("up");
+        compare(picker.currentIndex, 1);
     }
 
     function test_handle_action_accept_emits_accepted_with_current_id(): void {
-        picker.entries = _entries(3)
-        picker.open = true
-        picker.currentIndex = 2
-        picker.handleAction("accept")
-        compare(acceptedSpy.count, 1)
-        compare(acceptedSpy.signalArguments[0][0], "id-2")
+        picker.entries = _entries(3);
+        picker.open = true;
+        picker.currentIndex = 2;
+        picker.handleAction("accept");
+        compare(acceptedSpy.count, 1);
+        compare(acceptedSpy.signalArguments[0][0], "id-2");
     }
 
     function test_handle_action_accept_with_empty_entries_no_signal(): void {
-        picker.entries = []
-        picker.open = true
-        picker.currentIndex = 0
-        picker.handleAction("accept")
-        compare(acceptedSpy.count, 0)
+        picker.entries = [];
+        picker.open = true;
+        picker.currentIndex = 0;
+        picker.handleAction("accept");
+        compare(acceptedSpy.count, 0);
     }
 
     function test_handle_action_cancel_emits_close_requested(): void {
-        picker.entries = _entries(3)
-        picker.open = true
-        picker.handleAction("cancel")
-        compare(closeSpy.count, 1)
+        picker.entries = _entries(3);
+        picker.open = true;
+        picker.handleAction("cancel");
+        compare(closeSpy.count, 1);
     }
 
     function test_reopen_recomputes_initial_index(): void {
         // First open lands on a match.
-        picker.entries = _entries(4)
-        picker.initialId = "id-3"
-        picker.open = true
-        compare(picker.currentIndex, 3)
+        picker.entries = _entries(4);
+        picker.initialId = "id-3";
+        picker.open = true;
+        compare(picker.currentIndex, 3);
         // Close, swap entries + initialId, re-open. The next open must
         // re-resolve from the new initialId, not carry the prior index.
-        picker.open = false
-        picker.entries = _entries(2)
-        picker.initialId = "id-1"
-        picker.open = true
-        compare(picker.currentIndex, 1)
+        picker.open = false;
+        picker.entries = _entries(2);
+        picker.initialId = "id-1";
+        picker.open = true;
+        compare(picker.currentIndex, 1);
     }
 
     function test_long_list_caps_visible_rows(): void {
@@ -172,31 +175,27 @@ TestCase {
         // that. For a list longer than the cap, the viewport must
         // reflect the cap (not full content) so the Flickable
         // scrolls; _contentHeight stays sized to the full list.
-        const cap = picker._maxViewportHeight
-        const stride = picker._rowHeight + picker._rowSpacing
-        const fits = Math.floor((cap + picker._rowSpacing) / stride)
+        const cap = picker._maxViewportHeight;
+        const stride = picker._rowHeight + picker._rowSpacing;
+        const fits = Math.floor((cap + picker._rowSpacing) / stride);
         // Use enough entries to exceed the cap on any plausible
         // screen size so the cap is exercised.
-        const total = fits + 4
-        picker.entries = _entries(total)
-        picker.open = true
-        compare(picker._visibleRows, fits)
-        verify(picker._viewportHeight <= cap)
-        compare(picker._viewportHeight,
-                fits * picker._rowHeight
-                + Math.max(0, fits - 1) * picker._rowSpacing)
-        compare(picker._contentHeight,
-                total * picker._rowHeight
-                + (total - 1) * picker._rowSpacing)
+        const total = fits + 4;
+        picker.entries = _entries(total);
+        picker.open = true;
+        compare(picker._visibleRows, fits);
+        verify(picker._viewportHeight <= cap);
+        compare(picker._viewportHeight, fits * picker._rowHeight + Math.max(0, fits - 1) * picker._rowSpacing);
+        compare(picker._contentHeight, total * picker._rowHeight + (total - 1) * picker._rowSpacing);
     }
 
     function test_short_list_does_not_pad_viewport(): void {
         // For a list that fits inside the cap, the viewport should
         // match the content exactly so the modal doesn't reserve dead
         // space below the entries.
-        picker.entries = _entries(2)
-        picker.open = true
-        compare(picker._visibleRows, 2)
-        compare(picker._viewportHeight, picker._contentHeight)
+        picker.entries = _entries(2);
+        picker.open = true;
+        compare(picker._visibleRows, 2);
+        compare(picker._viewportHeight, picker._contentHeight);
     }
 }

@@ -64,7 +64,7 @@ QML scene aligned to integer pixels.
 - Treat line widths and borders as integer pixels only.
 - In CRT mode, `Sizing.fontSize()` is intentionally quantized to `8` or `16`
   pixels only. Intermediate sizes are not allowed for now.
-- The CRT path uses `Bongo-8 Mono` plus Qt native text rendering. Any new text
+- The CRT path uses `MxPlus HP 100LX 6x8` plus Qt native text rendering. Any new text
   treatment added to the CRT path must be checked against that assumption.
 - Header HUD layout reserves clock width using the measured advance of `23:59`
   so the Wi-Fi / LAN / Bluetooth / NFC icons do not shift as time changes.

@@ -83,9 +83,16 @@ test-san: build-san
 # `_LINT_IMAGE` is read from `scripts/lint/VERSION` so a single source of truth
 # drives both the publish workflow and local pulls.
 _LINT_IMAGE := "ghcr.io/zaparooproject/zaparoo-lint:" + trim(`cat scripts/lint/VERSION`)
+# Docker Desktop on Apple Silicon can run the published amd64 lint image under
+# emulation, while x86_64 hosts run it natively. Default to linux/amd64 so a
+# tag that has not been rebuilt multi-arch yet still works everywhere we care
+# about today. Contributors who have a native arm64 lint image available can
+# opt in with `DOCKER_PLATFORM=linux/arm64 just …`.
+_LINT_PLATFORM := env_var_or_default("DOCKER_PLATFORM", "linux/amd64")
 
 _lint *cmd:
     docker run --rm \
+        --platform {{_LINT_PLATFORM}} \
         -v "$PWD":/workdir \
         -u "$(id -u):$(id -g)" \
         {{_LINT_IMAGE}} \
@@ -135,6 +142,8 @@ _fix-internal:
 lint:
     just _lint just _lint-all-internal
 
+lint-docker: lint
+
 lint-rust:
     just _lint just _lint-rust-internal
 
@@ -147,8 +156,12 @@ lint-qml:
 fmt:
     just _lint just _fmt-internal
 
+fmt-docker: fmt
+
 fix:
     just _lint just _fix-internal
+
+fix-docker: fix
 
 # Install the host-only cargo extensions used by `just test*`.
 install-tools:

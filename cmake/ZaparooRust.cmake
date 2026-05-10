@@ -166,6 +166,18 @@ qt_add_translations(
     "${CMAKE_SOURCE_DIR}/src/ui/translations/launcher_en.ts"
     "${CMAKE_SOURCE_DIR}/src/ui/translations/launcher_it.ts"
     "${CMAKE_SOURCE_DIR}/src/ui/translations/launcher_es.ts"
+    "${CMAKE_SOURCE_DIR}/src/ui/translations/launcher_de.ts"
+    "${CMAKE_SOURCE_DIR}/src/ui/translations/launcher_el.ts"
+    "${CMAKE_SOURCE_DIR}/src/ui/translations/launcher_ja.ts"
+    "${CMAKE_SOURCE_DIR}/src/ui/translations/launcher_ko.ts"
+    "${CMAKE_SOURCE_DIR}/src/ui/translations/launcher_nl.ts"
+    "${CMAKE_SOURCE_DIR}/src/ui/translations/launcher_ro.ts"
+    "${CMAKE_SOURCE_DIR}/src/ui/translations/launcher_sk.ts"
+    "${CMAKE_SOURCE_DIR}/src/ui/translations/launcher_uk.ts"
+    "${CMAKE_SOURCE_DIR}/src/ui/translations/launcher_zh_CN.ts"
+    "${CMAKE_SOURCE_DIR}/src/ui/translations/launcher_he.ts"
+    "${CMAKE_SOURCE_DIR}/src/ui/translations/launcher_ar.ts"
+    "${CMAKE_SOURCE_DIR}/src/ui/translations/launcher_hi.ts"
     RESOURCE_PREFIX
     "/i18n"
     IMMEDIATE_CALL

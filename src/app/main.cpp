@@ -10,6 +10,7 @@
 #include "native_video_writer.h"
 
 #include <QByteArray>
+#include <QChar>
 #include <QFontDatabase>
 #include <QGuiApplication>
 #include <QImageReader>
@@ -155,11 +156,30 @@ int main(int argc, char* argv[])
         qInfo("Registered font %s: %s", qUtf8Printable(path),
               qUtf8Printable(QFontDatabase::applicationFontFamilies(fontId).join(", ")));
     };
-    registerFont(
-        QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/AtkinsonHyperlegible-Regular.ttf"));
-    registerFont(
-        QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/AtkinsonHyperlegible-Bold.ttf"));
-    registerFont(QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/Bongo-8 Mono.ttf"));
+    registerFont(QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/MxPlus_HP_100LX_6x8.ttf"));
+    registerFont(QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/NotoSans.ttf"));
+    registerFont(QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/NotoSansArabic.ttf"));
+    registerFont(QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/NotoSansDevanagari.ttf"));
+    registerFont(QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/NotoSansHebrew.ttf"));
+    registerFont(QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/NotoSansJP.ttf"));
+    registerFont(QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/NotoSansKR.ttf"));
+    registerFont(QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/NotoSansTC.ttf"));
+    // Keep the primary UI fonts separated by mode (CRT = HP 100LX,
+    // standard = Noto Sans). Only register bundled CJK fallbacks so
+    // scripts the primary family lacks still resolve consistently.
+    QFontDatabase::addApplicationFallbackFontFamily(QChar::Script_Hiragana,
+                                                    QStringLiteral("Noto Sans JP"));
+    QFontDatabase::addApplicationFallbackFontFamily(QChar::Script_Katakana,
+                                                    QStringLiteral("Noto Sans JP"));
+    QFontDatabase::addApplicationFallbackFontFamily(QChar::Script_Hangul,
+                                                    QStringLiteral("Noto Sans KR"));
+    QFontDatabase::addApplicationFallbackFontFamily(QChar::Script_Han,
+                                                    QStringLiteral("Noto Sans TC"));
+    QFontDatabase::addApplicationFallbackFontFamily(QChar::Script_Arabic,
+                                                    QStringLiteral("Noto Sans Arabic"));
+    QFontDatabase::addApplicationFallbackFontFamily(QChar::Script_Devanagari,
+                                                    QStringLiteral("Noto Sans Devanagari"));
+    qInfo("Registered application font fallbacks for CJK, Arabic, and Devanagari scripts");
     const bool crtNativePathEnabled = zaparoo_rust_crt_native_path_enabled();
     qInfo("CRT startup decision: Rust CRT native path %s",
           crtNativePathEnabled ? "enabled" : "disabled");
