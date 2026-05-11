@@ -31,7 +31,7 @@
 // when the user spams direction-arrow + Accept across a model swap.
 
 use crate::media_image_cache::{global_media_image_cache, MediaImageCache, MediaKey};
-use crate::models::{global_runtime, global_store};
+use crate::models::{global_handle, global_store};
 use cxx_qt::{CxxQtType, Threading};
 use cxx_qt_lib::{
     QByteArray, QHash, QHashPair_i32_QByteArray, QList, QModelIndex, QString, QVariant,
@@ -111,7 +111,7 @@ const FETCH_MORE_CHUNK_SIZE: i32 = 100;
 // across frames instead of one ~750 ms - 1.6 s block. The first batch
 // runs synchronously inside the original Qt-thread call so PagedGrid's
 // `_commitPendingTarget` fires within ~200 ms of the user's press; the
-// rest are posted from `global_runtime()` with one frame of breathing
+// rest are posted from `global_handle()` with one frame of breathing
 // room (`SUB_BATCH_FRAME_GAP_MS`) between batches so input + paint can
 // drain in between. 25 is one full visual page on a 5x5 dense layout
 // and roughly 190 ms of insert work warm — detectable as a hitch but
@@ -551,7 +551,7 @@ impl ffi::GamesModel {
         // append no longer belongs to the current page chain and
         // would corrupt the freshly-reset entries.
         let expected_prev_cursor = cursor.clone();
-        global_runtime().spawn(async move {
+        global_handle().spawn(async move {
             let result = store
                 .client()
                 .media_browse(MediaBrowseParams {
@@ -610,7 +610,7 @@ impl ffi::GamesModel {
         let text = entry.zap_script.clone();
         let name = entry.name.clone();
         let store = global_store();
-        global_runtime().spawn(async move {
+        global_handle().spawn(async move {
             if let Err(e) = store.run_mutation::<RunMutation>(RunParams { text }).await {
                 warn!("run failed for {name}: {}", e.message);
             }
@@ -646,7 +646,7 @@ impl ffi::GamesModel {
         self.as_mut().set_card_write_error(QString::default());
         self.as_mut().set_card_write_pending(true);
         let qt_thread = self.qt_thread();
-        global_runtime().spawn(async move {
+        global_handle().spawn(async move {
             let result = store
                 .run_mutation::<ReadersWriteMutation>(ReadersWriteParams { text })
                 .await;
@@ -688,7 +688,7 @@ impl ffi::GamesModel {
         let path = entry.path.clone();
         let store = global_store();
         let qt_thread = self.qt_thread();
-        global_runtime().spawn(async move {
+        global_handle().spawn(async move {
             match store.run_mutation::<MediaTagsUpdateMutation>(params).await {
                 Ok(result) => {
                     let _ = qt_thread.queue(move |mut model| {
@@ -789,7 +789,7 @@ impl ffi::GamesModel {
         let ticket = seq.load(Ordering::SeqCst);
         let store = global_store();
         let qt_thread = self.qt_thread();
-        global_runtime().spawn(async move {
+        global_handle().spawn(async move {
             let result = store
                 .client()
                 .media_meta(MediaMetaParams::for_media(system.clone(), path.clone()))
@@ -883,7 +883,7 @@ impl ffi::GamesModel {
         let cache = global_media_image_cache();
         let mut rx = cache.subscribe();
         let qt_thread = self.qt_thread();
-        let handle = global_runtime().spawn(async move {
+        let handle = global_handle().spawn(async move {
             loop {
                 match rx.recv().await {
                     Ok(update) => {
@@ -999,7 +999,7 @@ impl ffi::GamesModel {
         let qt_thread = self.qt_thread();
         let snapshot = status_rx.borrow_and_update().clone();
         let seq_for_loop = seq.clone();
-        let handle = global_runtime().spawn(async move {
+        let handle = global_handle().spawn(async move {
             while status_rx.changed().await.is_ok() {
                 let snapshot = status_rx.borrow_and_update().clone();
                 let seq_for_closure = seq_for_loop.clone();
@@ -1485,7 +1485,7 @@ fn notify_cover_update(mut model: Pin<&mut ffi::GamesModel>, key: &MediaKey) {
         let seq = model.rust().cover_gate_seq.clone();
         let ticket = seq.fetch_add(1, Ordering::SeqCst) + 1;
         let qt_thread = model.qt_thread();
-        let handle = global_runtime().spawn(async move {
+        let handle = global_handle().spawn(async move {
             tokio::time::sleep(Duration::from_millis(200)).await;
             let _ = qt_thread.queue(move |mut model: Pin<&mut ffi::GamesModel>| {
                 if seq.load(Ordering::SeqCst) != ticket {
@@ -1585,7 +1585,7 @@ fn arm_cover_gate(mut model: Pin<&mut ffi::GamesModel>) {
     let seq = model.rust().cover_gate_seq.clone();
     let ticket = seq.fetch_add(1, Ordering::SeqCst) + 1;
     let qt_thread = model.qt_thread();
-    let handle = global_runtime().spawn(async move {
+    let handle = global_handle().spawn(async move {
         tokio::time::sleep(Duration::from_secs(3)).await;
         let _ = qt_thread.queue(move |model| {
             if seq.load(Ordering::SeqCst) != ticket {
@@ -2117,7 +2117,7 @@ fn apply_append_page(
             //    clamp to the actual last item.
             //
             // Sub-batching note: the rest of the chunk is posted from
-            // `global_runtime()` one frame apart so the Repeater's
+            // `global_handle()` one frame apart so the Repeater's
             // per-delegate `createObject` cost (the dominant Qt-thread
             // stall on MiSTer) is spread across frames. Stale batches
             // self-disarm via the `append_seq` ticket if a new
@@ -2173,7 +2173,7 @@ fn apply_append_page(
             let seq = model.rust().append_seq.clone();
             let ticket = seq.load(Ordering::SeqCst);
             let qt_thread = model.qt_thread();
-            global_runtime().spawn(async move {
+            global_handle().spawn(async move {
                 let last_idx = batches.len().saturating_sub(1);
                 for (i, batch) in batches.into_iter().enumerate() {
                     tokio::time::sleep(Duration::from_millis(SUB_BATCH_FRAME_GAP_MS)).await;

@@ -48,7 +48,7 @@ impl Initialize for ffi::Platform {
         apply_state(self.as_mut(), project(rx.borrow_and_update().as_ref()));
 
         let qt_thread = self.qt_thread();
-        crate::models::global_runtime().spawn(async move {
+        crate::models::global_handle().spawn(async move {
             while rx.changed().await.is_ok() {
                 let next = project(rx.borrow_and_update().as_ref());
                 let _ = qt_thread.queue(move |m| apply_state(m, next));

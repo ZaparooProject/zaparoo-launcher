@@ -22,7 +22,7 @@
 // here yet — favorites launches by `run`-ing the entry's ZapScript.
 
 use crate::media_image_cache::{global_media_image_cache, MediaImageCache, MediaKey};
-use crate::models::{global_runtime, global_store};
+use crate::models::{global_handle, global_store};
 use cxx_qt::{CxxQtType, Threading};
 use cxx_qt_lib::{
     QByteArray, QHash, QHashPair_i32_QByteArray, QList, QModelIndex, QString, QVariant,
@@ -373,7 +373,7 @@ impl ffi::FavoritesModel {
         self.as_mut().set_loading_more(true);
         let qt_thread = self.qt_thread();
         let store = global_store();
-        global_runtime().spawn(async move {
+        global_handle().spawn(async move {
             let result = store
                 .client()
                 .media_search(MediaSearchParams {
@@ -403,7 +403,7 @@ impl ffi::FavoritesModel {
         }
         let name = entry.name.clone();
         let store = global_store();
-        global_runtime().spawn(async move {
+        global_handle().spawn(async move {
             if let Err(e) = store.run_mutation::<RunMutation>(RunParams { text }).await {
                 warn!("run failed for {name}: {}", e.message);
             }
@@ -439,7 +439,7 @@ impl ffi::FavoritesModel {
         self.as_mut().set_card_write_error(QString::default());
         self.as_mut().set_card_write_pending(true);
         let qt_thread = self.qt_thread();
-        global_runtime().spawn(async move {
+        global_handle().spawn(async move {
             let result = store
                 .run_mutation::<ReadersWriteMutation>(ReadersWriteParams { text })
                 .await;
@@ -478,7 +478,7 @@ impl ffi::FavoritesModel {
         let path = entry.path.clone();
         let store = global_store();
         let qt_thread = self.qt_thread();
-        global_runtime().spawn(async move {
+        global_handle().spawn(async move {
             match store.run_mutation::<MediaTagsUpdateMutation>(params).await {
                 Ok(result) => {
                     let _ = qt_thread.queue(move |mut model| {
@@ -550,7 +550,7 @@ impl ffi::FavoritesModel {
         let cache = global_media_image_cache();
         let mut rx = cache.subscribe();
         let qt_thread = self.qt_thread();
-        let handle = global_runtime().spawn(async move {
+        let handle = global_handle().spawn(async move {
             loop {
                 match rx.recv().await {
                     Ok(update) => {
@@ -767,7 +767,7 @@ fn notify_cover_update(mut model: Pin<&mut ffi::FavoritesModel>, key: &MediaKey)
         let seq = model.rust().cover_gate_seq.clone();
         let ticket = seq.fetch_add(1, Ordering::SeqCst) + 1;
         let qt_thread = model.qt_thread();
-        let handle = global_runtime().spawn(async move {
+        let handle = global_handle().spawn(async move {
             tokio::time::sleep(Duration::from_millis(200)).await;
             let _ = qt_thread.queue(move |mut model: Pin<&mut ffi::FavoritesModel>| {
                 if seq.load(Ordering::SeqCst) != ticket {
@@ -840,7 +840,7 @@ fn arm_cover_gate(mut model: Pin<&mut ffi::FavoritesModel>) {
     let seq = model.rust().cover_gate_seq.clone();
     let ticket = seq.fetch_add(1, Ordering::SeqCst) + 1;
     let qt_thread = model.qt_thread();
-    let handle = global_runtime().spawn(async move {
+    let handle = global_handle().spawn(async move {
         tokio::time::sleep(Duration::from_secs(3)).await;
         let _ = qt_thread.queue(move |model| {
             if seq.load(Ordering::SeqCst) != ticket {

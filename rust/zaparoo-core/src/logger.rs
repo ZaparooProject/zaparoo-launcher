@@ -43,7 +43,7 @@ pub fn install_at(config: &Config, log_path: &Path) -> LoggerGuard {
         .with_writer(std::io::stderr)
         .with_ansi(false)
         .with_target(false)
-        .with_timer(fmt::time::LocalTime::rfc_3339());
+        .with_timer(fmt::time::UtcTime::rfc_3339());
 
     let file_layer = fmt::layer()
         .with_writer(non_blocking_file)

@@ -108,7 +108,7 @@ fn bind_catalog_status(mut model: Pin<&mut ffi::AppStatus>) {
     apply_catalog_state(model.as_mut(), projected);
 
     let qt_thread = model.qt_thread();
-    crate::models::global_runtime().spawn(async move {
+    crate::models::global_handle().spawn(async move {
         while rx.changed().await.is_ok() {
             let projected = project_catalog(&rx.borrow_and_update());
             let _ = qt_thread.queue(move |m| apply_catalog_state(m, projected));
@@ -128,7 +128,7 @@ fn bind_link_state(mut model: Pin<&mut ffi::AppStatus>) {
     apply_link_state(model.as_mut(), projected);
 
     let qt_thread = model.qt_thread();
-    crate::models::global_runtime().spawn(async move {
+    crate::models::global_handle().spawn(async move {
         while rx.changed().await.is_ok() {
             let projected = project_link(&rx.borrow_and_update());
             let _ = qt_thread.queue(move |m| apply_link_state(m, projected));

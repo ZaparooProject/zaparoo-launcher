@@ -39,6 +39,7 @@ use std::io::Write as _;
 use std::os::fd::AsRawFd;
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
+use std::time::Duration;
 use zaparoo_core::{
     client::Client,
     config::load_config,
@@ -158,7 +159,6 @@ pub extern "C" fn zaparoo_rust_video_height() -> u32 {
 /// the chained default hook); the blocking append is durable before we
 /// hand off.
 fn install_panic_hook() {
-    let default = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
         let payload = info.payload();
         let msg = payload
@@ -170,14 +170,25 @@ fn install_panic_hook() {
             || "<unknown>".to_string(),
             |l| format!("{}:{}:{}", l.file(), l.line(), l.column()),
         );
-        let thread = std::thread::current();
-        let thread_name = thread.name().unwrap_or("<unnamed>");
-        let backtrace = std::backtrace::Backtrace::capture();
+        // `std::thread::current()` and `Backtrace::capture()` both touch
+        // TLS internally; on a thread mid-destruction they would
+        // re-panic and turn this hook into an abort. Catch-unwind those
+        // and substitute fallback strings so the hook always finishes.
+        let thread_name = std::panic::catch_unwind(|| {
+            std::thread::current()
+                .name()
+                .map_or_else(|| "<unnamed>".to_string(), str::to_string)
+        })
+        .unwrap_or_else(|_| "<tls-gone>".to_string());
+        let backtrace = std::panic::catch_unwind(std::backtrace::Backtrace::capture)
+            .map_or_else(|_| String::new(), |bt| bt.to_string());
         let line = format!("thread '{thread_name}' panicked at {location}: {msg}\n{backtrace}");
 
         // Best-effort blocking write to launcher.log. Each call opens a
         // fresh fd in append mode so we don't depend on any state that
-        // a partially-corrupted process might have torn down.
+        // a partially-corrupted process might have torn down. No TLS
+        // access here — File I/O via libc::write goes straight to the
+        // kernel.
         if let Ok(mut f) = std::fs::OpenOptions::new()
             .create(true)
             .append(true)
@@ -188,8 +199,20 @@ fn install_panic_hook() {
             let _ = f.sync_data();
         }
 
-        tracing::error!(target: "panic", "{line}");
-        default(info);
+        // Mirror to stderr via the libc-backed Stderr handle (no TLS).
+        // We deliberately do not call the default panic hook or
+        // `tracing::error!` — both reach into TLS for thread-name
+        // formatting and dispatcher lookup, which on a teardown-phase
+        // thread would re-panic into SIGABRT before the original cause
+        // is even visible.
+        let mut stderr = std::io::stderr();
+        let _ = std::io::Write::write_all(&mut stderr, b"thread '");
+        let _ = std::io::Write::write_all(&mut stderr, thread_name.as_bytes());
+        let _ = std::io::Write::write_all(&mut stderr, b"' panicked at ");
+        let _ = std::io::Write::write_all(&mut stderr, location.as_bytes());
+        let _ = std::io::Write::write_all(&mut stderr, b": ");
+        let _ = std::io::Write::write_all(&mut stderr, msg.as_bytes());
+        let _ = std::io::Write::write_all(&mut stderr, b"\n");
     }));
 }
 
@@ -333,27 +356,27 @@ pub extern "C" fn zaparoo_rust_init(crt_native_path_forced: bool) -> c_int {
         .enable_all()
         .build()
     {
-        Ok(r) => Arc::new(r),
+        Ok(r) => r,
         Err(e) => {
             tracing::error!("failed to build tokio runtime: {e}");
             return 1;
         }
     };
+    let handle = runtime.handle().clone();
 
     mister_runtime::apply_pre_qt_setup(&config, crt_native_path_forced);
 
-    let client = Client::new(config.core_endpoint.clone(), &runtime);
-    platform::spawn_fetcher(client.clone(), &runtime);
-    let store = Store::new(client.clone(), runtime.clone());
+    let client = Client::new(config.core_endpoint.clone(), &handle);
+    platform::spawn_fetcher(client.clone(), &handle);
+    let store = Store::new(client.clone(), handle.clone());
 
     // Load persisted UI state up front so per-screen singletons can seed
     // their properties from a consistent snapshot during Initialize.
     let persist_state = Arc::new(Mutex::new(persist::load()));
 
-    // init_globals stores Arcs — runtime keeps running after this fn returns.
-    // The `Client` is owned by the `Store` (and the platform fetcher
-    // task), so `init_globals` no longer takes it directly; singletons
-    // reach the client through `global_store()`.
+    // init_globals takes the owning `Runtime` — the static holder is
+    // what `zaparoo_rust_shutdown` later drains via `shutdown_timeout`.
+    // Other subsystems reach the runtime through `global_handle()`.
     let core_is_local = core_endpoint_is_loopback(&config.core_endpoint);
     models::init_globals(
         runtime,
@@ -364,6 +387,20 @@ pub extern "C" fn zaparoo_rust_init(crt_native_path_forced: bool) -> c_int {
     );
 
     0
+}
+
+/// Drains the tokio runtime with a 2-second deadline. Called from the
+/// C++ side via `QGuiApplication::aboutToQuit` so workers exit while
+/// the main thread is still alive and every thread's TLS storage is
+/// still addressable. Without this, static `Runtime` drop ran during
+/// `__cxa_finalize` after main returned, racing tokio worker exits
+/// with TLS teardown — any final tracing event from a finishing
+/// worker hit `LocalKey::with` and double-panicked into SIGABRT.
+///
+/// Idempotent — safe to call more than once.
+#[no_mangle]
+pub extern "C" fn zaparoo_rust_shutdown() {
+    models::shutdown_runtime(Duration::from_secs(2));
 }
 
 /// Called by the C++ main after the QML engine has loaded but before `exec()`.

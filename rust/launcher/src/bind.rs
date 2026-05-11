@@ -66,7 +66,7 @@ macro_rules! bind_to_endpoint {
                 $apply(self.as_mut(), projected);
 
                 let qt_thread = self.qt_thread();
-                $crate::models::global_runtime().spawn(async move {
+                $crate::models::global_handle().spawn(async move {
                     while rx.changed().await.is_ok() {
                         let projected = $select(&*rx.borrow_and_update());
                         let _ = qt_thread.queue(move |m| $apply(m, projected));

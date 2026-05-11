@@ -98,7 +98,7 @@ fn bind_local_readers(mut model: Pin<&mut ffi::SystemStatus>) {
     apply_has_nfc(model.as_mut(), project_readers(&rx.borrow_and_update()));
 
     let qt_thread = model.qt_thread();
-    crate::models::global_runtime().spawn(async move {
+    crate::models::global_handle().spawn(async move {
         while rx.changed().await.is_ok() {
             let has_nfc = project_readers(&rx.borrow_and_update());
             let _ = qt_thread.queue(move |m| apply_has_nfc(m, has_nfc));
@@ -107,7 +107,7 @@ fn bind_local_readers(mut model: Pin<&mut ffi::SystemStatus>) {
 
     let mut notifications = store.subscribe_notifications();
     let resource_for_notifications = resource.clone();
-    crate::models::global_runtime().spawn(async move {
+    crate::models::global_handle().spawn(async move {
         loop {
             match notifications.recv().await {
                 Ok(notification)

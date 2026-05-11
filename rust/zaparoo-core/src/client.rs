@@ -283,7 +283,7 @@ pub struct Client {
 }
 
 impl Client {
-    pub fn new(endpoint: String, runtime: &Arc<tokio::runtime::Runtime>) -> Arc<Self> {
+    pub fn new(endpoint: String, runtime: &tokio::runtime::Handle) -> Arc<Self> {
         let (connection_tx, _) = watch::channel(ConnectionState::Disconnected);
         let pending: PendingMap = Arc::new(Mutex::new(HashMap::new()));
         let pending_clone = pending.clone();

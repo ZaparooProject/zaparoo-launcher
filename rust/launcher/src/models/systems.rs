@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Wizzo Pty Ltd and the Zaparoo Project contributors.
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 
-use crate::models::{global_runtime, global_store};
+use crate::models::{global_handle, global_store};
 use cxx_qt::{CxxQtType, Threading};
 use cxx_qt_lib::{QByteArray, QHash, QHashPair_i32_QByteArray, QModelIndex, QString, QVariant};
 use std::pin::Pin;
@@ -347,7 +347,7 @@ impl ffi::SystemsModel {
         let catalog = self.rust().last_ready.clone();
 
         let qt_thread = self.qt_thread();
-        let handle = global_runtime().spawn(async move {
+        let handle = global_handle().spawn(async move {
             let rows = rows_for_category(catalog.as_ref(), &cat);
             let count = rows.len() as i32;
             let cat_for_log = cat.clone();
@@ -429,7 +429,7 @@ impl ffi::SystemsModel {
         self.as_mut().set_card_write_error(QString::default());
         self.as_mut().set_card_write_pending(true);
         let qt_thread = self.qt_thread();
-        global_runtime().spawn(async move {
+        global_handle().spawn(async move {
             let result = store
                 .run_mutation::<ReadersWriteMutation>(ReadersWriteParams { text })
                 .await;
@@ -461,7 +461,7 @@ impl ffi::SystemsModel {
         let text = format!("**launch.system:{}", system.id);
         let name = system.name.clone();
         let store = global_store();
-        global_runtime().spawn(async move {
+        global_handle().spawn(async move {
             if let Err(e) = store.run_mutation::<RunMutation>(RunParams { text }).await {
                 warn!("run failed for {name}: {}", e.message);
             }

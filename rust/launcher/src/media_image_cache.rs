@@ -38,7 +38,7 @@ use std::sync::{Arc, Mutex, OnceLock, RwLock};
 
 use base64::engine::general_purpose::{STANDARD as BASE64_STANDARD, URL_SAFE_NO_PAD};
 use base64::Engine as _;
-use tokio::runtime::Runtime;
+use tokio::runtime::Handle;
 use tokio::sync::{broadcast, Notify};
 use tracing::{debug, info, warn};
 
@@ -474,7 +474,7 @@ pub struct MediaImageCache {
 }
 
 impl MediaImageCache {
-    fn new<F>(cap_bytes: usize, runtime: &Arc<Runtime>, store_factory: F) -> Self
+    fn new<F>(cap_bytes: usize, runtime: &Handle, store_factory: F) -> Self
     where
         F: Fn() -> Arc<Store> + Send + Sync + 'static,
     {
@@ -698,7 +698,7 @@ fn drain_one_round(queue: &Arc<Mutex<VecDeque<QueueEntry>>>) -> Vec<QueueEntry> 
 }
 
 fn spawn_fetch_driver<F>(
-    runtime: &Arc<Runtime>,
+    runtime: &Handle,
     cap_bytes: usize,
     state: &Arc<RwLock<CacheState>>,
     updates_tx: &broadcast::Sender<MediaImageUpdate>,
@@ -1121,7 +1121,7 @@ static GLOBAL_MEDIA_IMAGE_CACHE: OnceLock<Arc<MediaImageCache>> = OnceLock::new(
 pub fn global_media_image_cache() -> Arc<MediaImageCache> {
     GLOBAL_MEDIA_IMAGE_CACHE
         .get_or_init(|| {
-            let runtime = crate::models::global_runtime();
+            let runtime = crate::models::global_handle();
             let cache =
                 MediaImageCache::new(CACHE_CAP_BYTES, &runtime, crate::models::global_store);
             Arc::new(cache)

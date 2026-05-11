@@ -176,7 +176,7 @@ impl Initialize for ffi::MediaStatus {
         apply(self.as_mut(), project(&rx.borrow_and_update()));
 
         let qt_thread = self.qt_thread();
-        crate::models::global_runtime().spawn(async move {
+        crate::models::global_handle().spawn(async move {
             while rx.changed().await.is_ok() {
                 let snapshot = project(&rx.borrow_and_update());
                 let _ = qt_thread.queue(move |m| apply(m, snapshot));
@@ -188,7 +188,7 @@ impl Initialize for ffi::MediaStatus {
 impl ffi::MediaStatus {
     fn start_index(self: Pin<&mut Self>) {
         let resource = crate::models::global_store().media_status();
-        crate::models::global_runtime().spawn(async move {
+        crate::models::global_handle().spawn(async move {
             if let Err(e) = resource.start_index(MediaIndexParams::default()).await {
                 warn!("media_status: start_index failed: {}", e.message);
             }
@@ -197,7 +197,7 @@ impl ffi::MediaStatus {
 
     fn cancel_index(self: Pin<&mut Self>) {
         let resource = crate::models::global_store().media_status();
-        crate::models::global_runtime().spawn(async move {
+        crate::models::global_handle().spawn(async move {
             if let Err(e) = resource.cancel_index().await {
                 warn!("media_status: cancel_index failed: {}", e.message);
             }
@@ -206,7 +206,7 @@ impl ffi::MediaStatus {
 
     fn start_scrape(self: Pin<&mut Self>) {
         let resource = crate::models::global_store().media_status();
-        crate::models::global_runtime().spawn(async move {
+        crate::models::global_handle().spawn(async move {
             // ES gamelist.xml across every indexed system, no re-scrape.
             // Core ships this scraper in-tree (see `pkg/api/server.go`
             // wiring `gamelistxml.NewGamelistXMLScraper`) and validates
@@ -228,7 +228,7 @@ impl ffi::MediaStatus {
 
     fn cancel_scrape(self: Pin<&mut Self>) {
         let resource = crate::models::global_store().media_status();
-        crate::models::global_runtime().spawn(async move {
+        crate::models::global_handle().spawn(async move {
             if let Err(e) = resource.cancel_scrape().await {
                 warn!("media_status: cancel_scrape failed: {}", e.message);
             }
