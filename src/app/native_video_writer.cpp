@@ -112,8 +112,8 @@ void initNativeVideoWriter()
     // Menu fork core expects, and silently copying the top-left slice
     // would mask that misconfiguration.
     if (var.bits_per_pixel != 32 || var.xres != static_cast<uint32_t>(kOutputWidth) ||
-        var.yres != static_cast<uint32_t>(kOutputHeight) ||
-        fixed.line_length != kOutputStride || var.xoffset != 0 || var.yoffset != 0)
+        var.yres != static_cast<uint32_t>(kOutputHeight) || fixed.line_length != kOutputStride ||
+        var.xoffset != 0 || var.yoffset != 0)
     {
         qWarning("native video writer: fb0 mode %ux%u %ubpp stride=%u offset=(%u,%u) does not "
                  "match required %dx%d 32bpp stride=%zu at (0,0); writer disabled",
@@ -214,9 +214,7 @@ void initNativeVideoWriter()
 {
     qInfo("native video writer: init requested on unsupported build/platform");
 }
-void copyFrameNativeVideoWriter()
-{
-}
+void copyFrameNativeVideoWriter() {}
 void stopNativeVideoWriter()
 {
     qInfo("native video writer: stop requested on unsupported build/platform");
