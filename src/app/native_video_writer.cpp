@@ -8,14 +8,12 @@
 
 #include <QLoggingCategory>
 #include <atomic>
-#include <chrono>
 #include <cstdint>
 #include <cstring>
 #include <fcntl.h>
 #include <linux/fb.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
-#include <thread>
 #include <unistd.h>
 
 namespace
@@ -25,220 +23,181 @@ constexpr uintptr_t kNativeVideoBase = 0x3A000000u;
 constexpr size_t kNativeVideoRegionSize = 0x000A0000u;
 constexpr size_t kControlOffset = 0x00000000u;
 constexpr size_t kBuffer0Offset = 0x00000100u;
+constexpr size_t kBuffer1Offset = 0x0004B100u;
 constexpr int kOutputWidth = 320;
 constexpr int kOutputHeight = 240;
 constexpr size_t kSourceBytesPerPixel = 4;
-constexpr int kOutputBytes = kOutputWidth * kOutputHeight * kSourceBytesPerPixel;
-constexpr size_t kBuffer1Offset = 0x0004B100u;
-constexpr size_t kOutputRowBytes = kOutputWidth * kSourceBytesPerPixel;
+constexpr size_t kOutputStride = kOutputWidth * kSourceBytesPerPixel;
+constexpr size_t kOutputBytes = kOutputStride * kOutputHeight;
 
-std::atomic<bool> g_running{false};
-std::thread g_thread;
+int g_fbFd = -1;
+int g_memFd = -1;
+const uint8_t* g_fb = nullptr;
+size_t g_fbSize = 0;
+volatile uint8_t* g_nativeBase = nullptr;
+volatile uint8_t* g_slot[2] = {nullptr, nullptr};
+volatile uint32_t* g_ctrl = nullptr;
+uint32_t g_frame = 0;
+int g_active = 0;
+bool g_initialized = false;
 
-bool validateFramebufferWindow(const fb_fix_screeninfo& fixed, const fb_var_screeninfo& var,
-                               size_t fbSize)
+void cleanup()
 {
-    if (var.bits_per_pixel != 32 || var.xres < kOutputWidth || var.yres < kOutputHeight ||
-        fixed.line_length < kOutputRowBytes)
+    if (g_ctrl != nullptr)
     {
-        qWarning("native video writer: unsupported fb0 mode %ux%u %u bpp; expected at least "
-                 "320x240 32 bpp",
-                 var.xres, var.yres, var.bits_per_pixel);
-        return false;
+        *g_ctrl = 0;
+        g_ctrl = nullptr;
     }
-
-    if (var.xres_virtual < var.xoffset || var.yres_virtual < var.yoffset ||
-        var.xres_virtual - var.xoffset < kOutputWidth ||
-        var.yres_virtual - var.yoffset < kOutputHeight)
+    g_slot[0] = nullptr;
+    g_slot[1] = nullptr;
+    if (g_nativeBase != nullptr)
     {
-        qWarning("native video writer: visible fb0 window %u,%u in %ux%u cannot cover 320x240",
-                 var.xoffset, var.yoffset, var.xres_virtual, var.yres_virtual);
-        return false;
+        munmap(const_cast<uint8_t*>(g_nativeBase), kNativeVideoRegionSize);
+        g_nativeBase = nullptr;
     }
-
-    const size_t sourceRowBytes =
-        (static_cast<size_t>(var.xoffset) + kOutputWidth) * kSourceBytesPerPixel;
-    if (fixed.line_length < sourceRowBytes)
+    if (g_fb != nullptr)
     {
-        qWarning("native video writer: fb0 stride %u too small for visible 320x240 window",
-                 fixed.line_length);
-        return false;
+        munmap(const_cast<uint8_t*>(g_fb), g_fbSize);
+        g_fb = nullptr;
+        g_fbSize = 0;
     }
-
-    const size_t visibleOffset = static_cast<size_t>(var.yoffset) * fixed.line_length +
-                                 static_cast<size_t>(var.xoffset) * kSourceBytesPerPixel;
-    const size_t lastByte = visibleOffset +
-                            static_cast<size_t>(kOutputHeight - 1) * fixed.line_length +
-                            static_cast<size_t>(kOutputWidth) * kSourceBytesPerPixel;
-    if (lastByte > fbSize)
+    if (g_memFd >= 0)
     {
-        qWarning("native video writer: visible fb0 window exceeds mapped framebuffer");
-        return false;
+        close(g_memFd);
+        g_memFd = -1;
     }
-
-    return true;
-}
-
-class Fd
-{
-  public:
-    explicit Fd(const char* path, int flags) : m_fd(open(path, flags)) {}
-
-    ~Fd()
+    if (g_fbFd >= 0)
     {
-        if (m_fd >= 0)
-        {
-            close(m_fd);
-        }
+        close(g_fbFd);
+        g_fbFd = -1;
     }
-
-    Fd(const Fd&) = delete;
-    Fd& operator=(const Fd&) = delete;
-
-    int get() const
-    {
-        return m_fd;
-    }
-    bool ok() const
-    {
-        return m_fd >= 0;
-    }
-
-  private:
-    int m_fd = -1;
-};
-
-void writerLoop()
-{
-    Fd fbFd("/dev/fb0", O_RDONLY | O_CLOEXEC);
-    if (!fbFd.ok())
-    {
-        qWarning("native video writer: failed to open /dev/fb0");
-        return;
-    }
-
-    fb_fix_screeninfo fixed = {};
-    fb_var_screeninfo var = {};
-    if (ioctl(fbFd.get(), FBIOGET_FSCREENINFO, &fixed) < 0 ||
-        ioctl(fbFd.get(), FBIOGET_VSCREENINFO, &var) < 0)
-    {
-        qWarning("native video writer: failed to inspect /dev/fb0");
-        return;
-    }
-    const size_t fbSize = fixed.smem_len != 0
-                              ? fixed.smem_len
-                              : static_cast<size_t>(fixed.line_length) * var.yres_virtual;
-    if (!validateFramebufferWindow(fixed, var, fbSize))
-    {
-        return;
-    }
-
-    auto* fb = static_cast<uint8_t*>(mmap(nullptr, fbSize, PROT_READ, MAP_SHARED, fbFd.get(), 0));
-    if (fb == MAP_FAILED)
-    {
-        qWarning("native video writer: failed to map /dev/fb0");
-        return;
-    }
-
-    Fd memFd("/dev/mem", O_RDWR | O_SYNC | O_CLOEXEC);
-    if (!memFd.ok())
-    {
-        munmap(fb, fbSize);
-        qWarning("native video writer: failed to open /dev/mem");
-        return;
-    }
-
-    auto* nativeBase =
-        static_cast<volatile uint8_t*>(mmap(nullptr, kNativeVideoRegionSize, PROT_READ | PROT_WRITE,
-                                            MAP_SHARED, memFd.get(), kNativeVideoBase));
-    if (nativeBase == MAP_FAILED)
-    {
-        munmap(fb, fbSize);
-        qWarning("native video writer: failed to map native video DDR");
-        return;
-    }
-
-    memset(const_cast<uint8_t*>(nativeBase + kBuffer0Offset), 0, kOutputBytes);
-    memset(const_cast<uint8_t*>(nativeBase + kBuffer1Offset), 0, kOutputBytes);
-    *reinterpret_cast<volatile uint32_t*>(const_cast<uint8_t*>(nativeBase + kControlOffset)) = 0;
-
-    qInfo("native video writer: copying top-left 320x240 RGB8888 from /dev/fb0 %ux%u to native DDR",
-          var.xres, var.yres);
-
-    uint32_t frame = 0;
-    int active = 0;
-    auto nextFrame = std::chrono::steady_clock::now();
-    while (g_running.load(std::memory_order_relaxed))
-    {
-        if (ioctl(fbFd.get(), FBIOGET_VSCREENINFO, &var) < 0)
-        {
-            qWarning("native video writer: failed to refresh /dev/fb0 state");
-            break;
-        }
-        if (!validateFramebufferWindow(fixed, var, fbSize))
-        {
-            break;
-        }
-
-        const auto* visible = fb + static_cast<size_t>(var.yoffset) * fixed.line_length +
-                              static_cast<size_t>(var.xoffset) * kSourceBytesPerPixel;
-        const size_t dstOffset = active == 0 ? kBuffer0Offset : kBuffer1Offset;
-        const size_t dstAddress = kNativeVideoBase + dstOffset;
-        auto* dst = const_cast<uint8_t*>(nativeBase + dstOffset);
-
-        for (int y = 0; y < kOutputHeight; ++y)
-        {
-            const auto* srcRow = visible + static_cast<size_t>(y) * fixed.line_length;
-            auto* dstRow = dst + static_cast<size_t>(y) * kOutputRowBytes;
-            memcpy(dstRow, srcRow, kOutputRowBytes);
-        }
-
-        std::atomic_thread_fence(std::memory_order_seq_cst);
-        ++frame;
-        *reinterpret_cast<volatile uint32_t*>(const_cast<uint8_t*>(nativeBase + kControlOffset)) =
-            (frame << 2) | static_cast<uint32_t>(active);
-        if (frame % 59 == 0)
-        {
-            qInfo("Copying frame buffer content to 0x%08zx", dstAddress);
-        }
-        active ^= 1;
-
-        nextFrame += std::chrono::microseconds(16667);
-        std::this_thread::sleep_until(nextFrame);
-    }
-
-    *reinterpret_cast<volatile uint32_t*>(const_cast<uint8_t*>(nativeBase + kControlOffset)) = 0;
-    munmap(const_cast<uint8_t*>(nativeBase), kNativeVideoRegionSize);
-    munmap(fb, fbSize);
+    g_frame = 0;
+    g_active = 0;
+    g_initialized = false;
 }
 
 } // namespace
 
 void startNativeVideoWriter()
 {
-    bool expected = false;
-    if (!g_running.compare_exchange_strong(expected, true))
+    if (g_initialized)
     {
-        qInfo("native video writer: start requested but writer already running");
+        qInfo("native video writer: start requested but already initialised");
         return;
     }
-    qInfo("native video writer: start requested, launching writer thread");
-    g_thread = std::thread(writerLoop);
+
+    g_fbFd = open("/dev/fb0", O_RDONLY | O_CLOEXEC);
+    if (g_fbFd < 0)
+    {
+        qWarning("native video writer: failed to open /dev/fb0");
+        cleanup();
+        return;
+    }
+
+    fb_fix_screeninfo fixed = {};
+    fb_var_screeninfo var = {};
+    if (ioctl(g_fbFd, FBIOGET_FSCREENINFO, &fixed) < 0 ||
+        ioctl(g_fbFd, FBIOGET_VSCREENINFO, &var) < 0)
+    {
+        qWarning("native video writer: failed to inspect /dev/fb0");
+        cleanup();
+        return;
+    }
+
+    // Single-memcpy precondition: fb0 must be exactly the 320x240 RGB8888
+    // surface the Menu fork core scans, with a tight stride and no pan
+    // offsets, so one bulk copy reaches every pixel. MiSTer_Zaparoo's
+    // wrapper sets fb0 up before the launcher starts; any deviation here
+    // means the host configured the framebuffer differently than the
+    // Menu fork core expects, and silently copying the top-left slice
+    // would mask that misconfiguration.
+    if (var.bits_per_pixel != 32 || var.xres != static_cast<uint32_t>(kOutputWidth) ||
+        var.yres != static_cast<uint32_t>(kOutputHeight) ||
+        fixed.line_length != kOutputStride || var.xoffset != 0 || var.yoffset != 0)
+    {
+        qWarning("native video writer: fb0 mode %ux%u %ubpp stride=%u offset=(%u,%u) does not "
+                 "match required %dx%d 32bpp stride=%zu at (0,0); writer disabled",
+                 var.xres, var.yres, var.bits_per_pixel, fixed.line_length, var.xoffset,
+                 var.yoffset, kOutputWidth, kOutputHeight, kOutputStride);
+        cleanup();
+        return;
+    }
+
+    g_fbSize = fixed.smem_len != 0 ? fixed.smem_len : kOutputBytes;
+    void* fbMap = mmap(nullptr, g_fbSize, PROT_READ, MAP_SHARED, g_fbFd, 0);
+    if (fbMap == MAP_FAILED)
+    {
+        qWarning("native video writer: failed to map /dev/fb0");
+        cleanup();
+        return;
+    }
+    g_fb = static_cast<const uint8_t*>(fbMap);
+
+    g_memFd = open("/dev/mem", O_RDWR | O_SYNC | O_CLOEXEC);
+    if (g_memFd < 0)
+    {
+        qWarning("native video writer: failed to open /dev/mem");
+        cleanup();
+        return;
+    }
+
+    void* ddrMap = mmap(nullptr, kNativeVideoRegionSize, PROT_READ | PROT_WRITE, MAP_SHARED,
+                        g_memFd, static_cast<off_t>(kNativeVideoBase));
+    if (ddrMap == MAP_FAILED)
+    {
+        qWarning("native video writer: failed to map native video DDR at 0x%08zx",
+                 kNativeVideoBase);
+        cleanup();
+        return;
+    }
+    g_nativeBase = static_cast<volatile uint8_t*>(ddrMap);
+    g_slot[0] = g_nativeBase + kBuffer0Offset;
+    g_slot[1] = g_nativeBase + kBuffer1Offset;
+    g_ctrl =
+        reinterpret_cast<volatile uint32_t*>(const_cast<uint8_t*>(g_nativeBase + kControlOffset));
+
+    memset(const_cast<uint8_t*>(g_slot[0]), 0, kOutputBytes);
+    memset(const_cast<uint8_t*>(g_slot[1]), 0, kOutputBytes);
+    *g_ctrl = 0;
+
+    g_initialized = true;
+    qInfo("native video writer: initialised, fb0 %ux%u stride=%u -> DDR slots at "
+          "0x%08zx / 0x%08zx, control at 0x%08zx",
+          var.xres, var.yres, fixed.line_length, kNativeVideoBase + kBuffer0Offset,
+          kNativeVideoBase + kBuffer1Offset, kNativeVideoBase + kControlOffset);
+}
+
+void copyFrameNativeVideoWriter()
+{
+    if (!g_initialized)
+    {
+        return;
+    }
+
+    // Single bulk copy: fb0 is validated as a contiguous 320x240x4 block
+    // at (0,0), so the entire frame is one memcpy from the cached fb0
+    // mapping to the uncached DDR slot. The cached -> uncached burst is
+    // what makes this cheap on Cortex-A9; per-pixel uncached writes
+    // from QPainter would not be.
+    memcpy(const_cast<uint8_t*>(g_slot[g_active]), g_fb, kOutputBytes);
+
+    // Publish the freshly written slot to the FPGA. The fence ensures
+    // the memcpy's stores are visible at the DDR controller before the
+    // control word advertises the slot index.
+    std::atomic_thread_fence(std::memory_order_seq_cst);
+    ++g_frame;
+    *g_ctrl = (g_frame << 2) | static_cast<uint32_t>(g_active);
+    g_active ^= 1;
 }
 
 void stopNativeVideoWriter()
 {
-    qInfo("native video writer: stop requested");
-    g_running.store(false);
-    if (g_thread.joinable())
+    if (!g_initialized && g_fbFd < 0 && g_memFd < 0)
     {
-        g_thread.join();
-        qInfo("native video writer: writer thread joined");
+        return;
     }
-    else
-    {
-        qInfo("native video writer: no running thread to join");
-    }
+    qInfo("native video writer: stopping");
+    cleanup();
 }
 
 #else
@@ -248,6 +207,9 @@ void stopNativeVideoWriter()
 void startNativeVideoWriter()
 {
     qInfo("native video writer: start requested on unsupported build/platform");
+}
+void copyFrameNativeVideoWriter()
+{
 }
 void stopNativeVideoWriter()
 {

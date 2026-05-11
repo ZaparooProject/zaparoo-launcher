@@ -332,6 +332,23 @@ int main(int argc, char* argv[])
         qInfo("CRT startup decision: starting native video writer");
         startNativeVideoWriter();
         std::atexit(stopNativeVideoWriter);
+        // Drive the fb0 -> DDR copy from Qt's render-finish signal so
+        // we mirror exactly one frame per actual scenegraph render.
+        // `frameSwapped` fires after the QPA backing store has been
+        // flushed to /dev/fb0, so by the time the slot copies pixels
+        // out, fb0 already holds the new frame. Idle scenes produce
+        // no `frameSwapped` and therefore no copy and no CPU work.
+        auto* rootWindow = qobject_cast<QQuickWindow*>(engine.rootObjects().first());
+        if (rootWindow != nullptr)
+        {
+            QObject::connect(rootWindow, &QQuickWindow::frameSwapped, rootWindow,
+                             []() { copyFrameNativeVideoWriter(); });
+        }
+        else
+        {
+            qCritical("CRT startup decision: QML root is not a QQuickWindow; per-frame copy "
+                      "hook not installed (FPGA will stay on the zero-initialised slot)");
+        }
     }
     else
     {
