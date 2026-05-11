@@ -329,20 +329,32 @@ int main(int argc, char* argv[])
 
     if (crtNativePathEnabled)
     {
-        qInfo("CRT startup decision: starting native video writer");
-        startNativeVideoWriter();
+        qInfo("CRT startup decision: initialising native video writer");
+        initNativeVideoWriter();
         std::atexit(stopNativeVideoWriter);
         // Drive the fb0 -> DDR copy from Qt's render-finish signal so
-        // we mirror exactly one frame per actual scenegraph render.
-        // `frameSwapped` fires after the QPA backing store has been
-        // flushed to /dev/fb0, so by the time the slot copies pixels
-        // out, fb0 already holds the new frame. Idle scenes produce
-        // no `frameSwapped` and therefore no copy and no CPU work.
+        // we mirror exactly one frame per actual scenegraph render
+        // (idle scenes produce no `frameSwapped` and therefore no
+        // copy and no CPU work).
+        //
+        // Qt::QueuedConnection is load-bearing: the linuxfb QPA
+        // doesn't write /dev/fb0 inside `QPlatformBackingStore::flush()`.
+        // It calls `QFbScreen::scheduleUpdate()` which only posts a
+        // `QEvent::UpdateRequest`; the actual blit to fb0 happens
+        // later, in `QFbScreen::doRedraw()`, on a subsequent event-
+        // loop iteration. `frameSwapped` is emitted *before* that
+        // posted event drains, so a DirectConnection slot would read
+        // stale fb0 and we'd publish the previous frame to the FPGA
+        // (one-frame-behind CRT output). Posting our copy via a
+        // queued connection puts it FIFO behind the UpdateRequest,
+        // so `doRedraw()` runs first and we then read the freshly
+        // updated fb0.
         auto* rootWindow = qobject_cast<QQuickWindow*>(engine.rootObjects().first());
         if (rootWindow != nullptr)
         {
-            QObject::connect(rootWindow, &QQuickWindow::frameSwapped, rootWindow,
-                             []() { copyFrameNativeVideoWriter(); });
+            QObject::connect(
+                rootWindow, &QQuickWindow::frameSwapped, rootWindow,
+                []() { copyFrameNativeVideoWriter(); }, Qt::QueuedConnection);
         }
         else
         {

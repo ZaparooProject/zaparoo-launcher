@@ -78,11 +78,11 @@ void cleanup()
 
 } // namespace
 
-void startNativeVideoWriter()
+void initNativeVideoWriter()
 {
     if (g_initialized)
     {
-        qInfo("native video writer: start requested but already initialised");
+        qInfo("native video writer: init requested but already initialised");
         return;
     }
 
@@ -159,6 +159,12 @@ void startNativeVideoWriter()
     memset(const_cast<uint8_t*>(g_slot[0]), 0, kOutputBytes);
     memset(const_cast<uint8_t*>(g_slot[1]), 0, kOutputBytes);
     *g_ctrl = 0;
+    // Control word's slot bit is 0, so the FPGA scans slot 0. Point
+    // the first write at slot 1 so the very first frame goes into
+    // the slot the FPGA is NOT reading; without this the initial
+    // memcpy races the scanout and produces a one-frame tear at
+    // startup.
+    g_active = 1;
 
     g_initialized = true;
     qInfo("native video writer: initialised, fb0 %ux%u stride=%u -> DDR slots at "
@@ -204,9 +210,9 @@ void stopNativeVideoWriter()
 
 #include <QLoggingCategory>
 
-void startNativeVideoWriter()
+void initNativeVideoWriter()
 {
-    qInfo("native video writer: start requested on unsupported build/platform");
+    qInfo("native video writer: init requested on unsupported build/platform");
 }
 void copyFrameNativeVideoWriter()
 {

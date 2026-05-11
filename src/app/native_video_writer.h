@@ -8,14 +8,14 @@
 // and prime both DDR slots and the control word. Idempotent; on
 // failure leaves the writer disabled and `copyFrameNativeVideoWriter()`
 // becomes a no-op.
-void startNativeVideoWriter();
+void initNativeVideoWriter();
 
 // One 320x240 RGB8888 memcpy from /dev/fb0 to the currently inactive
 // Menu fork DDR slot, then publish the slot via the control word and
 // flip the active slot. Intended to be invoked from a Qt
 // render-finish hook (e.g. `QQuickWindow::frameSwapped`) so the copy
 // happens once per actually-rendered frame and not on a free-running
-// timer. No-op if `startNativeVideoWriter()` did not initialise
+// timer. No-op if `initNativeVideoWriter()` did not initialise
 // cleanly.
 void copyFrameNativeVideoWriter();
 
