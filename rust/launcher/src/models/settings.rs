@@ -218,9 +218,9 @@ impl ffi::Settings {
         // QML side hooks `current_resolution_changed` to scrub them
         // with a one-frame full-screen repaint, which only works if
         // vmode has already finished by the time the signal fires.
-        if let Some((w, h)) = mister_runtime::parse_resolution(&value_str) {
-            mister_runtime::run_vmode(w, h);
-        }
+        // if let Some((w, h)) = mister_runtime::parse_resolution(&value_str) {
+        //     mister_runtime::run_vmode(w, h);
+        // }
         self.as_mut().rust_mut().current_resolution = value;
         self.as_mut().current_resolution_changed();
     }
