@@ -224,7 +224,7 @@ impl ffi::Settings {
             mister_runtime::run_vmode(w, h);
         }
         self.as_mut().rust_mut().current_resolution = value;
-        // self.as_mut().current_resolution_changed();
+        self.as_mut().current_resolution_changed();
     }
 
     #[allow(
