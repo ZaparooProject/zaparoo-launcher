@@ -155,12 +155,11 @@ int main(int argc, char* argv[])
         return EXIT_FAILURE;
     }
 
-    // Install after zaparoo_rust_init() so tracing is live before any Qt
-    // messages are emitted.
-    qInstallMessageHandler(qtMessageHandler);
-
     do
     {
+        // Install after zaparoo_rust_init() so tracing is live before any Qt
+        // messages are emitted.
+        qInstallMessageHandler(qtMessageHandler);
         QGuiApplication app(qtArgc, qtArgv);
         QPixmapCache::setCacheLimit(kPixmapCacheLimitKiB);
         // addApplicationFont returns -1 on failure (broken qrc path,
@@ -339,7 +338,6 @@ int main(int argc, char* argv[])
         {
             qInfo("CRT startup decision: initialising native video writer");
             initNativeVideoWriter();
-            std::atexit(stopNativeVideoWriter);
             // Drive the fb0 -> DDR copy from Qt's render-finish signal so
             // we mirror exactly one frame per actual scenegraph render
             // (idle scenes produce no `frameSwapped` and therefore no
@@ -388,6 +386,10 @@ int main(int argc, char* argv[])
                          []()
                          {
                              zaparoo_rust_shutdown();
+                             if (crtNativePathEnabled)
+                             {
+                                 stopNativeVideoWriter();
+                             }
                              qInstallMessageHandler(nullptr);
                          });
 

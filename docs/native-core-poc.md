@@ -39,7 +39,7 @@ vmode -r 960 720 rgb16
 
 After QML loads, the launcher also starts a native-video copy thread:
 
-- reads `/dev/fb0` as 16-bit RGB8888
+- reads `/dev/fb0` as 24-bit RGB8888
 - requires `/dev/fb0` to be at least `320x240`
 - copies only the top-left `320x240` pixels, with no scaling
 - copies pixels directly; no RGB conversion

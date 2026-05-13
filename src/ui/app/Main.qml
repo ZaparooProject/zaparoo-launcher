@@ -993,13 +993,13 @@ MainLayout {
     }
 
     function openSettingNeedsRestartModal(): void {
-        root.settingNeedsResetModalVisible = true;
+        root.settingNeedsRestartModalVisible = true;
         if (ScreenManager.topModal !== root.modalSettingNeedsRestart)
             ScreenManager.pushModal(root.modalSettingNeedsRestart);
     }
 
     function closeSettingNeedsRestartModal(): void {
-        root.settingNeedsResetModalVisible = false;
+        root.settingNeedsRestartModalVisible = false;
         if (ScreenManager.topModal === root.modalSettingNeedsRestart)
             ScreenManager.popModal();
     }

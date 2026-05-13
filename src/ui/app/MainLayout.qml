@@ -227,7 +227,7 @@ ApplicationWindow {
     property bool logUploadModalVisible: false
     property bool quitConfirmModalVisible: false
     property bool listPickerModalVisible: false
-    property bool settingNeedsResetModalVisible: false
+    property bool settingNeedsRestartModalVisible: false
     // Round-trip state for the list picker. The router writes these
     // when opening the modal (Settings emits requestListPicker with
     // fieldId so the accept handler can dispatch back to the right
@@ -522,12 +522,12 @@ ApplicationWindow {
             onCancelRequested: root.cancelCardWriteRequested()
         }
 
-        // ── Card writer modal ────────────────────────────────────────────────────
+        // ── Setting restart prompt modal ────────────────────────────────────────────────────
 
         Modal {
             id: settingNeedsRestartModal
 
-            open: root.settingNeedsResetModalVisible
+            open: root.settingNeedsRestartModalVisible
             kind: "confirm"
             title: qsTr("Quit and restart Zaparoo Launcher?")
             body: qsTr("In order to apply this setting we need to restart the launcher.")
@@ -737,7 +737,7 @@ ApplicationWindow {
                             label: qsTr("I understand")
                         }
                     ];
-                if (root.quitConfirmModalVisible || root.settingNeedsResetModalVisible || root.listPickerModalVisible)
+                if (root.quitConfirmModalVisible || root.settingNeedsRestartModalVisible || root.listPickerModalVisible)
                     return [
                         {
                             button: "Dpad",
