@@ -57,7 +57,7 @@
 // and language still takes effect on the next launch because Qt installs
 // translators only at startup.
 
-// use crate::mister_runtime;
+use crate::mister_runtime;
 use crate::models::{with_persist_mut, with_persist_read};
 use cxx_qt::{CxxQtType, Initialize};
 use cxx_qt_lib::{QString, QStringList};
@@ -220,9 +220,9 @@ impl ffi::Settings {
         // with a one-frame full-screen repaint, which only works if
         // vmode has already finished by the time the signal fires.
         // Runtime disabled code:
-        // if let Some((w, h)) = mister_runtime::parse_resolution(&value_str) {
-        //     mister_runtime::run_vmode(w, h);
-        // }
+        if let Some((w, h)) = mister_runtime::parse_resolution(&value_str) {
+            mister_runtime::run_vmode(w, h);
+        }
         self.as_mut().rust_mut().current_resolution = value;
         // self.as_mut().current_resolution_changed();
     }
