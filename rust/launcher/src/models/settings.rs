@@ -4,9 +4,8 @@
 //
 // `Browse.Settings` — gamepad-accessible settings form. The model is the
 // seam between the QML form and the persistence/runtime side: it owns
-// curated picker lists, remembers what the user picked, and on MiSTer
-// re-runs `vmode` when the resolution changes so the framebuffer updates
-// immediately.
+// curated picker lists, remembers what the user picked, and writes
+// restart-applied settings back to config/state.
 //
 // Field design:
 //   * `is_mister` — CONSTANT. Drives whether MiSTer-only fields render
@@ -209,20 +208,10 @@ impl ffi::Settings {
             return;
         }
         let value_str = value.to_string();
-        // Persist before `vmode` so a runtime fault mid-switch still
-        // leaves the session/state snapshot coherent for the next run.
+        // Resolution is restart-applied, so this setter only updates the
+        // durable state/config read by the next launcher process.
         let snapshot = persist_settings(|s| s.resolution.clone_from(&value_str));
         mirror_settings_to_config(&config_file_path(), &snapshot.settings);
-        // Apply the framebuffer change *before* notifying QML. `vmode`
-        // swaps the linuxfb mode in place and leaves stale pixels in
-        // any region Qt's dirty tracker doesn't already know about; the
-        // QML side hooks `current_resolution_changed` to scrub them
-        // with a one-frame full-screen repaint, which only works if
-        // vmode has already finished by the time the signal fires.
-        // Runtime disabled code:
-        if let Some((w, h)) = mister_runtime::parse_resolution(&value_str) {
-            mister_runtime::run_vmode(w, h);
-        }
         self.as_mut().rust_mut().current_resolution = value;
         self.as_mut().current_resolution_changed();
     }

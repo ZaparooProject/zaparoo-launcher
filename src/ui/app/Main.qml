@@ -46,6 +46,8 @@ MainLayout {
     // once per launcher process, even if the WS link drops and the
     // mediadb-empty condition would otherwise be satisfied again.
     property bool _firstRunIndexShown: false
+    property string _pendingLanguageSelection: ""
+    property string _pendingResolutionSelection: ""
     property string cardWriteOwner: ""
     property string contextMenuOwner: ""
     property int contextMenuIndex: -1
@@ -965,8 +967,8 @@ MainLayout {
     onCloseQuitConfirmRequested: root.closeQuitConfirmModal()
     onQuitConfirmAccepted: Qt.quit()
 
-    onAcceptRestart: root.restartApp()
-    onCancelRestart: root.closeSettingNeedsRestartModal()
+    onAcceptRestart: root.confirmPendingRestart()
+    onCancelRestart: root.cancelPendingRestart()
 
     // List-picker lifecycle. Settings screens emit requestListPicker
     // with a fieldId that round-trips through the modal so the accept
@@ -1004,21 +1006,53 @@ MainLayout {
             ScreenManager.popModal();
     }
 
+    function stageSettingRestart(fieldId: string, selectedId: string): void {
+        if (fieldId === "language")
+            root._pendingLanguageSelection = selectedId;
+        else if (fieldId === "resolution")
+            root._pendingResolutionSelection = selectedId;
+        root.openSettingNeedsRestartModal();
+    }
+
+    function cancelPendingRestart(): void {
+        root._pendingLanguageSelection = "";
+        root._pendingResolutionSelection = "";
+        root.closeSettingNeedsRestartModal();
+    }
+
+    function confirmPendingRestart(): void {
+        const language = root._pendingLanguageSelection;
+        const resolution = root._pendingResolutionSelection;
+        root._pendingLanguageSelection = "";
+        root._pendingResolutionSelection = "";
+        root.closeSettingNeedsRestartModal();
+        if (language !== "")
+            Browse.Settings.set_language(language);
+        if (resolution !== "")
+            Browse.Settings.set_resolution(resolution);
+        root.restartApp();
+    }
+
     function restartApp() {
         Qt.exit(1000);
     }
 
     onListPickerAccepted: (fieldId, selectedId) => {
-        if (fieldId === "language")
-            Browse.Settings.set_language(selectedId);
+        if (fieldId === "language") {
+            root.closeListPickerModal();
+            if (selectedId !== Browse.Settings.current_language)
+                root.stageSettingRestart(fieldId, selectedId);
+            return;
+        }
         else if (fieldId === "browseLayout")
             Browse.Settings.set_browse_layout(selectedId);
         else if (fieldId === "buttonLayout")
             Browse.Settings.set_button_layout(selectedId);
         else if (fieldId === "resolution") {
-            Browse.Settings.set_resolution(selectedId);
             root.closeListPickerModal();
-            root.openSettingNeedsRestartModal();
+            if (selectedId !== Browse.Settings.current_resolution)
+                root.stageSettingRestart(fieldId, selectedId);
+            return;
         } else if (fieldId === "screensaverTimeout")
             Browse.Settings.set_screensaver_timeout(selectedId);
         root.closeListPickerModal();
@@ -1463,56 +1497,6 @@ MainLayout {
                     return qsTr("Loading…");
                 }
             }
-        }
-    }
-
-    // Post-vmode framebuffer scrub. EXCEPTION to the no-full-screen-
-    // background rule: this Rectangle exists solely so a runtime
-    // resolution change can force every pixel to be repainted, and is
-    // visible for exactly one timer tick (~50 ms) — never as part of
-    // normal navigation chrome. `vmode -r W H rgb32` swaps the linuxfb
-    // mode in place; Qt's scene-graph dirty tracker has no way to
-    // notice the framebuffer pixels are now stale, so on the next
-    // render only items whose properties changed get repainted and
-    // the rest of the screen shows garbage from the prior mode. A
-    // full-screen Rectangle that flashes on for one frame marks the
-    // entire window dirty; once the timer hides it the scene re-renders
-    // end-to-end against the new mode and the corruption is gone.
-    // Using `Theme.bgDeep` so even if the timer fires off-cadence the
-    // user sees the same colour as the existing background underneath.
-    Rectangle {
-        id: forceRepaintCover
-        anchors.fill: parent
-        color: Theme.bgDeep
-        visible: false
-        // Above the transition cue Item (z: 100) so the scrub still
-        // covers the whole window if a vmode change ever lands during
-        // a forward transition.
-        z: 9999
-    }
-    Timer {
-        id: forceRepaintTimer
-        interval: 50
-        repeat: false
-        onTriggered: forceRepaintCover.visible = false
-    }
-    function _forceFullRepaint(): void {
-        forceRepaintCover.visible = true;
-        forceRepaintTimer.restart();
-    }
-    Connections {
-        target: Browse.Settings
-        // cxx-qt 0.8 preserves the snake_case property name in the
-        // signal — `current_resolution` → `current_resolutionChanged`
-        // (with the trailing `Changed` capitalised).
-        function onCurrent_resolutionChanged(): void {
-            // Desktop's set_resolution is a no-op beyond persisting,
-            // so there's no framebuffer to scrub there. Gate on
-            // is_mister to keep the desktop dev-loop free of cosmetic
-            // flashes when toggling resolutions for testing.
-            // Edit: not needed anymore with reboot after res change
-            if (Browse.Settings.is_mister)
-                root._forceFullRepaint();
         }
     }
 

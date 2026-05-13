@@ -16,11 +16,11 @@ import Zaparoo.Browse as Browse
 // qmllint disable compiler
 
 // Settings screen — gamepad-driven vertical form. Resolution is MiSTer-only
-// because the underlying `vmode` command lives on MiSTer's Linux framebuffer
-// (currently hidden — the picker doesn't switch reliably yet). Button style
-// is cross-platform and selects the resource directory for help-bar button
-// glyphs (Style A/B/C/D → resources/images/buttons/{a,b,c,d}/). Mouse support
-// is cross-platform and controls cursor visibility plus mouse hit targets.
+// because it changes launcher startup video config and applies on restart.
+// Button style is cross-platform and selects the resource directory for
+// help-bar button glyphs (Style A/B/C/D → resources/images/buttons/{a,b,c,d}/).
+// Mouse support is cross-platform and controls cursor visibility plus mouse
+// hit targets.
 //
 // Pure input dispatcher: emits `requestHubScreen()` on Escape; left/
 // right cycle the focused field's value via the model singleton.
@@ -60,18 +60,13 @@ Item {
             kind: "header",
             label: qsTr("General")
         });
-        // Resolution row hidden — `vmode` switching isn't reliable yet.
-        // Restore by re-enabling this block once the MiSTer-side path is
-        // trusted again; the picker plumbing in `_cycleResolution` and
-        // the Settings model's `current_resolution` property are still
-        // wired so the row works as soon as it's added back.
-        // if (Browse.Settings.is_mister) {
-        out.push({
-            kind: "field",
-            id: "resolution",
-            label: qsTr("Resolution")
-        });
-        // }
+        if (Browse.Settings.is_mister) {
+            out.push({
+                kind: "field",
+                id: "resolution",
+                label: qsTr("Resolution")
+            });
+        }
         out.push({
             kind: "field",
             id: "language",
