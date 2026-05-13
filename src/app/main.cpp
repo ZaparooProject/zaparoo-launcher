@@ -34,9 +34,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <vector>
-
 #include <unistd.h>
+#include <vector>
 
 // Default QPixmapCache cap is 10 MiB. With ~100 system PNGs decoded at
 // 256 px sourceSize the working set straddles that limit, so navigating
@@ -179,8 +178,7 @@ int main(int argc, char* argv[]) // NOLINT
         qInfo("Registered font %s: %s", qUtf8Printable(path),
               qUtf8Printable(QFontDatabase::applicationFontFamilies(fontId).join(", ")));
     };
-    registerFont(
-        QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/MxPlus_HP_100LX_6x8.ttf"));
+    registerFont(QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/MxPlus_HP_100LX_6x8.ttf"));
     registerFont(QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/NotoSans.ttf"));
     registerFont(QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/NotoSansArabic.ttf"));
     registerFont(QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/NotoSansDevanagari.ttf"));

@@ -1043,8 +1043,7 @@ MainLayout {
             if (selectedId !== Browse.Settings.current_language)
                 root.stageSettingRestart(fieldId, selectedId);
             return;
-        }
-        else if (fieldId === "browseLayout")
+        } else if (fieldId === "browseLayout")
             Browse.Settings.set_browse_layout(selectedId);
         else if (fieldId === "buttonLayout")
             Browse.Settings.set_button_layout(selectedId);

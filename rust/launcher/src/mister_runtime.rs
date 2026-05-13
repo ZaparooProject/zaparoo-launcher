@@ -6,10 +6,10 @@
 /// configured linuxfb video mode before `QGuiApplication`. No-op on
 /// non-MiSTer builds.
 ///
-/// The launcher owns MiSTer resolution startup so restart-applied
+/// The launcher owns `MiSTer` resolution startup so restart-applied
 /// settings take effect on the very next process boot. Both the normal
 /// and `--crt` paths keep linuxfb in `rgb32`, which is the mode the
-/// launcher has been using in practice on MiSTer.
+/// launcher has been using in practice on `MiSTer`.
 pub fn apply_pre_qt_setup(config: &zaparoo_core::config::Config, crt_native_path_forced: bool) {
     #[cfg(zaparoo_runtime = "mister")]
     {
@@ -21,15 +21,13 @@ pub fn apply_pre_qt_setup(config: &zaparoo_core::config::Config, crt_native_path
         if crt_native_path_forced {
             info!(
                 "--crt: applying linuxfb mode {}x{} rgb32",
-                config.video_width,
-                config.video_height
+                config.video_width, config.video_height
             );
             run_vmode_with_format(config.video_width, config.video_height, "rgb32");
         } else {
             info!(
                 "applying linuxfb mode {}x{} rgb32",
-                config.video_width,
-                config.video_height
+                config.video_width, config.video_height
             );
             run_vmode_with_format(config.video_width, config.video_height, "rgb32");
         }
