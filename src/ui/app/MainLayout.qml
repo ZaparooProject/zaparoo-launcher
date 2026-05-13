@@ -226,6 +226,7 @@ ApplicationWindow {
     property bool logUploadModalVisible: false
     property bool quitConfirmModalVisible: false
     property bool listPickerModalVisible: false
+    property bool settingNeedsResetModalVisible: false
     // Round-trip state for the list picker. The router writes these
     // when opening the modal (Settings emits requestListPicker with
     // fieldId so the accept handler can dispatch back to the right
@@ -720,22 +721,7 @@ ApplicationWindow {
                             label: qsTr("I understand")
                         }
                     ];
-                if (root.quitConfirmModalVisible)
-                    return [
-                        {
-                            button: "Dpad",
-                            label: qsTr("Move")
-                        },
-                        {
-                            button: "ButtonA",
-                            label: qsTr("Select")
-                        },
-                        {
-                            button: "ButtonB",
-                            label: qsTr("Cancel")
-                        }
-                    ];
-                if (root.listPickerModalVisible)
+                if (root.quitConfirmModalVisible || root.settingNeedsResetModalVisible || root.listPickerModalVisible)
                     return [
                         {
                             button: "Dpad",

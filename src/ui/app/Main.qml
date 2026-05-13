@@ -40,6 +40,8 @@ MainLayout {
     readonly property string modalLogUpload: "log_upload"
     readonly property string modalQuitConfirm: "quit_confirm"
     readonly property string modalListPicker: "list_picker"
+    readonly property string modalSettingNeedsRestart: "restart_confirm"
+
     // One-shot session flag: the first-run modal is shown at most
     // once per launcher process, even if the WS link drops and the
     // mediadb-empty condition would otherwise be satisfied again.
@@ -613,6 +615,12 @@ MainLayout {
         function onRequestListPicker(title: string, entries: var, initialId: string, fieldId: string): void {
             root.openListPickerModal(title, entries, initialId, fieldId);
         }
+        function onAcceptRestart(): void {
+            
+        }
+        function onCancelRestart(): void {
+            root.closeSettingNeedsRestartModal();
+        }
     }
     Connections {
         target: root.aboutScreen
@@ -987,6 +995,18 @@ MainLayout {
             ScreenManager.popModal();
     }
 
+    function openSettingNeedsRestartModal(): void {
+        root.settingNeedsResetModalVisible = true;
+        if (ScreenManager.topModal !== root.modalSettingNeedsRestart)
+            ScreenManager.pushModal(root.modalSettingNeedsRestart);
+    }
+
+    function closeSettingNeedsRestartModal(): void {
+        root.settingNeedsResetModalVisible = false;
+        if (ScreenManager.topModal === root.modalSettingNeedsRestart)
+            ScreenManager.popModal();
+    }
+
     onListPickerAccepted: (fieldId, selectedId) => {
         if (fieldId === "language")
             Browse.Settings.set_language(selectedId);
@@ -996,6 +1016,7 @@ MainLayout {
             Browse.Settings.set_button_layout(selectedId);
         else if (fieldId === "resolution")
             Browse.Settings.set_resolution(selectedId);
+            root.openSettingNeedsRestartModal();
         else if (fieldId === "screensaverTimeout")
             Browse.Settings.set_screensaver_timeout(selectedId);
         root.closeListPickerModal();
@@ -1134,6 +1155,8 @@ MainLayout {
             } else if (ScreenManager.topModal === root.modalLogUpload) {
                 root.logUploadModal.handleAction(action);
             } else if (ScreenManager.topModal === root.modalQuitConfirm) {
+                root.quitConfirmModal.handleAction(action);
+            } else if (ScreenManager.topModal === root.modalSettingNeedsRestart) {
                 root.quitConfirmModal.handleAction(action);
             } else if (ScreenManager.topModal === root.modalListPicker) {
                 root.listPickerModal.handleAction(action);

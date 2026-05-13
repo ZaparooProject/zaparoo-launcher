@@ -136,14 +136,17 @@ Item {
         return out;
     }
 
-    Modal {
-        id: settingsRestartModal
 
-        open: root.settingsRestartModalVisible
-        kind: "transient"
-        title: qsTr("Restart for settings to take effect.")
-        onAcceptRestart: root.acceptRestart()
-        onCancelRestart: root.cancelRestart()
+
+    Modal {
+        id: settingNeedsRestartModal
+
+        open: root.settingNeedsResetModalVisible
+        kind: "confirm"
+        title: qsTr("Quit and restart Zaparoo Launcher?")
+        body: qsTr("In order to apply this setting we need to restart the launcher.")
+        onConfirmed: root.acceptRestart()
+        onCancelRequested: root.cancelRestart()
     }
 
     // Live-state caption helpers for the action rows. While the matching
