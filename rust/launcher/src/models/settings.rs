@@ -57,7 +57,6 @@
 // and language still takes effect on the next launch because Qt installs
 // translators only at startup.
 
-use crate::mister_runtime;
 use crate::models::{with_persist_mut, with_persist_read};
 use cxx_qt::{CxxQtType, Initialize};
 use cxx_qt_lib::{QString, QStringList};
@@ -204,7 +203,7 @@ impl Initialize for ffi::Settings {
 }
 
 impl ffi::Settings {
-    fn set_resolution(mut self: Pin<&mut Self>, value: QString) {
+    fn set_resolution(self: Pin<&mut Self>, value: QString) {
         if self.current_resolution == value {
             return;
         }

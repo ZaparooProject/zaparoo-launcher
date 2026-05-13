@@ -616,7 +616,7 @@ MainLayout {
             root.openListPickerModal(title, entries, initialId, fieldId);
         }
         function onAcceptRestart(): void {
-            
+            root.closeSettingNeedsRestartModal();
         }
         function onCancelRestart(): void {
             root.closeSettingNeedsRestartModal();
@@ -1014,9 +1014,11 @@ MainLayout {
             Browse.Settings.set_browse_layout(selectedId);
         else if (fieldId === "buttonLayout")
             Browse.Settings.set_button_layout(selectedId);
-        else if (fieldId === "resolution")
+        else if (fieldId === "resolution") {
             Browse.Settings.set_resolution(selectedId);
+            root.closeListPickerModal();
             root.openSettingNeedsRestartModal();
+        }
         else if (fieldId === "screensaverTimeout")
             Browse.Settings.set_screensaver_timeout(selectedId);
         root.closeListPickerModal();
@@ -1157,7 +1159,7 @@ MainLayout {
             } else if (ScreenManager.topModal === root.modalQuitConfirm) {
                 root.quitConfirmModal.handleAction(action);
             } else if (ScreenManager.topModal === root.modalSettingNeedsRestart) {
-                root.quitConfirmModal.handleAction(action);
+                root.settingNeedsRestartModal.handleAction(action);
             } else if (ScreenManager.topModal === root.modalListPicker) {
                 root.listPickerModal.handleAction(action);
             }
