@@ -524,7 +524,6 @@ ApplicationWindow {
 
         // ── Card writer modal ────────────────────────────────────────────────────
 
-
         Modal {
             id: settingNeedsRestartModal
 

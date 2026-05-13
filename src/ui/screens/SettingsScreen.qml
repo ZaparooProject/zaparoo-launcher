@@ -66,11 +66,11 @@ Item {
         // the Settings model's `current_resolution` property are still
         // wired so the row works as soon as it's added back.
         // if (Browse.Settings.is_mister) {
-            out.push({
-                kind: "field",
-                id: "resolution",
-                label: qsTr("Resolution")
-            })
+        out.push({
+            kind: "field",
+            id: "resolution",
+            label: qsTr("Resolution")
+        });
         // }
         out.push({
             kind: "field",

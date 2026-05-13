@@ -966,7 +966,7 @@ MainLayout {
     onQuitConfirmAccepted: Qt.quit()
 
     onAcceptRestart: root.restartApp()
-    onCancelRestart: root.closeSettingNeedsRestartModal();
+    onCancelRestart: root.closeSettingNeedsRestartModal()
 
     // List-picker lifecycle. Settings screens emit requestListPicker
     // with a fieldId that round-trips through the modal so the accept
@@ -1019,8 +1019,7 @@ MainLayout {
             Browse.Settings.set_resolution(selectedId);
             root.closeListPickerModal();
             root.openSettingNeedsRestartModal();
-        }
-        else if (fieldId === "screensaverTimeout")
+        } else if (fieldId === "screensaverTimeout")
             Browse.Settings.set_screensaver_timeout(selectedId);
         root.closeListPickerModal();
     }

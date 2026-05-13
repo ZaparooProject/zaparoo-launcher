@@ -121,7 +121,6 @@ static ParsedArguments extractCrtArgument(int argc, char* argv[])
 
 int main(int argc, char* argv[])
 {
-
     int returnExitCode = 0;
 
     ParsedArguments parsedArgs = extractCrtArgument(argc, argv);
@@ -160,8 +159,8 @@ int main(int argc, char* argv[])
     // messages are emitted.
     qInstallMessageHandler(qtMessageHandler);
 
-    do {
-
+    do
+    {
         QGuiApplication app(qtArgc, qtArgv);
         QPixmapCache::setCacheLimit(kPixmapCacheLimitKiB);
         // addApplicationFont returns -1 on failure (broken qrc path,
@@ -177,9 +176,10 @@ int main(int argc, char* argv[])
                 return;
             }
             qInfo("Registered font %s: %s", qUtf8Printable(path),
-                qUtf8Printable(QFontDatabase::applicationFontFamilies(fontId).join(", ")));
+                  qUtf8Printable(QFontDatabase::applicationFontFamilies(fontId).join(", ")));
         };
-        registerFont(QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/MxPlus_HP_100LX_6x8.ttf"));
+        registerFont(
+            QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/MxPlus_HP_100LX_6x8.ttf"));
         registerFont(QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/NotoSans.ttf"));
         registerFont(QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/NotoSansArabic.ttf"));
         registerFont(QStringLiteral(":/qt/qml/Zaparoo/App/resources/fonts/NotoSansDevanagari.ttf"));
@@ -241,7 +241,7 @@ int main(int argc, char* argv[])
             // launcher_en.qm). Log at info so the sink records the resolved
             // locale for bug reports without spamming at warn level.
             qInfo("No translation catalog for %s in :/i18n; using source strings",
-                qUtf8Printable(locale.name()));
+                  qUtf8Printable(locale.name()));
         }
 
         QQmlApplicationEngine engine;
@@ -267,18 +267,18 @@ int main(int argc, char* argv[])
             formatNames << QString::fromLatin1(fmt);
         }
         qInfo("QImageReader supportedImageFormats: %s",
-            qUtf8Printable(formatNames.join(QStringLiteral(", "))));
+              qUtf8Printable(formatNames.join(QStringLiteral(", "))));
 
         QVariantMap initialProperties = {
             {"crtNativePath", crtNativePathEnabled},
         };
-    #ifdef ZAPAROO_EMBEDDED_BUILD
+#ifdef ZAPAROO_EMBEDDED_BUILD
         // MainLayout's `fullScreen` defaults true so the binding pass during
         // QML construction evaluates width/height/visibility against the
         // embedded branch — no transient 1280x720 frame for the writer
         // thread to copy into the CRT scan-out region.
         initialProperties.insert(QStringLiteral("fullScreen"), true);
-    #else
+#else
         // Desktop preview: override the QML default so the dev workflow
         // gets a windowed 1280x720 design canvas. The brief
         // FullScreen→Windowed transition during construction isn't visible
@@ -307,15 +307,15 @@ int main(int argc, char* argv[])
             initialProperties.insert(QStringLiteral("crtPreview"), true);
             initialProperties.insert(QStringLiteral("crtPreviewScale"), previewScale);
             initialProperties.insert(QStringLiteral("videoWidth"),
-                                    static_cast<int>(zaparoo_rust_video_width()));
+                                     static_cast<int>(zaparoo_rust_video_width()));
             initialProperties.insert(QStringLiteral("videoHeight"),
-                                    static_cast<int>(zaparoo_rust_video_height()));
+                                     static_cast<int>(zaparoo_rust_video_height()));
         }
-    #endif
+#endif
         initialProperties.insert(QStringLiteral("videoWidth"),
-                                static_cast<int>(zaparoo_rust_video_width()));
+                                 static_cast<int>(zaparoo_rust_video_width()));
         initialProperties.insert(QStringLiteral("videoHeight"),
-                                static_cast<int>(zaparoo_rust_video_height()));
+                                 static_cast<int>(zaparoo_rust_video_height()));
         engine.setInitialProperties(initialProperties);
 
         // objectCreationFailed fires before loadFromModule returns when a QML
@@ -367,7 +367,7 @@ int main(int argc, char* argv[])
             else
             {
                 qCritical("CRT startup decision: QML root is not a QQuickWindow; per-frame copy "
-                        "hook not installed (FPGA will stay on the zero-initialised slot)");
+                          "hook not installed (FPGA will stay on the zero-initialised slot)");
             }
         }
 
@@ -385,11 +385,11 @@ int main(int argc, char* argv[])
         // with `AccessError`, and the panic-hook's own `tracing::error!`
         // re-panics into SIGABRT (exit 134).
         QObject::connect(&app, &QGuiApplication::aboutToQuit, &app,
-                        []()
-                        {
-                            zaparoo_rust_shutdown();
-                            qInstallMessageHandler(nullptr);
-                        });
+                         []()
+                         {
+                             zaparoo_rust_shutdown();
+                             qInstallMessageHandler(nullptr);
+                         });
 
         zaparoo_rust_post_qt_start();
         returnExitCode = QGuiApplication::exec();

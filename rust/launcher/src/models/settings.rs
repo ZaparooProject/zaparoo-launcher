@@ -57,7 +57,7 @@
 // and language still takes effect on the next launch because Qt installs
 // translators only at startup.
 
-use crate::mister_runtime;
+// use crate::mister_runtime;
 use crate::models::{with_persist_mut, with_persist_read};
 use cxx_qt::{CxxQtType, Initialize};
 use cxx_qt_lib::{QString, QStringList};
@@ -212,7 +212,7 @@ impl ffi::Settings {
         // Persist before `vmode` so a runtime fault mid-switch still
         // leaves the session/state snapshot coherent for the next run.
         let snapshot = persist_settings(|s| s.resolution.clone_from(&value_str));
-         mirror_settings_to_config(&config_file_path(), &snapshot.settings);
+        mirror_settings_to_config(&config_file_path(), &snapshot.settings);
         // Apply the framebuffer change *before* notifying QML. `vmode`
         // swaps the linuxfb mode in place and leaves stale pixels in
         // any region Qt's dirty tracker doesn't already know about; the
