@@ -57,6 +57,7 @@
 // and language still takes effect on the next launch because Qt installs
 // translators only at startup.
 
+use crate::mister_runtime;
 use crate::models::{with_persist_mut, with_persist_read};
 use cxx_qt::{CxxQtType, Initialize};
 use cxx_qt_lib::{QString, QStringList};
@@ -183,8 +184,7 @@ impl Initialize for ffi::Settings {
         self.as_mut().rust_mut().available_resolutions = if is_mister {
             curated_resolutions()
         } else {
-            curated_resolutions()
-            // QStringList::default()
+            QStringList::default()
         };
         self.as_mut().rust_mut().current_resolution = QString::from(merged.resolution.as_str());
         self.as_mut().rust_mut().available_languages = languages();
@@ -211,7 +211,8 @@ impl ffi::Settings {
         let value_str = value.to_string();
         // Persist before `vmode` so a runtime fault mid-switch still
         // leaves the session/state snapshot coherent for the next run.
-        persist_settings(|s| s.resolution.clone_from(&value_str));
+        let snapshot = persist_settings(|s| s.resolution.clone_from(&value_str));
+         mirror_settings_to_config(&config_file_path(), &snapshot.settings);
         // Apply the framebuffer change *before* notifying QML. `vmode`
         // swaps the linuxfb mode in place and leaves stale pixels in
         // any region Qt's dirty tracker doesn't already know about; the
@@ -223,7 +224,7 @@ impl ffi::Settings {
         //     mister_runtime::run_vmode(w, h);
         // }
         self.as_mut().rust_mut().current_resolution = value;
-        self.as_mut().current_resolution_changed();
+        // self.as_mut().current_resolution_changed();
     }
 
     #[allow(
