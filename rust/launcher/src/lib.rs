@@ -309,14 +309,11 @@ pub extern "C" fn zaparoo_rust_init(crt_native_path_forced: bool) -> c_int {
     let config_path = config_file_path();
     let mut config = load_config(&config_path);
 
-    // CRT mode without an explicit [video] section: fall back to the
-    // 320x240 canvas hard-coded in native_video_writer.cpp (the actual
-    // pixels that reach the CRT). A user who passes `--crt` but hasn't
-    // configured `[video]` would otherwise get a 1920x1080 canvas —
-    // unusable on MiSTer (`vmode` would set a huge linuxfb that gets
-    // truncated to 320x240 anyway) and unusable on desktop preview (the
-    // upscaled window would dwarf any monitor).
-    if crt_native_path_forced && !config.video_explicit {
+    // CRT path always renders to the native writer's fixed 320x240 RGB8888
+    // linuxfb surface. User-configured [video] dimensions still apply to the
+    // normal MiSTer path, but `--crt` overrides them so startup `vmode`, the
+    // desktop preview canvas, and the writer's fb0 validation all agree.
+    if crt_native_path_forced {
         config.video_width = 320;
         config.video_height = 240;
     }

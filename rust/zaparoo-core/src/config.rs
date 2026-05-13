@@ -19,7 +19,7 @@ pub struct Config {
     /// distinguish "user wants the default 1920x1080" (in which case the
     /// preview canvas would be too large to upscale into a desktop window)
     /// from "user didn't write a [video] section at all" (in which case
-    /// `--crt` falls back to the 384x224 `native_video_writer` canvas).
+    /// `--crt` overrides this to the 320x240 `native_video_writer` canvas).
     pub video_explicit: bool,
     pub debug_logging: bool,
     /// Language override for the UI, passed to `QTranslator` via the
@@ -209,6 +209,7 @@ pub fn load_config(path: &Path) -> Config {
 
 pub fn save_settings_mirror(
     path: &Path,
+    resolution: &str,
     language: &str,
     browse_layout: &str,
     button_layout: &str,
@@ -238,6 +239,24 @@ pub fn save_settings_mirror(
         "language".into(),
         toml::Value::String(normalize_language_override(language)),
     );
+
+    let video_value = table
+        .entry("video")
+        .or_insert_with(|| toml::Value::Table(toml::Table::new()));
+    let Some(video) = video_value.as_table_mut() else {
+        return Err(format!(
+            "config key [video] in {} is not a table",
+            path.display()
+        ));
+    };
+    video.remove("backend");
+    if let Some((width, height)) = parse_resolution_override(resolution) {
+        video.insert("width".into(), toml::Value::Integer(i64::from(width)));
+        video.insert("height".into(), toml::Value::Integer(i64::from(height)));
+    } else {
+        video.remove("width");
+        video.remove("height");
+    }
 
     let settings_value = table
         .entry("settings")
@@ -272,10 +291,6 @@ pub fn save_settings_mirror(
         ));
     };
     logging.insert("debug".into(), toml::Value::Boolean(debug_logging));
-
-    if let Some(video) = table.get_mut("video").and_then(toml::Value::as_table_mut) {
-        video.remove("backend");
-    }
 
     let serialized =
         toml::to_string(&table).map_err(|e| format!("config serialisation failed: {e}"))?;
@@ -324,6 +339,22 @@ fn normalize_language_override(value: &str) -> String {
     } else {
         trimmed.into()
     }
+}
+
+fn parse_resolution_override(value: &str) -> Option<(u32, u32)> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let (width, height) = trimmed
+        .split_once('x')
+        .or_else(|| trimmed.split_once('X'))?;
+    let width = width.trim().parse().ok()?;
+    let height = height.trim().parse().ok()?;
+    if width == 0 || height == 0 {
+        return None;
+    }
+    Some((width, height))
 }
 
 fn write_atomic(path: &Path, contents: &[u8]) -> std::io::Result<()> {
@@ -550,9 +581,13 @@ mod tests {
     fn save_settings_mirror_creates_sections() {
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("launcher.toml");
-        save_settings_mirror(&path, "it_IT", "list", "b", false, true, "300").expect("save");
+        save_settings_mirror(&path, "1280x720", "it_IT", "list", "b", false, true, "300")
+            .expect("save");
         let cfg = load_config(&path);
         assert_eq!(cfg.language, "it_IT");
+        assert_eq!(cfg.video_width, 1280);
+        assert_eq!(cfg.video_height, 720);
+        assert!(cfg.video_explicit);
         assert_eq!(cfg.settings.browse_layout.as_deref(), Some("list"));
         assert_eq!(cfg.settings.button_layout.as_deref(), Some("b"));
         assert_eq!(cfg.settings.mouse_enabled, Some(false));
@@ -565,7 +600,8 @@ mod tests {
         let f = write_tmp(
             "[core]\nendpoint = \"ws://example.com/api\"\n[video]\nbackend = \"native-core-poc\"\nwidth = 1280\nheight = 720\n",
         );
-        save_settings_mirror(f.path(), "en", "grid", "a", true, false, "60").expect("save");
+        save_settings_mirror(f.path(), "1280x720", "en", "grid", "a", true, false, "60")
+            .expect("save");
         let written = std::fs::read_to_string(f.path()).expect("read");
         assert!(!written.contains("backend"));
         let cfg = load_config(f.path());
@@ -583,7 +619,7 @@ mod tests {
     #[test]
     fn save_settings_mirror_normalizes_auto() {
         let f = write_tmp("");
-        save_settings_mirror(f.path(), "", "list", "c", false, true, "off").expect("save");
+        save_settings_mirror(f.path(), "", "", "list", "c", false, true, "off").expect("save");
         let written = std::fs::read_to_string(f.path()).expect("read");
         assert!(written.contains("language = \"auto\""));
         assert!(written.contains("browse_layout = \"list\""));
@@ -593,6 +629,7 @@ mod tests {
         assert!(written.contains("debug = true"));
         let cfg = load_config(f.path());
         assert_eq!(cfg.language, "");
+        assert!(!cfg.video_explicit);
         assert_eq!(cfg.settings.browse_layout.as_deref(), Some("list"));
         assert_eq!(cfg.settings.button_layout.as_deref(), Some("c"));
         assert_eq!(cfg.settings.mouse_enabled, Some(false));

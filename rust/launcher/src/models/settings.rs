@@ -48,15 +48,13 @@
 // Launcher-owned durable settings are mirrored into both `state.toml`
 // and `launcher.toml`. `state.toml` keeps the in-process snapshot
 // coherent; `launcher.toml` is the durable copy that survives MiSTer's
-// `/tmp` lifecycle. Resolution is intentionally excluded from the config
-// mirror for now and remains state/session-backed only because startup
-// mode switching is not trusted yet. Button layout only changes the QML
+// `/tmp` lifecycle and is what startup `vmode` / translator install
+// read on the next process launch. Button layout only changes the QML
 // resource path used by help-bar icons, browse layout selects the game
 // browsing presentation, mouse support drives the QML cursor/input blocker,
 // and language still takes effect on the next launch because Qt installs
 // translators only at startup.
 
-use crate::mister_runtime;
 use crate::models::{with_persist_mut, with_persist_read};
 use cxx_qt::{CxxQtType, Initialize};
 use cxx_qt_lib::{QString, QStringList};
@@ -320,6 +318,7 @@ fn persist_if_changed(current: &SettingsState, merged: &SettingsState) {
 fn mirror_settings_to_config(config_path: &std::path::Path, settings: &SettingsState) {
     if let Err(e) = save_settings_mirror(
         config_path,
+        settings.resolution.as_str(),
         settings.language.as_str(),
         settings.browse_layout.as_str(),
         settings.button_layout.as_str(),
@@ -336,7 +335,11 @@ fn mirror_settings_to_config(config_path: &std::path::Path, settings: &SettingsS
 
 fn merge_settings(snapshot: &SettingsState, config: &Config) -> SettingsState {
     SettingsState {
-        resolution: snapshot.resolution.clone(),
+        resolution: if config.video_explicit {
+            format!("{}x{}", config.video_width, config.video_height)
+        } else {
+            String::new()
+        },
         language: normalize_language(&config.language).to_string(),
         browse_layout: normalize_browse_layout(
             config
