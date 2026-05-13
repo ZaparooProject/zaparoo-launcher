@@ -155,7 +155,7 @@ int main(int argc, char* argv[]) // NOLINT
         return EXIT_FAILURE;
     }
 
-    do
+    do // NOLINT
     {
         // Install after zaparoo_rust_init() so tracing is live before any Qt
         // messages are emitted.
