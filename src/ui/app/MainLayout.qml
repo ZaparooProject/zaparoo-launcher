@@ -208,6 +208,7 @@ ApplicationWindow {
     property alias firstRunIndexModal: firstRunIndexModal
     property alias logUploadModal: logUploadModal
     property alias quitConfirmModal: quitConfirmModal
+    property alias settingNeedsRestartModal: settingNeedsRestartModal
     property alias listPickerModal: listPickerModal
     property alias headerBar: headerBar
     property alias screensaverOverlay: screensaverOverlay
