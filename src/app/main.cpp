@@ -386,10 +386,7 @@ int main(int argc, char* argv[])
                          []()
                          {
                              zaparoo_rust_shutdown();
-                             if (crtNativePathEnabled)
-                             {
-                                 stopNativeVideoWriter();
-                             }
+                             stopNativeVideoWriter();
                              qInstallMessageHandler(nullptr);
                          });
 
