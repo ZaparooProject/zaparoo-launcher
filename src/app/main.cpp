@@ -119,7 +119,7 @@ static ParsedArguments extractCrtArgument(int argc, char* argv[])
     return parsed;
 }
 
-int main(int argc, char* argv[])
+int main(int argc, char* argv[]) // NO_LINT
 {
     int returnExitCode = 0;
 
