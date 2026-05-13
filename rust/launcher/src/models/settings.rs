@@ -183,7 +183,8 @@ impl Initialize for ffi::Settings {
         self.as_mut().rust_mut().available_resolutions = if is_mister {
             curated_resolutions()
         } else {
-            QStringList::default()
+            curated_resolutions()
+            // QStringList::default()
         };
         self.as_mut().rust_mut().current_resolution = QString::from(merged.resolution.as_str());
         self.as_mut().rust_mut().available_languages = languages();
@@ -203,7 +204,7 @@ impl Initialize for ffi::Settings {
 }
 
 impl ffi::Settings {
-    fn set_resolution(self: Pin<&mut Self>, value: QString) {
+    fn set_resolution(mut self: Pin<&mut Self>, value: QString) {
         if self.current_resolution == value {
             return;
         }
@@ -221,8 +222,8 @@ impl ffi::Settings {
         // if let Some((w, h)) = mister_runtime::parse_resolution(&value_str) {
         //     mister_runtime::run_vmode(w, h);
         // }
-        // self.as_mut().rust_mut().current_resolution = value;
-        // self.as_mut().current_resolution_changed();
+        self.as_mut().rust_mut().current_resolution = value;
+        self.as_mut().current_resolution_changed();
     }
 
     #[allow(

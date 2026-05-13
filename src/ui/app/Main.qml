@@ -615,12 +615,6 @@ MainLayout {
         function onRequestListPicker(title: string, entries: var, initialId: string, fieldId: string): void {
             root.openListPickerModal(title, entries, initialId, fieldId);
         }
-        function onAcceptRestart(): void {
-            root.closeSettingNeedsRestartModal();
-        }
-        function onCancelRestart(): void {
-            root.closeSettingNeedsRestartModal();
-        }
     }
     Connections {
         target: root.aboutScreen
@@ -971,6 +965,9 @@ MainLayout {
     onCloseQuitConfirmRequested: root.closeQuitConfirmModal()
     onQuitConfirmAccepted: Qt.quit()
 
+    onAcceptRestart: root.restartApp()
+    onCancelRestart: root.closeSettingNeedsRestartModal();
+
     // List-picker lifecycle. Settings screens emit requestListPicker
     // with a fieldId that round-trips through the modal so the accept
     // handler can dispatch the chosen id back to the matching
@@ -1005,6 +1002,10 @@ MainLayout {
         root.settingNeedsResetModalVisible = false;
         if (ScreenManager.topModal === root.modalSettingNeedsRestart)
             ScreenManager.popModal();
+    }
+
+    function restartApp() {
+        Qt.exit(1000);
     }
 
     onListPickerAccepted: (fieldId, selectedId) => {
@@ -1510,6 +1511,7 @@ MainLayout {
             // so there's no framebuffer to scrub there. Gate on
             // is_mister to keep the desktop dev-loop free of cosmetic
             // flashes when toggling resolutions for testing.
+            // Edit: not needed anymore with reboot after res change
             if (Browse.Settings.is_mister)
                 root._forceFullRepaint();
         }

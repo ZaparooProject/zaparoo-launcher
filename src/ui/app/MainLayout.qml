@@ -293,6 +293,8 @@ ApplicationWindow {
     signal quitConfirmAccepted
     signal listPickerAccepted(string fieldId, string selectedId)
     signal listPickerCloseRequested(string fieldId)
+    signal acceptRestart
+    signal cancelRestart
 
     // Two-way sync between root.activeScreen and ScreenManager.activeScreen.
     // Binding-breaking assignments (tests setting root.activeScreen = "games")
@@ -518,6 +520,20 @@ ApplicationWindow {
             failed: root.cardWriteFailed
             title: root.cardWriteFailed ? qsTr("Writing failed") : qsTr("Put a writable card near the reader")
             onCancelRequested: root.cancelCardWriteRequested()
+        }
+
+        // ── Card writer modal ────────────────────────────────────────────────────
+
+
+        Modal {
+            id: settingNeedsRestartModal
+
+            open: root.settingNeedsResetModalVisible
+            kind: "confirm"
+            title: qsTr("Quit and restart Zaparoo Launcher?")
+            body: qsTr("In order to apply this setting we need to restart the launcher.")
+            onConfirmed: root.acceptRestart()
+            onCancelRequested: root.cancelRestart()
         }
 
         ContextMenu {

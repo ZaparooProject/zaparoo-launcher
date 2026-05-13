@@ -310,15 +310,15 @@ pub extern "C" fn zaparoo_rust_init(crt_native_path_forced: bool) -> c_int {
     let mut config = load_config(&config_path);
 
     // CRT mode without an explicit [video] section: fall back to the
-    // 384x224 canvas hard-coded in native_video_writer.cpp (the actual
+    // 320x240 canvas hard-coded in native_video_writer.cpp (the actual
     // pixels that reach the CRT). A user who passes `--crt` but hasn't
     // configured `[video]` would otherwise get a 1920x1080 canvas —
     // unusable on MiSTer (`vmode` would set a huge linuxfb that gets
-    // truncated to 384x224 anyway) and unusable on desktop preview (the
+    // truncated to 320x240 anyway) and unusable on desktop preview (the
     // upscaled window would dwarf any monitor).
     if crt_native_path_forced && !config.video_explicit {
-        config.video_width = 384;
-        config.video_height = 224;
+        config.video_width = 320;
+        config.video_height = 240;
     }
 
     // Cache the language override so `zaparoo_rust_language_code` (called

@@ -44,9 +44,6 @@ Item {
     // matching `Browse.Settings` setter (keyed off `fieldId`).
     signal requestListPicker(title: string, entries: var, initialId: string, fieldId: string)
 
-    signal acceptRestart
-    signal cancelRestart
-
     // Field registry. Each entry's `kind` is `"header"` (non-focusable
     // group label) or `"field"` (a navigable row). Field entries also
     // carry an `id` that handleAction routes to the right model setter.
@@ -68,13 +65,13 @@ Item {
         // trusted again; the picker plumbing in `_cycleResolution` and
         // the Settings model's `current_resolution` property are still
         // wired so the row works as soon as it's added back.
-        if (Browse.Settings.is_mister) {
+        // if (Browse.Settings.is_mister) {
             out.push({
                 kind: "field",
                 id: "resolution",
                 label: qsTr("Resolution")
             })
-        }
+        // }
         out.push({
             kind: "field",
             id: "language",
@@ -134,19 +131,6 @@ Item {
             label: qsTr("About / License")
         });
         return out;
-    }
-
-
-
-    Modal {
-        id: settingNeedsRestartModal
-
-        open: root.settingNeedsResetModalVisible
-        kind: "confirm"
-        title: qsTr("Quit and restart Zaparoo Launcher?")
-        body: qsTr("In order to apply this setting we need to restart the launcher.")
-        onConfirmed: root.acceptRestart()
-        onCancelRequested: root.cancelRestart()
     }
 
     // Live-state caption helpers for the action rows. While the matching
