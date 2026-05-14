@@ -99,7 +99,10 @@ const DEFAULT_SCREENSAVER_TIMEOUT: &str = "300";
 #[cfg(debug_assertions)]
 const SCREENSAVER_TIMEOUTS_DEBUG: &[&str] = &["1"];
 
-#[allow(clippy::struct_excessive_bools)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "settings qobject is a persisted toggle bag exposed to QML"
+)]
 #[derive(Default)]
 pub struct SettingsRust {
     is_mister: bool,

@@ -68,7 +68,10 @@ impl Initialize for ffi::AlternateVersions {
 }
 
 impl ffi::AlternateVersions {
-    #[allow(clippy::needless_pass_by_value)]
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "cxx-qt qinvokable signatures use by-value QString"
+    )]
     fn discover_for(mut self: Pin<&mut Self>, system_id: QString, name: QString, path: QString) {
         let system_id = system_id.to_string();
         let name = name.to_string();
