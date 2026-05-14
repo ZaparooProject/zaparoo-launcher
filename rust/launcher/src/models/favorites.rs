@@ -164,6 +164,9 @@ pub mod ffi {
         fn path_at(self: &FavoritesModel, index: i32) -> QString;
 
         #[qinvokable]
+        fn system_id_at(self: &FavoritesModel, index: i32) -> QString;
+
+        #[qinvokable]
         fn index_for_path(self: &FavoritesModel, path: &QString) -> i32;
 
         #[inherit]
@@ -529,6 +532,13 @@ impl ffi::FavoritesModel {
             return QString::default();
         }
         QString::from(self.entries[index as usize].path.as_str())
+    }
+
+    fn system_id_at(&self, index: i32) -> QString {
+        if index < 0 || index >= self.count {
+            return QString::default();
+        }
+        QString::from(self.entries[index as usize].system.id.as_str())
     }
 
     fn index_for_path(&self, path: &QString) -> i32 {

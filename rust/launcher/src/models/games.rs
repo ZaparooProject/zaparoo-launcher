@@ -380,6 +380,9 @@ pub mod ffi {
         fn path_at(self: &GamesModel, index: i32) -> QString;
 
         #[qinvokable]
+        fn system_id_at(self: &GamesModel, index: i32) -> QString;
+
+        #[qinvokable]
         fn entry_type_at(self: &GamesModel, index: i32) -> QString;
 
         #[qinvokable]
@@ -855,6 +858,13 @@ impl ffi::GamesModel {
             return QString::default();
         }
         QString::from(self.entries[index as usize].path.as_str())
+    }
+
+    fn system_id_at(&self, index: i32) -> QString {
+        if index < 0 || index >= self.count {
+            return QString::default();
+        }
+        QString::from(entry_system_id(&self.entries[index as usize]).as_str())
     }
 
     fn entry_type_at(&self, index: i32) -> QString {

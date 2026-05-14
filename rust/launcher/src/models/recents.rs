@@ -136,6 +136,9 @@ pub mod ffi {
         fn path_at(self: &RecentsModel, index: i32) -> QString;
 
         #[qinvokable]
+        fn system_id_at(self: &RecentsModel, index: i32) -> QString;
+
+        #[qinvokable]
         fn index_for_path(self: &RecentsModel, path: &QString) -> i32;
 
         #[inherit]
@@ -393,6 +396,13 @@ impl ffi::RecentsModel {
             return QString::default();
         }
         QString::from(self.entries[index as usize].media_path.as_str())
+    }
+
+    fn system_id_at(&self, index: i32) -> QString {
+        if index < 0 || index >= self.count {
+            return QString::default();
+        }
+        QString::from(self.entries[index as usize].system_id.as_str())
     }
 
     fn index_for_path(&self, path: &QString) -> i32 {

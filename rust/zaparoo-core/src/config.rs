@@ -47,6 +47,7 @@ pub struct SettingsConfig {
     pub browse_layout: Option<String>,
     pub button_layout: Option<String>,
     pub mouse_enabled: Option<bool>,
+    pub discover_arcade_alternate_versions: Option<bool>,
     pub screensaver_timeout: Option<String>,
 }
 
@@ -57,6 +58,7 @@ pub struct SettingsMirror<'a> {
     pub browse_layout: &'a str,
     pub button_layout: &'a str,
     pub mouse_enabled: bool,
+    pub discover_arcade_alternate_versions: bool,
     pub debug_logging: bool,
     pub screensaver_timeout: &'a str,
 }
@@ -132,6 +134,7 @@ struct RawSettings {
     browse_layout: Option<String>,
     button_layout: Option<String>,
     mouse_enabled: Option<bool>,
+    discover_arcade_alternate_versions: Option<bool>,
     screensaver_timeout: Option<String>,
 }
 
@@ -207,6 +210,7 @@ pub fn load_config(path: &Path) -> Config {
             .button_layout
             .map(|value| value.trim().to_string()),
         mouse_enabled: raw.settings.mouse_enabled,
+        discover_arcade_alternate_versions: raw.settings.discover_arcade_alternate_versions,
         screensaver_timeout: raw
             .settings
             .screensaver_timeout
@@ -280,6 +284,10 @@ pub fn save_settings_mirror(path: &Path, mirror: SettingsMirror<'_>) -> Result<(
     settings.insert(
         "mouse_enabled".into(),
         toml::Value::Boolean(mirror.mouse_enabled),
+    );
+    settings.insert(
+        "discover_arcade_alternate_versions".into(),
+        toml::Value::Boolean(mirror.discover_arcade_alternate_versions),
     );
     settings.insert(
         "screensaver_timeout".into(),
@@ -422,6 +430,7 @@ mod tests {
         assert_eq!(cfg.settings.browse_layout, None);
         assert_eq!(cfg.settings.button_layout, None);
         assert_eq!(cfg.settings.mouse_enabled, None);
+        assert_eq!(cfg.settings.discover_arcade_alternate_versions, None);
         assert!(!cfg.notice.commercial_ack);
         // Default keyboard bindings populate the map.
         assert!(!cfg.key_to_action.is_empty());
@@ -594,6 +603,7 @@ mod tests {
                 browse_layout: "list",
                 button_layout: "b",
                 mouse_enabled: false,
+                discover_arcade_alternate_versions: true,
                 debug_logging: true,
                 screensaver_timeout: "300",
             },
@@ -607,6 +617,7 @@ mod tests {
         assert_eq!(cfg.settings.browse_layout.as_deref(), Some("list"));
         assert_eq!(cfg.settings.button_layout.as_deref(), Some("b"));
         assert_eq!(cfg.settings.mouse_enabled, Some(false));
+        assert_eq!(cfg.settings.discover_arcade_alternate_versions, Some(true));
         assert_eq!(cfg.settings.screensaver_timeout.as_deref(), Some("300"));
         assert!(cfg.debug_logging);
     }
@@ -624,6 +635,7 @@ mod tests {
                 browse_layout: "grid",
                 button_layout: "a",
                 mouse_enabled: true,
+                discover_arcade_alternate_versions: false,
                 debug_logging: false,
                 screensaver_timeout: "60",
             },
@@ -639,6 +651,7 @@ mod tests {
         assert_eq!(cfg.settings.browse_layout.as_deref(), Some("grid"));
         assert_eq!(cfg.settings.button_layout.as_deref(), Some("a"));
         assert_eq!(cfg.settings.mouse_enabled, Some(true));
+        assert_eq!(cfg.settings.discover_arcade_alternate_versions, Some(false));
         assert_eq!(cfg.settings.screensaver_timeout.as_deref(), Some("60"));
         assert!(!cfg.debug_logging);
     }
@@ -654,6 +667,7 @@ mod tests {
                 browse_layout: "list",
                 button_layout: "c",
                 mouse_enabled: false,
+                discover_arcade_alternate_versions: true,
                 debug_logging: true,
                 screensaver_timeout: "off",
             },
@@ -664,6 +678,7 @@ mod tests {
         assert!(written.contains("browse_layout = \"list\""));
         assert!(written.contains("button_layout = \"c\""));
         assert!(written.contains("mouse_enabled = false"));
+        assert!(written.contains("discover_arcade_alternate_versions = true"));
         assert!(written.contains("screensaver_timeout = \"off\""));
         assert!(written.contains("debug = true"));
         let cfg = load_config(f.path());
@@ -672,6 +687,7 @@ mod tests {
         assert_eq!(cfg.settings.browse_layout.as_deref(), Some("list"));
         assert_eq!(cfg.settings.button_layout.as_deref(), Some("c"));
         assert_eq!(cfg.settings.mouse_enabled, Some(false));
+        assert_eq!(cfg.settings.discover_arcade_alternate_versions, Some(true));
         assert_eq!(cfg.settings.screensaver_timeout.as_deref(), Some("off"));
         assert!(cfg.debug_logging);
     }

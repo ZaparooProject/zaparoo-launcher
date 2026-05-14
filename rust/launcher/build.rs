@@ -24,6 +24,7 @@ fn main() {
     .qt_module("Quick")
     .qt_module("QuickControls2")
     .files([
+        "src/models/alternate_versions.rs",
         "src/models/categories.rs",
         "src/models/systems.rs",
         "src/models/games.rs",

@@ -52,8 +52,9 @@
 // read on the next process launch. Button layout only changes the QML
 // resource path used by help-bar icons, browse layout selects the game
 // browsing presentation, mouse support drives the QML cursor/input blocker,
-// and language still takes effect on the next launch because Qt installs
-// translators only at startup.
+// discover-arcade-alternate-versions gates placeholder menu affordances for
+// MiSTer arcade alternates, and language still takes effect on the next launch
+// because Qt installs translators only at startup.
 
 use crate::models::{with_persist_mut, with_persist_read};
 use cxx_qt::{CxxQtType, Initialize};
@@ -110,6 +111,7 @@ pub struct SettingsRust {
     available_button_layouts: QStringList,
     current_button_layout: QString,
     current_mouse_enabled: bool,
+    current_discover_arcade_alternate_versions: bool,
     current_debug_logging: bool,
     available_screensaver_timeouts: QStringList,
     current_screensaver_timeout: QString,
@@ -138,6 +140,7 @@ pub mod ffi {
         #[qproperty(QStringList, available_button_layouts, READ, CONSTANT)]
         #[qproperty(QString, current_button_layout, READ, WRITE = set_button_layout, NOTIFY)]
         #[qproperty(bool, current_mouse_enabled, READ, WRITE = set_mouse_enabled, NOTIFY)]
+        #[qproperty(bool, current_discover_arcade_alternate_versions, READ, WRITE = set_discover_arcade_alternate_versions, NOTIFY)]
         #[qproperty(bool, current_debug_logging, READ, WRITE = set_debug_logging, NOTIFY)]
         #[qproperty(QStringList, available_screensaver_timeouts, READ, CONSTANT)]
         #[qproperty(QString, current_screensaver_timeout, READ, WRITE = set_screensaver_timeout, NOTIFY)]
@@ -157,6 +160,9 @@ pub mod ffi {
 
         #[qinvokable]
         fn set_mouse_enabled(self: Pin<&mut Settings>, value: bool);
+
+        #[qinvokable]
+        fn set_discover_arcade_alternate_versions(self: Pin<&mut Settings>, value: bool);
 
         #[qinvokable]
         fn set_debug_logging(self: Pin<&mut Settings>, value: bool);
@@ -193,6 +199,8 @@ impl Initialize for ffi::Settings {
         self.as_mut().rust_mut().current_button_layout =
             QString::from(merged.button_layout.as_str());
         self.as_mut().rust_mut().current_mouse_enabled = merged.mouse_enabled;
+        self.as_mut().rust_mut().current_discover_arcade_alternate_versions =
+            merged.discover_arcade_alternate_versions;
         self.as_mut().rust_mut().current_debug_logging = merged.debug_logging;
         self.as_mut().rust_mut().available_screensaver_timeouts = screensaver_timeouts();
         self.as_mut().rust_mut().current_screensaver_timeout =
@@ -269,6 +277,17 @@ impl ffi::Settings {
         self.as_mut().current_mouse_enabled_changed();
     }
 
+    fn set_discover_arcade_alternate_versions(mut self: Pin<&mut Self>, value: bool) {
+        if self.current_discover_arcade_alternate_versions == value {
+            return;
+        }
+        let snapshot = persist_settings(|s| s.discover_arcade_alternate_versions = value);
+        mirror_settings_to_config(&config_file_path(), &snapshot.settings);
+        self.as_mut().rust_mut().current_discover_arcade_alternate_versions = value;
+        self.as_mut()
+            .current_discover_arcade_alternate_versions_changed();
+    }
+
     fn set_debug_logging(mut self: Pin<&mut Self>, value: bool) {
         if self.current_debug_logging == value {
             return;
@@ -324,6 +343,7 @@ fn mirror_settings_to_config(config_path: &std::path::Path, settings: &SettingsS
             browse_layout: settings.browse_layout.as_str(),
             button_layout: settings.button_layout.as_str(),
             mouse_enabled: settings.mouse_enabled,
+            discover_arcade_alternate_versions: settings.discover_arcade_alternate_versions,
             debug_logging: settings.debug_logging,
             screensaver_timeout: settings.screensaver_timeout.as_str(),
         },
@@ -363,6 +383,10 @@ fn merge_settings(snapshot: &SettingsState, config: &Config) -> SettingsState {
             .settings
             .mouse_enabled
             .unwrap_or(snapshot.mouse_enabled),
+        discover_arcade_alternate_versions: config
+            .settings
+            .discover_arcade_alternate_versions
+            .unwrap_or(snapshot.discover_arcade_alternate_versions),
         // Config wins so launcher.toml is the durable source of truth on
         // MiSTer (state.toml lives on tmpfs).
         debug_logging: config.debug_logging,

@@ -93,6 +93,11 @@ Item {
         });
         out.push({
             kind: "field",
+            id: "discoverArcadeAlternateVersions",
+            label: qsTr("Discover arcade alternate versions")
+        });
+        out.push({
+            kind: "field",
             id: "updateMediaDb",
             label: qsTr("Update media database")
         });
@@ -228,7 +233,7 @@ Item {
         if (!settings._isField(settings.currentIndex))
             return false;
         const id = settings.fields[settings.currentIndex].id;
-        return id === "mouseEnabled" || id === "debugLogging";
+        return id === "mouseEnabled" || id === "discoverArcadeAlternateVersions" || id === "debugLogging";
     }
     // True when the focused field is a list-picker row (Accept opens a
     // modal; left/right is a no-op — pickers don't cycle inline). Drives
@@ -483,6 +488,14 @@ Item {
         Browse.Settings.set_debug_logging(!Browse.Settings.current_debug_logging);
     }
 
+    function _setDiscoverArcadeAlternateVersions(direction: int): void {
+        Browse.Settings.set_discover_arcade_alternate_versions(direction > 0);
+    }
+
+    function _toggleDiscoverArcadeAlternateVersions(): void {
+        Browse.Settings.set_discover_arcade_alternate_versions(!Browse.Settings.current_discover_arcade_alternate_versions);
+    }
+
     function _cycleFocused(direction: int): void {
         if (!settings._isField(settings.currentIndex))
             return;
@@ -492,6 +505,8 @@ Item {
         // direction presses (left = off, right = on).
         if (id === "mouseEnabled")
             settings._setMouseEnabled(direction);
+        else if (id === "discoverArcadeAlternateVersions")
+            settings._setDiscoverArcadeAlternateVersions(direction);
         else if (id === "debugLogging")
             settings._setDebugLogging(direction);
     }
@@ -511,6 +526,8 @@ Item {
             const id = settings.fields[settings.currentIndex].id;
             if (id === "mouseEnabled")
                 settings._toggleMouseEnabled();
+            else if (id === "discoverArcadeAlternateVersions")
+                settings._toggleDiscoverArcadeAlternateVersions();
             else if (id === "debugLogging")
                 settings._toggleDebugLogging();
             else if (id === "updateMediaDb")
@@ -651,14 +668,16 @@ Item {
                         enabled: row.modelData.id === "updateMediaDb" ? !settings._scrapeBusy : row.modelData.id === "runScraper" ? !settings._indexBusy : true
                         label: row.modelData.label
                         value: row.modelData.id === "resolution" ? settings._resolutionDisplay(Browse.Settings.current_resolution) : row.modelData.id === "language" ? settings._languageDisplay(Browse.Settings.current_language) : row.modelData.id === "browseLayout" ? settings._browseLayoutDisplay(Browse.Settings.current_browse_layout) : row.modelData.id === "buttonLayout" ? settings._buttonLayoutDisplay(Browse.Settings.current_button_layout) : row.modelData.id === "screensaverTimeout" ? settings._screensaverTimeoutDisplay(Browse.Settings.current_screensaver_timeout) : ""
-                        control: row.modelData.id === "mouseEnabled" || row.modelData.id === "debugLogging" ? "toggle" : row.modelData.id === "aboutLicense" ? "navigate" : (row.modelData.id === "updateMediaDb" || row.modelData.id === "runScraper" || row.modelData.id === "uploadLog") ? "action" : "picker"
-                        checked: row.modelData.id === "debugLogging" ? Browse.Settings.current_debug_logging : Browse.Settings.current_mouse_enabled
+                        control: row.modelData.id === "mouseEnabled" || row.modelData.id === "discoverArcadeAlternateVersions" || row.modelData.id === "debugLogging" ? "toggle" : row.modelData.id === "aboutLicense" ? "navigate" : (row.modelData.id === "updateMediaDb" || row.modelData.id === "runScraper" || row.modelData.id === "uploadLog") ? "action" : "picker"
+                        checked: row.modelData.id === "debugLogging" ? Browse.Settings.current_debug_logging : row.modelData.id === "discoverArcadeAlternateVersions" ? Browse.Settings.current_discover_arcade_alternate_versions : Browse.Settings.current_mouse_enabled
                         actionStatus: row.modelData.id === "updateMediaDb" ? settings._indexActionStatus() : row.modelData.id === "runScraper" ? settings._scrapeActionStatus() : ""
                         onHovered: settings.currentIndex = row.index
                         onClicked: {
                             settings.currentIndex = row.index;
                             if (row.modelData.id === "mouseEnabled")
                                 settings._toggleMouseEnabled();
+                            else if (row.modelData.id === "discoverArcadeAlternateVersions")
+                                settings._toggleDiscoverArcadeAlternateVersions();
                             else if (row.modelData.id === "debugLogging")
                                 settings._toggleDebugLogging();
                         }

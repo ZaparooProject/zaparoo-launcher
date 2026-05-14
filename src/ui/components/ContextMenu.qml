@@ -38,7 +38,7 @@ Item {
     readonly property int rowHeight: Sizing.pctH(6)
     readonly property int rowSpacing: Sizing.pctH(1)
     readonly property int horizontalPadding: Sizing.pctW(2)
-    readonly property int panelWidth: Math.min(Math.max(Sizing.pctW(26), Sizing.pctH(44)), Math.max(0, width - 2 * margin))
+    readonly property int panelWidth: Math.min(Math.max(Sizing.pctW(42), Sizing.pctH(56)), Math.max(0, width - 2 * margin))
     // Top/bottom margins inside the panel are sized to the panel
     // radius so a focused row's accent ring never intersects the
     // rounded corners — see the panel `Rectangle` below.
@@ -56,6 +56,15 @@ Item {
     onOpenChanged: {
         if (open)
             currentIndex = 0;
+    }
+
+    onEntriesChanged: {
+        if (menu.entries.length <= 0) {
+            currentIndex = 0;
+            return;
+        }
+        if (menu.currentIndex >= menu.entries.length)
+            currentIndex = menu.entries.length - 1;
     }
 
     function move(delta: int): void {

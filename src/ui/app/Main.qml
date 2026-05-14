@@ -48,7 +48,10 @@ MainLayout {
     property bool _firstRunIndexShown: false
     property string _pendingLanguageSelection: ""
     property string _pendingResolutionSelection: ""
+    property bool _discoverMenuPending: false
+    property var _discoverParentEntries: []
     property string cardWriteOwner: ""
+    property string contextMenuMode: "main"
     property string contextMenuOwner: ""
     property int contextMenuIndex: -1
     readonly property bool activeCardWritePending: root.cardWriteOwner === "systems" ? Browse.SystemsModel.card_write_pending : root.cardWriteOwner === "games" ? Browse.GamesModel.card_write_pending : root.cardWriteOwner === "favorites" ? Browse.FavoritesModel.card_write_pending : false
@@ -702,8 +705,35 @@ MainLayout {
     onActiveCardWriteErrorChanged: root.handleCardWriteStatus()
     onCancelCardWriteRequested: root.cancelCardWrite()
     onCloseQrCodeRequested: root.closeQrCodeModal()
-    onContextMenuCloseRequested: root.closeContextMenu()
+    onContextMenuCloseRequested: root.handleContextMenuCloseRequested()
     onContextMenuAccepted: id => root.handleContextMenuAccepted(id)
+    Connections {
+        target: Browse.AlternateVersions
+        function onLoadingChanged(): void {
+            if (Browse.AlternateVersions.loading || !root._discoverMenuPending)
+                return;
+            root._discoverMenuPending = false;
+            if (!root.contextMenuVisible || root.contextMenuMode !== "main")
+                return;
+            if (Browse.AlternateVersions.count <= 0)
+                root._replaceContextMenuEntryLabel("discover_loading", "No alternates found", "discover_unavailable");
+            if (Browse.AlternateVersions.count <= 0)
+                return;
+            const entries = [];
+            for (let i = 0; i < Browse.AlternateVersions.count; i++) {
+                entries.push({
+                    id: "alternate_version:" + i,
+                    label: Browse.AlternateVersions.name_at(i)
+                });
+            }
+            if (entries.length === 0)
+                return;
+            root._discoverParentEntries = root.contextMenuEntries;
+            root.contextMenuEntries = entries;
+            root.contextMenuMode = "alternate_versions";
+            root.contextMenu.currentIndex = 0;
+        }
+    }
 
     // Pure helper — owner/entryType/hasNfc/isFavorite → list of `{id,label}` entries.
     // Empty list = no menu (caller bails out of openContextMenu).
@@ -723,12 +753,18 @@ MainLayout {
             ];
         }
         if (owner === "recents") {
-            return [
+            const entries = [
                 {
                     id: "launch_game",
                     label: qsTr("Launch game")
                 }
             ];
+            if (Browse.Settings.current_discover_arcade_alternate_versions)
+                entries.unshift({
+                    id: "discover",
+                    label: "Discover alt. versions"
+                });
+            return entries;
         }
         if (owner === "games" || owner === "favorites") {
             if (entryType === "directory" || entryType === "root")
@@ -748,6 +784,12 @@ MainLayout {
                 id: "qr_code",
                 label: qsTr("QR code")
             });
+            if (Browse.Settings.current_discover_arcade_alternate_versions) {
+                entries.push({
+                    id: "discover",
+                    label: "Discover alt. versions"
+                });
+            }
             entries.push({
                 id: "launch_game",
                 label: qsTr("Launch game")
@@ -762,6 +804,38 @@ MainLayout {
     // hands the scanned zapscript back to a Core/launcher pairing.
     function _buildQrPayload(zapscript: string): string {
         return "https://zaparoo.app/write?v=" + encodeURIComponent(zapscript);
+    }
+
+    function _replaceContextMenuEntryLabel(targetId: string, nextLabel: string, nextId: string): void {
+        const entries = [];
+        for (let i = 0; i < root.contextMenuEntries.length; i++) {
+            const entry = root.contextMenuEntries[i];
+            if (entry.id === targetId) {
+                entries.push({
+                    id: nextId === undefined ? entry.id : nextId,
+                    label: nextLabel
+                });
+            } else {
+                entries.push(entry);
+            }
+        }
+        root.contextMenuEntries = entries;
+    }
+
+    function _restoreDiscoverContextMenuEntry(entriesIn: var): var {
+        const entries = [];
+        for (let i = 0; i < entriesIn.length; i++) {
+            const entry = entriesIn[i];
+            if (entry.id === "discover_loading" || entry.id === "discover_unavailable") {
+                entries.push({
+                    id: "discover",
+                    label: "Discover alt. versions"
+                });
+            } else {
+                entries.push(entry);
+            }
+        }
+        return entries;
     }
 
     function openContextMenu(owner: string, index: int, anchorRect): void {
@@ -788,16 +862,33 @@ MainLayout {
         root.contextMenuEntries = entries;
         root.contextMenuOwner = owner;
         root.contextMenuIndex = index;
+        root.contextMenuMode = "main";
+        root._discoverParentEntries = [];
+        root._discoverMenuPending = false;
         root.contextMenuAnchor = anchorRect;
         root.contextMenuVisible = true;
         if (ScreenManager.topModal !== root.modalContextMenu)
             ScreenManager.pushModal(root.modalContextMenu);
     }
 
+    function handleContextMenuCloseRequested(): void {
+        if (root.contextMenuMode === "alternate_versions") {
+            root.contextMenuEntries = root._restoreDiscoverContextMenuEntry(root._discoverParentEntries);
+            root._discoverParentEntries = [];
+            root.contextMenuMode = "main";
+            root._discoverMenuPending = false;
+            return;
+        }
+        root.closeContextMenu();
+    }
+
     function closeContextMenu(): void {
         root.contextMenuVisible = false;
         root.contextMenuOwner = "";
         root.contextMenuIndex = -1;
+        root.contextMenuMode = "main";
+        root._discoverParentEntries = [];
+        root._discoverMenuPending = false;
         root.contextMenuEntries = [];
         if (ScreenManager.topModal === root.modalContextMenu)
             ScreenManager.popModal();
@@ -806,10 +897,36 @@ MainLayout {
     function handleContextMenuAccepted(id: string): void {
         const owner = root.contextMenuOwner;
         const targetIndex = root.contextMenuIndex;
-        root.closeContextMenu();
         if (targetIndex < 0)
             return;
-        if (id === "launch_system") {
+        if (id === "discover") {
+            let systemId = "";
+            let name = "";
+            let path = "";
+            if (owner === "games") {
+                systemId = Browse.GamesModel.system_id_at(targetIndex);
+                name = Browse.GamesModel.name_at(targetIndex);
+                path = Browse.GamesModel.path_at(targetIndex);
+            } else if (owner === "favorites") {
+                systemId = Browse.FavoritesModel.system_id_at(targetIndex);
+                name = Browse.FavoritesModel.name_at(targetIndex);
+                path = Browse.FavoritesModel.path_at(targetIndex);
+            } else if (owner === "recents") {
+                systemId = Browse.RecentsModel.system_id_at(targetIndex);
+                name = Browse.RecentsModel.name_at(targetIndex);
+                path = Browse.RecentsModel.path_at(targetIndex);
+            }
+            root._discoverMenuPending = true;
+            root._replaceContextMenuEntryLabel("discover", "Searching....", "discover_loading");
+            Browse.AlternateVersions.discover_for(systemId, name, path);
+            return;
+        }
+        root.closeContextMenu();
+        if (id.startsWith("alternate_version:")) {
+            const altIndex = Number(id.slice("alternate_version:".length));
+            if (!Number.isNaN(altIndex))
+                Browse.AlternateVersions.launch_at(altIndex);
+        } else if (id === "launch_system") {
             Browse.SystemsModel.launch_at(targetIndex);
         } else if (id === "launch_game") {
             if (owner === "favorites")
@@ -840,6 +957,8 @@ MainLayout {
                 Browse.QrCode.generate(root._buildQrPayload(text));
                 root.openQrCodeModal();
             }
+        } else if (id === "discover_unavailable" || id === "discover_loading") {
+            return;
         }
     }
 
