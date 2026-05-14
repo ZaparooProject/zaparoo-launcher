@@ -36,40 +36,31 @@ pub fn apply_pre_qt_setup(config: &zaparoo_core::config::Config, crt_native_path
     let _ = (config, crt_native_path_forced);
 }
 
-/// Run `vmode -r W H rgb32`. No-op on non-MiSTer builds. Called by the
-/// Settings screen to apply a freshly-picked resolution at runtime.
-pub fn run_vmode(width: u32, height: u32) {
-    run_vmode_with_format(width, height, "rgb32");
-}
-
+#[cfg(zaparoo_runtime = "mister")]
 fn run_vmode_with_format(width: u32, height: u32, pixel_format: &str) {
-    #[cfg(zaparoo_runtime = "mister")]
-    {
-        use tracing::warn;
-        let status = std::process::Command::new("vmode")
-            .args(["-r", &width.to_string(), &height.to_string(), pixel_format])
-            .status();
-        match status {
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                warn!("vmode not found — display mode unchanged");
-            }
-            Err(e) => warn!("vmode error: {e}"),
-            Ok(s) if !s.success() => {
-                warn!(
-                    "vmode exited with {:?} — display mode may not have changed",
-                    s.code()
-                );
-            }
-            Ok(_) => {}
+    use tracing::warn;
+    let status = std::process::Command::new("vmode")
+        .args(["-r", &width.to_string(), &height.to_string(), pixel_format])
+        .status();
+    match status {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            warn!("vmode not found — display mode unchanged");
         }
+        Err(e) => warn!("vmode error: {e}"),
+        Ok(s) if !s.success() => {
+            warn!(
+                "vmode exited with {:?} — display mode may not have changed",
+                s.code()
+            );
+        }
+        Ok(_) => {}
     }
-    #[cfg(not(zaparoo_runtime = "mister"))]
-    let _ = (width, height, pixel_format);
 }
 
 /// Parse a `"WxH"` resolution string like `"1920x1080"` (case-insensitive
 /// `x`) into `(width, height)`. Returns `None` on empty input, missing
 /// separator, non-numeric components, or zero values.
+#[cfg(test)]
 pub fn parse_resolution(value: &str) -> Option<(u32, u32)> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
