@@ -277,7 +277,10 @@ pub fn save_settings_mirror(path: &Path, mirror: SettingsMirror<'_>) -> Result<(
         "button_layout".into(),
         toml::Value::String(mirror.button_layout.trim().to_string()),
     );
-    settings.insert("mouse_enabled".into(), toml::Value::Boolean(mirror.mouse_enabled));
+    settings.insert(
+        "mouse_enabled".into(),
+        toml::Value::Boolean(mirror.mouse_enabled),
+    );
     settings.insert(
         "screensaver_timeout".into(),
         toml::Value::String(mirror.screensaver_timeout.trim().to_string()),
@@ -399,7 +402,7 @@ mod tests {
         reason = "tests should fail-fast on unexpected errors"
     )]
 
-    use super::{load_config, save_notice_ack, save_settings_mirror, Config};
+    use super::{load_config, save_notice_ack, save_settings_mirror, Config, SettingsMirror};
     use std::io::Write;
 
     fn write_tmp(contents: &str) -> tempfile::NamedTempFile {
