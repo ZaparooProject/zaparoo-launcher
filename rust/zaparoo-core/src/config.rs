@@ -50,6 +50,17 @@ pub struct SettingsConfig {
     pub screensaver_timeout: Option<String>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SettingsMirror<'a> {
+    pub resolution: &'a str,
+    pub language: &'a str,
+    pub browse_layout: &'a str,
+    pub button_layout: &'a str,
+    pub mouse_enabled: bool,
+    pub debug_logging: bool,
+    pub screensaver_timeout: &'a str,
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct NoticeConfig {
     pub commercial_ack: bool,
@@ -207,16 +218,7 @@ pub fn load_config(path: &Path) -> Config {
     cfg
 }
 
-pub fn save_settings_mirror(
-    path: &Path,
-    resolution: &str,
-    language: &str,
-    browse_layout: &str,
-    button_layout: &str,
-    mouse_enabled: bool,
-    debug_logging: bool,
-    screensaver_timeout: &str,
-) -> Result<(), String> {
+pub fn save_settings_mirror(path: &Path, mirror: SettingsMirror<'_>) -> Result<(), String> {
     let mut table = if path.exists() {
         let src = std::fs::read_to_string(path)
             .map_err(|e| format!("could not read {}: {e}", path.display()))?;
@@ -237,7 +239,7 @@ pub fn save_settings_mirror(
     };
     general.insert(
         "language".into(),
-        toml::Value::String(normalize_language_override(language)),
+        toml::Value::String(normalize_language_override(mirror.language)),
     );
 
     let video_value = table
@@ -250,7 +252,7 @@ pub fn save_settings_mirror(
         ));
     };
     video.remove("backend");
-    if let Some((width, height)) = parse_resolution_override(resolution) {
+    if let Some((width, height)) = parse_resolution_override(mirror.resolution) {
         video.insert("width".into(), toml::Value::Integer(i64::from(width)));
         video.insert("height".into(), toml::Value::Integer(i64::from(height)));
     } else {
@@ -269,16 +271,16 @@ pub fn save_settings_mirror(
     };
     settings.insert(
         "browse_layout".into(),
-        toml::Value::String(browse_layout.trim().to_string()),
+        toml::Value::String(mirror.browse_layout.trim().to_string()),
     );
     settings.insert(
         "button_layout".into(),
-        toml::Value::String(button_layout.trim().to_string()),
+        toml::Value::String(mirror.button_layout.trim().to_string()),
     );
-    settings.insert("mouse_enabled".into(), toml::Value::Boolean(mouse_enabled));
+    settings.insert("mouse_enabled".into(), toml::Value::Boolean(mirror.mouse_enabled));
     settings.insert(
         "screensaver_timeout".into(),
-        toml::Value::String(screensaver_timeout.trim().to_string()),
+        toml::Value::String(mirror.screensaver_timeout.trim().to_string()),
     );
 
     let logging_value = table
@@ -290,7 +292,7 @@ pub fn save_settings_mirror(
             path.display()
         ));
     };
-    logging.insert("debug".into(), toml::Value::Boolean(debug_logging));
+    logging.insert("debug".into(), toml::Value::Boolean(mirror.debug_logging));
 
     let serialized =
         toml::to_string(&table).map_err(|e| format!("config serialisation failed: {e}"))?;
@@ -581,8 +583,19 @@ mod tests {
     fn save_settings_mirror_creates_sections() {
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("launcher.toml");
-        save_settings_mirror(&path, "1280x720", "it_IT", "list", "b", false, true, "300")
-            .expect("save");
+        save_settings_mirror(
+            &path,
+            SettingsMirror {
+                resolution: "1280x720",
+                language: "it_IT",
+                browse_layout: "list",
+                button_layout: "b",
+                mouse_enabled: false,
+                debug_logging: true,
+                screensaver_timeout: "300",
+            },
+        )
+        .expect("save");
         let cfg = load_config(&path);
         assert_eq!(cfg.language, "it_IT");
         assert_eq!(cfg.video_width, 1280);
@@ -600,8 +613,19 @@ mod tests {
         let f = write_tmp(
             "[core]\nendpoint = \"ws://example.com/api\"\n[video]\nbackend = \"native-core-poc\"\nwidth = 1280\nheight = 720\n",
         );
-        save_settings_mirror(f.path(), "1280x720", "en", "grid", "a", true, false, "60")
-            .expect("save");
+        save_settings_mirror(
+            f.path(),
+            SettingsMirror {
+                resolution: "1280x720",
+                language: "en",
+                browse_layout: "grid",
+                button_layout: "a",
+                mouse_enabled: true,
+                debug_logging: false,
+                screensaver_timeout: "60",
+            },
+        )
+        .expect("save");
         let written = std::fs::read_to_string(f.path()).expect("read");
         assert!(!written.contains("backend"));
         let cfg = load_config(f.path());
@@ -619,7 +643,19 @@ mod tests {
     #[test]
     fn save_settings_mirror_normalizes_auto() {
         let f = write_tmp("");
-        save_settings_mirror(f.path(), "", "", "list", "c", false, true, "off").expect("save");
+        save_settings_mirror(
+            f.path(),
+            SettingsMirror {
+                resolution: "",
+                language: "",
+                browse_layout: "list",
+                button_layout: "c",
+                mouse_enabled: false,
+                debug_logging: true,
+                screensaver_timeout: "off",
+            },
+        )
+        .expect("save");
         let written = std::fs::read_to_string(f.path()).expect("read");
         assert!(written.contains("language = \"auto\""));
         assert!(written.contains("browse_layout = \"list\""));

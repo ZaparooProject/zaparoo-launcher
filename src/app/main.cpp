@@ -400,8 +400,9 @@ int main(int argc, char* argv[]) // NOLINT
     // Restart as a fresh process so the Rust globals and cached config are
     // rebuilt from scratch. Re-entering main() in-process panics on the
     // OnceLock-backed runtime/store singletons.
-    ::execvp(argv[0], argv);
-    std::fprintf(stderr, "Failed to restart launcher via execvp(%s): %s\n", argv[0],
+    const char* programPath = parsedArgs.argv.front();
+    ::execvp(programPath, qtArgv);
+    std::fprintf(stderr, "Failed to restart launcher via execvp(%s): %s\n", programPath,
                  std::strerror(errno));
     return EXIT_FAILURE;
 }

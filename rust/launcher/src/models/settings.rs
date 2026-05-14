@@ -60,7 +60,7 @@ use cxx_qt::{CxxQtType, Initialize};
 use cxx_qt_lib::{QString, QStringList};
 use std::pin::Pin;
 use tracing::warn;
-use zaparoo_core::config::{load_config, save_settings_mirror, Config};
+use zaparoo_core::config::{load_config, save_settings_mirror, Config, SettingsMirror};
 use zaparoo_core::persist::{self, SettingsState};
 use zaparoo_core::platform_paths::config_file_path;
 use zaparoo_core::runtime;
@@ -318,13 +318,15 @@ fn persist_if_changed(current: &SettingsState, merged: &SettingsState) {
 fn mirror_settings_to_config(config_path: &std::path::Path, settings: &SettingsState) {
     if let Err(e) = save_settings_mirror(
         config_path,
-        settings.resolution.as_str(),
-        settings.language.as_str(),
-        settings.browse_layout.as_str(),
-        settings.button_layout.as_str(),
-        settings.mouse_enabled,
-        settings.debug_logging,
-        settings.screensaver_timeout.as_str(),
+        SettingsMirror {
+            resolution: settings.resolution.as_str(),
+            language: settings.language.as_str(),
+            browse_layout: settings.browse_layout.as_str(),
+            button_layout: settings.button_layout.as_str(),
+            mouse_enabled: settings.mouse_enabled,
+            debug_logging: settings.debug_logging,
+            screensaver_timeout: settings.screensaver_timeout.as_str(),
+        },
     ) {
         warn!(
             "could not save settings mirror to {}: {e}",
