@@ -7,8 +7,8 @@ use cxx_qt::{CxxQtType, Initialize, Threading};
 use cxx_qt_lib::QString;
 use std::collections::HashSet;
 use std::pin::Pin;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use tracing::warn;
 use zaparoo_core::endpoints::run::RunMutation;
 use zaparoo_core::media_types::{
@@ -158,7 +158,10 @@ async fn discover_alternate_versions(
         return Ok(Vec::new());
     }
     let canonical_title = client
-        .media_meta(MediaMetaParams::for_media(system_id.to_string(), selected_path.to_string()))
+        .media_meta(MediaMetaParams::for_media(
+            system_id.to_string(),
+            selected_path.to_string(),
+        ))
         .await
         .ok()
         .map(|result| result.media.title.name.trim().to_string())
@@ -264,7 +267,7 @@ fn media_item_from_browse_entry(entry: BrowseEntry) -> MediaItem {
 fn normalize_name(value: &str) -> String {
     value
         .chars()
-        .filter(|ch| ch.is_ascii_alphanumeric())
+        .filter(char::is_ascii_alphanumeric)
         .flat_map(char::to_lowercase)
         .collect()
 }
@@ -286,7 +289,7 @@ fn normalize_seed_title(value: &str) -> String {
     normalize_name(trimmed)
 }
 
-fn strip_trailing_group<'a>(value: &'a str, open: char, close: char) -> Option<&'a str> {
+fn strip_trailing_group(value: &str, open: char, close: char) -> Option<&str> {
     let value = value.trim_end();
     if !value.ends_with(close) {
         return None;
@@ -345,8 +348,14 @@ mod tests {
     #[test]
     fn normalize_seed_title_drops_trailing_variant_groups() {
         assert_eq!(normalize_seed_title("Bubble Bobble"), "bubblebobble");
-        assert_eq!(normalize_seed_title("Bubble Bobble (Japan)"), "bubblebobble");
-        assert_eq!(normalize_seed_title("Bubble Bobble [Bootleg]"), "bubblebobble");
+        assert_eq!(
+            normalize_seed_title("Bubble Bobble (Japan)"),
+            "bubblebobble"
+        );
+        assert_eq!(
+            normalize_seed_title("Bubble Bobble [Bootleg]"),
+            "bubblebobble"
+        );
         assert_eq!(
             normalize_seed_title("Bubble Bobble Lost Cave"),
             "bubblebobblelostcave"
@@ -356,7 +365,9 @@ mod tests {
     #[test]
     fn alternate_folder_path_returns_deepest_alternate_folder() {
         assert_eq!(
-            alternate_folder_path("/media/fat/_Arcade/_alternatives/Bubble Bobble/Bubble Bobble.mra"),
+            alternate_folder_path(
+                "/media/fat/_Arcade/_alternatives/Bubble Bobble/Bubble Bobble.mra"
+            ),
             Some("/media/fat/_Arcade/_alternatives/Bubble Bobble".into())
         );
     }
@@ -394,8 +405,7 @@ mod tests {
         let item = media_item_from_browse_entry(BrowseEntry {
             media_id: Some(42),
             name: "Bubble Bobble (Japan)".into(),
-            path: "/media/fat/_Arcade/_alternatives/Bubble Bobble/Bubble Bobble (Japan).mra"
-                .into(),
+            path: "/media/fat/_Arcade/_alternatives/Bubble Bobble/Bubble Bobble (Japan).mra".into(),
             system_id: "Arcade".into(),
             relative_path: "_alternatives/Bubble Bobble/Bubble Bobble (Japan).mra".into(),
             zap_script: "**launch:\"/x\"".into(),

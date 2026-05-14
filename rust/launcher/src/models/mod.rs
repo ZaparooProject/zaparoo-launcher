@@ -23,9 +23,9 @@
     reason = "process-local init invariants: any violation is a wiring bug and must be fatal"
 )]
 
+pub mod alternate_versions;
 pub mod app_state;
 pub mod app_status;
-pub mod alternate_versions;
 pub mod browse;
 pub mod build_info;
 pub mod categories;

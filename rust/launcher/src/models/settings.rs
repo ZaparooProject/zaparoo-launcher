@@ -199,8 +199,9 @@ impl Initialize for ffi::Settings {
         self.as_mut().rust_mut().current_button_layout =
             QString::from(merged.button_layout.as_str());
         self.as_mut().rust_mut().current_mouse_enabled = merged.mouse_enabled;
-        self.as_mut().rust_mut().current_discover_arcade_alternate_versions =
-            merged.discover_arcade_alternate_versions;
+        self.as_mut()
+            .rust_mut()
+            .current_discover_arcade_alternate_versions = merged.discover_arcade_alternate_versions;
         self.as_mut().rust_mut().current_debug_logging = merged.debug_logging;
         self.as_mut().rust_mut().available_screensaver_timeouts = screensaver_timeouts();
         self.as_mut().rust_mut().current_screensaver_timeout =
@@ -283,7 +284,9 @@ impl ffi::Settings {
         }
         let snapshot = persist_settings(|s| s.discover_arcade_alternate_versions = value);
         mirror_settings_to_config(&config_file_path(), &snapshot.settings);
-        self.as_mut().rust_mut().current_discover_arcade_alternate_versions = value;
+        self.as_mut()
+            .rust_mut()
+            .current_discover_arcade_alternate_versions = value;
         self.as_mut()
             .current_discover_arcade_alternate_versions_changed();
     }
