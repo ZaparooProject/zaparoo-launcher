@@ -24,7 +24,8 @@ Item {
     // on-screen geometry (mapToItem + paintedWidth/Height) and start
     // the bouncing copy at exactly the same position.
     property alias logoItem: logo
-    property string crtTitle: ""
+    property var layoutProfile: null
+    property string browseTitle: ""
 
     height: Sizing.headerHeight
 
@@ -59,8 +60,8 @@ Item {
     Row {
         id: topHud
 
-        anchors.top: Theme.crtNativePath ? undefined : parent.top
-        anchors.bottom: Theme.crtNativePath ? parent.bottom : undefined
+        anchors.top: header.layoutProfile && header.layoutProfile.headerHudBottomAligned ? undefined : parent.top
+        anchors.bottom: header.layoutProfile && header.layoutProfile.headerHudBottomAligned ? parent.bottom : undefined
         anchors.right: parent.right
         anchors.rightMargin: Sizing.headerSideMargin
         spacing: Sizing.pctW(1)
@@ -131,7 +132,7 @@ Item {
     TextMetrics {
         id: crtTitleMetrics
 
-        text: header.crtTitle
+        text: header.browseTitle
         font.family: Theme.fontUi
         font.pixelSize: Sizing.headerRowHeight
         font.weight: Font.Medium
@@ -140,7 +141,7 @@ Item {
     Text {
         id: crtTitleLabel
 
-        visible: Theme.crtNativePath && header.crtTitle !== ""
+        visible: header.layoutProfile && header.layoutProfile.showHeaderTitleInHeader && header.browseTitle !== ""
         x: Sizing.center(parent.width, width)
         y: parent.height - height
         width: Math.min(Math.floor(parent.width / 3), Math.ceil(Math.max(crtTitleMetrics.advanceWidth, crtTitleMetrics.boundingRect.width)))
@@ -148,7 +149,7 @@ Item {
         elide: Text.ElideRight
         horizontalAlignment: Text.AlignLeft
         verticalAlignment: Text.AlignVCenter
-        text: header.crtTitle
+        text: header.browseTitle
         font.family: Theme.fontUi
         font.pixelSize: Sizing.headerRowHeight
         font.weight: Font.Medium
@@ -162,8 +163,8 @@ Item {
     // idle, but its slot stays reserved by the header's fixed height
     // so the logo and the surrounding layout don't shift.
     CoreStatusPill {
-        anchors.top: Theme.crtNativePath ? parent.top : topHud.bottom
+        anchors.top: header.layoutProfile && header.layoutProfile.headerStatusPillPinnedTop ? parent.top : topHud.bottom
         anchors.right: topHud.right
-        anchors.topMargin: Theme.crtNativePath ? 0 : Sizing.headerStackGap
+        anchors.topMargin: header.layoutProfile && header.layoutProfile.headerStatusPillPinnedTop ? 0 : Sizing.headerStackGap
     }
 }

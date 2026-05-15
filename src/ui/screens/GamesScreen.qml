@@ -39,6 +39,7 @@ Item {
     readonly property int _listPageSize: 10
     readonly property int _browsePageSize: games._listLayout ? games._listPageSize : gamesGrid.pageSize
     readonly property bool _crtGridLayout: Theme.crtNativePath && !games._listLayout
+    readonly property var _tileLayout: games._crtGridLayout ? BrowseLayouts.crtTile : BrowseLayouts.defaultTile
     property bool _currentMoveIsRepeat: false
 
     // Cover-gate flag: true while `GamesModel` is holding `loading`
@@ -346,14 +347,14 @@ Item {
     // the precise entry count for the path.
     TopStatusStrip {
         id: topStrip
-        visible: !games.transitioning && !games.coverGateLoading && !games._crtGridLayout
+        visible: !games.transitioning && !games.coverGateLoading && games._tileLayout.showTopStrip
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
         anchors.topMargin: Sizing.headerBottom + Sizing.pctH(1)
-        height: games._crtGridLayout ? 0 : Sizing.pctH(7)
+        height: games._tileLayout.showTopStrip ? Sizing.pctH(7) : 0
         title: {
-            if (games._crtGridLayout)
+            if (games._tileLayout.showHeaderTitleInHeader)
                 return "";
             const sid = Browse.GamesModel.current_system_id;
             if (sid === "")
@@ -362,8 +363,8 @@ Item {
             return idx >= 0 ? Browse.SystemsModel.system_name_at(idx) : sid;
         }
         currentPage: Math.floor(gamesGrid.currentIndex / games._browsePageSize)
-        totalPages: games._crtGridLayout ? 1 : Math.max(1, Math.ceil((Browse.GamesModel.dir_count + Browse.GamesModel.total_files) / games._browsePageSize))
-        totalText: games._crtGridLayout ? "" : (Browse.GamesModel.total_files > 0 ? qsTr("%1 files").arg(Browse.GamesModel.total_files) : "")
+        totalPages: games._tileLayout.showBottomStatusRow ? 1 : Math.max(1, Math.ceil((Browse.GamesModel.dir_count + Browse.GamesModel.total_files) / games._browsePageSize))
+        totalText: games._tileLayout.showBottomStatusRow ? "" : (Browse.GamesModel.total_files > 0 ? qsTr("%1 files").arg(Browse.GamesModel.total_files) : "")
     }
 
     Item {
@@ -461,22 +462,12 @@ Item {
         anchors.right: parent.right
         anchors.top: topStrip.bottom
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: games._crtGridLayout ? Sizing.pctH(6) + Sizing.px(4) + 8 : Sizing.pctH(15)
+        anchors.bottomMargin: Sizing.pctH(6) + games._tileLayout.activeLabelBottomMargin + games._tileLayout.activeLabelHeight
         focused: games.gridFocused
         model: Browse.GamesModel
-        leftInsetOverride: games._crtGridLayout ? 4 : -1
-        rightInsetOverride: games._crtGridLayout ? 0 : -1
-        gutterWidthOverride: games._crtGridLayout ? 8 : -1
-        gutterGapOverride: games._crtGridLayout ? 4 : -1
-        cellSpacingXOverride: games._crtGridLayout ? 4 : -1
-        topInsetOverride: games._crtGridLayout ? 2 : -1
-        bottomInsetOverride: games._crtGridLayout ? 4 : -1
-        cellSpacingYOverride: games._crtGridLayout ? 4 : -1
-        scrollThumbWidthOverride: games._crtGridLayout ? 4 : -1
-        scrollThumbRightInsetOverride: games._crtGridLayout ? 2 : -1
-        scrollArrowSizeOverride: games._crtGridLayout ? 8 : -1
-        packHorizontalRemainderAfterGutter: games._crtGridLayout
+        layoutProfile: games._tileLayout
         delegate: Tile {
+            layoutProfile: games._tileLayout
             showCaption: true
         }
         // Cover-art tiles run taller than systems logos, so a 5x3
@@ -533,18 +524,18 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: games._crtGridLayout ? Sizing.pctH(6) + Sizing.px(4) : Sizing.pctH(8)
-        height: games._crtGridLayout ? 8 : Sizing.pctH(7)
+        anchors.bottomMargin: games._tileLayout.activeLabelBottomMargin
+        height: games._tileLayout.activeLabelHeight
         text: gamesGrid.itemCount > 0 ? Browse.GamesModel.name_at(gamesGrid.currentIndex) : ""
     }
 
     Text {
         id: bottomTotalText
-        visible: games._crtGridLayout && !games.transitioning && !games.coverGateLoading && Browse.GamesModel.total_files > 0
+        visible: games._tileLayout.showBottomStatusRow && !games.transitioning && !games.coverGateLoading && Browse.GamesModel.total_files > 0
         anchors.left: parent.left
-        anchors.leftMargin: 4
+        anchors.leftMargin: games._tileLayout.bottomStatusLeftMargin
         anchors.verticalCenter: activeLabel.verticalCenter
-        width: Sizing.px(parent.width / 3) - 4
+        width: Sizing.px(parent.width / 3) - games._tileLayout.bottomStatusLeftMargin
         height: Sizing.fontSize(2.9)
         elide: Text.ElideRight
         horizontalAlignment: Text.AlignLeft
@@ -557,11 +548,11 @@ Item {
     }
 
     Text {
-        visible: games._crtGridLayout && !games.transitioning && !games.coverGateLoading && Math.ceil((Browse.GamesModel.dir_count + Browse.GamesModel.total_files) / games._browsePageSize) > 1
+        visible: games._tileLayout.showBottomStatusRow && !games.transitioning && !games.coverGateLoading && Math.ceil((Browse.GamesModel.dir_count + Browse.GamesModel.total_files) / games._browsePageSize) > 1
         anchors.right: parent.right
-        anchors.rightMargin: Sizing.pctW(5)
+        anchors.rightMargin: games._tileLayout.bottomStatusRightMargin
         anchors.verticalCenter: activeLabel.verticalCenter
-        width: Sizing.px(parent.width / 3) - Sizing.pctW(5)
+        width: Sizing.px(parent.width / 3) - games._tileLayout.bottomStatusRightMargin
         height: Sizing.fontSize(2.9)
         elide: Text.ElideRight
         horizontalAlignment: Text.AlignRight
@@ -602,7 +593,7 @@ Item {
         id: pageLoadingCue
         visible: !games.transitioning && !games.coverGateLoading && Browse.GamesModel.loading_more && gamesGrid.hasPendingTarget
         anchors.left: activeLabel.left
-        anchors.leftMargin: games._crtGridLayout && bottomTotalText.visible ? bottomTotalText.x + bottomTotalText.width + 4 : gamesGrid.leftInset
+        anchors.leftMargin: games._tileLayout.showBottomStatusRow && bottomTotalText.visible ? bottomTotalText.x + bottomTotalText.width + games._tileLayout.bottomStatusLeftMargin : gamesGrid.leftInset
         anchors.verticalCenter: activeLabel.verticalCenter
         text: qsTr("Loading more…")
     }

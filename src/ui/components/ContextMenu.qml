@@ -29,6 +29,7 @@ Item {
     // dynamic per-owner menus silently re-shuffled the index/action map.
     property var entries: []
     property int currentIndex: 0
+    property int bottomUnsafeHeight: Sizing.pctH(6) + Sizing.pctH(2)
 
     signal accepted(string id)
     signal closeRequested
@@ -38,8 +39,7 @@ Item {
     readonly property int rowHeight: Sizing.pctH(6)
     readonly property int rowSpacing: Sizing.pctH(1)
     readonly property int horizontalPadding: Sizing.pctW(2)
-    readonly property int _bottomUnsafeHeight: Theme.crtNativePath ? 16 : Sizing.pctH(6) + Sizing.pctH(2)
-    readonly property int _usableBottom: Math.max(menu.margin, height - _bottomUnsafeHeight - menu.margin)
+    readonly property int _usableBottom: Math.max(menu.margin, height - menu.bottomUnsafeHeight - menu.margin)
     readonly property int panelWidth: Math.min(Math.max(Sizing.pctW(42), Sizing.pctH(56)), Math.max(0, width - 2 * margin))
     // Top/bottom margins inside the panel are sized to the panel
     // radius so a focused row's accent ring never intersects the

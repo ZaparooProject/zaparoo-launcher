@@ -50,6 +50,7 @@ Item {
     // Defaults to true so call sites that don't care keep working
     // untouched.
     property bool focused: true
+    property var layoutProfile: null
 
     // Emitted when the user is sitting on the last loaded page after a
     // selection move. Models with more data fetch the next page in
@@ -163,31 +164,19 @@ Item {
     // not as another cell, so a full inter-cell gap looks like wasted
     // space next to it. The gutter stays reserved on a single page
     // (just hidden) so cells don't reflow when paging activates.
-    property int leftInsetOverride: -1
-    property int rightInsetOverride: -1
-    property int gutterWidthOverride: -1
-    property int gutterGapOverride: -1
-    property int cellSpacingXOverride: -1
-    property int topInsetOverride: -1
-    property int bottomInsetOverride: -1
-    property int cellSpacingYOverride: -1
-    property int scrollThumbWidthOverride: -1
-    property int scrollThumbRightInsetOverride: -1
-    property int scrollArrowSizeOverride: -1
-    property bool packHorizontalRemainderAfterGutter: false
-    readonly property int leftInset: leftInsetOverride >= 0 ? leftInsetOverride : Sizing.pctW(5)
-    readonly property int rightInset: rightInsetOverride >= 0 ? rightInsetOverride : Sizing.pctW(5)
-    readonly property int gutterWidth: gutterWidthOverride >= 0 ? gutterWidthOverride : Sizing.pctW(3)
-    readonly property int gutterGap: gutterGapOverride >= 0 ? gutterGapOverride : Sizing.pctW(1.5)
-    readonly property int scrollThumbWidth: scrollThumbWidthOverride >= 0 ? scrollThumbWidthOverride : Sizing.pctW(1.2)
-    readonly property int scrollThumbRightInset: scrollThumbRightInsetOverride >= 0 ? scrollThumbRightInsetOverride : 0
-    readonly property int scrollArrowSize: scrollArrowSizeOverride >= 0 ? scrollArrowSizeOverride : Math.min(gutterWidth, Sizing.pctH(4))
-    readonly property int topInset: topInsetOverride >= 0 ? topInsetOverride : Sizing.pctH(2)
-    readonly property int bottomInset: bottomInsetOverride >= 0 ? bottomInsetOverride : Sizing.pctH(2)
-    readonly property int cellSpacingX: cellSpacingXOverride >= 0 ? cellSpacingXOverride : Sizing.pctW(3)
-    readonly property int cellSpacingY: cellSpacingYOverride >= 0 ? cellSpacingYOverride : Sizing.pctH(4)
+    readonly property int leftInset: root.layoutProfile ? root.layoutProfile.gridLeftInset : Sizing.pctW(5)
+    readonly property int rightInset: root.layoutProfile ? root.layoutProfile.gridRightInset : Sizing.pctW(5)
+    readonly property int gutterWidth: root.layoutProfile ? root.layoutProfile.gridGutterWidth : Sizing.pctW(3)
+    readonly property int gutterGap: root.layoutProfile ? root.layoutProfile.gridGutterGap : Sizing.pctW(1.5)
+    readonly property int scrollThumbWidth: root.layoutProfile ? root.layoutProfile.scrollThumbWidth : Sizing.pctW(1.2)
+    readonly property int scrollThumbRightInset: root.layoutProfile ? root.layoutProfile.scrollThumbRightInset : 0
+    readonly property int scrollArrowSize: root.layoutProfile ? root.layoutProfile.scrollArrowSize : Math.min(gutterWidth, Sizing.pctH(4))
+    readonly property int topInset: root.layoutProfile ? root.layoutProfile.gridTopInset : Sizing.pctH(2)
+    readonly property int bottomInset: root.layoutProfile ? root.layoutProfile.gridBottomInset : Sizing.pctH(2)
+    readonly property int cellSpacingX: root.layoutProfile ? root.layoutProfile.gridColumnGap : Sizing.pctW(3)
+    readonly property int cellSpacingY: root.layoutProfile ? root.layoutProfile.gridRowGap : Sizing.pctH(4)
     readonly property int _contentWidth: root.columns * root.cellWidth + (root.columns - 1) * root.cellSpacingX
-    readonly property int _scrollGutterX: root.packHorizontalRemainderAfterGutter ? root.leftInset + root._contentWidth + root.gutterGap : width - root.rightInset - root.gutterWidth
+    readonly property int _scrollGutterX: root.layoutProfile && root.layoutProfile.packHorizontalRemainderAfterGutter ? root.leftInset + root._contentWidth + root.gutterGap : width - root.rightInset - root.gutterWidth
 
     // Computed cell dimensions — fill the available area, divided by
     // gridColumns × gridRows. Callers don't override. The cell area

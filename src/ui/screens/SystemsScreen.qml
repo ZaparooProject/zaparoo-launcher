@@ -38,6 +38,7 @@ Item {
     property bool gridFocused: true
     readonly property bool _listLayout: Browse.Settings.current_browse_layout === "list"
     readonly property bool _crtGridLayout: Theme.crtNativePath && !systems._listLayout
+    readonly property var _tileLayout: systems._crtGridLayout ? BrowseLayouts.crtTile : BrowseLayouts.defaultTile
 
     signal requestAccept(systemId: string)
     signal requestHubScreen
@@ -176,12 +177,12 @@ Item {
         anchors.right: parent.right
         anchors.top: parent.top
         anchors.topMargin: Sizing.headerBottom + Sizing.pctH(1)
-        height: systems._crtGridLayout ? 0 : Sizing.pctH(7)
-        title: systems._crtGridLayout ? "" : Browse.SystemsModel.current_category
+        height: systems._tileLayout.showTopStrip ? Sizing.pctH(7) : 0
+        title: systems._tileLayout.showHeaderTitleInHeader ? "" : Browse.SystemsModel.current_category
         currentPage: systemsGrid.currentPage
-        totalPages: systems._crtGridLayout ? 1 : Math.max(1, Math.ceil(Browse.SystemsModel.count / systemsGrid.pageSize))
-        totalText: systems._crtGridLayout ? "" : (Browse.SystemsModel.count > 0 ? qsTr("%1 systems").arg(Browse.SystemsModel.count) : "")
-        visible: !systems.transitioning && !systems._crtGridLayout
+        totalPages: systems._tileLayout.showBottomStatusRow ? 1 : Math.max(1, Math.ceil(Browse.SystemsModel.count / systemsGrid.pageSize))
+        totalText: systems._tileLayout.showBottomStatusRow ? "" : (Browse.SystemsModel.count > 0 ? qsTr("%1 systems").arg(Browse.SystemsModel.count) : "")
+        visible: !systems.transitioning && systems._tileLayout.showTopStrip
     }
 
     BrowseList {
@@ -233,22 +234,13 @@ Item {
         anchors.right: parent.right
         anchors.top: topStrip.bottom
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: systems._crtGridLayout ? Sizing.pctH(6) + Sizing.px(4) + 8 : Sizing.pctH(15)
+        anchors.bottomMargin: Sizing.pctH(6) + systems._tileLayout.activeLabelBottomMargin + systems._tileLayout.activeLabelHeight
         focused: systems.gridFocused
         model: Browse.SystemsModel
-        leftInsetOverride: systems._crtGridLayout ? 4 : -1
-        rightInsetOverride: systems._crtGridLayout ? 0 : -1
-        gutterWidthOverride: systems._crtGridLayout ? 8 : -1
-        gutterGapOverride: systems._crtGridLayout ? 4 : -1
-        cellSpacingXOverride: systems._crtGridLayout ? 4 : -1
-        topInsetOverride: systems._crtGridLayout ? 2 : -1
-        bottomInsetOverride: systems._crtGridLayout ? 4 : -1
-        cellSpacingYOverride: systems._crtGridLayout ? 4 : -1
-        scrollThumbWidthOverride: systems._crtGridLayout ? 4 : -1
-        scrollThumbRightInsetOverride: systems._crtGridLayout ? 2 : -1
-        scrollArrowSizeOverride: systems._crtGridLayout ? 8 : -1
-        packHorizontalRemainderAfterGutter: systems._crtGridLayout
-        delegate: Tile {}
+        layoutProfile: systems._tileLayout
+        delegate: Tile {
+            layoutProfile: systems._tileLayout
+        }
         onItemHovered: index => systems._focusIndex(index)
         onItemClicked: index => {
             systems._focusIndex(index);
@@ -276,18 +268,18 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: systems._crtGridLayout ? Sizing.pctH(6) + Sizing.px(4) : Sizing.pctH(8)
-        height: systems._crtGridLayout ? 8 : Sizing.pctH(7)
+        anchors.bottomMargin: systems._tileLayout.activeLabelBottomMargin
+        height: systems._tileLayout.activeLabelHeight
         text: systemsGrid.itemCount > 0 ? Browse.SystemsModel.system_name_at(systemsGrid.currentIndex) : ""
         visible: !systems.transitioning && !systems._listLayout
     }
 
     Text {
-        visible: systems._crtGridLayout && !systems.transitioning && Browse.SystemsModel.count > 0
+        visible: systems._tileLayout.showBottomStatusRow && !systems.transitioning && Browse.SystemsModel.count > 0
         anchors.left: parent.left
-        anchors.leftMargin: 4
+        anchors.leftMargin: systems._tileLayout.bottomStatusLeftMargin
         anchors.verticalCenter: activeLabel.verticalCenter
-        width: Sizing.px(parent.width / 3) - 4
+        width: Sizing.px(parent.width / 3) - systems._tileLayout.bottomStatusLeftMargin
         height: Sizing.fontSize(2.9)
         elide: Text.ElideRight
         horizontalAlignment: Text.AlignLeft
@@ -300,11 +292,11 @@ Item {
     }
 
     Text {
-        visible: systems._crtGridLayout && !systems.transitioning && Math.ceil(Browse.SystemsModel.count / systemsGrid.pageSize) > 1
+        visible: systems._tileLayout.showBottomStatusRow && !systems.transitioning && Math.ceil(Browse.SystemsModel.count / systemsGrid.pageSize) > 1
         anchors.right: parent.right
-        anchors.rightMargin: Sizing.pctW(5)
+        anchors.rightMargin: systems._tileLayout.bottomStatusRightMargin
         anchors.verticalCenter: activeLabel.verticalCenter
-        width: Sizing.px(parent.width / 3) - Sizing.pctW(5)
+        width: Sizing.px(parent.width / 3) - systems._tileLayout.bottomStatusRightMargin
         height: Sizing.fontSize(2.9)
         elide: Text.ElideRight
         horizontalAlignment: Text.AlignRight

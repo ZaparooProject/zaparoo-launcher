@@ -284,6 +284,8 @@ ApplicationWindow {
 
     readonly property string recentsScreenState: Browse.RecentsModel.loading ? "loading" : ((Browse.RecentsModel.error_message ?? "") !== "" ? "error" : (Browse.RecentsModel.count === 0 ? "empty" : "ready"))
     readonly property bool _crtGridBrowseLayout: root.crtNativePath && Browse.Settings.current_browse_layout !== "list"
+    readonly property var _browseTileLayout: root._crtGridBrowseLayout ? BrowseLayouts.crtTile : BrowseLayouts.defaultTile
+    readonly property var _contextMenuLayout: root.crtNativePath ? BrowseLayouts.crtTile : BrowseLayouts.defaultTile
     readonly property string _crtGamesHeaderTitle: {
         const sid = Browse.GamesModel.current_system_id;
         if (sid === "")
@@ -291,7 +293,7 @@ ApplicationWindow {
         const idx = Browse.SystemsModel.index_for_system_id(sid);
         return idx >= 0 ? Browse.SystemsModel.system_name_at(idx) : sid;
     }
-    readonly property string crtHeaderTitle: {
+    readonly property string browseHeaderTitle: {
         if (!root._crtGridBrowseLayout)
             return "";
         if (root.activeScreen === root.screenSystems)
@@ -420,7 +422,8 @@ ApplicationWindow {
             anchors.right: parent.right
             anchors.top: parent.top
             anchors.topMargin: Sizing.headerTopMargin
-            crtTitle: root.crtHeaderTitle
+            layoutProfile: root._browseTileLayout
+            browseTitle: root.browseHeaderTitle
             z: 200
         }
 
@@ -559,6 +562,7 @@ ApplicationWindow {
             open: root.contextMenuVisible
             anchorRect: root.contextMenuAnchor
             entries: root.contextMenuEntries
+            bottomUnsafeHeight: root._contextMenuLayout.bottomUnsafeHeight
             onAccepted: id => root.contextMenuAccepted(id)
             onCloseRequested: root.contextMenuCloseRequested()
         }
