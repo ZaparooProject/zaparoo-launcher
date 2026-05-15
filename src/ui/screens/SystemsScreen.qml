@@ -37,6 +37,8 @@ Item {
     // times. The ring restores automatically when the modal pops.
     property bool gridFocused: true
     readonly property bool _listLayout: Browse.Settings.current_browse_layout === "list"
+    readonly property bool _crtGridLayout: Theme.crtNativePath && !systems._listLayout
+    readonly property var _tileLayout: systems._crtGridLayout ? BrowseLayouts.crtTile : BrowseLayouts.defaultTile
 
     signal requestAccept(systemId: string)
     signal requestHubScreen
@@ -175,12 +177,12 @@ Item {
         anchors.right: parent.right
         anchors.top: parent.top
         anchors.topMargin: Sizing.headerBottom + Sizing.pctH(1)
-        height: Sizing.pctH(7)
-        title: Browse.SystemsModel.current_category
+        height: systems._tileLayout.showTopStrip ? Sizing.pctH(7) : 0
+        title: systems._tileLayout.showHeaderTitleInHeader ? "" : Browse.SystemsModel.current_category
         currentPage: systemsGrid.currentPage
-        totalPages: Math.max(1, Math.ceil(Browse.SystemsModel.count / systemsGrid.pageSize))
-        totalText: Browse.SystemsModel.count > 0 ? qsTr("%1 systems").arg(Browse.SystemsModel.count) : ""
-        visible: !systems.transitioning
+        totalPages: systems._tileLayout.showBottomStatusRow ? 1 : Math.max(1, Math.ceil(Browse.SystemsModel.count / systemsGrid.pageSize))
+        totalText: systems._tileLayout.showBottomStatusRow ? "" : (Browse.SystemsModel.count > 0 ? qsTr("%1 systems").arg(Browse.SystemsModel.count) : "")
+        visible: !systems.transitioning && systems._tileLayout.showTopStrip
     }
 
     BrowseList {
@@ -232,10 +234,13 @@ Item {
         anchors.right: parent.right
         anchors.top: topStrip.bottom
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: Sizing.pctH(15)
+        anchors.bottomMargin: Sizing.pctH(6) + systems._tileLayout.activeLabelBottomMargin + systems._tileLayout.activeLabelHeight
         focused: systems.gridFocused
         model: Browse.SystemsModel
-        delegate: Tile {}
+        layoutProfile: systems._tileLayout
+        delegate: Tile {
+            layoutProfile: systems._tileLayout
+        }
         onItemHovered: index => systems._focusIndex(index)
         onItemClicked: index => {
             systems._focusIndex(index);
@@ -262,10 +267,45 @@ Item {
         id: activeLabel
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.top: systemsGrid.bottom
-        height: Sizing.pctH(7)
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: systems._tileLayout.activeLabelBottomMargin
+        height: systems._tileLayout.activeLabelHeight
         text: systemsGrid.itemCount > 0 ? Browse.SystemsModel.system_name_at(systemsGrid.currentIndex) : ""
         visible: !systems.transitioning && !systems._listLayout
+    }
+
+    Text {
+        visible: systems._tileLayout.showBottomStatusRow && !systems.transitioning && Browse.SystemsModel.count > 0
+        anchors.left: parent.left
+        anchors.leftMargin: systems._tileLayout.bottomStatusLeftMargin
+        anchors.verticalCenter: activeLabel.verticalCenter
+        width: Sizing.px(parent.width / 3) - systems._tileLayout.bottomStatusLeftMargin
+        height: Sizing.fontSize(2.9)
+        elide: Text.ElideRight
+        horizontalAlignment: Text.AlignLeft
+        verticalAlignment: Text.AlignVCenter
+        text: qsTr("%1 systems").arg(Browse.SystemsModel.count)
+        font.family: Theme.fontUi
+        font.pixelSize: Sizing.fontSize(2.9)
+        color: Theme.textPrimary
+        renderType: Text.NativeRendering
+    }
+
+    Text {
+        visible: systems._tileLayout.showBottomStatusRow && !systems.transitioning && Math.ceil(Browse.SystemsModel.count / systemsGrid.pageSize) > 1
+        anchors.right: parent.right
+        anchors.rightMargin: systems._tileLayout.bottomStatusRightMargin
+        anchors.verticalCenter: activeLabel.verticalCenter
+        width: Sizing.px(parent.width / 3) - systems._tileLayout.bottomStatusRightMargin
+        height: Sizing.fontSize(2.9)
+        elide: Text.ElideRight
+        horizontalAlignment: Text.AlignRight
+        verticalAlignment: Text.AlignVCenter
+        text: qsTr("%1 / %2").arg(systemsGrid.currentPage + 1).arg(Math.max(1, Math.ceil(Browse.SystemsModel.count / systemsGrid.pageSize)))
+        font.family: Theme.fontUi
+        font.pixelSize: Sizing.fontSize(2.9)
+        color: Theme.textPrimary
+        renderType: Text.NativeRendering
     }
 
     ScreenStateOverlay {

@@ -50,6 +50,7 @@ Item {
     // Defaults to true so call sites that don't care keep working
     // untouched.
     property bool focused: true
+    property var layoutProfile: null
 
     // Emitted when the user is sitting on the last loaded page after a
     // selection move. Models with more data fetch the next page in
@@ -163,14 +164,19 @@ Item {
     // not as another cell, so a full inter-cell gap looks like wasted
     // space next to it. The gutter stays reserved on a single page
     // (just hidden) so cells don't reflow when paging activates.
-    readonly property int leftInset: Sizing.pctW(5)
-    readonly property int rightInset: Sizing.pctW(5)
-    readonly property int gutterWidth: Sizing.pctW(3)
-    readonly property int gutterGap: Sizing.pctW(1.5)
-    readonly property int topInset: Sizing.pctH(2)
-    readonly property int bottomInset: Sizing.pctH(2)
-    readonly property int cellSpacingX: Sizing.pctW(3)
-    readonly property int cellSpacingY: Sizing.pctH(4)
+    readonly property int leftInset: root.layoutProfile ? root.layoutProfile.gridLeftInset : Sizing.pctW(5)
+    readonly property int rightInset: root.layoutProfile ? root.layoutProfile.gridRightInset : Sizing.pctW(5)
+    readonly property int gutterWidth: root.layoutProfile ? root.layoutProfile.gridGutterWidth : Sizing.pctW(3)
+    readonly property int gutterGap: root.layoutProfile ? root.layoutProfile.gridGutterGap : Sizing.pctW(1.5)
+    readonly property int scrollThumbWidth: root.layoutProfile ? root.layoutProfile.scrollThumbWidth : Sizing.pctW(1.2)
+    readonly property int scrollThumbRightInset: root.layoutProfile ? root.layoutProfile.scrollThumbRightInset : 0
+    readonly property int scrollArrowSize: root.layoutProfile ? root.layoutProfile.scrollArrowSize : Math.min(gutterWidth, Sizing.pctH(4))
+    readonly property int topInset: root.layoutProfile ? root.layoutProfile.gridTopInset : Sizing.pctH(2)
+    readonly property int bottomInset: root.layoutProfile ? root.layoutProfile.gridBottomInset : Sizing.pctH(2)
+    readonly property int cellSpacingX: root.layoutProfile ? root.layoutProfile.gridColumnGap : Sizing.pctW(3)
+    readonly property int cellSpacingY: root.layoutProfile ? root.layoutProfile.gridRowGap : Sizing.pctH(4)
+    readonly property int _contentWidth: root.columns * root.cellWidth + (root.columns - 1) * root.cellSpacingX
+    readonly property int _scrollGutterX: root.layoutProfile && root.layoutProfile.packHorizontalRemainderAfterGutter ? root.leftInset + root._contentWidth + root.gutterGap : width - root.rightInset - root.gutterWidth
 
     // Computed cell dimensions — fill the available area, divided by
     // gridColumns × gridRows. Callers don't override. The cell area
@@ -654,8 +660,7 @@ Item {
     Item {
         id: scrollGutter
 
-        anchors.right: parent.right
-        anchors.rightMargin: root.rightInset
+        x: root._scrollGutterX
         anchors.top: parent.top
         anchors.topMargin: root.topInset
         anchors.bottom: parent.bottom
@@ -663,13 +668,11 @@ Item {
         width: root.gutterWidth
         visible: root.totalPageCount > 1
 
-        readonly property int arrowSize: Math.min(width, Sizing.pctH(4))
-
         Image {
             id: upArrow
             source: Resources.iconUrl("ScrollUp")
-            width: scrollGutter.arrowSize
-            height: scrollGutter.arrowSize
+            width: root.scrollArrowSize
+            height: root.scrollArrowSize
             anchors.top: parent.top
             anchors.horizontalCenter: parent.horizontalCenter
             fillMode: Image.PreserveAspectFit
@@ -688,8 +691,8 @@ Item {
         Image {
             id: downArrow
             source: Resources.iconUrl("ScrollDown")
-            width: scrollGutter.arrowSize
-            height: scrollGutter.arrowSize
+            width: root.scrollArrowSize
+            height: root.scrollArrowSize
             anchors.bottom: parent.bottom
             anchors.horizontalCenter: parent.horizontalCenter
             fillMode: Image.PreserveAspectFit
@@ -711,10 +714,12 @@ Item {
         Item {
             id: scrollRegion
             anchors.top: parent.top
-            anchors.topMargin: scrollGutter.arrowSize + Sizing.pctH(1)
+            anchors.topMargin: root.scrollArrowSize + Sizing.pctH(1)
             anchors.bottom: parent.bottom
-            anchors.bottomMargin: scrollGutter.arrowSize + Sizing.pctH(1)
-            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.bottomMargin: root.scrollArrowSize + Sizing.pctH(1)
+            anchors.right: parent.right
+            anchors.rightMargin: root.scrollThumbRightInset
+            width: root.scrollThumbWidth
 
             // Standard paginated-scrollbar formulas (cf. Qt
             // `ScrollBar.size`/`position`, GTK `Gtk.Scrollbar`, Apple
@@ -728,9 +733,9 @@ Item {
 
             Rectangle {
                 id: scrollThumb
-                width: Sizing.pctW(1.2)
+                width: root.scrollThumbWidth
                 height: scrollRegion._thumbHeight
-                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.right: parent.right
                 y: scrollRegion._thumbY
                 color: Theme.textPrimary
                 radius: Sizing.half(width)

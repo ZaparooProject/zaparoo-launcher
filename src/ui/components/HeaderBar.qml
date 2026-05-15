@@ -24,6 +24,8 @@ Item {
     // on-screen geometry (mapToItem + paintedWidth/Height) and start
     // the bouncing copy at exactly the same position.
     property alias logoItem: logo
+    property var layoutProfile: null
+    property string browseTitle: ""
 
     height: Sizing.headerHeight
 
@@ -58,7 +60,8 @@ Item {
     Row {
         id: topHud
 
-        anchors.top: parent.top
+        anchors.top: header.layoutProfile && header.layoutProfile.headerHudBottomAligned ? undefined : parent.top
+        anchors.bottom: header.layoutProfile && header.layoutProfile.headerHudBottomAligned ? parent.bottom : undefined
         anchors.right: parent.right
         anchors.rightMargin: Sizing.headerSideMargin
         spacing: Sizing.pctW(1)
@@ -126,14 +129,42 @@ Item {
         }
     }
 
+    TextMetrics {
+        id: crtTitleMetrics
+
+        text: header.browseTitle
+        font.family: Theme.fontUi
+        font.pixelSize: Sizing.headerRowHeight
+        font.weight: Font.Medium
+    }
+
+    Text {
+        id: crtTitleLabel
+
+        visible: header.layoutProfile && header.layoutProfile.showHeaderTitleInHeader && header.browseTitle !== ""
+        x: Sizing.center(parent.width, width)
+        y: parent.height - height
+        width: Math.min(Math.floor(parent.width / 3), Math.ceil(Math.max(crtTitleMetrics.advanceWidth, crtTitleMetrics.boundingRect.width)))
+        height: Sizing.headerRowHeight
+        elide: Text.ElideRight
+        horizontalAlignment: Text.AlignLeft
+        verticalAlignment: Text.AlignVCenter
+        text: header.browseTitle
+        font.family: Theme.fontUi
+        font.pixelSize: Sizing.headerRowHeight
+        font.weight: Font.Medium
+        color: Theme.textPrimary
+        renderType: Text.NativeRendering
+    }
+
     // Mutually-exclusive Core / indexing / scraper status surface. Sits
     // on its own line directly under `topHud`, right-aligned to the
     // same edge as the clock. The pill collapses to zero size when
     // idle, but its slot stays reserved by the header's fixed height
     // so the logo and the surrounding layout don't shift.
     CoreStatusPill {
-        anchors.top: topHud.bottom
+        anchors.top: header.layoutProfile && header.layoutProfile.headerStatusPillPinnedTop ? parent.top : topHud.bottom
         anchors.right: topHud.right
-        anchors.topMargin: Sizing.headerStackGap
+        anchors.topMargin: header.layoutProfile && header.layoutProfile.headerStatusPillPinnedTop ? 0 : Sizing.headerStackGap
     }
 }

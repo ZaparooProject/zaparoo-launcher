@@ -70,6 +70,7 @@ Item {
     readonly property string delegateName: parent.name
     readonly property string delegateCoverKey: parent.coverKey
     readonly property bool delegateFavorite: parent.favorite !== 0
+    property var layoutProfile: null
     // Opt-in per-tile name caption. Off by default so Hub and Systems
     // keep their full-bleed logo layout. Cover-art screens (Games,
     // Recents) flip this on at the delegate template.
@@ -86,7 +87,8 @@ Item {
     readonly property int _captionHeight: Sizing.pctH(5.5)
     readonly property int _captionGap: Sizing.pctH(0.4)
     readonly property int _captionTextSize: Sizing.fontSize(2.2)
-    readonly property int _captionTextMaxWidth: Math.max(0, root.width - 2 * Sizing.cornerRadius)
+    readonly property int _tileCornerRadius: root.layoutProfile ? root.layoutProfile.tileCornerRadius : Sizing.cornerRadius
+    readonly property int _captionTextMaxWidth: Math.max(0, root.width - 2 * root._tileCornerRadius)
     readonly property int _textMeasureSlack: Theme.crtNativePath ? 0 : 2
     readonly property int _captionMeasuredWidth: Math.ceil(Math.max(captionMetrics.advanceWidth, captionMetrics.boundingRect.width) + root._textMeasureSlack)
     readonly property int _captionTextWidth: Math.min(root._captionTextMaxWidth, root._captionMeasuredWidth)
@@ -127,7 +129,7 @@ Item {
     // selection.
     Rectangle {
         anchors.fill: parent
-        radius: Sizing.cornerRadius
+        radius: root._tileCornerRadius
         color: Theme.surfaceCard
         border.color: Theme.borderMid
         border.width: Sizing.stroke(1)
@@ -160,7 +162,7 @@ Item {
         anchors.fill: parent
         anchors.margins: root._outlineGap
         color: Theme.accent
-        radius: Math.max(0, Sizing.cornerRadius - root._outlineGap)
+        radius: Math.max(0, root._tileCornerRadius - root._outlineGap)
         antialiasing: true
         visible: root._focusedSelection
     }
