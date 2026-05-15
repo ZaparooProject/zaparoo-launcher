@@ -9,6 +9,7 @@ qt_add_qml_module(
     URI ZaparooTest.Ui
     VERSION 1.0
     QML_FILES
+        tst_browse_layout_profiles.qml
         tst_smoke.qml
         tst_navigation.qml
         tst_sizing.qml
