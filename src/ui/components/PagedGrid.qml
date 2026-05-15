@@ -167,14 +167,27 @@ Item {
     property int rightInsetOverride: -1
     property int gutterWidthOverride: -1
     property int gutterGapOverride: -1
+    property int cellSpacingXOverride: -1
+    property int topInsetOverride: -1
+    property int bottomInsetOverride: -1
+    property int cellSpacingYOverride: -1
+    property int scrollThumbWidthOverride: -1
+    property int scrollThumbRightInsetOverride: -1
+    property int scrollArrowSizeOverride: -1
+    property bool packHorizontalRemainderAfterGutter: false
     readonly property int leftInset: leftInsetOverride >= 0 ? leftInsetOverride : Sizing.pctW(5)
     readonly property int rightInset: rightInsetOverride >= 0 ? rightInsetOverride : Sizing.pctW(5)
     readonly property int gutterWidth: gutterWidthOverride >= 0 ? gutterWidthOverride : Sizing.pctW(3)
     readonly property int gutterGap: gutterGapOverride >= 0 ? gutterGapOverride : Sizing.pctW(1.5)
-    readonly property int topInset: Sizing.pctH(2)
-    readonly property int bottomInset: Sizing.pctH(2)
-    readonly property int cellSpacingX: Sizing.pctW(3)
-    readonly property int cellSpacingY: Sizing.pctH(4)
+    readonly property int scrollThumbWidth: scrollThumbWidthOverride >= 0 ? scrollThumbWidthOverride : Sizing.pctW(1.2)
+    readonly property int scrollThumbRightInset: scrollThumbRightInsetOverride >= 0 ? scrollThumbRightInsetOverride : 0
+    readonly property int scrollArrowSize: scrollArrowSizeOverride >= 0 ? scrollArrowSizeOverride : Math.min(gutterWidth, Sizing.pctH(4))
+    readonly property int topInset: topInsetOverride >= 0 ? topInsetOverride : Sizing.pctH(2)
+    readonly property int bottomInset: bottomInsetOverride >= 0 ? bottomInsetOverride : Sizing.pctH(2)
+    readonly property int cellSpacingX: cellSpacingXOverride >= 0 ? cellSpacingXOverride : Sizing.pctW(3)
+    readonly property int cellSpacingY: cellSpacingYOverride >= 0 ? cellSpacingYOverride : Sizing.pctH(4)
+    readonly property int _contentWidth: root.columns * root.cellWidth + (root.columns - 1) * root.cellSpacingX
+    readonly property int _scrollGutterX: root.packHorizontalRemainderAfterGutter ? root.leftInset + root._contentWidth + root.gutterGap : width - root.rightInset - root.gutterWidth
 
     // Computed cell dimensions — fill the available area, divided by
     // gridColumns × gridRows. Callers don't override. The cell area
@@ -658,8 +671,7 @@ Item {
     Item {
         id: scrollGutter
 
-        anchors.right: parent.right
-        anchors.rightMargin: root.rightInset
+        x: root._scrollGutterX
         anchors.top: parent.top
         anchors.topMargin: root.topInset
         anchors.bottom: parent.bottom
@@ -667,13 +679,11 @@ Item {
         width: root.gutterWidth
         visible: root.totalPageCount > 1
 
-        readonly property int arrowSize: Math.min(width, Sizing.pctH(4))
-
         Image {
             id: upArrow
             source: Resources.iconUrl("ScrollUp")
-            width: scrollGutter.arrowSize
-            height: scrollGutter.arrowSize
+            width: root.scrollArrowSize
+            height: root.scrollArrowSize
             anchors.top: parent.top
             anchors.horizontalCenter: parent.horizontalCenter
             fillMode: Image.PreserveAspectFit
@@ -692,8 +702,8 @@ Item {
         Image {
             id: downArrow
             source: Resources.iconUrl("ScrollDown")
-            width: scrollGutter.arrowSize
-            height: scrollGutter.arrowSize
+            width: root.scrollArrowSize
+            height: root.scrollArrowSize
             anchors.bottom: parent.bottom
             anchors.horizontalCenter: parent.horizontalCenter
             fillMode: Image.PreserveAspectFit
@@ -715,10 +725,12 @@ Item {
         Item {
             id: scrollRegion
             anchors.top: parent.top
-            anchors.topMargin: scrollGutter.arrowSize + Sizing.pctH(1)
+            anchors.topMargin: root.scrollArrowSize + Sizing.pctH(1)
             anchors.bottom: parent.bottom
-            anchors.bottomMargin: scrollGutter.arrowSize + Sizing.pctH(1)
-            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.bottomMargin: root.scrollArrowSize + Sizing.pctH(1)
+            anchors.right: parent.right
+            anchors.rightMargin: root.scrollThumbRightInset
+            width: root.scrollThumbWidth
 
             // Standard paginated-scrollbar formulas (cf. Qt
             // `ScrollBar.size`/`position`, GTK `Gtk.Scrollbar`, Apple
@@ -732,9 +744,9 @@ Item {
 
             Rectangle {
                 id: scrollThumb
-                width: Sizing.pctW(1.2)
+                width: root.scrollThumbWidth
                 height: scrollRegion._thumbHeight
-                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.right: parent.right
                 y: scrollRegion._thumbY
                 color: Theme.textPrimary
                 radius: Sizing.half(width)

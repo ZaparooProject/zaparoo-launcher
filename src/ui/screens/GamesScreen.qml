@@ -461,13 +461,21 @@ Item {
         anchors.right: parent.right
         anchors.top: topStrip.bottom
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: games._crtGridLayout ? Sizing.pctH(6) + Sizing.px(2) + Sizing.pctH(7) : Sizing.pctH(15)
+        anchors.bottomMargin: games._crtGridLayout ? Sizing.pctH(6) + Sizing.px(4) + 8 : Sizing.pctH(15)
         focused: games.gridFocused
         model: Browse.GamesModel
         leftInsetOverride: games._crtGridLayout ? 4 : -1
-        rightInsetOverride: games._crtGridLayout ? 4 : -1
-        gutterWidthOverride: games._crtGridLayout ? 4 : -1
+        rightInsetOverride: games._crtGridLayout ? 0 : -1
+        gutterWidthOverride: games._crtGridLayout ? 8 : -1
         gutterGapOverride: games._crtGridLayout ? 4 : -1
+        cellSpacingXOverride: games._crtGridLayout ? 4 : -1
+        topInsetOverride: games._crtGridLayout ? 2 : -1
+        bottomInsetOverride: games._crtGridLayout ? 4 : -1
+        cellSpacingYOverride: games._crtGridLayout ? 4 : -1
+        scrollThumbWidthOverride: games._crtGridLayout ? 4 : -1
+        scrollThumbRightInsetOverride: games._crtGridLayout ? 2 : -1
+        scrollArrowSizeOverride: games._crtGridLayout ? 8 : -1
+        packHorizontalRemainderAfterGutter: games._crtGridLayout
         delegate: Tile {
             showCaption: true
         }
@@ -525,8 +533,8 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: games._crtGridLayout ? Sizing.pctH(6) + Sizing.px(2) : Sizing.pctH(8)
-        height: Sizing.pctH(7)
+        anchors.bottomMargin: games._crtGridLayout ? Sizing.pctH(6) + Sizing.px(4) : Sizing.pctH(8)
+        height: games._crtGridLayout ? 8 : Sizing.pctH(7)
         text: gamesGrid.itemCount > 0 ? Browse.GamesModel.name_at(gamesGrid.currentIndex) : ""
     }
 

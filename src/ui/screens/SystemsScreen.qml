@@ -233,13 +233,21 @@ Item {
         anchors.right: parent.right
         anchors.top: topStrip.bottom
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: systems._crtGridLayout ? Sizing.pctH(6) + Sizing.px(2) + Sizing.pctH(7) : Sizing.pctH(15)
+        anchors.bottomMargin: systems._crtGridLayout ? Sizing.pctH(6) + Sizing.px(4) + 8 : Sizing.pctH(15)
         focused: systems.gridFocused
         model: Browse.SystemsModel
         leftInsetOverride: systems._crtGridLayout ? 4 : -1
-        rightInsetOverride: systems._crtGridLayout ? 4 : -1
-        gutterWidthOverride: systems._crtGridLayout ? 4 : -1
+        rightInsetOverride: systems._crtGridLayout ? 0 : -1
+        gutterWidthOverride: systems._crtGridLayout ? 8 : -1
         gutterGapOverride: systems._crtGridLayout ? 4 : -1
+        cellSpacingXOverride: systems._crtGridLayout ? 4 : -1
+        topInsetOverride: systems._crtGridLayout ? 2 : -1
+        bottomInsetOverride: systems._crtGridLayout ? 4 : -1
+        cellSpacingYOverride: systems._crtGridLayout ? 4 : -1
+        scrollThumbWidthOverride: systems._crtGridLayout ? 4 : -1
+        scrollThumbRightInsetOverride: systems._crtGridLayout ? 2 : -1
+        scrollArrowSizeOverride: systems._crtGridLayout ? 8 : -1
+        packHorizontalRemainderAfterGutter: systems._crtGridLayout
         delegate: Tile {}
         onItemHovered: index => systems._focusIndex(index)
         onItemClicked: index => {
@@ -268,8 +276,8 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: systems._crtGridLayout ? Sizing.pctH(6) + Sizing.px(2) : Sizing.pctH(8)
-        height: Sizing.pctH(7)
+        anchors.bottomMargin: systems._crtGridLayout ? Sizing.pctH(6) + Sizing.px(4) : Sizing.pctH(8)
+        height: systems._crtGridLayout ? 8 : Sizing.pctH(7)
         text: systemsGrid.itemCount > 0 ? Browse.SystemsModel.system_name_at(systemsGrid.currentIndex) : ""
         visible: !systems.transitioning && !systems._listLayout
     }
