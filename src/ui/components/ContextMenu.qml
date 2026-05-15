@@ -38,12 +38,14 @@ Item {
     readonly property int rowHeight: Sizing.pctH(6)
     readonly property int rowSpacing: Sizing.pctH(1)
     readonly property int horizontalPadding: Sizing.pctW(2)
+    readonly property int _bottomUnsafeHeight: Theme.crtNativePath ? 16 : Sizing.pctH(6) + Sizing.pctH(2)
+    readonly property int _usableBottom: Math.max(menu.margin, height - _bottomUnsafeHeight - menu.margin)
     readonly property int panelWidth: Math.min(Math.max(Sizing.pctW(42), Sizing.pctH(56)), Math.max(0, width - 2 * margin))
     // Top/bottom margins inside the panel are sized to the panel
     // radius so a focused row's accent ring never intersects the
     // rounded corners — see the panel `Rectangle` below.
     readonly property int panelRadius: Sizing.half(Sizing.cornerRadius)
-    readonly property int panelHeight: Math.min(entries.length * rowHeight + Math.max(0, entries.length - 1) * rowSpacing + 2 * panelRadius, Math.max(0, height - 2 * margin))
+    readonly property int panelHeight: Math.min(entries.length * rowHeight + Math.max(0, entries.length - 1) * rowSpacing + 2 * panelRadius, Math.max(0, _usableBottom - menu.margin))
     readonly property bool preferRight: anchorRect.x + anchorRect.width + gap + panelWidth <= width - margin
     readonly property int preferredX: preferRight ? Sizing.px(anchorRect.x + anchorRect.width + gap) : Sizing.px(anchorRect.x - gap - panelWidth)
     readonly property int preferredY: Sizing.px(anchorRect.y + Sizing.center(anchorRect.height, panelHeight))
@@ -148,7 +150,7 @@ Item {
         id: panel
 
         x: Sizing.px(Math.max(menu.margin, Math.min(menu.preferredX, menu.width - menu.margin - menu.panelWidth)))
-        y: Sizing.px(Math.max(menu.margin, Math.min(menu.preferredY, menu.height - menu.margin - menu.panelHeight)))
+        y: Sizing.px(Math.max(menu.margin, Math.min(menu.preferredY, menu._usableBottom - menu.panelHeight)))
         width: menu.panelWidth
         height: menu.panelHeight
         color: Theme.bgPanel
