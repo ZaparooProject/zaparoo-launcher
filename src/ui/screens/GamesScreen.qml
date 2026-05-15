@@ -38,6 +38,7 @@ Item {
     readonly property real _listBandScale: 0.85
     readonly property int _listPageSize: 10
     readonly property int _browsePageSize: games._listLayout ? games._listPageSize : gamesGrid.pageSize
+    readonly property bool _crtGridLayout: Theme.crtNativePath && !games._listLayout
     property bool _currentMoveIsRepeat: false
 
     // Cover-gate flag: true while `GamesModel` is holding `loading`
@@ -345,13 +346,15 @@ Item {
     // the precise entry count for the path.
     TopStatusStrip {
         id: topStrip
-        visible: !games.transitioning && !games.coverGateLoading
+        visible: !games.transitioning && !games.coverGateLoading && !games._crtGridLayout
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
         anchors.topMargin: Sizing.headerBottom + Sizing.pctH(1)
-        height: Sizing.pctH(7)
+        height: games._crtGridLayout ? 0 : Sizing.pctH(7)
         title: {
+            if (games._crtGridLayout)
+                return "";
             const sid = Browse.GamesModel.current_system_id;
             if (sid === "")
                 return "";
@@ -359,8 +362,8 @@ Item {
             return idx >= 0 ? Browse.SystemsModel.system_name_at(idx) : sid;
         }
         currentPage: Math.floor(gamesGrid.currentIndex / games._browsePageSize)
-        totalPages: Math.max(1, Math.ceil((Browse.GamesModel.dir_count + Browse.GamesModel.total_files) / games._browsePageSize))
-        totalText: Browse.GamesModel.total_files > 0 ? qsTr("%1 files").arg(Browse.GamesModel.total_files) : ""
+        totalPages: games._crtGridLayout ? 1 : Math.max(1, Math.ceil((Browse.GamesModel.dir_count + Browse.GamesModel.total_files) / games._browsePageSize))
+        totalText: games._crtGridLayout ? "" : (Browse.GamesModel.total_files > 0 ? qsTr("%1 files").arg(Browse.GamesModel.total_files) : "")
     }
 
     Item {
@@ -458,9 +461,13 @@ Item {
         anchors.right: parent.right
         anchors.top: topStrip.bottom
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: Sizing.pctH(15)
+        anchors.bottomMargin: games._crtGridLayout ? Sizing.pctH(6) + Sizing.px(2) + Sizing.pctH(7) : Sizing.pctH(15)
         focused: games.gridFocused
         model: Browse.GamesModel
+        leftInsetOverride: games._crtGridLayout ? 4 : -1
+        rightInsetOverride: games._crtGridLayout ? 4 : -1
+        gutterWidthOverride: games._crtGridLayout ? 4 : -1
+        gutterGapOverride: games._crtGridLayout ? 4 : -1
         delegate: Tile {
             showCaption: true
         }
@@ -517,9 +524,45 @@ Item {
         visible: !games.transitioning && !games.coverGateLoading && !games._listLayout
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.top: gamesGrid.bottom
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: games._crtGridLayout ? Sizing.pctH(6) + Sizing.px(2) : Sizing.pctH(8)
         height: Sizing.pctH(7)
         text: gamesGrid.itemCount > 0 ? Browse.GamesModel.name_at(gamesGrid.currentIndex) : ""
+    }
+
+    Text {
+        id: bottomTotalText
+        visible: games._crtGridLayout && !games.transitioning && !games.coverGateLoading && Browse.GamesModel.total_files > 0
+        anchors.left: parent.left
+        anchors.leftMargin: 4
+        anchors.verticalCenter: activeLabel.verticalCenter
+        width: Sizing.px(parent.width / 3) - 4
+        height: Sizing.fontSize(2.9)
+        elide: Text.ElideRight
+        horizontalAlignment: Text.AlignLeft
+        verticalAlignment: Text.AlignVCenter
+        text: qsTr("%1 files").arg(Browse.GamesModel.total_files)
+        font.family: Theme.fontUi
+        font.pixelSize: Sizing.fontSize(2.9)
+        color: Theme.textPrimary
+        renderType: Text.NativeRendering
+    }
+
+    Text {
+        visible: games._crtGridLayout && !games.transitioning && !games.coverGateLoading && Math.ceil((Browse.GamesModel.dir_count + Browse.GamesModel.total_files) / games._browsePageSize) > 1
+        anchors.right: parent.right
+        anchors.rightMargin: Sizing.pctW(5)
+        anchors.verticalCenter: activeLabel.verticalCenter
+        width: Sizing.px(parent.width / 3) - Sizing.pctW(5)
+        height: Sizing.fontSize(2.9)
+        elide: Text.ElideRight
+        horizontalAlignment: Text.AlignRight
+        verticalAlignment: Text.AlignVCenter
+        text: qsTr("%1 / %2").arg(Math.floor(gamesGrid.currentIndex / games._browsePageSize) + 1).arg(Math.max(1, Math.ceil((Browse.GamesModel.dir_count + Browse.GamesModel.total_files) / games._browsePageSize)))
+        font.family: Theme.fontUi
+        font.pixelSize: Sizing.fontSize(2.9)
+        color: Theme.textPrimary
+        renderType: Text.NativeRendering
     }
 
     ScreenStateOverlay {
@@ -551,7 +594,7 @@ Item {
         id: pageLoadingCue
         visible: !games.transitioning && !games.coverGateLoading && Browse.GamesModel.loading_more && gamesGrid.hasPendingTarget
         anchors.left: activeLabel.left
-        anchors.leftMargin: gamesGrid.leftInset
+        anchors.leftMargin: games._crtGridLayout && bottomTotalText.visible ? bottomTotalText.x + bottomTotalText.width + 4 : gamesGrid.leftInset
         anchors.verticalCenter: activeLabel.verticalCenter
         text: qsTr("Loading more…")
     }

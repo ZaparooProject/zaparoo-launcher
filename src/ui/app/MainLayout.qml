@@ -283,6 +283,23 @@ ApplicationWindow {
     readonly property string hubScreenState: (Browse.CategoriesModel.error_message ?? "") !== "" ? "error" : (Browse.CategoriesModel.count === 0 ? "empty" : "ready")
 
     readonly property string recentsScreenState: Browse.RecentsModel.loading ? "loading" : ((Browse.RecentsModel.error_message ?? "") !== "" ? "error" : (Browse.RecentsModel.count === 0 ? "empty" : "ready"))
+    readonly property bool _crtGridBrowseLayout: root.crtNativePath && Browse.Settings.current_browse_layout !== "list"
+    readonly property string _crtGamesHeaderTitle: {
+        const sid = Browse.GamesModel.current_system_id;
+        if (sid === "")
+            return "";
+        const idx = Browse.SystemsModel.index_for_system_id(sid);
+        return idx >= 0 ? Browse.SystemsModel.system_name_at(idx) : sid;
+    }
+    readonly property string crtHeaderTitle: {
+        if (!root._crtGridBrowseLayout)
+            return "";
+        if (root.activeScreen === root.screenSystems)
+            return Browse.SystemsModel.current_category;
+        if (root.activeScreen === root.screenGames)
+            return root._crtGamesHeaderTitle;
+        return "";
+    }
 
     signal cancelCardWriteRequested
     signal closeQrCodeRequested
@@ -403,6 +420,7 @@ ApplicationWindow {
             anchors.right: parent.right
             anchors.top: parent.top
             anchors.topMargin: Sizing.headerTopMargin
+            crtTitle: root.crtHeaderTitle
             z: 200
         }
 

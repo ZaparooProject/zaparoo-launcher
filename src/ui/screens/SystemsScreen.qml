@@ -37,6 +37,7 @@ Item {
     // times. The ring restores automatically when the modal pops.
     property bool gridFocused: true
     readonly property bool _listLayout: Browse.Settings.current_browse_layout === "list"
+    readonly property bool _crtGridLayout: Theme.crtNativePath && !systems._listLayout
 
     signal requestAccept(systemId: string)
     signal requestHubScreen
@@ -175,12 +176,12 @@ Item {
         anchors.right: parent.right
         anchors.top: parent.top
         anchors.topMargin: Sizing.headerBottom + Sizing.pctH(1)
-        height: Sizing.pctH(7)
-        title: Browse.SystemsModel.current_category
+        height: systems._crtGridLayout ? 0 : Sizing.pctH(7)
+        title: systems._crtGridLayout ? "" : Browse.SystemsModel.current_category
         currentPage: systemsGrid.currentPage
-        totalPages: Math.max(1, Math.ceil(Browse.SystemsModel.count / systemsGrid.pageSize))
-        totalText: Browse.SystemsModel.count > 0 ? qsTr("%1 systems").arg(Browse.SystemsModel.count) : ""
-        visible: !systems.transitioning
+        totalPages: systems._crtGridLayout ? 1 : Math.max(1, Math.ceil(Browse.SystemsModel.count / systemsGrid.pageSize))
+        totalText: systems._crtGridLayout ? "" : (Browse.SystemsModel.count > 0 ? qsTr("%1 systems").arg(Browse.SystemsModel.count) : "")
+        visible: !systems.transitioning && !systems._crtGridLayout
     }
 
     BrowseList {
@@ -232,9 +233,13 @@ Item {
         anchors.right: parent.right
         anchors.top: topStrip.bottom
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: Sizing.pctH(15)
+        anchors.bottomMargin: systems._crtGridLayout ? Sizing.pctH(6) + Sizing.px(2) + Sizing.pctH(7) : Sizing.pctH(15)
         focused: systems.gridFocused
         model: Browse.SystemsModel
+        leftInsetOverride: systems._crtGridLayout ? 4 : -1
+        rightInsetOverride: systems._crtGridLayout ? 4 : -1
+        gutterWidthOverride: systems._crtGridLayout ? 4 : -1
+        gutterGapOverride: systems._crtGridLayout ? 4 : -1
         delegate: Tile {}
         onItemHovered: index => systems._focusIndex(index)
         onItemClicked: index => {
@@ -262,10 +267,45 @@ Item {
         id: activeLabel
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.top: systemsGrid.bottom
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: systems._crtGridLayout ? Sizing.pctH(6) + Sizing.px(2) : Sizing.pctH(8)
         height: Sizing.pctH(7)
         text: systemsGrid.itemCount > 0 ? Browse.SystemsModel.system_name_at(systemsGrid.currentIndex) : ""
         visible: !systems.transitioning && !systems._listLayout
+    }
+
+    Text {
+        visible: systems._crtGridLayout && !systems.transitioning && Browse.SystemsModel.count > 0
+        anchors.left: parent.left
+        anchors.leftMargin: 4
+        anchors.verticalCenter: activeLabel.verticalCenter
+        width: Sizing.px(parent.width / 3) - 4
+        height: Sizing.fontSize(2.9)
+        elide: Text.ElideRight
+        horizontalAlignment: Text.AlignLeft
+        verticalAlignment: Text.AlignVCenter
+        text: qsTr("%1 systems").arg(Browse.SystemsModel.count)
+        font.family: Theme.fontUi
+        font.pixelSize: Sizing.fontSize(2.9)
+        color: Theme.textPrimary
+        renderType: Text.NativeRendering
+    }
+
+    Text {
+        visible: systems._crtGridLayout && !systems.transitioning && Math.ceil(Browse.SystemsModel.count / systemsGrid.pageSize) > 1
+        anchors.right: parent.right
+        anchors.rightMargin: Sizing.pctW(5)
+        anchors.verticalCenter: activeLabel.verticalCenter
+        width: Sizing.px(parent.width / 3) - Sizing.pctW(5)
+        height: Sizing.fontSize(2.9)
+        elide: Text.ElideRight
+        horizontalAlignment: Text.AlignRight
+        verticalAlignment: Text.AlignVCenter
+        text: qsTr("%1 / %2").arg(systemsGrid.currentPage + 1).arg(Math.max(1, Math.ceil(Browse.SystemsModel.count / systemsGrid.pageSize)))
+        font.family: Theme.fontUi
+        font.pixelSize: Sizing.fontSize(2.9)
+        color: Theme.textPrimary
+        renderType: Text.NativeRendering
     }
 
     ScreenStateOverlay {

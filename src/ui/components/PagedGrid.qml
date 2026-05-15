@@ -163,10 +163,14 @@ Item {
     // not as another cell, so a full inter-cell gap looks like wasted
     // space next to it. The gutter stays reserved on a single page
     // (just hidden) so cells don't reflow when paging activates.
-    readonly property int leftInset: Sizing.pctW(5)
-    readonly property int rightInset: Sizing.pctW(5)
-    readonly property int gutterWidth: Sizing.pctW(3)
-    readonly property int gutterGap: Sizing.pctW(1.5)
+    property int leftInsetOverride: -1
+    property int rightInsetOverride: -1
+    property int gutterWidthOverride: -1
+    property int gutterGapOverride: -1
+    readonly property int leftInset: leftInsetOverride >= 0 ? leftInsetOverride : Sizing.pctW(5)
+    readonly property int rightInset: rightInsetOverride >= 0 ? rightInsetOverride : Sizing.pctW(5)
+    readonly property int gutterWidth: gutterWidthOverride >= 0 ? gutterWidthOverride : Sizing.pctW(3)
+    readonly property int gutterGap: gutterGapOverride >= 0 ? gutterGapOverride : Sizing.pctW(1.5)
     readonly property int topInset: Sizing.pctH(2)
     readonly property int bottomInset: Sizing.pctH(2)
     readonly property int cellSpacingX: Sizing.pctW(3)
